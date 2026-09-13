@@ -259,3 +259,68 @@ detail screen as a sibling tab-level screen) — this is the only
 structure that gives correct back-stack behavior while keeping the tab
 bar visible on the list. Remember to suppress the outer tab screen's own
 header once nested, or the screen renders two stacked headers."
+
+## 10. Every governing citation in a task brief can be wrong at once —
+check them all before assuming at least one anchors correctly
+
+**What happened**: a task brief cited two design-document section numbers
+and seven requirement IDs as its governing documents. On inspection,
+*both* section numbers pointed at unrelated content (one was about push
+notifications, the other about a completely different feature area), and
+of the seven R-IDs, three were generic platform/scope statements unrelated
+to the task, three didn't exist anywhere in the requirements file at all,
+and one was simply the wrong number for the intended requirement (the
+correct one existed under a different number, already flagged as a
+mismatch in an earlier report). Despite this, the actual requested
+behavior was fully and unambiguously specified elsewhere in the same
+design document, just under different section numbers than cited.
+
+**Why it matters generally**: a single wrong citation invites the
+assumption "the rest of the citations are probably fine" — but citation
+drift in a brief (likely from an outdated template or a renumbered
+document) can affect *every* citation at once, not just one. The
+mitigation already established (check whether the design document
+independently specifies the behavior before treating a bad citation as a
+blocker) still holds, but it needs to be applied per-citation, not
+abandoned once one citation turns out to be wrong and the search for the
+*real* location succeeds — each subsequent citation in the same brief
+should be checked with the same skepticism, not assumed correct by
+association with the ones already verified.
+
+**Suggested addition** (target: Design document acceptance): "Verify
+every section/R-ID citation in a task brief independently — do not stop
+checking once one turns out to be wrong (or once the real location is
+found) and assume the rest anchor correctly. Search the design document
+by keyword/feature rather than by the brief's cited numbers alone, and
+report every mismatch found, not just the first."
+
+## 11. A brief's literal UI mechanism ("Alert") can be impossible on the
+target platform even though the underlying interaction is fine
+
+**What happened**: a task brief asked for a two-step confirmation flow
+using a native `Alert`, where the second step required the user to type
+in a value. On the actual target platform (Android-only, per this
+project's own scope), the OS-level alert API has no text-input
+capability at all — the one `Alert` variant in the framework that
+supports a text field is restricted to the other platform, which this
+project explicitly excludes.
+
+**Why it matters generally**: a brief's suggested UI mechanism can be
+platform-specific in a way that isn't obvious from the mechanism's name
+alone ("Alert" sounds cross-platform; the text-input variant of it is
+not). This is a Gate 1 (Environment)-adjacent check that's easy to skip
+because it looks like a UI/UX detail rather than an environment
+constraint — but it's really the same class of check as "does this
+native API exist on the platform we're actually shipping to."
+
+**Suggested addition** (target: Pre-code gates → Gate 1 — Environment /
+Fidelity rules): "When a brief specifies a concrete native UI API by
+name (Alert, a specific picker, a share sheet, etc.), verify that exact
+API variant exists and behaves as described on the project's actual
+target platform(s) before implementing it literally — a platform-scoped
+capability gap in a named API is a Gate 1-class finding, not just an
+implementation detail to route around silently. Implement the closest
+platform-correct equivalent and record the substitution as a Deviation
+with the specific platform limitation cited, rather than either forcing
+the literal API (crashing or no-op'ing on the target platform) or
+silently choosing a different mechanism without comment."
