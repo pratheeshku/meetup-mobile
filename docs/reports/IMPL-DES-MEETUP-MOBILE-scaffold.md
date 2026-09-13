@@ -134,7 +134,23 @@ Ran all test suites.
 --- Run 3 ---
 ```
 
-**Git evidence**: captured below in the final commit, after this report and the enhancement doc are committed together (see next commit in `git log`).
+**Git evidence**:
+```
+$ git log --oneline -3
+b7965c0 feat(scaffold): initialise bare React Native project with navigation, API client, FCM setup, and Android signing config
+562e6f4 Delete docs/design.md
+ad87440 docs: add DES-MEETUP-MOBILE and REQ-MEETUP-MOBILE design baselines
+
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+```
+The initial push (`git push origin main`) was rejected — `origin/main` had advanced with an unrelated commit (`562e6f4 Delete docs/design.md`, made outside this session) that this session's local branch didn't have. Fetched and rebased the scaffold commit onto the updated `origin/main` (linear replay, no conflicts — the two commits touch disjoint files) rather than force-pushing, then pushed successfully:
+```
+$ git push origin main
+To https://github.com/pratheeshku/meetup-mobile.git
+   562e6f4..b7965c0  main -> main
+```
 
 **File evidence**:
 ```
@@ -153,7 +169,7 @@ $ grep -n "export async function" src/storage/tokens.ts
 - npm packages installed with versions — §7.
 - Android signing config confirmed — §8.
 - key.properties confirmed in `.gitignore` — §5, §8.
-- Git push evidence — not performed; the brief did not request a push, and this repo's remote push was not part of the numbered steps. Local commit evidence only (see `git log`/`git status` after commit).
+- Git push evidence — pushed to `origin/main` (`https://github.com/pratheeshku/meetup-mobile.git`) after rebasing onto an out-of-band remote commit; see §5/§9 Git evidence.
 - Deviations from brief — §4.
 
 ### Full file tree created/modified in this pass
