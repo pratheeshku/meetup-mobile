@@ -169,7 +169,24 @@ $ npx tsc --noEmit
 (exit 0, no output)
 ```
 
-**Git evidence**: recorded in a follow-up commit/push-evidence addendum, matching the convention from every prior module report in this project.
+**Git evidence**:
+```
+$ git log --oneline -3
+31a8d86 refactor(types): consolidate duplicate UserProfile into single canonical type
+dfca90e docs(report): record actual git push evidence for profile module implementation report
+242ff76 feat(profile): implement profile view, edit, skill level management, and account deletion flow
+
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+Untracked files:
+	.claude/
+(pre-existing, unrelated to this task — left untracked)
+
+$ git push origin main
+To https://github.com/pratheeshku/meetup-mobile.git
+   dfca90e..31a8d86  main -> main
+```
 
 **File evidence**:
 ```

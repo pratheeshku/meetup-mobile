@@ -1,4 +1,4 @@
-## Status — 2026-09-13T02:10:00Z
+## Status — 2026-09-13T02:10:00Z (ARCHIVED — Implementation Report committed and pushed)
 ### Completed
 - UserProfile type consolidation: canonical superset type in
   src/types/user.ts (id/email/nickname required, role/avatar_url/
