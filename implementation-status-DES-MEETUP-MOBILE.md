@@ -1,27 +1,36 @@
-## Status — 2026-09-13T02:40:00Z (ARCHIVED — Implementation Report committed and pushed)
+## Status — 2026-09-13T03:10:00Z
 ### Completed
-- Groups module: types (src/types/group.ts: Group, GroupDetail,
-  GroupMember, GroupsListResponse), API layer (src/api/groups.ts:
-  getMyGroups/getGroup/inviteMember/updateMemberRole/removeMember),
-  GroupsScreen rebuilt (fetch-on-mount, pull-to-refresh, loading/empty/
-  error states, role badges), GroupDetailScreen (members list, invite,
-  change role owner/admin-gated, remove member, leave group), nested
-  Groups stack navigation wiring (RootNavigator.tsx).
+- Tournaments module: types (src/types/tournament.ts: Tournament,
+  TournamentFixture, TournamentRegistration, TournamentsListResponse),
+  API layer (src/api/tournaments.ts: getTournaments/getTournament/
+  registerForTournament/withdrawFromTournament/getFixtures/
+  getRegistrations/cancelTournament), TournamentsScreen rebuilt
+  (fetch-on-mount, pull-to-refresh, loading/empty/error states,
+  registration badges), TournamentDetailScreen (register/withdraw,
+  registration-closed message, Fixtures/Registrations toggle tabs,
+  organiser cancel), nested Tournaments stack navigation wiring
+  (RootNavigator.tsx).
 - tsc --noEmit clean, eslint clean, jest passing (3x stability run).
-- No auth/events/profile files touched, docs/ untouched, no
-  console.log anywhere, no group-creation code.
-- Resolved a real API-contract gap: brief's GET /groups doesn't exist;
-  sourced getMyGroups() from /settings/groups-owned +
-  /settings/groups-member (§7.5) instead. Also another broken R-ID
-  citation range (R-038-048 don't exist; correct ones are R-030/R-031).
-- Implementation Report committed: docs/reports/IMPL-DES-MEETUP-MOBILE-groups.md
+- No auth/events/profile/groups files touched, docs/ untouched, no
+  console.log anywhere, no creation/result-entry/schedule-generation
+  code.
+- Fourth broken governing-section citation in a row (§4.6/§7.6 are
+  Committee Governance/Notifications, not Tournaments; correct ones
+  are §4.5/§7.7). Also documented a genuine design gap: no Standings/
+  leaderboard endpoint exists anywhere despite being named repeatedly
+  in the design (screen inventory, R-042, notification-type mapping) --
+  this task's own brief sidesteps it (Fixtures+Registrations tabs only,
+  no Standings), so it wasn't a blocker here, but flagged for future
+  work.
+- Implementation Report committed: docs/reports/IMPL-DES-MEETUP-MOBILE-tournaments.md
 
 ### In Progress
-- (none — groups module pass complete)
+- (none — tournaments module pass complete)
 
 ### Pending
 - Handoff to testing agent (fresh session) per skill instructions
-- Follow-ups listed in Implementation Report §6 (Known gaps)
+- Follow-ups listed in Implementation Report §6 (Known gaps), notably
+  the missing Standings endpoint for any future task that needs it
 
 ### Blocked
 - (none)

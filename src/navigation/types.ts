@@ -15,3 +15,9 @@ export type GroupsStackParamList = {
   GroupsList: undefined;
   GroupDetail: { groupId: string };
 };
+
+/** Tournaments tab's nested stack route params (§4.5 — Tournaments list, Tournament Detail). */
+export type TournamentsStackParamList = {
+  TournamentsList: undefined;
+  TournamentDetail: { tournamentId: string };
+};

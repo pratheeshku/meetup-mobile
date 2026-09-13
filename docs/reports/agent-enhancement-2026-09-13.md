@@ -403,3 +403,43 @@ document for the same capability under a different heading (Settings/
 Dashboard/Me-style sections often hold 'the current user's own X'
 endpoints separately from resource X's own CRUD section) before
 concluding no path exists."
+
+## 14. A feature can be mentioned consistently across a design document
+(screen inventory, a requirement, even a notification-type mapping)
+and still have no backing endpoint anywhere in the API contract
+
+**What happened**: a design document referenced a specific feature (a
+computed/aggregated view) by name in at least three independent places —
+a screen inventory entry, a requirement statement explicitly describing
+its data-integrity property, and a push-notification-type-to-screen
+mapping table — with consistent, confident language each time. A
+full-document search for the feature's own API route turned up nothing:
+no endpoint anywhere provides the data that view would need to render.
+Two of the three ways to build it anyway were both independently
+forbidden — one by the "nothing invented" fidelity rule (no undocumented
+endpoint), the other by the very requirement that named the feature (no
+client-side computation of exactly this kind of data).
+
+**Why it matters generally**: repetition across a design document is not
+the same evidence as a concrete route existing — a feature can be
+"real" in every prose sense (the architect clearly intends it, refers
+to it by a stable name, ties it into notification routing) while still
+being an unbuilt or under-specified backend capability. Don't let
+multiple *consistent* mentions substitute for checking the one place
+that actually matters for implementation: the API contract table. This
+is a stronger and subtly different check than #13 (missing endpoint
+under the resource's own heading) — here, the gap isn't that the
+endpoint lives elsewhere in the document, it's that it doesn't exist
+anywhere in the document at all, despite the feature being named
+repeatedly.
+
+**Suggested addition** (target: Design document acceptance / Propose &
+Proceed): "When a design document names a specific feature in its
+screen inventory, a requirement, or any cross-reference table (not just
+the resource's own API contract section), still verify a concrete
+endpoint exists for it before treating it as buildable — consistent
+mentions across multiple sections is not proof a route exists. If no
+task in the current scope actually requires building that specific
+feature, it's not a blocker — flag the gap for whichever future task
+does need it, rather than resolving it now via an invented endpoint or
+a forbidden client-side computation."

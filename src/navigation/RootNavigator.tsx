@@ -8,16 +8,15 @@
  * part of this pass — this component remains the intended extension
  * point.
  *
- * The Home and Groups tabs each wrap a nested native-stack (`HomeStack`,
- * `GroupsStack`) rather than rendering their list screen directly, so
- * each can push a detail screen with correct back navigation while the
- * bottom tab bar stays available on the list itself. `headerShown:
- * false` on those tab screens avoids a duplicate header (the tab
- * navigator's own plus the nested stack's).
+ * The Home, Groups, and Tournaments tabs each wrap a nested native-stack
+ * (`HomeStack`, `GroupsStack`, `TournamentsStack`) rather than rendering
+ * their list screen directly, so each can push a detail screen with
+ * correct back navigation while the bottom tab bar stays available on
+ * the list itself. `headerShown: false` on those tab screens avoids a
+ * duplicate header (the tab navigator's own plus the nested stack's).
  *
- * No other App Stack screen carries feature logic yet — Tournaments and
- * Profile's tab wrapper remain as before (Profile itself is a full
- * screen, just not nested in a stack — see its own module).
+ * Profile remains a full screen, not nested in a stack — see its own
+ * module.
  */
 import React from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
@@ -26,7 +25,12 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { useAuth } from '../auth/AuthContext';
-import type { AuthStackParamList, GroupsStackParamList, HomeStackParamList } from './types';
+import type {
+  AuthStackParamList,
+  GroupsStackParamList,
+  HomeStackParamList,
+  TournamentsStackParamList,
+} from './types';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -35,11 +39,13 @@ import EventDetailScreen from '../screens/EventDetailScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import TournamentsScreen from '../screens/TournamentsScreen';
+import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
 const GroupsStackNav = createNativeStackNavigator<GroupsStackParamList>();
+const TournamentsStackNav = createNativeStackNavigator<TournamentsStackParamList>();
 const AppTabsNav = createBottomTabNavigator();
 
 function AuthStack(): React.JSX.Element {
@@ -77,12 +83,33 @@ function GroupsStack(): React.JSX.Element {
   );
 }
 
+function TournamentsStack(): React.JSX.Element {
+  return (
+    <TournamentsStackNav.Navigator>
+      <TournamentsStackNav.Screen
+        name="TournamentsList"
+        component={TournamentsScreen}
+        options={{ title: 'Tournaments' }}
+      />
+      <TournamentsStackNav.Screen
+        name="TournamentDetail"
+        component={TournamentDetailScreen}
+        options={{ title: 'Tournament' }}
+      />
+    </TournamentsStackNav.Navigator>
+  );
+}
+
 function AppStack(): React.JSX.Element {
   return (
     <AppTabsNav.Navigator>
       <AppTabsNav.Screen name="Home" component={HomeStack} options={{ headerShown: false }} />
       <AppTabsNav.Screen name="Groups" component={GroupsStack} options={{ headerShown: false }} />
-      <AppTabsNav.Screen name="Tournaments" component={TournamentsScreen} />
+      <AppTabsNav.Screen
+        name="Tournaments"
+        component={TournamentsStack}
+        options={{ headerShown: false }}
+      />
       <AppTabsNav.Screen name="Profile" component={ProfileScreen} />
     </AppTabsNav.Navigator>
   );
