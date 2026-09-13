@@ -1,0 +1,7 @@
+## Placeholder only — copy to android/key.properties and fill in with your
+## own release keystore values. android/key.properties is gitignored and
+## must never be committed (P10; DES-MEETUP-MOBILE.md §3.11).
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=REPLACE_ME
+storeFile=REPLACE_ME_ABSOLUTE_PATH_TO_KEYSTORE
