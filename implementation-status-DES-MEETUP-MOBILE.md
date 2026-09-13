@@ -1,4 +1,4 @@
-## Status — 2026-09-13T01:15:00Z
+## Status — 2026-09-13T01:15:00Z (ARCHIVED — Implementation Report committed and pushed)
 ### Completed
 - Events module: types (src/types/event.ts), API layer (src/api/events.ts:
   getEvents/getEvent/rsvpEvent/withdrawEvent/cancelEvent), events feed
