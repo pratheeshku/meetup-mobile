@@ -144,7 +144,24 @@ $ npx tsc --noEmit
 (exit 0, no output)
 ```
 
-**Git evidence**: recorded in a follow-up commit/push-evidence addendum, matching the convention from the auth and events module reports.
+**Git evidence**:
+```
+$ git log --oneline -3
+242ff76 feat(profile): implement profile view, edit, skill level management, and account deletion flow
+d529c26 docs(report): record actual git push evidence for events module implementation report
+9c61411 feat(events): implement events feed, detail, RSVP, withdraw, and organiser cancel flows
+
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+Untracked files:
+	.claude/
+(pre-existing, unrelated to this task — left untracked)
+
+$ git push origin main
+To https://github.com/pratheeshku/meetup-mobile.git
+   d529c26..242ff76  main -> main
+```
 
 **File evidence**:
 ```
