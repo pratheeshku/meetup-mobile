@@ -169,7 +169,24 @@ $ npx tsc --noEmit
 (exit 0, no output)
 ```
 
-**Git evidence** — see the commit created alongside this report; `git log --oneline -3` and `git status` will be pasted into the follow-up commit-confirmation message per session convention.
+**Git evidence**:
+```
+$ git log --oneline -3
+0d7797e feat(auth): implement Google OAuth and email/password auth module with login, registration, and logout flows
+ac2012b fix(deps): replace unmaintained react-native-camera with react-native-vision-camera v4
+68a7721 feat(android): wire Firebase Google Services Gradle plugin for FCM support
+
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+Untracked files:
+	.claude/
+(pre-existing, unrelated to this task — left untracked)
+
+$ git push origin main
+To https://github.com/pratheeshku/meetup-mobile.git
+   ac2012b..0d7797e  main -> main
+```
 
 **File evidence**:
 ```

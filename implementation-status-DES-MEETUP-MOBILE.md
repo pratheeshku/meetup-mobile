@@ -1,4 +1,4 @@
-## Status — 2026-09-13T00:45:00Z
+## Status — 2026-09-13T00:45:00Z (ARCHIVED — Implementation Report committed and pushed)
 ### Completed
 - Full auth module: Google OAuth (googleAuth.ts), email/password
   sign-in/registration (emailAuth.ts), AuthContext (session restore,
