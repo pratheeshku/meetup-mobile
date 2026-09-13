@@ -8,7 +8,8 @@
  */
 import { apiClient } from '../api/client';
 import { saveTokens } from '../storage/tokens';
-import type { AuthResponse, UserProfile } from './types';
+import type { AuthResponse } from './types';
+import type { UserProfile } from '../types/user';
 
 /** Signs in with email/password (R-012) and stores the returned tokens. */
 export async function login(email: string, password: string): Promise<UserProfile> {

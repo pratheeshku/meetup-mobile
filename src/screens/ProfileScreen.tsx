@@ -243,6 +243,14 @@ export default function ProfileScreen(): React.JSX.Element {
     );
   }
 
+  // `skill_levels` is optional on the canonical `UserProfile` type (it's
+  // only present in this module's original shape, pre-consolidation —
+  // see docs/reports/IMPL-DES-MEETUP-MOBILE-types-consolidation.md).
+  // Treated as empty when absent; no behavioral change versus before the
+  // consolidation, since the actual `GET /users/me` response always
+  // includes it in practice (Proposed Assumption, unchanged).
+  const skillLevels = profile.skill_levels ?? [];
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.header}>
@@ -309,10 +317,10 @@ export default function ProfileScreen(): React.JSX.Element {
           ) : null}
         </View>
 
-        {profile.skill_levels.length === 0 ? (
+        {skillLevels.length === 0 ? (
           <Text style={styles.emptyText}>No skill levels declared yet.</Text>
         ) : (
-          profile.skill_levels.map(item => (
+          skillLevels.map(item => (
             <Pressable
               key={item.sport}
               style={styles.skillLevelRow}

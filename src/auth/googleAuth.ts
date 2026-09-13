@@ -42,7 +42,8 @@ import { apiClient } from '../api/client';
 import { saveTokens, clearTokens } from '../storage/tokens';
 import { withCorrelationId } from '../api/correlationId';
 import { deregisterDeviceToken } from '../notifications/fcm';
-import type { AuthResponse, UserProfile } from './types';
+import type { AuthResponse } from './types';
+import type { UserProfile } from '../types/user';
 
 let isConfigured = false;
 

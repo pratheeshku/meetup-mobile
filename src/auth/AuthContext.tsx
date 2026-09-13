@@ -23,7 +23,7 @@ import { authEvents } from '../api/authEvents';
 import { getAccessToken } from '../storage/tokens';
 import { configureGoogleSignIn, signIn as googleSignIn, signOut as sharedSignOut } from './googleAuth';
 import { login as emailLogin, register as emailRegister } from './emailAuth';
-import type { UserProfile } from './types';
+import type { UserProfile } from '../types/user';
 
 interface AuthContextValue {
   user: UserProfile | null;

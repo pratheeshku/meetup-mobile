@@ -1,27 +1,22 @@
 /**
  * Shared auth-domain types (DES-MEETUP-MOBILE.md §3.10, §4.2, §7.1, §7.2).
  *
- * Proposed Assumption: the exact response body of `GET /users/me`,
- * `POST /auth/login`, `POST /auth/register`, and
- * `POST /auth/oauth/google/callback` is not specified in the local
- * design excerpt — §7.1/§7.2 list method/path/auth-required/notes only,
- * no body schemas, and the parent backend design (DES-MEETUP.md) is not
- * available in this repo (same gap already recorded against
- * `POST /auth/refresh` in `src/api/client.ts`).
+ * `UserProfile` used to be defined locally in this file. It's now the
+ * canonical type in `src/types/user.ts` (consolidated with the profile
+ * module's independently-grown definition of the same `GET /users/me`
+ * response — see `docs/reports/IMPL-DES-MEETUP-MOBILE-types-consolidation.md`).
+ * Re-exported here only via the `AuthResponse` field below; import
+ * `UserProfile` itself from `../types/user`.
  *
- * `UserProfile.role` is the one field §3.10 explicitly requires
- * ("`useRole()` hook backed by `GET /users/me`'s `role` field", gating
- * organiser/admin screens per R-017/R-082). The rest of the shape is a
- * conservative, minimal read of what the login/register/profile screens
- * in this task need. Correct against the actual backend contract on
- * conformance review.
+ * Proposed Assumption (carried over, unchanged by the consolidation):
+ * the exact response body of `GET /users/me`, `POST /auth/login`,
+ * `POST /auth/register`, and `POST /auth/oauth/google/callback` is not
+ * specified in the local design excerpt — §7.1/§7.2 list method/path/
+ * auth-required/notes only, no body schemas, and the parent backend
+ * design (DES-MEETUP.md) is not available in this repo (same gap
+ * already recorded against `POST /auth/refresh` in `src/api/client.ts`).
  */
-export interface UserProfile {
-  id: string;
-  email: string;
-  nickname: string;
-  role: 'participant' | 'organiser' | 'admin';
-}
+import type { UserProfile } from '../types/user';
 
 /**
  * Shared response shape for the three endpoints that establish a session:

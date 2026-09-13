@@ -1,25 +1,25 @@
-## Status — 2026-09-13T01:45:00Z (ARCHIVED — Implementation Report committed and pushed)
+## Status — 2026-09-13T02:10:00Z
 ### Completed
-- Profile module: types (src/types/user.ts), API layer (src/api/profile.ts:
-  getProfile/updateProfile/updateSkillLevel/requestDeletion/confirmDeletion),
-  ProfileScreen rebuilt (avatar/nickname/email display, inline nickname
-  edit, skill levels list + add/edit form, sign out, two-step account
-  deletion flow with Alert + inline confirmation-code entry).
+- UserProfile type consolidation: canonical superset type in
+  src/types/user.ts (id/email/nickname required, role/avatar_url/
+  is_admin/created_at/skill_levels optional), duplicate removed from
+  src/auth/types.ts, all import sites updated (googleAuth.ts,
+  emailAuth.ts, AuthContext.tsx). One necessary null-safety fix in
+  ProfileScreen.tsx (profile.skill_levels -> skillLevels with ?? []
+  fallback) to keep tsc clean after the optionality change — no
+  behavior change.
 - tsc --noEmit clean, eslint clean, jest passing (3x stability run).
-- No auth files, events files, or docs/ touched. No console.log anywhere
-  in new code.
-- Governing-document citation mismatches investigated and documented
-  (both cited design sections and 6 of 7 cited R-IDs were wrong/missing;
-  actual behavior located via §4.13/§7.2/R-124).
-- Implementation Report committed: docs/reports/IMPL-DES-MEETUP-MOBILE-profile.md
+- No business logic, API calls, or UI behavior changed beyond the one
+  documented type-safety shim.
+- Implementation Report committed: docs/reports/IMPL-DES-MEETUP-MOBILE-types-consolidation.md
 
 ### In Progress
-- (none — profile module pass complete)
+- (none — consolidation pass complete)
 
 ### Pending
 - Handoff to testing agent (fresh session) per skill instructions
-- Follow-ups listed in Implementation Report §6 (Known gaps), notably
-  the two-divergent-UserProfile-type consolidation
+- Follow-up: re-verify actual GET /users/me backend shape and tighten
+  fields back to required where guaranteed (Implementation Report §7)
 
 ### Blocked
 - (none)

@@ -324,3 +324,43 @@ platform-correct equivalent and record the substitution as a Deviation
 with the specific platform limitation cited, rather than either forcing
 the literal API (crashing or no-op'ing on the target platform) or
 silently choosing a different mechanism without comment."
+
+## 12. "Make fields optional where they differ" can force a mechanical
+fix at existing call sites even under a strict "no behavior change" rule
+
+**What happened**: a task explicitly instructed merging two divergent
+type shapes by making every non-common field optional, under a rule
+that otherwise forbade any business-logic, API, or UI-behavior change.
+Applying the merge exactly as instructed broke the type checker at an
+existing call site that had (correctly, at the time) assumed one of
+those fields was always present — the type system now honestly reported
+what the merge instruction had just made true. A one-line null-coalescing
+fallback fixed it with no actual runtime behavior change (the field is
+still always present in practice, per the same assumption already on
+record), but *some* code edit beyond the type files themselves was
+unavoidable.
+
+**Why it matters generally**: a "type-only, no behavior change" framing
+for a task can be in tension with its own explicit instructions once
+those instructions are followed literally — widening a type's
+optionality is itself a behavior-relevant change from the type checker's
+point of view, even when the underlying runtime data never actually
+changes. Refusing to touch the consuming file to preserve a narrow reading
+of "no logic changes" would leave the task's own mandatory verification
+step (`tsc --noEmit` passing) failing — the stricter deliverable
+(compiles clean) has to win over the narrower one (touch nothing outside
+the type files) when they conflict, and the fix should be the smallest
+one that changes zero observable behavior (a `?? []`/`?? undefined`-style
+guard, not a rewritten code path).
+
+**Suggested addition** (target: Fidelity rules / Propose & Proceed):
+"When a scoped refactor's own instructions (e.g. 'make these fields
+optional') will mechanically break type-checking at existing call sites,
+treat the resulting minimal, behavior-preserving fix (a null/undefined
+guard, not a logic rewrite) as an in-scope, required part of the same
+task — not a rule violation and not a separate blocked item — since the
+task's own mandatory verification step (a clean type-check) cannot be
+satisfied otherwise. Document the specific fix and why it changes no
+observable behavior in the Implementation Report's Deviations section
+rather than silently including it as if no edit were needed outside the
+type files."
