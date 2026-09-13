@@ -1,6 +1,12 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+// react-native-config: reads the repo-root .env file at build time and
+// exposes its values to JS via Config.* and to native code via BuildConfig.
+// Autolinked (RN >=0.60) — do not add manual settings.gradle/MainApplication
+// linking for this library; that would leave the JS module resolving to
+// null at runtime (see the library's own README warning).
+apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
 
 import java.util.Properties
 import java.io.FileInputStream
@@ -98,6 +104,12 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // Explicit per react-native-config's "Advanced Android Setup": this
+        // project's namespace and applicationId are already identical, so
+        // the library's automatic BuildConfig-package resolution would find
+        // this without it — set explicitly anyway for robustness against a
+        // future flavor/applicationIdSuffix split.
+        resValue "string", "build_config_package", "com.meetupmobile"
     }
     signingConfigs {
         debug {
