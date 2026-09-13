@@ -127,7 +127,24 @@ $ npx tsc --noEmit
 (exit 0, no output)
 ```
 
-**Git evidence**: recorded in a follow-up commit/push-evidence addendum, matching the convention from every prior module report in this project.
+**Git evidence**:
+```
+$ git log --oneline -3
+87840de feat(groups): implement groups list, detail, member invite, role management, and remove flows
+d9f54e9 docs(report): record actual git push evidence for types consolidation implementation report
+31a8d86 refactor(types): consolidate duplicate UserProfile into single canonical type
+
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+Untracked files:
+	.claude/
+(pre-existing, unrelated to this task — left untracked)
+
+$ git push origin main
+To https://github.com/pratheeshku/meetup-mobile.git
+   d9f54e9..87840de  main -> main
+```
 
 **File evidence**:
 ```

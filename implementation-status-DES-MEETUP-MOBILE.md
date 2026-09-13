@@ -1,4 +1,4 @@
-## Status — 2026-09-13T02:40:00Z
+## Status — 2026-09-13T02:40:00Z (ARCHIVED — Implementation Report committed and pushed)
 ### Completed
 - Groups module: types (src/types/group.ts: Group, GroupDetail,
   GroupMember, GroupsListResponse), API layer (src/api/groups.ts:
