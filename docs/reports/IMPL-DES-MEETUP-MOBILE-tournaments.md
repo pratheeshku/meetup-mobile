@@ -133,7 +133,24 @@ $ npx tsc --noEmit
 (exit 0, no output)
 ```
 
-**Git evidence**: recorded in a follow-up commit/push-evidence addendum, matching the convention from every prior module report in this project.
+**Git evidence**:
+```
+$ git log --oneline -3
+c3761b5 feat(tournaments): implement tournaments list, detail, register, withdraw, fixtures and standings views
+2a7fc64 docs(report): record actual git push evidence for groups module implementation report
+87840de feat(groups): implement groups list, detail, member invite, role management, and remove flows
+
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+Untracked files:
+	.claude/
+(pre-existing, unrelated to this task — left untracked)
+
+$ git push origin main
+To https://github.com/pratheeshku/meetup-mobile.git
+   2a7fc64..c3761b5  main -> main
+```
 
 **File evidence**:
 ```

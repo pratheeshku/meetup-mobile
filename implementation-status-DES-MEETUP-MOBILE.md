@@ -1,4 +1,4 @@
-## Status — 2026-09-13T03:10:00Z
+## Status — 2026-09-13T03:10:00Z (ARCHIVED — Implementation Report committed and pushed)
 ### Completed
 - Tournaments module: types (src/types/tournament.ts: Tournament,
   TournamentFixture, TournamentRegistration, TournamentsListResponse),
