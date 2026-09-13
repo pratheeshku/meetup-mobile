@@ -9,3 +9,9 @@ export type HomeStackParamList = {
   EventsList: undefined;
   EventDetail: { eventId: string };
 };
+
+/** Groups tab's nested stack route params (§4.4 — Groups list, Group Detail). */
+export type GroupsStackParamList = {
+  GroupsList: undefined;
+  GroupDetail: { groupId: string };
+};

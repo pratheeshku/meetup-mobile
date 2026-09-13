@@ -364,3 +364,42 @@ satisfied otherwise. Document the specific fix and why it changes no
 observable behavior in the Implementation Report's Deviations section
 rather than silently including it as if no edit were needed outside the
 type files."
+
+## 13. A missing endpoint in an API contract table is easier to spot —
+and resolve — by comparing it against an analogous resource in the same
+table, and by searching other sections before assuming it's absent
+
+**What happened**: a task brief asked for a "list the current user's
+[resource]" call against a specific bare collection endpoint. That exact
+endpoint didn't exist anywhere in the design's API contract table for
+that resource — only a create and a single-item-detail endpoint did.
+The same table, a few rows down, listed a bare list endpoint for a
+structurally analogous resource. That asymmetry was the tell that the
+missing endpoint wasn't just an editorial gap in an otherwise-complete
+table. A search of a *different* section of the same document (grouped
+by feature area, not by resource) turned up the actual two endpoints
+needed to reconstruct the requested listing.
+
+**Why it matters generally**: a design document's API contract is often
+organized by primary resource (Events, Groups, Users), but a specific
+capability (e.g. "the current user's own groups," "the current user's
+own events") can live in a different section organized by feature
+(Settings, Dashboard, Me) rather than under the resource's own heading.
+Concluding "this endpoint doesn't exist, therefore I must invent one or
+follow the brief's guess literally" without a full-document search for
+the capability under a different heading skips a cheap, high-value check.
+Comparing the resource's row-set against a structurally similar resource
+in the same table is also a fast way to notice an asymmetric gap is
+probably deliberate, not accidental.
+
+**Suggested addition** (target: Design document acceptance / Fidelity
+rules): "When a task brief asks for an endpoint that doesn't appear
+under its resource's own section in the API contract, before treating
+it as invented or assuming the brief is simply wrong: (1) check whether
+a structurally analogous resource in the same table has the endpoint
+the current one is missing — an asymmetry is a signal the gap is
+deliberate, not an editorial oversight; (2) search the rest of the
+document for the same capability under a different heading (Settings/
+Dashboard/Me-style sections often hold 'the current user's own X'
+endpoints separately from resource X's own CRUD section) before
+concluding no path exists."

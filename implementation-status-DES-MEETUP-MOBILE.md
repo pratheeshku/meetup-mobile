@@ -1,25 +1,27 @@
-## Status — 2026-09-13T02:10:00Z (ARCHIVED — Implementation Report committed and pushed)
+## Status — 2026-09-13T02:40:00Z
 ### Completed
-- UserProfile type consolidation: canonical superset type in
-  src/types/user.ts (id/email/nickname required, role/avatar_url/
-  is_admin/created_at/skill_levels optional), duplicate removed from
-  src/auth/types.ts, all import sites updated (googleAuth.ts,
-  emailAuth.ts, AuthContext.tsx). One necessary null-safety fix in
-  ProfileScreen.tsx (profile.skill_levels -> skillLevels with ?? []
-  fallback) to keep tsc clean after the optionality change — no
-  behavior change.
+- Groups module: types (src/types/group.ts: Group, GroupDetail,
+  GroupMember, GroupsListResponse), API layer (src/api/groups.ts:
+  getMyGroups/getGroup/inviteMember/updateMemberRole/removeMember),
+  GroupsScreen rebuilt (fetch-on-mount, pull-to-refresh, loading/empty/
+  error states, role badges), GroupDetailScreen (members list, invite,
+  change role owner/admin-gated, remove member, leave group), nested
+  Groups stack navigation wiring (RootNavigator.tsx).
 - tsc --noEmit clean, eslint clean, jest passing (3x stability run).
-- No business logic, API calls, or UI behavior changed beyond the one
-  documented type-safety shim.
-- Implementation Report committed: docs/reports/IMPL-DES-MEETUP-MOBILE-types-consolidation.md
+- No auth/events/profile files touched, docs/ untouched, no
+  console.log anywhere, no group-creation code.
+- Resolved a real API-contract gap: brief's GET /groups doesn't exist;
+  sourced getMyGroups() from /settings/groups-owned +
+  /settings/groups-member (§7.5) instead. Also another broken R-ID
+  citation range (R-038-048 don't exist; correct ones are R-030/R-031).
+- Implementation Report committed: docs/reports/IMPL-DES-MEETUP-MOBILE-groups.md
 
 ### In Progress
-- (none — consolidation pass complete)
+- (none — groups module pass complete)
 
 ### Pending
 - Handoff to testing agent (fresh session) per skill instructions
-- Follow-up: re-verify actual GET /users/me backend shape and tighten
-  fields back to required where guaranteed (Implementation Report §7)
+- Follow-ups listed in Implementation Report §6 (Known gaps)
 
 ### Blocked
 - (none)
