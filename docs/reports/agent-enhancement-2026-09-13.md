@@ -195,3 +195,67 @@ so, ask a specific, self-contained question first rather than defaulting
 to a full stop-and-document Blocked Report. Reserve the formal Blocked
 Report for gaps that need research, approval from someone not present, or
 that block the entire task rather than one isolated piece."
+
+## 8. A task brief can cite requirement IDs that don't exist in the
+canonical requirements baseline — check the design document's explicit
+content before treating this as a blocker
+
+**What happened**: a task brief listed two R-IDs among its "governing
+requirements" that, on a full-document grep, simply didn't exist
+anywhere in the single canonical requirements file. The requested
+behavior itself (two specific state-transition actions) was, however,
+fully and unambiguously specified in the governing design document's own
+endpoint list and screen inventory — just not tied to a requirement
+number matching what the brief cited.
+
+**Why it matters generally**: a missing/wrong R-ID citation in a task
+brief is a traceability-numbering problem, not automatically a
+behavioral gap. Treating every citation mismatch as a CRITICAL blocker
+would stop well-specified work over a clerical issue. The right check is
+whether the *design document* (the actual source of truth for
+behavior/contracts per the fidelity rules) already specifies the
+requested behavior unambiguously — if it does, proceed and flag the
+numbering gap as a Proposed-Assumption-adjacent note for the
+architect to reconcile in the requirements baseline; only escalate to a
+Blocked Report if the design document itself is silent or ambiguous on
+the actual behavior, not merely on which R-ID owns it.
+
+**Suggested addition** (target: Design document acceptance / Propose &
+Proceed): "When a task brief cites an R-ID that doesn't exist in the
+requirements baseline, check whether the governing design document
+independently and unambiguously specifies the requested behavior
+(endpoint, screen, field). If it does, this is a requirements-baseline
+traceability gap — proceed, and record it as a note for the architect to
+reconcile, not a Blocked Report. Escalate only if the design document is
+also silent or ambiguous on the underlying behavior."
+
+## 9. List screens with a detail push need a nested stack navigator
+inside their tab, not a bare tab screen
+
+**What happened**: a task brief asked for a list screen (one tab of a
+bottom-tabs navigator) to navigate to a new detail screen "with back
+navigation working correctly," without specifying the navigator
+structure. A bottom-tabs navigator has no back-stack concept per tab on
+its own — pushing a second screen onto a tab requires nesting a
+native-stack navigator inside that tab and rendering the stack as the
+tab's component, not adding the detail screen as a sibling tab-level
+screen.
+
+**Why it matters generally**: this is a well-known React Navigation
+pattern, but a brief that just says "add screen X to the tab stack" and
+"back navigation should work" doesn't spell out the nesting requirement
+— it's easy to read literally as "add another screen to the same
+navigator" and get either broken back-navigation or an unwanted item
+appearing in the tab bar. The nested-stack requirement also has a
+follow-on consequence worth remembering: the outer tab screen needs
+`headerShown: false` (or equivalent) to avoid a duplicate header stacking
+the tab navigator's own header on top of the nested stack's.
+
+**Suggested addition** (target: Fidelity rules / Pre-code gates → Gate 3
+— Task confirmation): "When a brief asks for 'list screen navigates to
+detail screen, back navigation works correctly' inside a tab-based app,
+default to nesting a stack navigator inside that tab (not adding the
+detail screen as a sibling tab-level screen) — this is the only
+structure that gives correct back-stack behavior while keeping the tab
+bar visible on the list. Remember to suppress the outer tab screen's own
+header once nested, or the screen renders two stacked headers."

@@ -1,21 +1,21 @@
-## Status — 2026-09-13T00:45:00Z (ARCHIVED — Implementation Report committed and pushed)
+## Status — 2026-09-13T01:15:00Z
 ### Completed
-- Full auth module: Google OAuth (googleAuth.ts), email/password
-  sign-in/registration (emailAuth.ts), AuthContext (session restore,
-  auth-expired handling), Login/Register screens, AuthProvider wiring
-  into App.tsx/RootNavigator, FCM de-registration primitive for
-  R-030-ordered sign-out, GOOGLE_WEB_CLIENT_ID config wiring.
+- Events module: types (src/types/event.ts), API layer (src/api/events.ts:
+  getEvents/getEvent/rsvpEvent/withdrawEvent/cancelEvent), events feed
+  (HomeScreen.tsx rebuilt: fetch-on-mount, pull-to-refresh, loading/empty/
+  error states, RSVP badge), Event Detail screen (RSVP/Leave/Cancel flows,
+  waitlist indicator, recurring badge, cost display), nested Home stack
+  navigation wiring (RootNavigator.tsx), date/time formatting helper.
 - tsc --noEmit clean, eslint clean, jest passing (3x stability run).
-- Implementation Report committed: docs/reports/IMPL-DES-MEETUP-MOBILE-auth.md
-- Enhancement notes appended: docs/reports/agent-enhancement-2026-09-13.md
+- No auth files touched, docs/ untouched.
+- Implementation Report committed: docs/reports/IMPL-DES-MEETUP-MOBILE-events.md
 
 ### In Progress
-- (none — auth module pass complete)
+- (none — events module pass complete)
 
 ### Pending
 - Handoff to testing agent (fresh session) per skill instructions
-- Architect ratification of the Google Sign-In SDK deviation (Implementation Report §4.1)
 - Follow-ups listed in Implementation Report §6 (Known gaps)
 
 ### Blocked
-- (none — both blockers hit mid-session were resolved in-session by the user: Google SDK approach confirmed, GOOGLE_WEB_CLIENT_ID value supplied)
+- (none)
