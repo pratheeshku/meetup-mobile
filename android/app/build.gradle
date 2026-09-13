@@ -154,3 +154,9 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Applied last, per Google's documented convention: reads
+// android/app/google-services.json (gitignored — see .gitignore; never
+// committed) to configure @react-native-firebase/app and
+// @react-native-firebase/messaging (FCM) for this app module.
+apply plugin: 'com.google.gms.google-services'
