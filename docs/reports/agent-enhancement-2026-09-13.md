@@ -102,3 +102,96 @@ generated config values (min OS version, default permissions, etc.)
 against every numbered Assumption and R-ID in the design/requirements
 baseline that pins a concrete config value — do not assume generator
 defaults are compatible with already-decided requirements."
+
+## 5. A design document's characterization of a third-party package's
+technical capability can be factually wrong, and reads as authoritative
+until checked empirically
+
+**What happened**: the governing design named a specific implementation
+vehicle for a feature — "the Universal Sign-In API of `<package>`,
+Google's current, recommended replacement for the deprecated legacy
+module" — as an architecture decision with rationale and rejected
+alternatives, reading exactly like a verified technical fact. Installing
+the named package and reading its own README surfaced a direct
+contradiction: the free package explicitly still uses the "legacy" SDK
+the design said it replaced; the modern API the design described is a
+different, commercial product from the same author, not a mode of the
+installed package. Confirmed further by grepping the package's native
+Android source for the actual imports used.
+
+**Why it matters generally**: a design document's authority (source of
+truth for behavior/contracts) is not the same as its correctness about
+external facts (a package's current capabilities, licensing model, or
+API surface). Confident, specific-sounding design language about a
+third-party dependency can still be stale or wrong — package APIs and
+product tiers change after a design is approved. Gate 2's dependency
+audit checks versions/conflicts but not whether the design's *claims*
+about a dependency's capabilities still hold.
+
+**Suggested addition** (target: Pre-code gates → Gate 2 — Dependency
+audit): "When the design document asserts a specific technical capability
+of a named third-party package (not just 'use package X' but 'X does Y
+via mechanism Z'), verify that claim against the installed package's own
+current documentation and, for native modules, its actual native source
+— before writing code against it. If the claim doesn't hold, this is a
+CRITICAL/HIGH gap (architecture + security/cost) requiring a Blocked
+Report or explicit user sign-off, not a silent implementation against
+either the design's stale claim or the brief's literal (possibly
+equally-uninformed) instruction."
+
+## 6. Wiring a previously-inert module into the render tree can silently
+break test coverage that never caught the underlying Jest-mock gap
+
+**What happened**: a config-reading module and a Firebase module both
+existed in the codebase already, imported by nothing in the app's actual
+render tree, so a prior smoke test passed even though the config
+module's real implementation throws outright under Jest (native
+TurboModule not registered) and the Firebase module was never mocked.
+Wiring an unrelated feature (auth) into `App.tsx` pulled both into the
+render tree transitively for the first time, and the existing test would
+have started failing immediately without additions to the Jest native
+-module mock set.
+
+**Why it matters generally**: "the test suite is green" is only informative
+about the code paths a test actually exercises. A module that compiles and
+type-checks cleanly can still be one import-graph change away from a
+runtime throw that no existing test would have caught, because nothing
+ever imported it inside a rendered tree. This is a blind spot Gate 3's
+"existing patterns grepped" step doesn't currently prompt for.
+
+**Suggested addition** (target: Debugging discipline / Test data hygiene):
+"When wiring a new module into an existing render tree (e.g. a Context
+Provider into `App.tsx`), check every transitive import it newly pulls in
+for native-module Jest-mock coverage before assuming the existing test
+suite protects you — a previously-passing smoke test can mean 'this path
+was never exercised,' not 'this path works under Jest.'"
+
+## 7. A missing pre-implementation credential gate is often faster to
+resolve by asking the reachable user directly than by writing a Blocked
+Report
+
+**What happened**: a design's own requirements baseline named a specific
+credential-provisioning step as a formal pre-implementation gate, and the
+file the task brief pointed to for that credential was empty (the
+credential had not actually been provisioned yet, contrary to what the
+gate's "CLOSED" status in the design implied). In an interactive session
+with the actual user reachable, asking a direct, specific question
+("here's exactly what's missing and where I looked — do you have it?")
+resolved the blocker in one turn, versus a formal Blocked Report that
+would have stopped all work pending an asynchronous response.
+
+**Why it matters generally**: the Blocked Report format is designed for
+async/unattended handoff to an architect. When the session is interactive
+and the missing input is something the user plausibly has on hand (an API
+key, a credential, a config value), a direct, well-scoped question costs
+one turn and keeps momentum; a full Blocked Report is the right tool when
+the answer requires research or isn't the immediate user's to give.
+
+**Suggested addition** (target: Blocked Report format / Propose & Proceed):
+"Before issuing a Blocked Report in an interactive session, consider
+whether the missing input is something the present user is likely to have
+directly (a credential, a config value, a yes/no architecture call) — if
+so, ask a specific, self-contained question first rather than defaulting
+to a full stop-and-document Blocked Report. Reserve the formal Blocked
+Report for gaps that need research, approval from someone not present, or
+that block the entire task rather than one isolated piece."

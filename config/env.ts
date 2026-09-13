@@ -16,4 +16,8 @@ import Config from 'react-native-config';
 export const ENV = {
   API_BASE_URL: Config.API_BASE_URL ?? 'https://meetups.duckdns.org',
   CORRELATION_ID_HEADER: 'X-Correlation-ID',
+  // OAuth client ID for Google Sign-In (R-010, R-018). Never a secret in
+  // the OAuth-client sense (it's not a client *secret*), but still kept
+  // config-driven rather than hardcoded per P1/§3.11.
+  GOOGLE_WEB_CLIENT_ID: Config.GOOGLE_WEB_CLIENT_ID ?? '',
 };

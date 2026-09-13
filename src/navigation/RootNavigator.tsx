@@ -1,37 +1,40 @@
 /**
- * Root navigation skeleton (DES-MEETUP-MOBILE.md §3.1).
+ * Root navigation skeleton (DES-MEETUP-MOBILE.md §3.1, §4.2).
  *
  * A single root switch gates between the Auth Stack and the App Stack
- * based on whether a token is present in secure storage. Deep-link routing
- * (§3.9) and session silent-refresh-on-cold-start (R-016, §4.2) are
- * designed but not part of this scaffold pass — this component is the
- * intended extension point for both, tracked as a follow-up.
+ * based on `AuthContext`'s `user` state (§7 wiring) — session
+ * restore-on-cold-start and `auth-expired` handling both live in
+ * `AuthContext`, not here. Deep-link routing (§3.9) is designed but not
+ * part of this pass — this component remains the intended extension
+ * point.
  *
- * No screen here carries feature logic — every screen is a centred-text
- * placeholder (Step 8 of the scaffold brief).
+ * No App Stack screen carries feature logic beyond auth — every
+ * non-auth screen is still a centred-text placeholder (scaffold pass).
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
-import { getAccessToken } from '../storage/tokens';
-import { authEvents } from '../api/authEvents';
+import { useAuth } from '../auth/AuthContext';
+import type { AuthStackParamList } from './types';
 
 import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import TournamentsScreen from '../screens/TournamentsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
-const AuthStackNav = createNativeStackNavigator();
+const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const AppTabsNav = createBottomTabNavigator();
 
 function AuthStack(): React.JSX.Element {
   return (
     <AuthStackNav.Navigator>
       <AuthStackNav.Screen name="Login" component={LoginScreen} />
+      <AuthStackNav.Screen name="Register" component={RegisterScreen} />
     </AuthStackNav.Navigator>
   );
 }
@@ -48,23 +51,7 @@ function AppStack(): React.JSX.Element {
 }
 
 export default function RootNavigator(): React.JSX.Element {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  const checkToken = useCallback(async () => {
-    const token = await getAccessToken();
-    setIsAuthenticated(token != null);
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    checkToken();
-
-    const unsubscribe = authEvents.on('auth-expired', () => {
-      setIsAuthenticated(false);
-    });
-    return unsubscribe;
-  }, [checkToken]);
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -74,11 +61,7 @@ export default function RootNavigator(): React.JSX.Element {
     );
   }
 
-  return (
-    <NavigationContainer>
-      {isAuthenticated ? <AppStack /> : <AuthStack />}
-    </NavigationContainer>
-  );
+  return <NavigationContainer>{user ? <AppStack /> : <AuthStack />}</NavigationContainer>;
 }
 
 const styles = StyleSheet.create({

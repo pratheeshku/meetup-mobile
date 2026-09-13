@@ -78,6 +78,24 @@ export async function getToken(): Promise<string> {
 }
 
 /**
+ * De-registers the current device's FCM token (R-030, R-077, §5.2).
+ *
+ * Called by the auth module's `signOut()` **before** `POST /auth/logout`
+ * (§3.5, §5.2). Best-effort by design: §5.2 explicitly accepts this
+ * ordering as client-enforced only (OI-2, T1 residual risk) — a failure
+ * here must never block the rest of sign-out, so callers should wrap
+ * this in their own try/catch rather than let it abort the sequence.
+ *
+ * Accepts an optional correlation ID so callers can thread this call
+ * into the same logical sign-out action as the subsequent
+ * `POST /auth/logout` call (§3.12, R-113).
+ */
+export async function deregisterDeviceToken(config?: { correlationId?: string }): Promise<void> {
+  const token = await getFcmToken(messaging);
+  await apiClient.delete(`/notifications/mobile-subscriptions/${token}`, config);
+}
+
+/**
  * Silently re-registers the device token whenever FCM rotates it (R-075).
  * Returns the unsubscribe function.
  */
