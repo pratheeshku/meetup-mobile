@@ -18,6 +18,13 @@
  *   concept to redirect through) rather than via `Alert`, except the
  *   deletion confirmation dialog itself which the brief explicitly asks
  *   to be an `Alert`.
+ *
+ * Push-notifications task (§4.8, R-076): now nested inside its own
+ * `ProfileStack` (`RootNavigator.tsx`) rather than sitting directly on the
+ * tab bar, so it can push `NotificationPreferencesScreen` — this screen's
+ * "no navigation back-stack concept" note above predates that change and
+ * now only describes this screen's own error-handling style, not its
+ * navigation context.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -31,6 +38,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
 import { withCorrelationId } from '../api/correlationId';
@@ -42,10 +50,13 @@ import {
   updateSkillLevel,
 } from '../api/profile';
 import type { SkillLevelValue, UserProfile } from '../types/user';
+import type { ProfileStackParamList } from '../navigation/types';
 
 const SKILL_LEVEL_OPTIONS: SkillLevelValue[] = ['Beginner', 'Intermediate', 'Expert'];
 
-export default function ProfileScreen(): React.JSX.Element {
+type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
+
+export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
   const { signOut } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -389,6 +400,13 @@ export default function ProfileScreen(): React.JSX.Element {
         ) : null}
       </View>
 
+      <Pressable
+        style={styles.linkButton}
+        onPress={() => navigation.navigate('NotificationPreferences')}
+      >
+        <Text style={styles.linkButtonText}>Notification Preferences</Text>
+      </Pressable>
+
       {signOutError ? <Text style={styles.errorText}>{signOutError}</Text> : null}
 
       <Pressable
@@ -532,6 +550,15 @@ const styles = StyleSheet.create({
   },
   smallButtonSecondaryText: { color: '#555', fontWeight: '600', fontSize: 14 },
   buttonDisabled: { opacity: 0.6 },
+  linkButton: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  linkButtonText: { color: '#222', fontWeight: '600', fontSize: 16 },
   signOutButton: {
     borderWidth: 1,
     borderColor: '#2563eb',

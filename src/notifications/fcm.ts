@@ -1,13 +1,24 @@
 /**
- * FCM setup scaffold (DES-MEETUP-MOBILE.md §3.6, R-070–R-076).
+ * FCM setup (DES-MEETUP-MOBILE.md §3.6, R-070–R-076).
  *
- * These functions are standalone building blocks, not yet wired into the
- * sign-in / cold-start lifecycle described in §3.6 — that wiring depends
- * on the auth flow (§3.5), which is not built in this scaffold pass. No
- * screen calls these yet.
+ * Token registration/rotation/de-registration (`getToken`,
+ * `deregisterDeviceToken`, `onTokenRefresh`) are the pre-existing
+ * registration flow — unmodified by the push-notifications task per its
+ * explicit "Do not modify the registration flow" rule. These functions
+ * are standalone building blocks, not yet wired into the sign-in /
+ * cold-start lifecycle described in §3.6 — that wiring depends on the
+ * auth flow (§3.5), which is not built in this scaffold pass. No screen
+ * calls these yet.
+ *
+ * `onMessage` (foreground), `onNotificationOpenedApp` (background tap),
+ * `getInitialNotification` (quit-state tap) and
+ * `registerBackgroundMessageHandler` below are new for the
+ * push-notifications task (§3.6 "Notification handling", §4.8) — routing
+ * wiring lives in `RootNavigator.tsx`.
  *
  * Never logs the FCM token itself, per R-111 (§5.4 requires it excluded
- * "beyond a truncated reference").
+ * "beyond a truncated reference"), and never logs notification title/body
+ * content (R-111, task brief Rules).
  */
 import { Platform, PermissionsAndroid } from 'react-native';
 import { getApp } from '@react-native-firebase/app';
@@ -18,9 +29,16 @@ import {
   getToken as getFcmToken,
   onTokenRefresh as onFcmTokenRefresh,
   onMessage as onFcmMessage,
+  onNotificationOpenedApp as onFcmNotificationOpenedApp,
+  getInitialNotification as getFcmInitialNotification,
+  setBackgroundMessageHandler as setFcmBackgroundMessageHandler,
+  type RemoteMessage,
 } from '@react-native-firebase/messaging';
 
 import { apiClient } from '../api/client';
+import { showBanner } from './notificationBannerStore';
+import { NOTIFICATION_TYPES } from '../types/notification';
+import type { NotificationType, PushNotificationPayload } from '../types/notification';
 
 const messaging = getMessaging(getApp());
 
@@ -111,10 +129,51 @@ export function onTokenRefresh(): () => void {
   });
 }
 
+function isKnownNotificationType(value: unknown): value is NotificationType {
+  return typeof value === 'string' && (NOTIFICATION_TYPES as string[]).includes(value);
+}
+
 /**
- * Foreground message handler. Rendering via `notifee` (§3.6) is not part
- * of this scaffold pass — logs a minimal, non-sensitive marker only.
- * Never logs token or auth data (R-111).
+ * Extracts a typed `PushNotificationPayload` from a raw FCM
+ * `RemoteMessage`, or `null` if the message doesn't carry one of the 12
+ * confirmed notification types (§4.8) — e.g. a malformed/unexpected
+ * payload, which is dropped rather than crashing the handler.
+ *
+ * `title`/`body` come from `data` first (the backend-authored payload
+ * shape per the task brief's Step 1 `PushNotificationPayload`), falling
+ * back to the FCM `notification` block for a message sent with both
+ * (standard for a message with a `notification` block the OS also
+ * auto-displays in background/killed state, §3.6).
+ */
+function extractPushPayload(remoteMessage: RemoteMessage): PushNotificationPayload | null {
+  const data = remoteMessage.data;
+  const notificationType = data?.notification_type;
+  if (!isKnownNotificationType(notificationType)) {
+    return null;
+  }
+
+  const entityId = data?.entity_id;
+  const title = data?.title ?? remoteMessage.notification?.title;
+  const body = data?.body ?? remoteMessage.notification?.body;
+
+  return {
+    notification_type: notificationType,
+    entity_id: typeof entityId === 'string' ? entityId : '',
+    title: typeof title === 'string' ? title : '',
+    body: typeof body === 'string' ? body : '',
+  };
+}
+
+/**
+ * Foreground message handler (§3.6, §4.8; R-073). Shows the in-app
+ * `NotificationBanner` (`notificationBannerStore.ts`) instead of an OS
+ * notification, per the task brief's Step 3 ("do not use OS notification
+ * for foreground") — this is the deviation from §3.6's `notifee` decision
+ * recorded in `notificationBannerStore.ts`'s file header.
+ *
+ * Logs only the message id and notification type (a fixed backend enum
+ * value, not user content) — never title/body/entity id (R-111, task
+ * brief Rules: "No notification content logged").
  */
 export function onMessage(): () => void {
   return onFcmMessage(messaging, remoteMessage => {
@@ -122,5 +181,71 @@ export function onMessage(): () => void {
       messageId: remoteMessage.messageId,
       notificationType: remoteMessage.data?.notification_type,
     });
+
+    const payload = extractPushPayload(remoteMessage);
+    if (payload) {
+      showBanner(payload);
+    }
   });
+}
+
+/**
+ * Registers the FCM background message handler (§3.6 "Background/killed
+ * -state messages via FCM's native background handler").
+ *
+ * Deliberately a no-op body: this app's push messages always carry a
+ * `notification` block (server-controlled), which Android's FCM SDK
+ * displays in the system tray automatically while the app is
+ * backgrounded or killed — no client code is needed to *display* it.
+ * Registering the handler is still required by the Firebase Android SDK
+ * (an unregistered handler logs a native warning and, on some OEM
+ * skins, can prevent the message from being delivered at all while the
+ * app process is not running); routing on tap is handled separately by
+ * `onNotificationOpenedApp`/`getInitialNotification` below, not by this
+ * handler. Must be called once at module/app init time (see
+ * `RootNavigator.tsx`), before any message can arrive.
+ *
+ * Never logs message content (R-111) — intentionally logs nothing at all,
+ * since a background-process log has no dev-visible console to read
+ * anyway.
+ */
+export function registerBackgroundMessageHandler(): void {
+  setFcmBackgroundMessageHandler(messaging, async () => {
+    // Intentionally empty — see file comment above.
+  });
+}
+
+/**
+ * Background-state notification tap handler (§3.6, §4.8; R-073): fires
+ * when the app was backgrounded (not killed) and the user taps the
+ * system-tray notification, bringing the app to the foreground.
+ * `RootNavigator` wires this to `navigateToNotificationTarget`. Returns
+ * the unsubscribe function, matching this file's other listener
+ * functions' shape.
+ */
+export function onNotificationOpenedApp(
+  handler: (payload: PushNotificationPayload) => void,
+): () => void {
+  return onFcmNotificationOpenedApp(messaging, remoteMessage => {
+    const payload = extractPushPayload(remoteMessage);
+    if (payload) {
+      handler(payload);
+    }
+  });
+}
+
+/**
+ * Quit-state notification tap handler (§3.6, §4.8; R-073): the app was
+ * not running at all and was launched by the user tapping the system
+ * -tray notification. Must be called once, at cold start, after the
+ * navigation container is ready (`RootNavigator`) — unlike the listener
+ * functions above, `getInitialNotification` is a one-shot read, not a
+ * subscription.
+ */
+export async function getInitialNotification(): Promise<PushNotificationPayload | null> {
+  const remoteMessage = await getFcmInitialNotification(messaging);
+  if (!remoteMessage) {
+    return null;
+  }
+  return extractPushPayload(remoteMessage);
 }

@@ -1,3 +1,5 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 /** Auth Stack route params (§4.2 — Sign In, Register). */
 export type AuthStackParamList = {
   Login: undefined;
@@ -20,4 +22,34 @@ export type GroupsStackParamList = {
 export type TournamentsStackParamList = {
   TournamentsList: undefined;
   TournamentDetail: { tournamentId: string };
+};
+
+/**
+ * Profile tab's nested stack route params (§4.8 — Profile,
+ * Notification Preferences). Added by the push-notifications task: Profile
+ * was previously a flat tab screen with no nested stack of its own (see
+ * `RootNavigator`'s file header for the "why" of this change) — mirrors
+ * the `HomeStack`/`GroupsStack`/`TournamentsStack` pattern above so
+ * Notification Preferences can be pushed from Profile with correct back
+ * navigation.
+ */
+export type ProfileStackParamList = {
+  ProfileHome: undefined;
+  NotificationPreferences: undefined;
+};
+
+/**
+ * Top-level authenticated tab param list (§3.1, §4.8). Each tab wraps a
+ * nested stack, so its own param list is threaded through via
+ * `NavigatorScreenParams` — this is what makes it possible to
+ * type-safely navigate to a screen nested two levels deep (tab -> stack
+ * -> screen) from a single root ref, which is exactly what routing a
+ * notification tap to e.g. Tournaments -> TournamentDetail requires
+ * (§3.6, §4.8, R-073).
+ */
+export type AppTabParamList = {
+  Home: NavigatorScreenParams<HomeStackParamList>;
+  Groups: NavigatorScreenParams<GroupsStackParamList>;
+  Tournaments: NavigatorScreenParams<TournamentsStackParamList>;
+  Profile: NavigatorScreenParams<ProfileStackParamList>;
 };

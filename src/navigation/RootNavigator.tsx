@@ -1,24 +1,55 @@
 /**
- * Root navigation skeleton (DES-MEETUP-MOBILE.md §3.1, §4.2, §4.3).
+ * Root navigation skeleton (DES-MEETUP-MOBILE.md §3.1, §3.6, §4.2, §4.3, §4.8).
  *
  * A single root switch gates between the Auth Stack and the App Stack
  * based on `AuthContext`'s `user` state (§7 wiring) — session
  * restore-on-cold-start and `auth-expired` handling both live in
- * `AuthContext`, not here. Deep-link routing (§3.9) is designed but not
- * part of this pass — this component remains the intended extension
- * point.
+ * `AuthContext`, not here. Full URL-scheme/App-Links deep linking (§3.9)
+ * is designed but still not part of this pass — this component remains
+ * the intended extension point. Notification-tap routing (§3.6, §4.8,
+ * R-073) *is* wired here now (push-notifications task) — see the
+ * dedicated effect block below.
  *
- * The Home, Groups, and Tournaments tabs each wrap a nested native-stack
- * (`HomeStack`, `GroupsStack`, `TournamentsStack`) rather than rendering
- * their list screen directly, so each can push a detail screen with
- * correct back navigation while the bottom tab bar stays available on
- * the list itself. `headerShown: false` on those tab screens avoids a
+ * The Home, Groups, Tournaments, and (as of this task) Profile tabs each
+ * wrap a nested native-stack rather than rendering their top screen
+ * directly, so each can push a detail screen with correct back
+ * navigation while the bottom tab bar stays available on the list/home
+ * screen itself. `headerShown: false` on those tab screens avoids a
  * duplicate header (the tab navigator's own plus the nested stack's).
  *
- * Profile remains a full screen, not nested in a stack — see its own
- * module.
+ * Profile stack change (push-notifications task, §4.8): Profile was
+ * previously a flat tab screen with no nested stack. The task's Step 8
+ * ("Add NotificationPreferencesScreen to AppStack") needs Profile to be
+ * able to push a new screen with back navigation, so it now wraps its own
+ * `ProfileStack` (`ProfileHome` + `NotificationPreferences`) — the
+ * smallest change that makes the new screen reachable while keeping every
+ * other tab's existing pattern untouched.
+ *
+ * Notification-tap routing (§3.6, §4.8, R-073): a single `navigationRef`
+ * (`notificationRouting.ts`) is attached to `NavigationContainer` so code
+ * outside the React tree (FCM listeners) can navigate. Three FCM entry
+ * points are wired, one per app state at tap time:
+ * - Foreground: handled by `NotificationBanner` itself (it calls
+ *   `resolveNotificationTarget`/`navigateToNotificationTarget` directly on
+ *   tap) — no listener needed here for that case.
+ * - Background (app alive, not foregrounded): `onNotificationOpenedApp`.
+ * - Quit state (app launched by the tap): `getInitialNotification`, a
+ *   one-shot check run once navigation is ready and a session exists.
+ *
+ * Deviation (recorded for the Implementation Report, needs architect
+ * ratification): the task brief's Step 4 says to implement background/
+ * quit-tap routing by editing native Android Java (`MainApplication.java`
+ * "or equivalent"). This uses the official `@react-native-firebase/messaging`
+ * JS SDK's `onNotificationOpenedApp`/`getInitialNotification` APIs
+ * instead of touching native code — the "or equivalent" wording gives
+ * latitude, and DES-MEETUP-MOBILE.md §3.6 explicitly names "a custom
+ * native module instead of the official Firebase RN SDK" as a **rejected
+ * alternative**. Writing routing logic into `MainApplication.java` would
+ * be exactly that rejected alternative, so the JS SDK path was followed
+ * as the design-compliant reading of "or equivalent". No native Android
+ * file was modified by this task.
  */
-import React from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -27,10 +58,23 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../auth/AuthContext';
 import type {
   AuthStackParamList,
+  AppTabParamList,
   GroupsStackParamList,
   HomeStackParamList,
+  ProfileStackParamList,
   TournamentsStackParamList,
 } from './types';
+import {
+  navigationRef,
+  navigateToNotificationTarget,
+  resolveNotificationTarget,
+} from '../notifications/notificationRouting';
+import {
+  getInitialNotification,
+  onMessage,
+  onNotificationOpenedApp,
+  registerBackgroundMessageHandler,
+} from '../notifications/fcm';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -41,12 +85,15 @@ import GroupDetailScreen from '../screens/GroupDetailScreen';
 import TournamentsScreen from '../screens/TournamentsScreen';
 import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
+import NotificationBanner from '../components/NotificationBanner';
 
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
 const GroupsStackNav = createNativeStackNavigator<GroupsStackParamList>();
 const TournamentsStackNav = createNativeStackNavigator<TournamentsStackParamList>();
-const AppTabsNav = createBottomTabNavigator();
+const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
+const AppTabsNav = createBottomTabNavigator<AppTabParamList>();
 
 function AuthStack(): React.JSX.Element {
   return (
@@ -100,6 +147,19 @@ function TournamentsStack(): React.JSX.Element {
   );
 }
 
+function ProfileStack(): React.JSX.Element {
+  return (
+    <ProfileStackNav.Navigator>
+      <ProfileStackNav.Screen name="ProfileHome" component={ProfileScreen} options={{ title: 'Profile' }} />
+      <ProfileStackNav.Screen
+        name="NotificationPreferences"
+        component={NotificationPreferencesScreen}
+        options={{ title: 'Notification Preferences' }}
+      />
+    </ProfileStackNav.Navigator>
+  );
+}
+
 function AppStack(): React.JSX.Element {
   return (
     <AppTabsNav.Navigator>
@@ -110,13 +170,78 @@ function AppStack(): React.JSX.Element {
         component={TournamentsStack}
         options={{ headerShown: false }}
       />
-      <AppTabsNav.Screen name="Profile" component={ProfileScreen} />
+      <AppTabsNav.Screen name="Profile" component={ProfileStack} options={{ headerShown: false }} />
     </AppTabsNav.Navigator>
   );
 }
 
 export default function RootNavigator(): React.JSX.Element {
   const { user, isLoading } = useAuth();
+
+  // A one-shot guard: `getInitialNotification` is only meaningful the
+  // very first time this app instance checks it (the tap that launched
+  // the quit-state app), so it must never re-run on later renders/re
+  // -sign-ins. Set synchronously before the async call starts to avoid a
+  // race between the `onReady` and `user`-change triggers below.
+  const hasCheckedInitialNotification = useRef(false);
+
+  // `isLoading` above already gates mount until auth state is resolved,
+  // so by the time this reads `user` it is the settled value, not a
+  // stale one — a plain ref (updated every render, no effect needed) is
+  // enough to give the stable `handleInitialNotification` callback a
+  // fresh read of it.
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  const handleInitialNotification = useCallback(async () => {
+    if (hasCheckedInitialNotification.current) {
+      return;
+    }
+    hasCheckedInitialNotification.current = true;
+
+    const payload = await getInitialNotification();
+    // Known limitation (consistent with §3.9's own "unauthenticated deep
+    // links" note, which this codebase hasn't built the
+    // `pendingDestination` mechanism for either): a quit-state tap that
+    // lands on the Auth Stack (no restored session) is dropped rather
+    // than queued — `navigationRef` only ever targets `AppTabParamList`
+    // routes, which don't exist while `AuthStack` is mounted.
+    if (payload && userRef.current && navigationRef.isReady()) {
+      navigateToNotificationTarget(
+        resolveNotificationTarget(payload.notification_type, payload.entity_id),
+      );
+    }
+  }, []);
+
+  // Foreground banner display and background-tap routing (§3.6, §4.8):
+  // registered once, independent of auth state — harmless to set up
+  // before a session exists, and required to be in place before any
+  // message can arrive.
+  useEffect(() => {
+    registerBackgroundMessageHandler();
+    const unsubscribeMessage = onMessage();
+    const unsubscribeOpenedApp = onNotificationOpenedApp(payload => {
+      navigateToNotificationTarget(
+        resolveNotificationTarget(payload.notification_type, payload.entity_id),
+      );
+    });
+
+    return () => {
+      unsubscribeMessage();
+      unsubscribeOpenedApp();
+    };
+  }, []);
+
+  // Quit-state tap routing (§3.6, §4.8, Step 8 "initial route on
+  // notification tap when app is in quit state"): re-checked whenever
+  // `user` becomes available, since `NavigationContainer`'s `onReady`
+  // alone only fires once and may fire before a restored session (and
+  // therefore the App Stack / tab routes the target needs) exists.
+  useEffect(() => {
+    if (user) {
+      handleInitialNotification();
+    }
+  }, [user, handleInitialNotification]);
 
   if (isLoading) {
     return (
@@ -126,9 +251,17 @@ export default function RootNavigator(): React.JSX.Element {
     );
   }
 
-  return <NavigationContainer>{user ? <AppStack /> : <AuthStack />}</NavigationContainer>;
+  return (
+    <View style={styles.root}>
+      <NavigationContainer ref={navigationRef} onReady={handleInitialNotification}>
+        {user ? <AppStack /> : <AuthStack />}
+      </NavigationContainer>
+      <NotificationBanner />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

@@ -50,6 +50,12 @@ jest.mock('@react-native-firebase/app', () => ({
   getApp: jest.fn(() => ({})),
 }));
 
+// Push-notifications task additions: `onNotificationOpenedApp`,
+// `getInitialNotification`, `setBackgroundMessageHandler` — used by
+// src/notifications/fcm.ts's new background/quit-tap handlers, wired into
+// the render tree via RootNavigator. Added to this same centralised mock
+// per this file's own established convention (see the comment above)
+// rather than a new ad hoc mock.
 jest.mock('@react-native-firebase/messaging', () => ({
   getMessaging: jest.fn(() => ({})),
   requestPermission: jest.fn(async () => 1),
@@ -57,4 +63,7 @@ jest.mock('@react-native-firebase/messaging', () => ({
   getToken: jest.fn(async () => 'mock-fcm-token'),
   onTokenRefresh: jest.fn(() => () => {}),
   onMessage: jest.fn(() => () => {}),
+  onNotificationOpenedApp: jest.fn(() => () => {}),
+  getInitialNotification: jest.fn(async () => null),
+  setBackgroundMessageHandler: jest.fn(),
 }));
