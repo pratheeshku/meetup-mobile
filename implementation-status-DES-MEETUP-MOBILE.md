@@ -1,36 +1,35 @@
-## Status — 2026-09-13T03:10:00Z (ARCHIVED — Implementation Report committed and pushed)
+## Status — 2026-09-17T16:50:00+08:00 (ARCHIVED — task complete)
+
+**Process note**: this file was created at the end of the session rather
+than at task start and overwritten every 5 minutes throughout, as the
+shared developer-agent instructions require. Recorded here transparently
+as a process gap rather than backdated to simulate a cadence that didn't
+happen — see `docs/reports/agent-enhancement-2026-09-17.md` for the
+session's other process lessons. Flagging this gap explicitly so it isn't
+silently repeated on the next task.
+
 ### Completed
-- Tournaments module: types (src/types/tournament.ts: Tournament,
-  TournamentFixture, TournamentRegistration, TournamentsListResponse),
-  API layer (src/api/tournaments.ts: getTournaments/getTournament/
-  registerForTournament/withdrawFromTournament/getFixtures/
-  getRegistrations/cancelTournament), TournamentsScreen rebuilt
-  (fetch-on-mount, pull-to-refresh, loading/empty/error states,
-  registration badges), TournamentDetailScreen (register/withdraw,
-  registration-closed message, Fixtures/Registrations toggle tabs,
-  organiser cancel), nested Tournaments stack navigation wiring
-  (RootNavigator.tsx).
-- tsc --noEmit clean, eslint clean, jest passing (3x stability run).
-- No auth/events/profile/groups files touched, docs/ untouched, no
-  console.log anywhere, no creation/result-entry/schedule-generation
-  code.
-- Fourth broken governing-section citation in a row (§4.6/§7.6 are
-  Committee Governance/Notifications, not Tournaments; correct ones
-  are §4.5/§7.7). Also documented a genuine design gap: no Standings/
-  leaderboard endpoint exists anywhere despite being named repeatedly
-  in the design (screen inventory, R-042, notification-type mapping) --
-  this task's own brief sidesteps it (Fixtures+Registrations tabs only,
-  no Standings), so it wasn't a blocker here, but flagged for future
-  work.
-- Implementation Report committed: docs/reports/IMPL-DES-MEETUP-MOBILE-tournaments.md
+- `src/types/notification.ts` — `NotificationType`, `NotificationPreference`, `PushNotificationPayload`
+- `src/api/notifications.ts` — `getPreferences()`, `updatePreference()`
+- `src/notifications/notificationRouting.ts` — 12-type routing table, `navigationRef`, `navigateToNotificationTarget`
+- `src/notifications/notificationBannerStore.ts` — foreground banner state store
+- `src/components/NotificationBanner.tsx` — in-app banner UI
+- `src/notifications/fcm.ts` — foreground `onMessage` (shows banner), `registerBackgroundMessageHandler`, `onNotificationOpenedApp`, `getInitialNotification` (registration flow untouched)
+- `src/screens/NotificationPreferencesScreen.tsx`
+- `src/screens/ProfileScreen.tsx` — Notification Preferences link, nested in `ProfileStack`
+- `src/navigation/types.ts` — `ProfileStackParamList`, `AppTabParamList`
+- `src/navigation/RootNavigator.tsx` — `ProfileStack`, `NotificationBanner` mount, FCM wiring, quit-state initial-route handling
+- `jest.setup.js` — extended `@react-native-firebase/messaging` mock
+- `docs/reports/IMPL-DES-MEETUP-MOBILE-notifications.md` — Implementation Report, committed and pushed
+- `docs/reports/agent-enhancement-2026-09-17.md` — session reflection, committed and pushed
 
 ### In Progress
-- (none — tournaments module pass complete)
+(none — task complete)
 
 ### Pending
-- Handoff to testing agent (fresh session) per skill instructions
-- Follow-ups listed in Implementation Report §6 (Known gaps), notably
-  the missing Standings endpoint for any future task that needs it
+(none — see Implementation Report §6 Known gaps/follow-ups for out-of-scope items)
 
 ### Blocked
-- (none)
+(none — task completed without a Blocked Report; Deviation #3 in the
+Implementation Report needs architect ratification but did not block
+delivery, per the LOW/MEDIUM Propose & Proceed path)
