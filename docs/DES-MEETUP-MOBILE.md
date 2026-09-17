@@ -315,14 +315,14 @@ outright. Custom encryption atop `AsyncStorage` — reinvents Keystore
 ### 3.5 Auth Flow (R-010, R-012)
 
 **Decision**:
-- **Google (R-010)**: implemented via Android **Credential Manager**
-  (`androidx.credentials`), through the **Universal Sign-In API** of
-  `@react-native-google-signin/google-signin` — Google's current,
-  recommended replacement for the deprecated legacy `GoogleSignin`
-  module. Credential Manager completes via a native OS account-picker
-  bottom sheet with verified, no-browser-involved completion.
-  Fail-closed is fully achievable: if Credential Manager cannot
-  complete, sign-in fails with a generic error and retry option.
+- **Google (R-010)**: implemented via the legacy GoogleSignin API of
+  `@react-native-google-signin/google-signin` (v16.1.5). The design
+  originally specified Android Credential Manager (`androidx.credentials`)
+  via the Universal Sign-In API, but the free/public package uses the
+  legacy Google Sign-In SDK on Android — Credential Manager is only
+  available in a separate paid product (Universal Sign In). The legacy
+  API fully satisfies R-010 (native picker, no browser, no WebView).
+  Architect-ratified deviation — see Deviation entry below.
 - **Facebook OAuth — deferred.** Facebook OAuth deferred. Re-entry
   trigger: Google OAuth live and stable in production with no
   auth-related incidents for 30 days. No Facebook button, SDK
@@ -353,9 +353,11 @@ R-010/R-012 by definition.
 
 **R-ID(s) served**: R-010 (fully), R-012 (fully), R-013, R-016, R-017.
 
-**Deviation**: None. **Open dependency**: R-018 (Google-only OAuth
-credential provisioning, §10 OI-5, closed as a named pre-implementation
-gate, not a design blocker).
+**Deviation**: Credential Manager not used. The free
+`@react-native-google-signin` package uses the legacy Google Sign-In SDK.
+The paid Universal Sign-In product would be required for Credential
+Manager support. Architect-ratified 2026-09-13: legacy SDK fully
+satisfies R-010 at zero additional cost. Named OI-12 below.
 
 ### 3.6 FCM Integration (R-070–R-077)
 
@@ -1175,14 +1177,17 @@ regression guard consistent with the Facebook deferral.
 | OI-6 | Android App Links domain verification (`assetlinks.json`) pending | Pratheesh (architect) / backend deploy owner | Blocks full App-Links-quality deep linking; custom-scheme fallback remains functional in the interim |
 | ~~OI-10~~ | ~~Facebook Custom-Tab fallback conflict~~ | — | **CLOSED.** REQ-MEETUP-MOBILE Non-Goal 9 formally defers R-011 with a measurable, automatic re-entry trigger. No Facebook code path ships this release. |
 | ~~OI-11~~ | ~~REQ-MEETUP-MOBILE.md branch divergence~~ | — | **CLOSED.** A single, canonical, reconciled REQ-MEETUP-MOBILE.md now exists, containing both the R-060/R-061 rewrite and the R-011 deferral, plus the R-005 correction. |
+| OI-12 | §3.5 Credential Manager deviation — legacy Google Sign-In SDK used instead of Credential Manager (paid product required) | Pratheesh (architect) | CLOSED — architect-ratified 2026-09-13. Legacy SDK satisfies R-010 fully. Upgrade path: if Credential Manager becomes available in the free package or cost justification exists, migrate at that point. |
+| OI-13 | Standings view for tournaments — design references a Standings tab in §4.5, screen inventory, and notification mapping table, but no standings endpoint exists in §7.7 or the running backend. R-042 explicitly forbids client-side computation. | Pratheesh (architect) / backend owner | OPEN — unblocked for current implementation (Fixtures + Registrations tabs shipped instead). Requires a new backend endpoint before a Standings tab can be built. Resolution: add endpoint to DES-MEETUP.md and REQ-MEETUP.md, then implement. |
+| OI-14 | Offline gating — §4.11 specifies mutating controls disabled when offline, but no connectivity-detection library exists in the codebase. Current behaviour: inline network error on failure. | Claude Code (implementation) | OPEN — accepted T1 interim behaviour. Resolution trigger: implement when offline-first UX becomes a user-reported pain point or when connectivity library is added for another feature. |
+| OI-15 | Forgot Password screen — listed in screen inventory but not yet implemented. | Claude Code (implementation) | OPEN — deferred by architect. Implement after core feature modules are complete. |
 
-**Approval status: APPROVED — architect-approved 2026-09-13.** Every
-Open Item traceable to this design document's own content is closed.
-The one remaining item — OI-6 (App Links DNS/domain verification) — is a
-deployment-layer dependency tracked for pre-release completion, not a
-design defect. Both architect-sign-off deviations (OI-2/R-077,
-P16/§3.13) are explicitly recorded as approved.
+Approval status: APPROVED — architect-approved 2026-09-13. Open Items OI-6,
+OI-13, OI-14, OI-15 remain open — all are named deferrals with defined resolution
+conditions, not design defects. OI-12 is closed (architect-ratified deviation).
+Both architect sign-off deviations (OI-2/R-077, P16/§3.13) remain explicitly
+recorded as approved.
 
 ---
 
-*DES-MEETUP-MOBILE · APPROVED — architect-approved 2026-09-13 · T1 · Requirements Baseline: REQ-MEETUP-MOBILE, single canonical file, APPROVED (architect-approved 2026-09-13, R-005 corrected 2026-09-13) · Parent Backend Design: DES-MEETUP.md v1.66 (APPROVED) · Governing files Enterprise_Design_Principles_v1.0.md (P1–P17) and design-best-practices.md (BP-01–BP-13) confirmed in context at drafting. Eight external adversarial review rounds completed; all design-document-traceable Open Items closed.*
+*DES-MEETUP-MOBILE · APPROVED — architect-approved 2026-09-13 · T1 · Requirements Baseline: REQ-MEETUP-MOBILE (APPROVED 2026-09-13) · Parent Backend Design: DES-MEETUP.md (APPROVED) · Governing files Enterprise_Design_Principles_v1.0.md (P1–P17) and design-best-practices.md (BP-01–BP-13) confirmed in context at drafting. Eight external adversarial review rounds completed. Open Items: OI-6 (deployment gate), OI-13 (standings endpoint), OI-14 (offline gating), OI-15 (forgot password) — all named deferrals. OI-12 (Credential Manager deviation) closed.*
