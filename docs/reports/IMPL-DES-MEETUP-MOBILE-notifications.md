@@ -243,8 +243,41 @@ $ git diff --cached --stat
  src/types/notification.ts                     |  72 +++++++++++
  12 files changed, 1189 insertions(+), 25 deletions(-)
 ```
-(git commit evidence and push evidence to be appended after the commit
-below.)
+**Actual commit and push evidence** (recorded after committing, matching
+this project's established pattern of confirming the real values rather
+than pre-stating them):
+```
+$ git log --oneline -3
+d713814 feat(notifications): implement foreground banner, background deep-link routing, and notification preferences screen
+907ce8a Updated Design
+1ba9362 docs(report): record actual git push evidence for tournaments module implementation report
+
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.claude/
+
+nothing added to commit but untracked files present (use "git add" to track)
+
+$ git push origin main
+To https://github.com/pratheeshku/meetup-mobile.git
+   907ce8a..d713814  main -> main
+
+$ git log origin/main -1 --oneline
+d713814 feat(notifications): implement foreground banner, background deep-link routing, and notification preferences screen
+```
+Note: the commit was amended once, locally, before this push — the
+initial `git commit` inadvertently included a `Co-Authored-By` trailer
+from this session's general attribution instructions, which conflicts
+with CLAUDE.md's explicit "Never add Co-Authored-By trailers or any AI
+tool attribution to commit messages" rule. Caught immediately, before
+any push, and fixed with `git commit --amend` (no push had happened yet,
+so nothing shared was rewritten) to the exact brief-specified commit
+message with no trailer. Recorded here for transparency rather than
+silently corrected.
 
 ## 6. Known gaps / follow-ups
 
@@ -314,9 +347,25 @@ Ran all test suites.
 --- Run 3 ---
 ```
 
-**Git evidence**: see the commit created immediately after this report
-and `git log --oneline -3` / `git status` pasted in the commit follow
--up below.
+**Git evidence**:
+```
+$ git log --oneline -3
+d713814 feat(notifications): implement foreground banner, background deep-link routing, and notification preferences screen
+907ce8a Updated Design
+1ba9362 docs(report): record actual git push evidence for tournaments module implementation report
+
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.claude/
+
+nothing added to commit but untracked files present (use "git add" to track)
+```
+(See §5 "Actual commit and push evidence" above for the push confirmation
+against `origin/main`.)
 
 **File evidence** (all 12 notification types present in the routing
 table):
