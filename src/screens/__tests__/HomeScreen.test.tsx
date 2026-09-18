@@ -97,11 +97,19 @@ beforeEach(() => {
 });
 
 describe('HomeScreen dashboard', () => {
-  it('greets the signed-in user by nickname and disables Create Game (no create screen exists)', async () => {
+  it('greets the signed-in user by nickname', async () => {
     const root = await mount();
     expect(texts(root)).toContain('Good to see you 👋');
     expect(texts(root)).toContain('Ready to play, Sam?');
-    expect(pressableLabelled(root, '+ Create Game').props.disabled).toBe(true);
+  });
+
+  it('enables Create Game and opens the CreateGame placeholder route on press', async () => {
+    const root = await mount();
+    const button = pressableLabelled(root, '+ Create Game');
+    expect(button.props.disabled).toBe(false);
+    act(() => button.props.onPress());
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith('CreateGame');
   });
 
   it('lists upcoming games soonest-first, capped at three, from going/waitlisted events only', async () => {

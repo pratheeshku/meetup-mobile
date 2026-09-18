@@ -2,10 +2,10 @@
  * Home header: small muted greeting, large bold "Ready to play, <nickname>?"
  * headline, and a "+ Create Game" button at the top right.
  *
- * No create-event screen exists yet (DES §4.3 lists "Create/Edit Event" but
- * it is a later task), so `onCreateGame` is optional and, when omitted, the
- * button renders disabled rather than as a tappable control that does
- * nothing. Wiring the future screen is one prop at the call site.
+ * `onCreateGame` is optional and, when omitted, the button renders disabled
+ * rather than as a tappable control that does nothing. Home passes a handler
+ * that opens the placeholder `CreateGameScreen` (real event creation, DES
+ * §4.3 "Create/Edit Event", is a later task).
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';

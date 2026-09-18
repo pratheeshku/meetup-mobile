@@ -17,15 +17,15 @@
  * events request is a full error state, as before. Pagination beyond the
  * first page is still not built (unchanged from the previous list).
  *
- * The native stack header is hidden for this screen (see `RootNavigator`):
- * the greeting is the header, so the top safe-area inset is applied here.
+ * This screen's stack header is the branded `AppHeader` (see
+ * `RootNavigator`), which applies the top safe-area inset itself, so the
+ * content here only needs ordinary top spacing.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getEvents } from '../api/events';
 import { withCorrelationId } from '../api/correlationId';
@@ -55,7 +55,6 @@ type Props = CompositeScreenProps<
 
 export default function HomeScreen({ navigation }: Props): React.JSX.Element {
   const { user } = useAuth();
-  const insets = useSafeAreaInsets();
 
   const [events, setEvents] = useState<Event[]>([]);
   // `null` = the groups request failed; the tile then omits the count.
@@ -117,6 +116,8 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
     [navigation],
   );
 
+  const openCreateGame = useCallback(() => navigation.navigate('CreateGame'), [navigation]);
+
   if (isLoading) {
     return <LoadingView />;
   }
@@ -128,7 +129,7 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
   return (
     <ScrollView
       contentContainerStyle={{
-        paddingTop: insets.top + spacing.md,
+        paddingTop: spacing.md,
         paddingBottom: spacing.lg,
       }}
       refreshControl={
@@ -141,8 +142,7 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
       }
     >
       <View style={styles.block}>
-        {/* No `onCreateGame`: no create-event screen exists yet (button renders disabled). */}
-        <GreetingHeader nickname={user?.nickname} />
+        <GreetingHeader nickname={user?.nickname} onCreateGame={openCreateGame} />
       </View>
       <View style={styles.pills}>
         <SportFilterPills sports={sports} selectedKey={activeSport} onSelect={setSelectedSport} />

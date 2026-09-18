@@ -6,10 +6,15 @@ export type AuthStackParamList = {
   Register: undefined;
 };
 
-/** Home tab's nested stack route params (§4.3 — Events feed, Event Detail). */
+/**
+ * Home tab's nested stack route params (§4.3 — Events feed, Event Detail,
+ * Create Game). `CreateGame` is a placeholder until real event creation
+ * (§4.3 "Create/Edit Event") is built.
+ */
 export type HomeStackParamList = {
   EventsList: undefined;
   EventDetail: { eventId: string };
+  CreateGame: undefined;
 };
 
 /** Groups tab's nested stack route params (§4.4 — Groups list, Group Detail). */

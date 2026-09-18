@@ -69,6 +69,7 @@ import type {
   ProfileStackParamList,
   TournamentsStackParamList,
 } from './types';
+import HomeHeader from './HomeHeader';
 import { TAB_EMOJI, TabEmoji } from './tabIcons';
 import {
   navigationRef,
@@ -85,6 +86,7 @@ import {
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import HomeScreen from '../screens/HomeScreen';
+import CreateGameScreen from '../screens/CreateGameScreen';
 import EventDetailScreen from '../screens/EventDetailScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
@@ -143,12 +145,25 @@ function AuthStack(): React.JSX.Element {
 function HomeStack(): React.JSX.Element {
   return (
     <HomeStackNav.Navigator screenOptions={stackScreenOptions}>
-      {/* The dashboard's greeting is its own header (HomeScreen applies the top inset). */}
-      <HomeStackNav.Screen name="EventsList" component={HomeScreen} options={{ headerShown: false }} />
+      {/*
+        The dashboard uses the branded AppHeader (logo + notification bell,
+        see HomeHeader) instead of the default title header. Only Home uses
+        it for now; the other tabs keep their titled headers.
+      */}
+      <HomeStackNav.Screen
+        name="EventsList"
+        component={HomeScreen}
+        options={{ header: HomeHeader }}
+      />
       <HomeStackNav.Screen
         name="EventDetail"
         component={EventDetailScreen}
         options={{ title: 'Event' }}
+      />
+      <HomeStackNav.Screen
+        name="CreateGame"
+        component={CreateGameScreen}
+        options={{ title: 'Create Game' }}
       />
     </HomeStackNav.Navigator>
   );

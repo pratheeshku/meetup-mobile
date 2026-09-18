@@ -120,4 +120,8 @@ export const sizes = {
   avatar: 88,
   emptyStateIcon: 72,
   emptyStateIconInner: 24,
+  /** Additive: content height of the app header (excludes the status-bar inset). */
+  appHeader: 56,
+  /** Additive: diameter of the notification-bell unread badge. */
+  notificationBadge: 18,
 };
