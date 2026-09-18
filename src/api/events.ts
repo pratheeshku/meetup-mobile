@@ -90,10 +90,13 @@ interface EventApiItem {
  *    authenticated user's id compared against `organizer_id`, which is
  *    not available from this endpoint and not read here (importing an
  *    auth/session accessor into `src/api/events.ts` would also cross the
- *    documented zero-sibling-import boundary). HomeScreen does not render
- *    `is_organiser`, so the default is inert for this fix; role/permission
- *    UI gating remains a UX convenience only, per R-017/R-082 — the
- *    backend enforces the real authorization on every write endpoint.
+ *    documented zero-sibling-import boundary). The value is therefore
+ *    NOT trustworthy: consumers must derive organiser status with
+ *    `isOrganiserOf(event, currentUserId)` (`src/utils/homeDashboard.ts`),
+ *    as `EventDetailScreen` and the Home dashboard do — never read
+ *    `event.is_organiser` alone. Role/permission UI gating remains a UX
+ *    convenience only, per R-017/R-082 — the backend enforces the real
+ *    authorization on every write endpoint.
  * 5. `cost` <- `estimated_cost_cents` as-is (still cents, not converted to
  *    a display currency amount). HomeScreen does not render `cost`, so
  *    this is inert for this fix; flagged for correction alongside the

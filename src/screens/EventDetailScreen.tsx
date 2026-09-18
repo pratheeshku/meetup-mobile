@@ -3,9 +3,17 @@
  *
  * Role/permission gating here is UX-only (§3.10, §5.3, R-017/R-082) —
  * every gated action still calls its endpoint normally and the backend
- * remains the sole authority; a stale `is_organiser`/`status` value can
+ * remains the sole authority; a stale organiser/`status` value can
  * briefly show an affordance that then fails server-side, which §3.10
  * itself accepts as a trade-off.
+ *
+ * Organiser detection: `Event.is_organiser` is a stub that `mapEventApiItem`
+ * always sets to `false` (the endpoint returns no such field), so it cannot
+ * drive the RSVP/Cancel gates on its own — that hid Cancel from everyone and
+ * showed organisers an RSVP button on their own events. The gates use
+ * `isOrganiserOf(event, currentUserId)`, which also compares `organiser_id`
+ * with the signed-in user's id (same derivation as `TournamentDetailScreen`
+ * and the Home dashboard).
  *
  * Proposed Assumption: the brief specifies "'Join' if status is none"
  * without naming a button state for `withdrawn`. Treated the same as
@@ -18,6 +26,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { cancelEvent, getEvent, rsvpEvent, withdrawEvent } from '../api/events';
 import { withCorrelationId } from '../api/correlationId';
+import { useAuth } from '../auth/AuthContext';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -27,11 +36,13 @@ import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { Event } from '../types/event';
 import type { HomeStackParamList } from '../navigation/types';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
+import { isOrganiserOf } from '../utils/homeDashboard';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 
 export default function EventDetailScreen({ route, navigation }: Props): React.JSX.Element {
   const { eventId } = route.params;
+  const { user } = useAuth();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,13 +117,14 @@ export default function EventDetailScreen({ route, navigation }: Props): React.J
     return <ErrorView message={loadError ?? 'Event not found.'} onRetry={loadEvent} />;
   }
 
+  const isOrganiser = isOrganiserOf(event, user?.id);
   const isRsvpVisible =
-    !event.is_organiser && event.status !== 'cancelled' && event.status !== 'completed';
+    !isOrganiser && event.status !== 'cancelled' && event.status !== 'completed';
   const isGoingOrWaitlisted =
     event.current_user_rsvp_status === 'going' || event.current_user_rsvp_status === 'waitlisted';
   const isAtCapacity = event.participant_count >= event.capacity;
   const isCancelVisible =
-    event.is_organiser && (event.status === 'upcoming' || event.status === 'active');
+    isOrganiser && (event.status === 'upcoming' || event.status === 'active');
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
