@@ -69,6 +69,7 @@ import type {
   ProfileStackParamList,
   TournamentsStackParamList,
 } from './types';
+import { TAB_EMOJI, TabEmoji } from './tabIcons';
 import {
   navigationRef,
   navigateToNotificationTarget,
@@ -115,13 +116,20 @@ const stackScreenOptions: NativeStackNavigationOptions = {
   contentStyle: { backgroundColor: colors.background },
 };
 
-const tabScreenOptions: BottomTabNavigationOptions = {
+const tabScreenOptions = ({
+  route,
+}: {
+  route: { name: keyof AppTabParamList };
+}): BottomTabNavigationOptions => ({
+  tabBarIcon: ({ focused, size }) => (
+    <TabEmoji emoji={TAB_EMOJI[route.name]} focused={focused} size={size} />
+  ),
   headerStyle: { backgroundColor: colors.surface },
   headerTitleStyle: { color: colors.textPrimary, ...typography.h3 },
   tabBarActiveTintColor: colors.primary,
   tabBarInactiveTintColor: colors.textMuted,
   tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-};
+});
 
 function AuthStack(): React.JSX.Element {
   return (
@@ -135,7 +143,8 @@ function AuthStack(): React.JSX.Element {
 function HomeStack(): React.JSX.Element {
   return (
     <HomeStackNav.Navigator screenOptions={stackScreenOptions}>
-      <HomeStackNav.Screen name="EventsList" component={HomeScreen} options={{ title: 'Events' }} />
+      {/* The dashboard's greeting is its own header (HomeScreen applies the top inset). */}
+      <HomeStackNav.Screen name="EventsList" component={HomeScreen} options={{ headerShown: false }} />
       <HomeStackNav.Screen
         name="EventDetail"
         component={EventDetailScreen}

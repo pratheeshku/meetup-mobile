@@ -1,20 +1,22 @@
-## Status — 2026-09-19 (ARCHIVED — follow-up fixes committed; awaiting testing-agent and conformance review)
+## Status — 2026-09-19 (HomeScreen dashboard rebuild — milestone-based updates, no timer available)
 
-Follow-up to the design-system task: (1) convert `NotificationBanner` to tokens, (2) fix `textMuted` AA contrast.
+Task: rebuild `HomeScreen` as a dashboard (greeting, sport pills, Upcoming, Recommended, My Games & Groups) + emoji tab icons.
+Design: DES-MEETUP-MOBILE, APPROVED 2026-09-13, tier T1. Baseline before changes: tsc exit 0, jest 61/61, eslint clean.
 
 ### Completed
-- `NotificationBanner.tsx` token conversion; `shadows.overlay` token; `textMuted` #8B97B5 -> #5E6D94
-- Tests: `src/theme/__tests__/tokens.test.ts`, `src/components/__tests__/NotificationBanner.test.tsx`
-- Code commit `85da015` pushed; report addendum in `docs/reports/IMPL-DES-MEETUP-MOBILE-design-system.md`
+- Pre-code gates (no new dependencies; Node v20.20.2 satisfies RN 0.86.3 engine)
+- Contract finding: `mapEventApiItem` hardcodes `is_organiser: false` -> organiser derived from `organiser_id === user.id` in `src/utils/homeDashboard.ts`
+- Code: selectors, StatCard, 5 home components (+ shared EventListSection), HomeScreen, tabIcons, RootNavigator
+- Tests: 78 new (selectors 30, components 29, HomeScreen 15, tab icons 4) — mutation-checked (selector rules, filter wiring)
+- Full gate after last code edit: tsc 0, eslint 0, jest 139/139 x3; token audit (with positive controls) clean
 
 ### In Progress
-- None
+- Commit code, then implementation report + agent-enhancement doc, commit, push
 
 ### Pending
-- Visual verification on a device/emulator (light and system dark mode) — NOT done
+- Push + capture push evidence
+- On-device visual check (no emulator on this machine) — NOT done
 - Testing-agent pass (fresh session), then conformance-review
 
 ### Blocked
-- None
-
-Process note: updated at start/close only (no timer available) — see report P3.
+- None (Create Game screen does not exist -> button rendered disabled; flagged, not faked)
