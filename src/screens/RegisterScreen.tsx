@@ -7,17 +7,14 @@
  * the API.
  */
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
+import Button from '../components/Button';
+import TextField from '../components/TextField';
+import TextLink from '../components/TextLink';
+import { colors, spacing, typography } from '../theme/tokens';
 import type { AuthStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
@@ -58,7 +55,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
     <View style={styles.container}>
       <Text style={styles.title}>Register</Text>
 
-      <TextInput
+      <TextField
         style={styles.input}
         placeholder="Nickname"
         autoCapitalize="none"
@@ -66,7 +63,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         onChangeText={setNickname}
         editable={!isSubmitting}
       />
-      <TextInput
+      <TextField
         style={styles.input}
         placeholder="Email"
         autoCapitalize="none"
@@ -76,7 +73,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         onChangeText={setEmail}
         editable={!isSubmitting}
       />
-      <TextInput
+      <TextField
         style={styles.input}
         placeholder="Password"
         secureTextEntry
@@ -85,7 +82,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         onChangeText={setPassword}
         editable={!isSubmitting}
       />
-      <TextInput
+      <TextField
         style={styles.input}
         placeholder="Confirm Password"
         secureTextEntry
@@ -96,44 +93,38 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Pressable
-        style={[styles.button, isSubmitting && styles.buttonDisabled]}
+      <Button
+        label="Register"
         onPress={handleRegister}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Register</Text>
-        )}
-      </Pressable>
+        loading={isSubmitting}
+        style={styles.button}
+      />
 
-      <Pressable onPress={() => navigation.navigate('Login')} disabled={isSubmitting}>
-        <Text style={styles.link}>Already have an account? Sign In</Text>
-      </Pressable>
+      <TextLink
+        label="Already have an account? Sign In"
+        onPress={() => navigation.navigate('Login')}
+        disabled={isSubmitting}
+        style={styles.link}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 24, textAlign: 'center' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+  container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  title: {
+    ...typography.h1,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
   },
-  error: { color: '#c0392b', marginBottom: 12, textAlign: 'center' },
-  button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    marginBottom: 16,
+  input: { marginBottom: spacing.md },
+  error: {
+    ...typography.body,
+    color: colors.error,
+    marginBottom: spacing.md,
+    textAlign: 'center',
   },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-  link: { color: '#2563eb', textAlign: 'center' },
+  button: { marginBottom: spacing.md },
+  link: { alignSelf: 'center' },
 });

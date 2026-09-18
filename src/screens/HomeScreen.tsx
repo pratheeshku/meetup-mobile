@@ -7,18 +7,17 @@
  * Implementation Report Known Gaps).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getEvents } from '../api/events';
+import Badge from '../components/Badge';
+import type { BadgeVariant } from '../components/Badge';
+import Card from '../components/Card';
+import EmptyState from '../components/EmptyState';
+import ErrorView from '../components/ErrorView';
+import LoadingView from '../components/LoadingView';
+import { colors, spacing, typography } from '../theme/tokens';
 import type { Event, RsvpStatus } from '../types/event';
 import type { HomeStackParamList } from '../navigation/types';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
@@ -37,6 +36,13 @@ const RSVP_BADGE_LABEL: Record<RsvpStatus, string> = {
   going: 'Going',
   waitlisted: 'Waitlisted',
   withdrawn: 'None',
+};
+
+const RSVP_BADGE_VARIANT: Record<RsvpStatus, BadgeVariant> = {
+  none: 'neutral',
+  going: 'success',
+  waitlisted: 'warning',
+  withdrawn: 'neutral',
 };
 
 export default function HomeScreen({ navigation }: Props): React.JSX.Element {
@@ -68,22 +74,11 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
   }, [loadEvents]);
 
   if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retryButton} onPress={() => loadEvents(false)}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorView message={error} onRetry={() => loadEvents(false)} />;
   }
 
   return (
@@ -92,15 +87,16 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
       keyExtractor={item => item.id}
       contentContainerStyle={events.length === 0 ? styles.emptyContainer : styles.listContainer}
       refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={() => loadEvents(true)} />
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={() => loadEvents(true)}
+          colors={[colors.primary]}
+          progressBackgroundColor={colors.surface}
+        />
       }
-      ListEmptyComponent={
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>No events yet. Check back soon.</Text>
-        </View>
-      }
+      ListEmptyComponent={<EmptyState title="No events yet" subtitle="Check back soon." />}
       renderItem={({ item }) => (
-        <Pressable
+        <Card
           style={styles.card}
           onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
         >
@@ -108,9 +104,11 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
             <Text style={styles.cardTitle} numberOfLines={1}>
               {item.title}
             </Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{RSVP_BADGE_LABEL[item.current_user_rsvp_status]}</Text>
-            </View>
+            <Badge
+              label={RSVP_BADGE_LABEL[item.current_user_rsvp_status]}
+              variant={RSVP_BADGE_VARIANT[item.current_user_rsvp_status]}
+              style={styles.badge}
+            />
           </View>
           <Text style={styles.cardMeta}>
             {item.sport} · {item.location}
@@ -121,47 +119,23 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
           <Text style={styles.cardMeta}>
             {item.participant_count}/{item.capacity} going
           </Text>
-        </Pressable>
+        </Card>
       )}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  listContainer: { padding: 16 },
+  listContainer: { padding: spacing.md },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { fontSize: 16, color: '#666', textAlign: 'center' },
-  errorText: { fontSize: 16, color: '#c0392b', textAlign: 'center', marginBottom: 16 },
-  retryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  retryButtonText: { color: '#fff', fontWeight: '600' },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
+  card: { marginBottom: spacing.md },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: spacing.xs,
   },
-  cardTitle: { fontSize: 17, fontWeight: '700', flexShrink: 1 },
-  cardMeta: { fontSize: 14, color: '#555', marginTop: 2 },
-  badge: {
-    backgroundColor: '#2563eb',
-    borderRadius: 6,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    marginLeft: 8,
-  },
-  badgeText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  cardTitle: { ...typography.h3, color: colors.textPrimary, flexShrink: 1 },
+  cardMeta: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  badge: { marginLeft: spacing.sm },
 });

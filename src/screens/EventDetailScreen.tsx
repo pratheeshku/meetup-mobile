@@ -13,18 +13,17 @@
  * re-join, and no other button state is described for that value.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { cancelEvent, getEvent, rsvpEvent, withdrawEvent } from '../api/events';
 import { withCorrelationId } from '../api/correlationId';
+import Badge from '../components/Badge';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import ErrorView from '../components/ErrorView';
+import LoadingView from '../components/LoadingView';
+import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { Event } from '../types/event';
 import type { HomeStackParamList } from '../navigation/types';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
@@ -100,22 +99,11 @@ export default function EventDetailScreen({ route, navigation }: Props): React.J
   };
 
   if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (loadError || !event) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{loadError ?? 'Event not found.'}</Text>
-        <Pressable style={styles.retryButton} onPress={loadEvent}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorView message={loadError ?? 'Event not found.'} onRetry={loadEvent} />;
   }
 
   const isRsvpVisible =
@@ -128,32 +116,32 @@ export default function EventDetailScreen({ route, navigation }: Props): React.J
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>{event.title}</Text>
-        {event.is_recurring ? (
-          <View style={styles.recurringBadge}>
-            <Text style={styles.recurringBadgeText}>Recurring</Text>
-          </View>
+      <Card style={styles.infoCard}>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>{event.title}</Text>
+          {event.is_recurring ? (
+            <Badge label="Recurring" variant="neutral" style={styles.recurringBadge} />
+          ) : null}
+        </View>
+
+        {event.status === 'cancelled' ? (
+          <Text style={styles.cancelledBanner}>This event has been cancelled.</Text>
         ) : null}
-      </View>
 
-      {event.status === 'cancelled' ? (
-        <Text style={styles.cancelledBanner}>This event has been cancelled.</Text>
-      ) : null}
+        <Text style={styles.meta}>
+          {event.sport} · {event.location}
+        </Text>
+        <Text style={styles.meta}>{formatEventDate(event.starts_at)}</Text>
+        <Text style={styles.meta}>{formatEventTimeRange(event.starts_at, event.ends_at)}</Text>
+        <Text style={styles.meta}>
+          {event.participant_count}/{event.capacity} going
+          {event.waitlist_count > 0 ? ` · ${event.waitlist_count} waitlisted` : ''}
+        </Text>
+        <Text style={styles.meta}>Organised by {event.organiser_nickname}</Text>
+        {event.cost != null ? <Text style={styles.meta}>Cost: {event.cost}</Text> : null}
 
-      <Text style={styles.meta}>
-        {event.sport} · {event.location}
-      </Text>
-      <Text style={styles.meta}>{formatEventDate(event.starts_at)}</Text>
-      <Text style={styles.meta}>{formatEventTimeRange(event.starts_at, event.ends_at)}</Text>
-      <Text style={styles.meta}>
-        {event.participant_count}/{event.capacity} going
-        {event.waitlist_count > 0 ? ` · ${event.waitlist_count} waitlisted` : ''}
-      </Text>
-      <Text style={styles.meta}>Organised by {event.organiser_nickname}</Text>
-      {event.cost != null ? <Text style={styles.meta}>Cost: {event.cost}</Text> : null}
-
-      <Text style={styles.description}>{event.description}</Text>
+        <Text style={styles.description}>{event.description}</Text>
+      </Card>
 
       {isAtCapacity ? (
         <Text style={styles.waitlistNotice}>
@@ -164,75 +152,57 @@ export default function EventDetailScreen({ route, navigation }: Props): React.J
       {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
 
       {isRsvpVisible ? (
-        <Pressable
-          style={[styles.button, isActionLoading && styles.buttonDisabled]}
+        <Button
+          label={isGoingOrWaitlisted ? 'Leave' : 'Join'}
+          variant={isGoingOrWaitlisted ? 'secondary' : 'primary'}
           onPress={isGoingOrWaitlisted ? handleWithdraw : handleRsvp}
-          disabled={isActionLoading}
-        >
-          {isActionLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>{isGoingOrWaitlisted ? 'Leave' : 'Join'}</Text>
-          )}
-        </Pressable>
+          loading={isActionLoading}
+          style={styles.button}
+        />
       ) : null}
 
       {isCancelVisible ? (
-        <Pressable
-          style={[styles.cancelButton, isActionLoading && styles.buttonDisabled]}
+        <Button
+          label="Cancel Event"
+          variant="destructive"
           onPress={handleCancel}
-          disabled={isActionLoading}
-        >
-          {isActionLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Cancel Event</Text>
-          )}
-        </Pressable>
+          loading={isActionLoading}
+          style={styles.button}
+        />
       ) : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 24 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  title: { fontSize: 22, fontWeight: '700', flexShrink: 1 },
-  recurringBadge: {
-    backgroundColor: '#eee',
-    borderRadius: 6,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    marginLeft: 8,
+  container: { padding: spacing.md },
+  infoCard: { marginBottom: spacing.md },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  title: { ...typography.h2, color: colors.textPrimary, flexShrink: 1 },
+  recurringBadge: { marginLeft: spacing.sm },
+  cancelledBanner: {
+    ...typography.bodyBold,
+    color: colors.error,
+    backgroundColor: colors.errorLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
-  recurringBadgeText: { fontSize: 12, fontWeight: '600', color: '#555' },
-  cancelledBanner: { color: '#c0392b', fontWeight: '600', marginBottom: 12 },
-  meta: { fontSize: 15, color: '#444', marginBottom: 4 },
-  description: { fontSize: 15, color: '#222', marginTop: 12, marginBottom: 16 },
-  waitlistNotice: { fontSize: 14, color: '#b8860b', marginBottom: 16 },
-  errorText: { fontSize: 15, color: '#c0392b', textAlign: 'center', marginBottom: 16 },
-  retryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  meta: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xs },
+  description: { ...typography.body, color: colors.textPrimary, marginTop: spacing.md },
+  waitlistNotice: {
+    ...typography.body,
+    color: colors.textPrimary,
+    backgroundColor: colors.warningLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
-  retryButtonText: { color: '#fff', fontWeight: '600' },
-  button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    marginTop: 8,
+  errorText: {
+    ...typography.body,
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing.md,
   },
-  cancelButton: {
-    backgroundColor: '#c0392b',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  button: { marginBottom: spacing.sm },
 });

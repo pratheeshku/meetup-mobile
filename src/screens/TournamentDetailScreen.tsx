@@ -34,14 +34,7 @@
  * actions.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -54,6 +47,11 @@ import {
   registerForTournament,
   withdrawFromTournament,
 } from '../api/tournaments';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import ErrorView from '../components/ErrorView';
+import LoadingView from '../components/LoadingView';
+import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
 import type { TournamentsStackParamList } from '../navigation/types';
 
@@ -174,22 +172,11 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
   };
 
   if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (loadError || !tournament) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{loadError ?? 'Tournament not found.'}</Text>
-        <Pressable style={styles.retryButton} onPress={loadAll}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorView message={loadError ?? 'Tournament not found.'} onRetry={loadAll} />;
   }
 
   // Full-contract-audit fix (2026-09-18, see
@@ -214,51 +201,44 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{tournament.name}</Text>
-      <Text style={styles.meta}>
-        {tournament.sport} · {tournament.format}
-      </Text>
-      <Text style={styles.meta}>Status: {tournament.status}</Text>
-      <Text style={styles.meta}>Organised by {tournament.organiser_nickname}</Text>
-      <Text style={styles.meta}>Starts {formatDateTime(tournament.starts_at)}</Text>
-      {/* `registrations.length` used instead of `tournament.participant_count` —
-          the real backend has no such field; this screen already fetches
-          the registrations list, so this is exact rather than a
-          placeholder (see the audit report / mapTournamentApiItem). */}
-      <Text style={styles.meta}>
-        {registrations.length}/{tournament.max_participants} registered
-      </Text>
-      <Text style={styles.description}>{tournament.description}</Text>
+      <Card style={styles.infoCard}>
+        <Text style={styles.title}>{tournament.name}</Text>
+        <Text style={styles.meta}>
+          {tournament.sport} · {tournament.format}
+        </Text>
+        <Text style={styles.meta}>Status: {tournament.status}</Text>
+        <Text style={styles.meta}>Organised by {tournament.organiser_nickname}</Text>
+        <Text style={styles.meta}>Starts {formatDateTime(tournament.starts_at)}</Text>
+        {/* `registrations.length` used instead of `tournament.participant_count` —
+            the real backend has no such field; this screen already fetches
+            the registrations list, so this is exact rather than a
+            placeholder (see the audit report / mapTournamentApiItem). */}
+        <Text style={styles.meta}>
+          {registrations.length}/{tournament.max_participants} registered
+        </Text>
+        <Text style={styles.description}>{tournament.description}</Text>
+      </Card>
 
       {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
       {withdrawError ? <Text style={styles.errorText}>{withdrawError}</Text> : null}
 
       {canRegister ? (
-        <Pressable
-          style={[styles.button, isRegistering && styles.buttonDisabled]}
+        <Button
+          label="Register"
           onPress={handleRegister}
-          disabled={isRegistering}
-        >
-          {isRegistering ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Register</Text>
-          )}
-        </Pressable>
+          loading={isRegistering}
+          style={styles.button}
+        />
       ) : null}
 
       {canWithdraw ? (
-        <Pressable
-          style={[styles.button, isWithdrawing && styles.buttonDisabled]}
+        <Button
+          label="Withdraw"
+          variant="secondary"
           onPress={handleWithdraw}
-          disabled={isWithdrawing}
-        >
-          {isWithdrawing ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Withdraw</Text>
-          )}
-        </Pressable>
+          loading={isWithdrawing}
+          style={styles.button}
+        />
       ) : null}
 
       {showRegistrationClosedMessage ? (
@@ -269,6 +249,8 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         <Pressable
           style={[styles.tabButton, activeTab === 'fixtures' && styles.tabButtonActive]}
           onPress={() => setActiveTab('fixtures')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'fixtures' }}
         >
           <Text
             style={[styles.tabButtonText, activeTab === 'fixtures' && styles.tabButtonTextActive]}
@@ -279,6 +261,8 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         <Pressable
           style={[styles.tabButton, activeTab === 'registrations' && styles.tabButtonActive]}
           onPress={() => setActiveTab('registrations')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'registrations' }}
         >
           <Text
             style={[
@@ -291,50 +275,47 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         </Pressable>
       </View>
 
-      {activeTab === 'fixtures' ? (
-        fixtures.length === 0 ? (
-          <Text style={styles.emptyText}>No fixtures yet.</Text>
+      <Card>
+        {activeTab === 'fixtures' ? (
+          fixtures.length === 0 ? (
+            <Text style={styles.emptyText}>No fixtures yet.</Text>
+          ) : (
+            fixtures.map(fixture => (
+              <View key={fixture.id} style={styles.listRow}>
+                <Text style={styles.fixtureRound}>{fixture.round}</Text>
+                <Text style={styles.fixtureTeams}>
+                  {fixture.home_team} {fixture.home_score ?? '-'} : {fixture.away_score ?? '-'}{' '}
+                  {fixture.away_team}
+                </Text>
+                <Text style={styles.fixtureMeta}>
+                  {formatDateTime(fixture.scheduled_at)} · {fixture.status}
+                </Text>
+              </View>
+            ))
+          )
+        ) : registrations.length === 0 ? (
+          <Text style={styles.emptyText}>No one has registered yet.</Text>
         ) : (
-          fixtures.map(fixture => (
-            <View key={fixture.id} style={styles.listRow}>
-              <Text style={styles.fixtureRound}>{fixture.round}</Text>
-              <Text style={styles.fixtureTeams}>
-                {fixture.home_team} {fixture.home_score ?? '-'} : {fixture.away_score ?? '-'}{' '}
-                {fixture.away_team}
-              </Text>
+          registrations.map(registration => (
+            <View key={registration.id} style={styles.listRow}>
+              <Text style={styles.memberNickname}>{registration.nickname}</Text>
               <Text style={styles.fixtureMeta}>
-                {formatDateTime(fixture.scheduled_at)} · {fixture.status}
+                Registered {formatDateTime(registration.registered_at)}
               </Text>
             </View>
           ))
-        )
-      ) : registrations.length === 0 ? (
-        <Text style={styles.emptyText}>No one has registered yet.</Text>
-      ) : (
-        registrations.map(registration => (
-          <View key={registration.id} style={styles.listRow}>
-            <Text style={styles.memberNickname}>{registration.nickname}</Text>
-            <Text style={styles.fixtureMeta}>
-              Registered {formatDateTime(registration.registered_at)}
-            </Text>
-          </View>
-        ))
-      )}
+        )}
+      </Card>
 
       {canCancel ? (
         <View style={styles.cancelSection}>
           {cancelError ? <Text style={styles.errorText}>{cancelError}</Text> : null}
-          <Pressable
-            style={[styles.cancelButton, isCancelling && styles.buttonDisabled]}
+          <Button
+            label="Cancel Tournament"
+            variant="destructive"
             onPress={handleCancel}
-            disabled={isCancelling}
-          >
-            {isCancelling ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Cancel Tournament</Text>
-            )}
-          </Pressable>
+            loading={isCancelling}
+          />
         </View>
       ) : null}
     </ScrollView>
@@ -342,51 +323,60 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 24 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
-  meta: { fontSize: 15, color: '#444', marginBottom: 4 },
-  description: { fontSize: 15, color: '#222', marginTop: 8, marginBottom: 16 },
-  closedNotice: { fontSize: 14, color: '#b8860b', marginBottom: 16 },
-  button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    marginBottom: 12,
+  container: { padding: spacing.md },
+  infoCard: { marginBottom: spacing.md },
+  title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.sm },
+  meta: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xs },
+  description: { ...typography.body, color: colors.textPrimary, marginTop: spacing.sm },
+  closedNotice: {
+    ...typography.body,
+    color: colors.textPrimary,
+    backgroundColor: colors.warningLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-  tabRow: { flexDirection: 'row', marginTop: 12, marginBottom: 12 },
+  button: { marginBottom: spacing.sm },
+  tabRow: { flexDirection: 'row', marginTop: spacing.sm, marginBottom: spacing.md },
   tabButton: {
     flex: 1,
-    paddingVertical: 10,
+    minHeight: sizes.touchTarget,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: '#eee',
+    justifyContent: 'center',
+    borderBottomWidth: borderWidth.thick,
+    borderBottomColor: colors.border,
   },
-  tabButtonActive: { borderBottomColor: '#2563eb' },
-  tabButtonText: { fontSize: 14, fontWeight: '600', color: '#666' },
-  tabButtonTextActive: { color: '#2563eb' },
-  emptyText: { fontSize: 14, color: '#666', textAlign: 'center', marginTop: 12 },
-  listRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  fixtureRound: { fontSize: 12, fontWeight: '600', color: '#888', marginBottom: 2 },
-  fixtureTeams: { fontSize: 15, color: '#222', marginBottom: 2 },
-  fixtureMeta: { fontSize: 13, color: '#666' },
-  memberNickname: { fontSize: 15, color: '#222', marginBottom: 2 },
-  cancelSection: { marginTop: 24, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 16 },
-  cancelButton: {
-    backgroundColor: '#c0392b',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
+  tabButtonActive: { borderBottomColor: colors.primary },
+  tabButtonText: { ...typography.bodyBold, color: colors.textSecondary },
+  tabButtonTextActive: { color: colors.primary },
+  emptyText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
-  errorText: { fontSize: 14, color: '#c0392b', marginBottom: 8, textAlign: 'center' },
-  retryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  listRow: {
+    paddingVertical: spacing.sm,
+    borderBottomWidth: borderWidth.thin,
+    borderBottomColor: colors.border,
   },
-  retryButtonText: { color: '#fff', fontWeight: '600' },
+  fixtureRound: {
+    ...typography.label,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  fixtureTeams: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.xs },
+  fixtureMeta: { ...typography.caption, color: colors.textSecondary },
+  memberNickname: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.xs },
+  cancelSection: {
+    marginTop: spacing.lg,
+    borderTopWidth: borderWidth.thin,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
+  },
+  errorText: {
+    ...typography.body,
+    color: colors.error,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
 });

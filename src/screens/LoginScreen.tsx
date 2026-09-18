@@ -6,19 +6,16 @@
  * logs (R-111, P10).
  */
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
 import { GoogleSignInCancelledError } from '../auth/googleAuth';
+import Button from '../components/Button';
+import TextField from '../components/TextField';
+import TextLink from '../components/TextLink';
+import { colors, spacing, typography } from '../theme/tokens';
 import type { AuthStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
@@ -77,7 +74,7 @@ export default function LoginScreen({ navigation }: Props): React.JSX.Element {
         onPress={handleGoogleSignIn}
       />
 
-      <TextInput
+      <TextField
         style={styles.input}
         placeholder="Email"
         autoCapitalize="none"
@@ -87,7 +84,7 @@ export default function LoginScreen({ navigation }: Props): React.JSX.Element {
         onChangeText={setEmail}
         editable={!isSubmitting}
       />
-      <TextInput
+      <TextField
         style={styles.input}
         placeholder="Password"
         secureTextEntry
@@ -99,45 +96,39 @@ export default function LoginScreen({ navigation }: Props): React.JSX.Element {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Pressable
-        style={[styles.button, isSubmitting && styles.buttonDisabled]}
+      <Button
+        label="Sign In"
         onPress={handleEmailSignIn}
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Sign In</Text>
-        )}
-      </Pressable>
+        loading={isSubmitting}
+        style={styles.button}
+      />
 
-      <Pressable onPress={() => navigation.navigate('Register')} disabled={isSubmitting}>
-        <Text style={styles.link}>Don&apos;t have an account? Register</Text>
-      </Pressable>
+      <TextLink
+        label="Don't have an account? Register"
+        onPress={() => navigation.navigate('Register')}
+        disabled={isSubmitting}
+        style={styles.link}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 24, textAlign: 'center' },
-  googleButton: { alignSelf: 'center', marginBottom: 24 },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+  container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  title: {
+    ...typography.h1,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
   },
-  error: { color: '#c0392b', marginBottom: 12, textAlign: 'center' },
-  button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    marginBottom: 16,
+  googleButton: { alignSelf: 'center', marginBottom: spacing.lg },
+  input: { marginBottom: spacing.md },
+  error: {
+    ...typography.body,
+    color: colors.error,
+    marginBottom: spacing.md,
+    textAlign: 'center',
   },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-  link: { color: '#2563eb', textAlign: 'center' },
+  button: { marginBottom: spacing.md },
+  link: { alignSelf: 'center' },
 });

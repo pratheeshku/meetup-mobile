@@ -24,27 +24,37 @@
  * rejected server-side regardless.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
 import { withCorrelationId } from '../api/correlationId';
 import { getGroup, inviteMember, removeMember, updateMemberRole } from '../api/groups';
+import Badge from '../components/Badge';
+import type { BadgeVariant } from '../components/Badge';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import ErrorView from '../components/ErrorView';
+import LoadingView from '../components/LoadingView';
+import TextField from '../components/TextField';
+import TextLink from '../components/TextLink';
+import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { GroupDetail, GroupMember, GroupMemberRole } from '../types/group';
 import type { GroupsStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'GroupDetail'>;
 
 const ROLE_OPTIONS: GroupMemberRole[] = ['member', 'admin'];
+
+const ROLE_BADGE_VARIANT: Record<GroupMemberRole, BadgeVariant> = {
+  owner: 'primary',
+  admin: 'primary',
+  member: 'neutral',
+};
+
+function formatRoleLabel(role: GroupMemberRole): string {
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
 
 export default function GroupDetailScreen({ route, navigation }: Props): React.JSX.Element {
   const { groupId } = route.params;
@@ -199,22 +209,11 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
   };
 
   if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (loadError || !group) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{loadError ?? 'Group not found.'}</Text>
-        <Pressable style={styles.retryButton} onPress={loadGroup}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorView message={loadError ?? 'Group not found.'} onRetry={loadGroup} />;
   }
 
   // Full-contract-audit fix (2026-09-18, see
@@ -236,26 +235,26 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{group.name}</Text>
-      <Text style={styles.description}>{group.description}</Text>
-      <Text style={styles.meta}>Owned by {group.owner_nickname}</Text>
-      <Text style={styles.meta}>
-        {group.member_count} {group.member_count === 1 ? 'member' : 'members'}
-      </Text>
+      <Card style={styles.infoCard}>
+        <Text style={styles.title}>{group.name}</Text>
+        <Text style={styles.description}>{group.description}</Text>
+        <Text style={styles.meta}>Owned by {group.owner_nickname}</Text>
+        <Text style={styles.meta}>
+          {group.member_count} {group.member_count === 1 ? 'member' : 'members'}
+        </Text>
+      </Card>
 
-      <View style={styles.section}>
+      <Card>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Members</Text>
           {canInvite && !isInviteFormOpen ? (
-            <Pressable onPress={handleOpenInviteForm}>
-              <Text style={styles.editLink}>Invite</Text>
-            </Pressable>
+            <TextLink label="Invite" onPress={handleOpenInviteForm} />
           ) : null}
         </View>
 
         {isInviteFormOpen ? (
           <View style={styles.editRow}>
-            <TextInput
+            <TextField
               style={styles.input}
               placeholder="User ID"
               value={inviteUserIdDraft}
@@ -266,24 +265,20 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
             />
             {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
             <View style={styles.editActionsRow}>
-              <Pressable
-                style={[styles.smallButton, isInviting && styles.buttonDisabled]}
+              <Button
+                label="Send Invite"
+                size="sm"
                 onPress={handleSendInvite}
-                disabled={isInviting}
-              >
-                {isInviting ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.smallButtonText}>Send Invite</Text>
-                )}
-              </Pressable>
-              <Pressable
-                style={[styles.smallButtonSecondary, isInviting && styles.buttonDisabled]}
+                loading={isInviting}
+                style={styles.actionSpacing}
+              />
+              <Button
+                label="Cancel"
+                size="sm"
+                variant="secondary"
                 onPress={handleCancelInvite}
                 disabled={isInviting}
-              >
-                <Text style={styles.smallButtonSecondaryText}>Cancel</Text>
-              </Pressable>
+              />
             </View>
           </View>
         ) : null}
@@ -301,7 +296,10 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
             <View key={member.user_id} style={styles.memberRow}>
               <View style={styles.memberInfo}>
                 <Text style={styles.memberNickname}>{member.nickname}</Text>
-                <Text style={styles.memberRoleBadge}>{member.role}</Text>
+                <Badge
+                  label={formatRoleLabel(member.role)}
+                  variant={ROLE_BADGE_VARIANT[member.role]}
+                />
               </View>
 
               {isEditingThisRole ? (
@@ -330,66 +328,55 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
                   </View>
                   {roleError ? <Text style={styles.errorText}>{roleError}</Text> : null}
                   <View style={styles.editActionsRow}>
-                    <Pressable
-                      style={[styles.smallButton, isSavingRole && styles.buttonDisabled]}
+                    <Button
+                      label="Save"
+                      size="sm"
                       onPress={handleSaveRole}
-                      disabled={isSavingRole}
-                    >
-                      {isSavingRole ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                      ) : (
-                        <Text style={styles.smallButtonText}>Save</Text>
-                      )}
-                    </Pressable>
-                    <Pressable
-                      style={[styles.smallButtonSecondary, isSavingRole && styles.buttonDisabled]}
+                      loading={isSavingRole}
+                      style={styles.actionSpacing}
+                    />
+                    <Button
+                      label="Cancel"
+                      size="sm"
+                      variant="secondary"
                       onPress={handleCancelEditRole}
                       disabled={isSavingRole}
-                    >
-                      <Text style={styles.smallButtonSecondaryText}>Cancel</Text>
-                    </Pressable>
+                    />
                   </View>
                 </View>
               ) : (
                 <View style={styles.memberActionsRow}>
                   {showRoleControl ? (
-                    <Pressable onPress={() => handleStartEditRole(member)}>
-                      <Text style={styles.editLink}>Change Role</Text>
-                    </Pressable>
+                    <TextLink
+                      label="Change Role"
+                      onPress={() => handleStartEditRole(member)}
+                      style={styles.linkSpacing}
+                    />
                   ) : null}
                   {showRemoveControl ? (
-                    <Pressable
+                    <TextLink
+                      label="Remove"
+                      tone="destructive"
                       onPress={() => handleRemoveMemberPress(member)}
-                      disabled={removingUserId === member.user_id}
-                    >
-                      {removingUserId === member.user_id ? (
-                        <ActivityIndicator size="small" color="#c0392b" />
-                      ) : (
-                        <Text style={styles.removeLink}>Remove</Text>
-                      )}
-                    </Pressable>
+                      loading={removingUserId === member.user_id}
+                    />
                   ) : null}
                 </View>
               )}
             </View>
           );
         })}
-      </View>
+      </Card>
 
       {canLeave ? (
         <View style={styles.leaveSection}>
           {leaveError ? <Text style={styles.errorText}>{leaveError}</Text> : null}
-          <Pressable
-            style={[styles.leaveButton, isLeaving && styles.buttonDisabled]}
+          <Button
+            label="Leave Group"
+            variant="destructive"
             onPress={handleLeaveGroupPress}
-            disabled={isLeaving}
-          >
-            {isLeaving ? (
-              <ActivityIndicator color="#c0392b" />
-            ) : (
-              <Text style={styles.leaveButtonText}>Leave Group</Text>
-            )}
-          </Pressable>
+            loading={isLeaving}
+          />
         </View>
       ) : null}
     </ScrollView>
@@ -397,95 +384,62 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 24 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  title: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
-  description: { fontSize: 15, color: '#222', marginBottom: 12 },
-  meta: { fontSize: 15, color: '#444', marginBottom: 4 },
-  section: { marginTop: 20 },
+  container: { padding: spacing.md },
+  infoCard: { marginBottom: spacing.md },
+  title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.sm },
+  description: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.md },
+  meta: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xs },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
-  sectionTitle: { fontSize: 17, fontWeight: '700' },
-  editLink: { color: '#2563eb', fontWeight: '600' },
-  removeLink: { color: '#c0392b', fontWeight: '600' },
+  sectionTitle: { ...typography.h3, color: colors.textPrimary },
   memberRow: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: borderWidth.thin,
+    borderBottomColor: colors.border,
   },
   memberInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  memberNickname: { fontSize: 15, color: '#222' },
-  memberRoleBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#555',
+  memberNickname: { ...typography.body, color: colors.textPrimary },
+  memberActionsRow: { flexDirection: 'row', marginTop: spacing.sm },
+  linkSpacing: { marginRight: spacing.md },
+  editRow: { marginTop: spacing.sm, width: '100%' },
+  input: { marginBottom: spacing.sm },
+  editActionsRow: { flexDirection: 'row', marginTop: spacing.xs },
+  actionSpacing: { marginRight: spacing.sm },
+  rolePickerRow: { flexDirection: 'row', marginBottom: spacing.sm },
+  roleOption: {
+    minHeight: sizes.controlSmall,
+    justifyContent: 'center',
+    borderWidth: borderWidth.thin,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    marginRight: spacing.sm,
+  },
+  roleOptionSelected: { backgroundColor: colors.primary },
+  roleOptionText: {
+    ...typography.bodyBold,
+    color: colors.primary,
     textTransform: 'capitalize',
   },
-  memberActionsRow: { flexDirection: 'row', marginTop: 6 },
-  editRow: { marginTop: 8, width: '100%' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-    fontSize: 15,
+  roleOptionTextSelected: { color: colors.white },
+  leaveSection: {
+    marginTop: spacing.xl,
+    borderTopWidth: borderWidth.thin,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
   },
-  editActionsRow: { flexDirection: 'row', marginTop: 4 },
-  smallButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+  errorText: {
+    ...typography.body,
+    color: colors.error,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
-  smallButtonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  smallButtonSecondary: {
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  smallButtonSecondaryText: { color: '#555', fontWeight: '600', fontSize: 14 },
-  rolePickerRow: { flexDirection: 'row', marginBottom: 8 },
-  roleOption: {
-    borderWidth: 1,
-    borderColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginRight: 8,
-  },
-  roleOptionSelected: { backgroundColor: '#2563eb' },
-  roleOptionText: { color: '#2563eb', fontWeight: '600', fontSize: 13, textTransform: 'capitalize' },
-  roleOptionTextSelected: { color: '#fff' },
-  buttonDisabled: { opacity: 0.6 },
-  leaveSection: { marginTop: 32, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 16 },
-  leaveButton: {
-    borderWidth: 1,
-    borderColor: '#c0392b',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-  },
-  leaveButtonText: { color: '#c0392b', fontWeight: '600', fontSize: 16 },
-  errorText: { fontSize: 14, color: '#c0392b', marginBottom: 8, textAlign: 'center' },
-  retryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  retryButtonText: { color: '#fff', fontWeight: '600' },
 });

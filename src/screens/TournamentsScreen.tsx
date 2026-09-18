@@ -2,18 +2,17 @@
  * Tournaments list (DES-MEETUP-MOBILE.md §4.5, §7.7; R-041).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getTournaments } from '../api/tournaments';
+import Badge from '../components/Badge';
+import type { BadgeVariant } from '../components/Badge';
+import Card from '../components/Card';
+import EmptyState from '../components/EmptyState';
+import ErrorView from '../components/ErrorView';
+import LoadingView from '../components/LoadingView';
+import { colors, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentRegistrationStatus } from '../types/tournament';
 import type { TournamentsStackParamList } from '../navigation/types';
 
@@ -23,6 +22,12 @@ const REGISTRATION_BADGE_LABEL: Record<TournamentRegistrationStatus, string> = {
   none: 'Not Registered',
   registered: 'Registered',
   withdrawn: 'Withdrawn',
+};
+
+const REGISTRATION_BADGE_VARIANT: Record<TournamentRegistrationStatus, BadgeVariant> = {
+  none: 'neutral',
+  registered: 'success',
+  withdrawn: 'warning',
 };
 
 export default function TournamentsScreen({ navigation }: Props): React.JSX.Element {
@@ -54,22 +59,11 @@ export default function TournamentsScreen({ navigation }: Props): React.JSX.Elem
   }, [loadTournaments]);
 
   if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.retryButton} onPress={() => loadTournaments(false)}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorView message={error} onRetry={() => loadTournaments(false)} />;
   }
 
   return (
@@ -80,15 +74,18 @@ export default function TournamentsScreen({ navigation }: Props): React.JSX.Elem
         tournaments.length === 0 ? styles.emptyContainer : styles.listContainer
       }
       refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={() => loadTournaments(true)} />
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={() => loadTournaments(true)}
+          colors={[colors.primary]}
+          progressBackgroundColor={colors.surface}
+        />
       }
       ListEmptyComponent={
-        <View style={styles.centered}>
-          <Text style={styles.emptyText}>No tournaments yet. Check back soon.</Text>
-        </View>
+        <EmptyState title="No tournaments yet" subtitle="Check back soon." />
       }
       renderItem={({ item }) => (
-        <Pressable
+        <Card
           style={styles.card}
           onPress={() => navigation.navigate('TournamentDetail', { tournamentId: item.id })}
         >
@@ -96,11 +93,11 @@ export default function TournamentsScreen({ navigation }: Props): React.JSX.Elem
             <Text style={styles.cardTitle} numberOfLines={1}>
               {item.name}
             </Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {REGISTRATION_BADGE_LABEL[item.current_user_registration_status]}
-              </Text>
-            </View>
+            <Badge
+              label={REGISTRATION_BADGE_LABEL[item.current_user_registration_status]}
+              variant={REGISTRATION_BADGE_VARIANT[item.current_user_registration_status]}
+              style={styles.badge}
+            />
           </View>
           <Text style={styles.cardMeta}>
             {item.sport} · {item.format}
@@ -109,47 +106,23 @@ export default function TournamentsScreen({ navigation }: Props): React.JSX.Elem
           <Text style={styles.cardMeta}>
             {item.participant_count}/{item.max_participants} registered
           </Text>
-        </Pressable>
+        </Card>
       )}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  listContainer: { padding: 16 },
+  listContainer: { padding: spacing.md },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  emptyText: { fontSize: 16, color: '#666', textAlign: 'center' },
-  errorText: { fontSize: 16, color: '#c0392b', textAlign: 'center', marginBottom: 16 },
-  retryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  retryButtonText: { color: '#fff', fontWeight: '600' },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
+  card: { marginBottom: spacing.md },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: spacing.xs,
   },
-  cardTitle: { fontSize: 17, fontWeight: '700', flexShrink: 1 },
-  cardMeta: { fontSize: 14, color: '#555', marginTop: 2 },
-  badge: {
-    backgroundColor: '#2563eb',
-    borderRadius: 6,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    marginLeft: 8,
-  },
-  badgeText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  cardTitle: { ...typography.h3, color: colors.textPrimary, flexShrink: 1 },
+  cardMeta: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  badge: { marginLeft: spacing.sm },
 });

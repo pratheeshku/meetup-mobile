@@ -27,17 +27,7 @@
  * navigation context.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -49,6 +39,13 @@ import {
   updateProfile,
   updateSkillLevel,
 } from '../api/profile';
+import Button from '../components/Button';
+import Card from '../components/Card';
+import ErrorView from '../components/ErrorView';
+import LoadingView from '../components/LoadingView';
+import TextField from '../components/TextField';
+import TextLink from '../components/TextLink';
+import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { SkillLevelValue, UserProfile } from '../types/user';
 import type { ProfileStackParamList } from '../navigation/types';
 
@@ -236,22 +233,11 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   };
 
   if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (loadError || !profile) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{loadError ?? 'Profile not found.'}</Text>
-        <Pressable style={styles.retryButton} onPress={loadProfile}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorView message={loadError ?? 'Profile not found.'} onRetry={loadProfile} />;
   }
 
   // `skill_levels` is optional on the canonical `UserProfile` type (it's
@@ -264,7 +250,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
+      <Card style={styles.header}>
         {profile.avatar_url ? (
           <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
         ) : (
@@ -277,8 +263,8 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
         {isEditingNickname ? (
           <View style={styles.editRow}>
-            <TextInput
-              style={styles.nicknameInput}
+            <TextField
+              style={styles.input}
               value={nicknameDraft}
               onChangeText={setNicknameDraft}
               editable={!isSavingNickname}
@@ -286,45 +272,37 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
             />
             {nicknameError ? <Text style={styles.errorText}>{nicknameError}</Text> : null}
             <View style={styles.editActionsRow}>
-              <Pressable
-                style={[styles.smallButton, isSavingNickname && styles.buttonDisabled]}
+              <Button
+                label="Save"
+                size="sm"
                 onPress={handleSaveNickname}
-                disabled={isSavingNickname}
-              >
-                {isSavingNickname ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.smallButtonText}>Save</Text>
-                )}
-              </Pressable>
-              <Pressable
-                style={[styles.smallButtonSecondary, isSavingNickname && styles.buttonDisabled]}
+                loading={isSavingNickname}
+                style={styles.actionSpacing}
+              />
+              <Button
+                label="Cancel"
+                size="sm"
+                variant="secondary"
                 onPress={handleCancelEditNickname}
                 disabled={isSavingNickname}
-              >
-                <Text style={styles.smallButtonSecondaryText}>Cancel</Text>
-              </Pressable>
+              />
             </View>
           </View>
         ) : (
           <View style={styles.nicknameRow}>
             <Text style={styles.nickname}>{profile.nickname}</Text>
-            <Pressable onPress={handleStartEditNickname}>
-              <Text style={styles.editLink}>Edit</Text>
-            </Pressable>
+            <TextLink label="Edit" onPress={handleStartEditNickname} />
           </View>
         )}
 
         <Text style={styles.email}>{profile.email}</Text>
-      </View>
+      </Card>
 
-      <View style={styles.section}>
+      <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Skill Levels</Text>
           {!isEditingSkillLevel ? (
-            <Pressable onPress={handleStartAddSkillLevel}>
-              <Text style={styles.editLink}>Add</Text>
-            </Pressable>
+            <TextLink label="Add" onPress={handleStartAddSkillLevel} />
           ) : null}
         </View>
 
@@ -336,6 +314,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
               key={item.sport}
               style={styles.skillLevelRow}
               onPress={() => handleStartEditSkillLevel(item.sport, item.skill_level)}
+              accessibilityRole="button"
             >
               <Text style={styles.skillLevelSport}>{item.sport}</Text>
               <Text style={styles.skillLevelValue}>{item.skill_level}</Text>
@@ -345,8 +324,8 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
         {isEditingSkillLevel ? (
           <View style={styles.editRow}>
-            <TextInput
-              style={styles.nicknameInput}
+            <TextField
+              style={styles.input}
               placeholder="Sport"
               value={sportDraft}
               onChangeText={setSportDraft}
@@ -377,49 +356,41 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
             </View>
             {skillLevelError ? <Text style={styles.errorText}>{skillLevelError}</Text> : null}
             <View style={styles.editActionsRow}>
-              <Pressable
-                style={[styles.smallButton, isSavingSkillLevel && styles.buttonDisabled]}
+              <Button
+                label="Save"
+                size="sm"
                 onPress={handleSaveSkillLevel}
-                disabled={isSavingSkillLevel}
-              >
-                {isSavingSkillLevel ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.smallButtonText}>Save</Text>
-                )}
-              </Pressable>
-              <Pressable
-                style={[styles.smallButtonSecondary, isSavingSkillLevel && styles.buttonDisabled]}
+                loading={isSavingSkillLevel}
+                style={styles.actionSpacing}
+              />
+              <Button
+                label="Cancel"
+                size="sm"
+                variant="secondary"
                 onPress={handleCancelEditSkillLevel}
                 disabled={isSavingSkillLevel}
-              >
-                <Text style={styles.smallButtonSecondaryText}>Cancel</Text>
-              </Pressable>
+              />
             </View>
           </View>
         ) : null}
-      </View>
+      </Card>
 
-      <Pressable
-        style={styles.linkButton}
+      <Button
+        label="Notification Preferences"
+        variant="secondary"
         onPress={() => navigation.navigate('NotificationPreferences')}
-      >
-        <Text style={styles.linkButtonText}>Notification Preferences</Text>
-      </Pressable>
+        style={styles.stackedButton}
+      />
 
       {signOutError ? <Text style={styles.errorText}>{signOutError}</Text> : null}
 
-      <Pressable
-        style={[styles.signOutButton, isSigningOut && styles.buttonDisabled]}
+      <Button
+        label="Sign Out"
+        variant="secondary"
         onPress={handleSignOut}
-        disabled={isSigningOut}
-      >
-        {isSigningOut ? (
-          <ActivityIndicator color="#2563eb" />
-        ) : (
-          <Text style={styles.signOutButtonText}>Sign Out</Text>
-        )}
-      </Pressable>
+        loading={isSigningOut}
+        style={styles.signOutButton}
+      />
 
       <View style={styles.dangerZone}>
         {deletionError ? <Text style={styles.errorText}>{deletionError}</Text> : null}
@@ -429,8 +400,8 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
             <Text style={styles.dangerZoneText}>
               Enter the confirmation code sent to your email to proceed.
             </Text>
-            <TextInput
-              style={styles.nicknameInput}
+            <TextField
+              style={styles.input}
               placeholder="Confirmation code"
               value={confirmationCodeDraft}
               onChangeText={setConfirmationCodeDraft}
@@ -438,38 +409,30 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
               autoCapitalize="none"
             />
             <View style={styles.editActionsRow}>
-              <Pressable
-                style={[styles.deleteButton, isConfirmingDeletion && styles.buttonDisabled]}
+              <Button
+                label="Confirm Deletion"
+                size="sm"
+                variant="destructive"
                 onPress={handleConfirmDeletion}
-                disabled={isConfirmingDeletion}
-              >
-                {isConfirmingDeletion ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.smallButtonText}>Confirm Deletion</Text>
-                )}
-              </Pressable>
-              <Pressable
-                style={[styles.smallButtonSecondary, isConfirmingDeletion && styles.buttonDisabled]}
+                loading={isConfirmingDeletion}
+                style={styles.actionSpacing}
+              />
+              <Button
+                label="Cancel"
+                size="sm"
+                variant="secondary"
                 onPress={handleCancelDeletionCode}
                 disabled={isConfirmingDeletion}
-              >
-                <Text style={styles.smallButtonSecondaryText}>Cancel</Text>
-              </Pressable>
+              />
             </View>
           </View>
         ) : (
-          <Pressable
-            style={[styles.deleteButton, isRequestingDeletion && styles.buttonDisabled]}
+          <Button
+            label="Delete Account"
+            variant="destructive"
             onPress={handleDeleteAccountPress}
-            disabled={isRequestingDeletion}
-          >
-            {isRequestingDeletion ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.smallButtonText}>Delete Account</Text>
-            )}
-          </Pressable>
+            loading={isRequestingDeletion}
+          />
         )}
       </View>
     </ScrollView>
@@ -477,111 +440,78 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 24 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  header: { alignItems: 'center', marginBottom: 24 },
-  avatar: { width: 88, height: 88, borderRadius: 44, marginBottom: 12 },
+  container: { padding: spacing.md },
+  header: { alignItems: 'center', marginBottom: spacing.md },
+  avatar: {
+    width: sizes.avatar,
+    height: sizes.avatar,
+    borderRadius: radius.full,
+    marginBottom: spacing.md,
+  },
   avatarPlaceholder: {
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarPlaceholderText: { color: '#fff', fontSize: 32, fontWeight: '700' },
+  avatarPlaceholderText: { ...typography.h1, color: colors.white },
   nicknameRow: { flexDirection: 'row', alignItems: 'center' },
-  nickname: { fontSize: 20, fontWeight: '700', marginRight: 8 },
-  email: { fontSize: 14, color: '#666', marginTop: 4 },
-  editLink: { color: '#2563eb', fontWeight: '600' },
-  section: { marginBottom: 24 },
+  nickname: { ...typography.h2, color: colors.textPrimary, marginRight: spacing.sm },
+  email: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  section: { marginBottom: spacing.md },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
-  sectionTitle: { fontSize: 17, fontWeight: '700' },
-  emptyText: { fontSize: 14, color: '#666' },
+  sectionTitle: { ...typography.h3, color: colors.textPrimary },
+  emptyText: { ...typography.body, color: colors.textSecondary },
   skillLevelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    alignItems: 'center',
+    minHeight: sizes.controlSmall,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: borderWidth.thin,
+    borderBottomColor: colors.border,
   },
-  skillLevelSport: { fontSize: 15, color: '#222' },
-  skillLevelValue: { fontSize: 15, color: '#555', fontWeight: '600' },
-  skillLevelPickerRow: { flexDirection: 'row', marginTop: 8, marginBottom: 4 },
+  skillLevelSport: { ...typography.body, color: colors.textPrimary },
+  skillLevelValue: { ...typography.bodyBold, color: colors.textSecondary },
+  skillLevelPickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
   skillLevelOption: {
-    borderWidth: 1,
-    borderColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginRight: 8,
-  },
-  skillLevelOptionSelected: { backgroundColor: '#2563eb' },
-  skillLevelOptionText: { color: '#2563eb', fontWeight: '600', fontSize: 13 },
-  skillLevelOptionTextSelected: { color: '#fff' },
-  editRow: { marginTop: 8, width: '100%' },
-  nicknameInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-    fontSize: 15,
-  },
-  editActionsRow: { flexDirection: 'row', marginTop: 4 },
-  smallButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    alignItems: 'center',
+    minHeight: sizes.controlSmall,
     justifyContent: 'center',
+    borderWidth: borderWidth.thin,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  smallButtonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  smallButtonSecondary: {
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+  skillLevelOptionSelected: { backgroundColor: colors.primary },
+  skillLevelOptionText: { ...typography.bodyBold, color: colors.primary },
+  skillLevelOptionTextSelected: { color: colors.white },
+  editRow: { marginTop: spacing.sm, width: '100%' },
+  input: { marginBottom: spacing.sm },
+  editActionsRow: { flexDirection: 'row', marginTop: spacing.xs },
+  actionSpacing: { marginRight: spacing.sm },
+  stackedButton: { marginBottom: spacing.sm },
+  signOutButton: { marginBottom: spacing.xl },
+  dangerZone: {
+    borderTopWidth: borderWidth.thin,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
   },
-  smallButtonSecondaryText: { color: '#555', fontWeight: '600', fontSize: 14 },
-  buttonDisabled: { opacity: 0.6 },
-  linkButton: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    marginBottom: 12,
+  dangerZoneText: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.sm },
+  errorText: {
+    ...typography.body,
+    color: colors.error,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
-  linkButtonText: { color: '#222', fontWeight: '600', fontSize: 16 },
-  signOutButton: {
-    borderWidth: 1,
-    borderColor: '#2563eb',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  signOutButtonText: { color: '#2563eb', fontWeight: '600', fontSize: 16 },
-  dangerZone: { borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 16 },
-  dangerZoneText: { fontSize: 14, color: '#444', marginBottom: 8 },
-  deleteButton: {
-    backgroundColor: '#c0392b',
-    borderRadius: 8,
-    padding: 14,
-    alignItems: 'center',
-  },
-  errorText: { fontSize: 14, color: '#c0392b', marginBottom: 8, textAlign: 'center' },
-  retryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  retryButtonText: { color: '#fff', fontWeight: '600' },
 });

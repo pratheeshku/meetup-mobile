@@ -50,12 +50,17 @@
  * file was modified by this task.
  */
 import React, { useCallback, useEffect, useRef } from 'react';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 
 import { useAuth } from '../auth/AuthContext';
+import LoadingView from '../components/LoadingView';
+import { navigationTheme } from '../theme/navigationTheme';
+import { colors, typography } from '../theme/tokens';
 import type {
   AuthStackParamList,
   AppTabParamList,
@@ -95,9 +100,32 @@ const TournamentsStackNav = createNativeStackNavigator<TournamentsStackParamList
 const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
 const AppTabsNav = createBottomTabNavigator<AppTabParamList>();
 
+/**
+ * Design-system navigation styling (visual layer only). The container-level
+ * `navigationTheme` supplies screen background/card/border colours; these
+ * options add the header and tab-bar specifics. `statusBarStyle: 'dark'` is
+ * explicit because the header is now a light surface — dark icons keep the
+ * status bar legible regardless of the system colour scheme.
+ */
+const stackScreenOptions: NativeStackNavigationOptions = {
+  headerStyle: { backgroundColor: colors.surface },
+  headerTitleStyle: { color: colors.textPrimary, ...typography.h3 },
+  headerTintColor: colors.primary,
+  statusBarStyle: 'dark',
+  contentStyle: { backgroundColor: colors.background },
+};
+
+const tabScreenOptions: BottomTabNavigationOptions = {
+  headerStyle: { backgroundColor: colors.surface },
+  headerTitleStyle: { color: colors.textPrimary, ...typography.h3 },
+  tabBarActiveTintColor: colors.primary,
+  tabBarInactiveTintColor: colors.textMuted,
+  tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+};
+
 function AuthStack(): React.JSX.Element {
   return (
-    <AuthStackNav.Navigator>
+    <AuthStackNav.Navigator screenOptions={stackScreenOptions}>
       <AuthStackNav.Screen name="Login" component={LoginScreen} />
       <AuthStackNav.Screen name="Register" component={RegisterScreen} />
     </AuthStackNav.Navigator>
@@ -106,7 +134,7 @@ function AuthStack(): React.JSX.Element {
 
 function HomeStack(): React.JSX.Element {
   return (
-    <HomeStackNav.Navigator>
+    <HomeStackNav.Navigator screenOptions={stackScreenOptions}>
       <HomeStackNav.Screen name="EventsList" component={HomeScreen} options={{ title: 'Events' }} />
       <HomeStackNav.Screen
         name="EventDetail"
@@ -119,7 +147,7 @@ function HomeStack(): React.JSX.Element {
 
 function GroupsStack(): React.JSX.Element {
   return (
-    <GroupsStackNav.Navigator>
+    <GroupsStackNav.Navigator screenOptions={stackScreenOptions}>
       <GroupsStackNav.Screen name="GroupsList" component={GroupsScreen} options={{ title: 'Groups' }} />
       <GroupsStackNav.Screen
         name="GroupDetail"
@@ -132,7 +160,7 @@ function GroupsStack(): React.JSX.Element {
 
 function TournamentsStack(): React.JSX.Element {
   return (
-    <TournamentsStackNav.Navigator>
+    <TournamentsStackNav.Navigator screenOptions={stackScreenOptions}>
       <TournamentsStackNav.Screen
         name="TournamentsList"
         component={TournamentsScreen}
@@ -149,7 +177,7 @@ function TournamentsStack(): React.JSX.Element {
 
 function ProfileStack(): React.JSX.Element {
   return (
-    <ProfileStackNav.Navigator>
+    <ProfileStackNav.Navigator screenOptions={stackScreenOptions}>
       <ProfileStackNav.Screen name="ProfileHome" component={ProfileScreen} options={{ title: 'Profile' }} />
       <ProfileStackNav.Screen
         name="NotificationPreferences"
@@ -162,7 +190,7 @@ function ProfileStack(): React.JSX.Element {
 
 function AppStack(): React.JSX.Element {
   return (
-    <AppTabsNav.Navigator>
+    <AppTabsNav.Navigator screenOptions={tabScreenOptions}>
       <AppTabsNav.Screen name="Home" component={HomeStack} options={{ headerShown: false }} />
       <AppTabsNav.Screen name="Groups" component={GroupsStack} options={{ headerShown: false }} />
       <AppTabsNav.Screen
@@ -244,16 +272,16 @@ export default function RootNavigator(): React.JSX.Element {
   }, [user, handleInitialNotification]);
 
   if (isLoading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   return (
     <View style={styles.root}>
-      <NavigationContainer ref={navigationRef} onReady={handleInitialNotification}>
+      <NavigationContainer
+        ref={navigationRef}
+        theme={navigationTheme}
+        onReady={handleInitialNotification}
+      >
         {user ? <AppStack /> : <AuthStack />}
       </NavigationContainer>
       <NotificationBanner />
@@ -262,6 +290,5 @@ export default function RootNavigator(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  root: { flex: 1, backgroundColor: colors.background },
 });

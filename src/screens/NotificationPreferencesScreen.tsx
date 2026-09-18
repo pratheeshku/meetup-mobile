@@ -17,7 +17,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -27,6 +26,10 @@ import {
 
 import { withCorrelationId } from '../api/correlationId';
 import { getPreferences, updatePreference } from '../api/notifications';
+import Card from '../components/Card';
+import ErrorView from '../components/ErrorView';
+import LoadingView from '../components/LoadingView';
+import { borderWidth, colors, spacing, typography } from '../theme/tokens';
 import { NOTIFICATION_TYPES } from '../types/notification';
 import type {
   NotificationPreference,
@@ -106,74 +109,67 @@ export default function NotificationPreferencesScreen(): React.JSX.Element {
   };
 
   if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+    return <LoadingView />;
   }
 
   if (loadError) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{loadError}</Text>
-        <Pressable style={styles.retryButton} onPress={loadPreferences}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
+    return <ErrorView message={loadError} onRetry={loadPreferences} />;
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
 
-      {NOTIFICATION_TYPES.map(type => (
-        <View key={type} style={styles.row}>
-          <Text style={styles.rowLabel}>{NOTIFICATION_TYPE_LABELS[type]}</Text>
-          {savingType === type ? (
-            <ActivityIndicator size="small" />
-          ) : (
-            <Switch
-              value={preferences[type] ?? true}
-              onValueChange={value => handleToggle(type, value)}
-              disabled={savingType !== null}
-            />
-          )}
-        </View>
-      ))}
+      <Card>
+        {NOTIFICATION_TYPES.map((type, index) => (
+          <View
+            key={type}
+            style={[
+              styles.row,
+              index < NOTIFICATION_TYPES.length - 1 ? styles.rowDivider : null,
+            ]}
+          >
+            <Text style={styles.rowLabel}>{NOTIFICATION_TYPE_LABELS[type]}</Text>
+            {savingType === type ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Switch
+                value={preferences[type] ?? true}
+                onValueChange={value => handleToggle(type, value)}
+                disabled={savingType !== null}
+                trackColor={{ false: colors.border, true: colors.primaryLight }}
+                thumbColor={(preferences[type] ?? true) ? colors.primary : colors.textMuted}
+              />
+            )}
+          </View>
+        ))}
+      </Card>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 24 },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
+  container: { padding: spacing.md },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingVertical: spacing.sm,
   },
-  rowLabel: { fontSize: 15, color: '#222', flex: 1, marginRight: 12 },
+  rowDivider: {
+    borderBottomWidth: borderWidth.thin,
+    borderBottomColor: colors.border,
+  },
+  rowLabel: {
+    ...typography.body,
+    color: colors.textPrimary,
+    flex: 1,
+    marginRight: spacing.md,
+  },
   errorText: {
-    fontSize: 14,
-    color: '#c0392b',
-    marginBottom: 12,
+    ...typography.body,
+    color: colors.error,
+    marginBottom: spacing.md,
     textAlign: 'center',
   },
-  retryButton: {
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-  },
-  retryButtonText: { color: '#fff', fontWeight: '600' },
 });
