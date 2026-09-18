@@ -26,27 +26,118 @@
  * the full discrepancy write-up.
  */
 import { apiClient } from './client';
-import type { Group, GroupDetail, GroupMemberRole, GroupsListResponse } from '../types/group';
+import type {
+  Group,
+  GroupDetail,
+  GroupMember,
+  GroupMemberRole,
+  GroupRole,
+  GroupsListResponse,
+} from '../types/group';
 
 interface RequestOptions {
   correlationId?: string;
 }
 
+/**
+ * Full-contract-audit fix (2026-09-18, see
+ * docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md), confirmed against the
+ * live backend's OpenAPI schema. `GroupResponse` (`GET /settings/groups-owned`,
+ * `GET /settings/groups-member`, `GET /groups/{group_id}` all return this
+ * shape, bare-array for the first two — already correctly typed as such
+ * here, so no envelope bug like `events.ts` had) is:
+ * `{ id, name, description, owner_id, members_can_invite, created_at }` —
+ * no `owner_nickname`, `member_count`, or `current_user_role` field
+ * exists on it at all.
+ */
+interface GroupApiItem {
+  id: string;
+  name: string;
+  description: string | null;
+  owner_id: string;
+  created_at: string;
+}
+
+/**
+ * `GET /groups/{group_id}/members` — confirmed to exist (the prior
+ * Implementation Report's Proposed Assumption that no member-listing
+ * endpoint exists was wrong; corrected here). Returns
+ * `GroupMembershipResponse[]`: `{ id, group_id, user_id, role, joined_at,
+ * user_display_name, user_nickname }`.
+ */
+interface GroupMembershipApiItem {
+  user_id: string;
+  role: string;
+  joined_at: string;
+  user_display_name: string | null;
+  user_nickname: string | null;
+}
+
+function mapGroupMember(raw: GroupMembershipApiItem): GroupMember {
+  return {
+    user_id: raw.user_id,
+    nickname: raw.user_nickname ?? raw.user_display_name ?? '',
+    role: raw.role as GroupMemberRole,
+    joined_at: raw.joined_at,
+  };
+}
+
+/**
+ * Proposed Assumption: `current_user_role` is set per the caller's own
+ * knowledge of which source list an item came from ('owner' for
+ * `/settings/groups-owned`, 'member' for `/settings/groups-member') —
+ * see `getMyGroups()`. `owner_nickname`/`member_count` are left
+ * `undefined` here: deriving them accurately needs the group's member
+ * list, which would mean an N+1 fan-out call per group for a list
+ * screen — flagged in the audit report as needing an architect decision,
+ * not implemented.
+ */
+function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
+  return {
+    id: raw.id,
+    name: raw.name,
+    description: raw.description ?? '',
+    owner_id: raw.owner_id,
+    created_at: raw.created_at,
+    current_user_role: currentUserRole,
+  };
+}
+
 export async function getMyGroups(options?: RequestOptions): Promise<GroupsListResponse> {
   const correlationId = options?.correlationId;
   const [{ data: owned }, { data: member }] = await Promise.all([
-    apiClient.get<Group[]>('/settings/groups-owned', { correlationId }),
-    apiClient.get<Group[]>('/settings/groups-member', { correlationId }),
+    apiClient.get<GroupApiItem[]>('/settings/groups-owned', { correlationId }),
+    apiClient.get<GroupApiItem[]>('/settings/groups-member', { correlationId }),
   ]);
-  const items = [...owned, ...member];
+  const items = [
+    ...owned.map(raw => mapGroupApiItem(raw, 'owner')),
+    ...member.map(raw => mapGroupApiItem(raw, 'member')),
+  ];
   return { items, total: items.length, page: 1, page_size: items.length };
 }
 
+/**
+ * `current_user_role` on the returned `GroupDetail` is always `'none'` —
+ * `api/groups.ts` has no access to the signed-in user's id (reading it
+ * here would cross the documented zero-sibling-import boundary between
+ * `src/api` and auth/session state). `GroupDetailScreen` computes the
+ * authoritative value itself from `members` (now correctly populated
+ * below) plus the id it already reads via `useAuth()`.
+ */
 export async function getGroup(id: string, options?: RequestOptions): Promise<GroupDetail> {
-  const { data } = await apiClient.get<GroupDetail>(`/groups/${id}`, {
-    correlationId: options?.correlationId,
-  });
-  return data;
+  const correlationId = options?.correlationId;
+  const [{ data: raw }, { data: rawMembers }] = await Promise.all([
+    apiClient.get<GroupApiItem>(`/groups/${id}`, { correlationId }),
+    apiClient.get<GroupMembershipApiItem[]>(`/groups/${id}/members`, { correlationId }),
+  ]);
+  const members = rawMembers.map(mapGroupMember);
+  const owner = members.find(m => m.user_id === raw.owner_id);
+  return {
+    ...mapGroupApiItem(raw, 'none'),
+    owner_nickname: owner?.nickname ?? '',
+    member_count: members.length,
+    members,
+  };
 }
 
 /**
@@ -71,6 +162,13 @@ export async function inviteMember(
   );
 }
 
+/**
+ * Full-contract-audit fix: the real endpoint is
+ * `PATCH /groups/{group_id}/members/{user_id}` — there is no `/role`
+ * suffix (confirmed against the live OpenAPI schema; the prior path
+ * 404'd on the real backend). The request body shape (`{ role }`,
+ * matching `GroupRoleUpdateRequest`) was already correct.
+ */
 export async function updateMemberRole(
   groupId: string,
   userId: string,
@@ -78,7 +176,7 @@ export async function updateMemberRole(
   options?: RequestOptions,
 ): Promise<void> {
   await apiClient.patch(
-    `/groups/${groupId}/members/${userId}/role`,
+    `/groups/${groupId}/members/${userId}`,
     { role },
     { correlationId: options?.correlationId },
   );

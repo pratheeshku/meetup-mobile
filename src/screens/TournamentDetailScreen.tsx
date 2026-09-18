@@ -192,17 +192,25 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
     );
   }
 
+  // Full-contract-audit fix (2026-09-18, see
+  // docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md): the real backend's
+  // `TournamentResponse` has no `current_user_registration_status` or
+  // `is_organiser` field, and `api/tournaments.ts` cannot derive either
+  // (no access to the signed-in user's id). Computed here instead, from
+  // data this screen already loads: `registrations` (for the user's own
+  // registration status) and `tournament.organiser_id` vs `currentUserId`
+  // (for organiser status) — the same `myRegistration` lookup
+  // `handleWithdraw` below already performs.
+  const myRegistration = registrations.find(r => r.user_id === currentUserId);
+  const currentUserRegistrationStatus = myRegistration?.status ?? 'none';
+  const isOrganiser = tournament.organiser_id === currentUserId;
+
   const canRegister =
-    tournament.registration_open &&
-    tournament.current_user_registration_status === 'none' &&
-    !tournament.is_organiser;
-  const canWithdraw = tournament.current_user_registration_status === 'registered';
+    tournament.registration_open && currentUserRegistrationStatus === 'none' && !isOrganiser;
+  const canWithdraw = currentUserRegistrationStatus === 'registered';
   const showRegistrationClosedMessage =
-    !tournament.registration_open &&
-    tournament.current_user_registration_status === 'none' &&
-    !tournament.is_organiser;
-  const canCancel =
-    tournament.is_organiser && tournament.status !== 'completed' && tournament.status !== 'cancelled';
+    !tournament.registration_open && currentUserRegistrationStatus === 'none' && !isOrganiser;
+  const canCancel = isOrganiser && tournament.status !== 'completed' && tournament.status !== 'cancelled';
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -213,8 +221,12 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
       <Text style={styles.meta}>Status: {tournament.status}</Text>
       <Text style={styles.meta}>Organised by {tournament.organiser_nickname}</Text>
       <Text style={styles.meta}>Starts {formatDateTime(tournament.starts_at)}</Text>
+      {/* `registrations.length` used instead of `tournament.participant_count` —
+          the real backend has no such field; this screen already fetches
+          the registrations list, so this is exact rather than a
+          placeholder (see the audit report / mapTournamentApiItem). */}
       <Text style={styles.meta}>
-        {tournament.participant_count}/{tournament.max_participants} registered
+        {registrations.length}/{tournament.max_participants} registered
       </Text>
       <Text style={styles.description}>{tournament.description}</Text>
 

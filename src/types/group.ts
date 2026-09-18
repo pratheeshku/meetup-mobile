@@ -24,9 +24,31 @@ export interface Group {
   name: string;
   description: string;
   owner_id: string;
-  owner_nickname: string;
-  member_count: number;
+  /**
+   * Full-contract-audit finding (2026-09-18, see
+   * docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md): the real backend's
+   * `GroupResponse` (confirmed via live OpenAPI schema) has no
+   * `owner_nickname`/`member_count` fields at all — only `getGroup()`
+   * (which also fetches the member list) can derive these accurately.
+   * `getMyGroups()`'s list items cannot, without an N+1 fan-out call per
+   * group (flagged for an architect decision, not implemented), so both
+   * are optional here.
+   */
+  owner_nickname?: string;
+  member_count?: number;
   created_at: string;
+  /**
+   * On `getMyGroups()` list items: a Proposed Assumption ('owner' for
+   * items sourced from `/settings/groups-owned`, 'member' for items from
+   * `/settings/groups-member` — the real backend gives no way to tell
+   * 'admin' apart from 'member' for the latter without an extra
+   * per-group members-list call). Cosmetic only — this list screen does
+   * not gate any action on it.
+   * On `GroupDetail` from `getGroup()`: not reliable (`api/groups.ts` has
+   * no access to the current user's id) — screens must compute the
+   * authoritative value themselves from `members` + the signed-in user's
+   * id (see `GroupDetailScreen`).
+   */
   current_user_role: GroupRole;
 }
 

@@ -50,10 +50,10 @@ interface RequestOptions {
  * `current_user_rsvp_status`, `recurrence_rule_id` not `is_recurring`, no
  * `waitlist_count`/`is_organiser` field at all). `EventApiItem` below is
  * the actual wire shape (subset needed to populate `Event` for the feed);
- * `mapEventApiItem` adapts it. This mapping is applied only to the list
- * endpoint consumed by HomeScreen — `getEvent()` (singular, consumed by
- * EventDetailScreen) is unchanged and out of scope for this fix; see the
- * Implementation Report's Known Gaps for that follow-up.
+ * `mapEventApiItem` adapts it, and is now also applied to `getEvent()`
+ * (singular, consumed by EventDetailScreen) — confirmed the same class of
+ * gap there per the full-API-contract audit (`docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md`)
+ * and fixed below.
  */
 interface EventApiItem {
   id: string;
@@ -140,24 +140,55 @@ export async function getEvents(
 }
 
 export async function getEvent(id: string, options?: RequestOptions): Promise<Event> {
-  const { data } = await apiClient.get<Event>(`/events/${id}`, {
+  const { data } = await apiClient.get<EventApiItem>(`/events/${id}`, {
     correlationId: options?.correlationId,
   });
-  return data;
+  return mapEventApiItem(data);
 }
 
+/**
+ * BLOCKED — needs an architect decision, not fixed here (do not guess):
+ * confirmed against the live OpenAPI schema that `POST /events/{event_id}/rsvp`
+ * requires a body matching `RSVPRequest { action: string }` (`action` is
+ * REQUIRED, no enum of accepted values is documented anywhere in the
+ * schema or the design excerpt). This call currently sends no body at
+ * all, so every RSVP attempt against the real backend gets a 422
+ * Validation Error. Guessing a value for `action` risks silently doing
+ * the wrong thing (e.g. if it also encodes "withdraw"/"decline" verbs).
+ * See docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md for the full
+ * write-up and the two questions the architect needs to answer.
+ */
 export async function rsvpEvent(id: string, options?: RequestOptions): Promise<void> {
   await apiClient.post(`/events/${id}/rsvp`, undefined, {
     correlationId: options?.correlationId,
   });
 }
 
+/**
+ * BLOCKED — needs an architect decision, not fixed here (do not guess):
+ * confirmed against the live OpenAPI schema that `POST /events/{event_id}/withdraw`
+ * does not exist on the real backend at all (404) — there is no
+ * `/events/{event_id}/withdraw` path. The two plausible real mechanisms —
+ * `POST /events/{event_id}/rsvp` with some `action` value (see `rsvpEvent`
+ * above), or `DELETE /events/{event_id}/participants/{user_id}` — are
+ * both unconfirmed. See the audit report for the full write-up.
+ */
 export async function withdrawEvent(id: string, options?: RequestOptions): Promise<void> {
   await apiClient.post(`/events/${id}/withdraw`, undefined, {
     correlationId: options?.correlationId,
   });
 }
 
+/**
+ * BLOCKED — needs an architect decision, not fixed here (do not guess):
+ * confirmed against the live OpenAPI schema that `POST /events/{event_id}/cancel`
+ * requires a body matching `EventCancelRequest { reason: string }` (1–500
+ * chars, REQUIRED). This call currently sends no body, so every cancel
+ * attempt against the real backend gets a 422 Validation Error. Fixing
+ * this needs a cancellation-reason UI (EventDetailScreen's cancel flow
+ * has none today) — a UX/design decision beyond an API-layer adapter,
+ * out of scope for this audit pass. See the audit report.
+ */
 export async function cancelEvent(id: string, options?: RequestOptions): Promise<void> {
   await apiClient.post(`/events/${id}/cancel`, undefined, {
     correlationId: options?.correlationId,

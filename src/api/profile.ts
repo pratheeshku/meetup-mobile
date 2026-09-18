@@ -23,19 +23,88 @@
  * gesture, which this is not).
  */
 import { apiClient } from './client';
-import type { SkillLevelValue, UpdateProfilePayload, UserProfile } from '../types/user';
+import type { SkillLevel, SkillLevelValue, UpdateProfilePayload, UserProfile } from '../types/user';
 
 interface RequestOptions {
   correlationId?: string;
 }
 
-export async function getProfile(options?: RequestOptions): Promise<UserProfile> {
-  const { data } = await apiClient.get<UserProfile>('/users/me', {
-    correlationId: options?.correlationId,
-  });
-  return data;
+/**
+ * Full-contract-audit fix (2026-09-18, see
+ * docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md), confirmed against the
+ * live backend's `PrivateUserProfile` OpenAPI schema — see
+ * `../types/user.ts`'s `UserProfile` comment for the full per-field
+ * write-up (what's fixed vs. flagged/BLOCKED).
+ */
+interface PrivateUserProfileApiItem {
+  id: string;
+  display_name: string;
+  nickname: string;
+  avatar_storage_key: string | null;
+  created_at: string;
+  email: string;
+  is_admin: boolean;
 }
 
+function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: SkillLevel[]): UserProfile {
+  return {
+    id: raw.id,
+    email: raw.email,
+    nickname: raw.nickname,
+    display_name: raw.display_name,
+    is_admin: raw.is_admin,
+    created_at: raw.created_at,
+    // BLOCKED, not guessed — see the type-level comment: no scheme exists
+    // to turn `avatar_storage_key` into a displayable URL.
+    avatar_url: null,
+    // BLOCKED, not guessed — see the type-level comment: no `role` field
+    // exists on the real response at all.
+    role: undefined,
+    skill_levels: skillLevels,
+  };
+}
+
+/**
+ * `GET /users/me/skill-levels` (plural) is a real, separate endpoint —
+ * confirmed to exist against the live OpenAPI schema (the prior
+ * assumption that skill levels were embedded in `GET /users/me` was
+ * wrong; `PrivateUserProfile` has no such field). Its response schema is
+ * undeclared in the live OpenAPI doc, so the exact field names are a
+ * Proposed Assumption (mirrors the confirmed write-side
+ * `UserSkillLevelUpdate` shape: `{ sport, skill_level }`), not verified
+ * end-to-end. Fetched defensively (falls back to `[]` on any failure,
+ * including an unexpected shape) so an unconfirmed secondary endpoint
+ * can never break the whole profile load.
+ */
+async function getSkillLevels(options?: RequestOptions): Promise<SkillLevel[]> {
+  try {
+    const { data } = await apiClient.get<SkillLevel[]>('/users/me/skill-levels', {
+      correlationId: options?.correlationId,
+    });
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getProfile(options?: RequestOptions): Promise<UserProfile> {
+  const correlationId = options?.correlationId;
+  const [{ data: raw }, skillLevels] = await Promise.all([
+    apiClient.get<PrivateUserProfileApiItem>('/users/me', { correlationId }),
+    getSkillLevels({ correlationId }),
+  ]);
+  return mapPrivateUserProfile(raw, skillLevels);
+}
+
+/**
+ * BLOCKED — needs an architect decision, not fixed here (do not guess):
+ * confirmed against the live OpenAPI schema that `PATCH /users/me`'s real
+ * body (`UserUpdate`) only accepts `{ display_name?, theme_preference? }`.
+ * Neither `nickname` nor `avatar_url` (this function's only params) is
+ * accepted — every call today is effectively a no-op against the real
+ * backend. See `../types/user.ts`'s `UpdateProfilePayload` comment and
+ * docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md.
+ */
 export async function updateProfile(
   payload: UpdateProfilePayload,
   options?: RequestOptions,
@@ -43,6 +112,10 @@ export async function updateProfile(
   await apiClient.patch('/users/me', payload, { correlationId: options?.correlationId });
 }
 
+/**
+ * Verified compatible against the live OpenAPI schema: body `{ sport,
+ * skill_level }` matches `UserSkillLevelUpdate` exactly — no fix needed.
+ */
 export async function updateSkillLevel(
   sport: string,
   skill_level: SkillLevelValue,
@@ -56,6 +129,19 @@ export async function updateSkillLevel(
 }
 
 /**
+ * BLOCKED — CRITICAL, needs an architect/product decision, not fixed
+ * here (do not guess or invent a replacement endpoint): confirmed
+ * against the live OpenAPI schema that neither `/users/me/deletion-request`
+ * nor `/users/me/deletion-confirm` (below) exists on the real backend at
+ * all — not a field mismatch, the paths themselves 404. The entire
+ * "Delete Account" flow in `ProfileScreen` is calling endpoints that do
+ * not exist. Nothing in the live schema suggests an alternative
+ * account-deletion mechanism (no `/users/me` DELETE, no other
+ * deletion-shaped path anywhere in the 123 real paths audited). This may
+ * mean the feature was never built server-side yet — needs the architect
+ * to confirm with the backend team before any client-side fix is
+ * attempted. See docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md.
+ *
  * Triggers the backend to send a confirmation code to the user's email
  * (§4.13). The code itself is never returned in this response — it is
  * delivered out-of-band, matching an email-based confirmation flow and
@@ -67,12 +153,9 @@ export async function requestDeletion(): Promise<void> {
 }
 
 /**
- * Proposed Assumption: the request body field name for the confirmation
- * code is not specified anywhere in the local design excerpt. Used
- * `confirmation_token` (snake_case), matching this backend's dominant
- * JSON convention elsewhere (e.g. `access_token`/`refresh_token`,
- * event fields like `starts_at`/`participant_count`). Correct against
- * the actual backend contract on conformance review.
+ * BLOCKED — see `requestDeletion()`'s comment above: this endpoint also
+ * does not exist on the real backend (confirmed via the live OpenAPI
+ * schema). Left unchanged pending the architect/backend-team decision.
  */
 export async function confirmDeletion(confirmationToken: string): Promise<void> {
   await apiClient.post('/users/me/deletion-confirm', { confirmation_token: confirmationToken });

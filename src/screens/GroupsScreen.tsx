@@ -103,9 +103,11 @@ export default function GroupsScreen({ navigation }: Props): React.JSX.Element {
               <Text style={styles.badgeText}>{ROLE_BADGE_LABEL[item.current_user_role]}</Text>
             </View>
           </View>
-          <Text style={styles.cardMeta}>
-            {item.member_count} {item.member_count === 1 ? 'member' : 'members'}
-          </Text>
+          {item.member_count !== undefined ? (
+            <Text style={styles.cardMeta}>
+              {item.member_count} {item.member_count === 1 ? 'member' : 'members'}
+            </Text>
+          ) : null}
         </Pressable>
       )}
     />

@@ -217,12 +217,22 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
     );
   }
 
-  const canInvite = group.current_user_role === 'owner' || group.current_user_role === 'admin';
+  // Full-contract-audit fix (2026-09-18, see
+  // docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md): the real backend's
+  // `GroupResponse` has no `current_user_role` field, and `api/groups.ts`
+  // cannot derive one (no access to the signed-in user's id). Computed
+  // here instead, from `group.members` (now correctly populated by
+  // `getGroup()`) plus `currentUserId` (already read above via
+  // `useAuth()`) — the same data this screen already uses for `isSelf`
+  // below.
+  const currentUserRole = group.members.find(m => m.user_id === currentUserId)?.role ?? 'none';
+
+  const canInvite = currentUserRole === 'owner' || currentUserRole === 'admin';
   // §4.4: "Role management — owner/admin only" (design overrides the
   // brief's narrower "owner only" wording — see the file-level comment).
-  const canChangeRoles = group.current_user_role === 'owner' || group.current_user_role === 'admin';
-  const canRemoveMembers = group.current_user_role === 'owner' || group.current_user_role === 'admin';
-  const canLeave = group.current_user_role !== 'owner' && group.current_user_role !== 'none';
+  const canChangeRoles = currentUserRole === 'owner' || currentUserRole === 'admin';
+  const canRemoveMembers = currentUserRole === 'owner' || currentUserRole === 'admin';
+  const canLeave = currentUserRole !== 'owner' && currentUserRole !== 'none';
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

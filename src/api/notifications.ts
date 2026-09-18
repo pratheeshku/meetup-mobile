@@ -19,20 +19,39 @@ interface RequestOptions {
   correlationId?: string;
 }
 
+/**
+ * Full-contract-audit fix (2026-09-18, see
+ * docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md), confirmed against the
+ * live backend's OpenAPI schema: `GET /notifications/preferences` returns
+ * `NotificationPreferencesResponse`, `{ preferences: NotificationPreferenceItem[] }`
+ * — an envelope object, not a bare array (the same class of bug
+ * `src/api/events.ts` had, in the opposite direction). Each item's own
+ * shape (`{ notification_type, enabled }`) already matched
+ * `NotificationPreference` exactly — only the envelope needed unwrapping.
+ */
+interface NotificationPreferencesApiResponse {
+  preferences: NotificationPreference[];
+}
+
 /** `GET /notifications/preferences` (§7.6). */
 export async function getPreferences(
   options?: RequestOptions,
 ): Promise<NotificationPreference[]> {
-  const { data } = await apiClient.get<NotificationPreference[]>(
+  const { data } = await apiClient.get<NotificationPreferencesApiResponse>(
     '/notifications/preferences',
     {
       correlationId: options?.correlationId,
     },
   );
-  return data;
+  return data.preferences;
 }
 
-/** `PUT /notifications/preferences/{type}` (§7.6). */
+/**
+ * Verified compatible against the live OpenAPI schema: path
+ * `/notifications/preferences/{notification_type}` and body `{ enabled }`
+ * match `NotificationPreferenceUpdate` exactly — no fix needed.
+ * `PUT /notifications/preferences/{type}` (§7.6).
+ */
 export async function updatePreference(
   type: NotificationType,
   enabled: boolean,

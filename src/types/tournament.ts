@@ -30,6 +30,29 @@ export type TournamentRegistrationStatus = 'none' | 'registered' | 'withdrawn';
  */
 export type FixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
+/**
+ * Full-contract-audit findings (2026-09-18, see
+ * docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md), confirmed against the
+ * live backend's `TournamentResponse` schema — kept as required fields
+ * (unlike `Group.owner_nickname`/`member_count`) because `getTournament()`
+ * (singular) can be, and now is, corrected by its caller
+ * (`TournamentDetailScreen`, which already independently fetches
+ * registrations and reads the current user's id): the placeholder values
+ * `api/tournaments.ts` fills in are inert there. They remain
+ * best-effort/flagged for the *list* screen only:
+ * - `organiser_nickname`: `TournamentResponse` has no nickname/display-name
+ *   field at all, and no `GET /users/{id}` lookup endpoint exists to
+ *   resolve `organizer_id` — unreconcilable without a backend change.
+ *   Always `''` from the API layer.
+ * - `participant_count`: not on `TournamentResponse`; would need an extra
+ *   `GET /tournaments/{id}/registrations` call per tournament in the list
+ *   view (N+1) — flagged, not implemented. `0` from the API layer for
+ *   list items; `TournamentDetailScreen` uses its own already-fetched
+ *   `registrations.length` instead of this field.
+ * - `current_user_registration_status`, `is_organiser`: need the current
+ *   user's id, unavailable to `api/tournaments.ts` — `'none'`/`false`
+ *   from the API layer; `TournamentDetailScreen` recomputes both locally.
+ */
 export interface Tournament {
   id: string;
   name: string;
@@ -70,9 +93,23 @@ export interface TournamentFixture {
 
 export interface TournamentRegistration {
   id: string;
-  user_id: string;
+  /**
+   * Full-contract-audit finding (2026-09-18, see
+   * docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md): the real backend's
+   * `TournamentRegistrationResponse` has `user_id: string | null` (a
+   * team-based registration has `team_id` set and `user_id` null) —
+   * widened from the assumed always-present `string`.
+   */
+  user_id: string | null;
   nickname: string;
   registered_at: string;
+  /**
+   * Added by the audit fix: needed by `TournamentDetailScreen` to derive
+   * the signed-in user's own registration status locally (`api/tournaments.ts`
+   * has no access to the current user's id). Sourced from the real
+   * `TournamentRegistrationResponse.status` field.
+   */
+  status: TournamentRegistrationStatus;
 }
 
 export interface TournamentsListResponse {
