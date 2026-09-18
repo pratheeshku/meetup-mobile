@@ -103,13 +103,11 @@ describe('HomeScreen dashboard', () => {
     expect(texts(root)).toContain('Ready to play, Sam?');
   });
 
-  it('enables Create Game and opens the CreateGame placeholder route on press', async () => {
+  it('has no Create Game control on the dashboard (it is the tab bar FAB now)', async () => {
     const root = await mount();
-    const button = pressableLabelled(root, '+ Create Game');
-    expect(button.props.disabled).toBe(false);
-    act(() => button.props.onPress());
-    expect(navigate).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith('CreateGame');
+    expect(texts(root).some(text => text.includes('Create Game'))).toBe(false);
+    expect(() => pressableLabelled(root, '+ Create Game')).toThrow(/found 0/);
+    expect(navigate).not.toHaveBeenCalledWith('CreateGame');
   });
 
   it('lists upcoming games soonest-first, capped at three, from going/waitlisted events only', async () => {

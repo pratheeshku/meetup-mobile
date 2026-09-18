@@ -17,7 +17,10 @@ import { StyleSheet, Text } from 'react-native';
 import { opacity } from '../theme/tokens';
 import type { AppTabParamList } from './types';
 
-export const TAB_EMOJI: Record<keyof AppTabParamList, string> = {
+/** `Create` is excluded: the center action button draws its own "+" glyph. */
+export type EmojiTabName = Exclude<keyof AppTabParamList, 'Create'>;
+
+export const TAB_EMOJI: Record<EmojiTabName, string> = {
   Home: '🏠',
   Groups: '👥',
   Tournaments: '🏆',

@@ -1,30 +1,21 @@
 /**
- * Home header: small muted greeting, large bold "Ready to play, <nickname>?"
- * headline, and a "+ Create Game" button at the top right.
+ * Home header: small muted greeting and a large bold "Ready to play,
+ * <nickname>?" headline.
  *
- * `onCreateGame` is optional and, when omitted, the button renders disabled
- * rather than as a tappable control that does nothing. Home passes a handler
- * that opens the placeholder `CreateGameScreen` (real event creation, DES
- * §4.3 "Create/Edit Event", is a later task).
+ * Create Game no longer lives here — it is the raised center button in the
+ * bottom tab bar (see `navigation/CreateTabButton`).
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, spacing, typography } from '../../theme/tokens';
-import Button from '../Button';
 
 interface GreetingHeaderProps {
   /** Signed-in user's nickname; the headline drops it when empty. */
   nickname?: string;
-  onCreateGame?: () => void;
 }
 
-const noop = (): void => {};
-
-export default function GreetingHeader({
-  nickname,
-  onCreateGame,
-}: GreetingHeaderProps): React.JSX.Element {
+export default function GreetingHeader({ nickname }: GreetingHeaderProps): React.JSX.Element {
   const name = nickname?.trim();
   const headline = name ? `Ready to play, ${name}?` : 'Ready to play?';
 
@@ -36,13 +27,6 @@ export default function GreetingHeader({
           {headline}
         </Text>
       </View>
-      <Button
-        label="+ Create Game"
-        size="sm"
-        onPress={onCreateGame ?? noop}
-        disabled={!onCreateGame}
-        style={styles.button}
-      />
     </View>
   );
 }
@@ -52,5 +36,4 @@ const styles = StyleSheet.create({
   textColumn: { flex: 1 },
   greeting: { ...typography.caption, color: colors.textMuted },
   headline: { ...typography.h1, color: colors.textPrimary, marginTop: spacing.xs },
-  button: { marginLeft: spacing.md },
 });

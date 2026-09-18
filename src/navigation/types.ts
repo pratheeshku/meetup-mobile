@@ -51,10 +51,15 @@ export type ProfileStackParamList = {
  * -> screen) from a single root ref, which is exactly what routing a
  * notification tap to e.g. Tournaments -> TournamentDetail requires
  * (§3.6, §4.8, R-073).
+ *
+ * `Create` is not a destination: it is the raised center action button
+ * (`CreateTabButton`). Pressing it is intercepted and routed to
+ * Home -> CreateGame, so it never becomes the focused tab.
  */
 export type AppTabParamList = {
   Home: NavigatorScreenParams<HomeStackParamList>;
   Groups: NavigatorScreenParams<GroupsStackParamList>;
+  Create: undefined;
   Tournaments: NavigatorScreenParams<TournamentsStackParamList>;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
 };

@@ -116,8 +116,6 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
     [navigation],
   );
 
-  const openCreateGame = useCallback(() => navigation.navigate('CreateGame'), [navigation]);
-
   if (isLoading) {
     return <LoadingView />;
   }
@@ -142,7 +140,7 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
       }
     >
       <View style={styles.block}>
-        <GreetingHeader nickname={user?.nickname} onCreateGame={openCreateGame} />
+        <GreetingHeader nickname={user?.nickname} />
       </View>
       <View style={styles.pills}>
         <SportFilterPills sports={sports} selectedKey={activeSport} onSelect={setSelectedSport} />

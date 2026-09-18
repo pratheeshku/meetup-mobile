@@ -1,7 +1,7 @@
 /**
  * Behavioural contract of the Home dashboard's presentational components.
  * Focus: the rules the brief states (max three cards, exact empty-state
- * copy, "All" selected by default, disabled Create Game with no handler) and
+ * copy, "All" selected by default) and
  * the accessibility semantics that keep an inert tile from looking tappable.
  */
 import React from 'react';
@@ -41,21 +41,10 @@ describe('GreetingHeader', () => {
     expect(texts(render(<GreetingHeader nickname="   " />))).toContain('Ready to play?');
   });
 
-  it('renders the Create Game button disabled when no handler is supplied', () => {
-    const button = pressableLabelled(render(<GreetingHeader nickname="Sam" />), '+ Create Game');
-    expect(button.props.disabled).toBe(true);
-    expect(button.props.accessibilityState).toMatchObject({ disabled: true });
-  });
-
-  it('enables Create Game and fires the handler when one is supplied', () => {
-    const onCreateGame = jest.fn();
-    const button = pressableLabelled(
-      render(<GreetingHeader nickname="Sam" onCreateGame={onCreateGame} />),
-      '+ Create Game',
-    );
-    expect(button.props.disabled).toBe(false);
-    button.props.onPress();
-    expect(onCreateGame).toHaveBeenCalledTimes(1);
+  it('renders no Create Game control (it lives in the tab bar now)', () => {
+    const root = render(<GreetingHeader nickname="Sam" />);
+    expect(texts(root).some(text => text.includes('Create Game'))).toBe(false);
+    expect(pressables(root)).toHaveLength(0);
   });
 });
 

@@ -70,6 +70,7 @@ import type {
   TournamentsStackParamList,
 } from './types';
 import HomeHeader from './HomeHeader';
+import { CreateTabButton, CreateTabScreen, createTabListeners } from './CreateTabButton';
 import { TAB_EMOJI, TabEmoji } from './tabIcons';
 import {
   navigationRef,
@@ -122,16 +123,20 @@ const tabScreenOptions = ({
   route,
 }: {
   route: { name: keyof AppTabParamList };
-}): BottomTabNavigationOptions => ({
-  tabBarIcon: ({ focused, size }) => (
-    <TabEmoji emoji={TAB_EMOJI[route.name]} focused={focused} size={size} />
-  ),
-  headerStyle: { backgroundColor: colors.surface },
-  headerTitleStyle: { color: colors.textPrimary, ...typography.h3 },
-  tabBarActiveTintColor: colors.primary,
-  tabBarInactiveTintColor: colors.textMuted,
-  tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-});
+}): BottomTabNavigationOptions => {
+  // `Create` is the raised action button, which draws its own glyph.
+  const emoji = route.name === 'Create' ? undefined : TAB_EMOJI[route.name];
+  return {
+    tabBarIcon: emoji
+      ? ({ focused, size }) => <TabEmoji emoji={emoji} focused={focused} size={size} />
+      : undefined,
+    headerStyle: { backgroundColor: colors.surface },
+    headerTitleStyle: { color: colors.textPrimary, ...typography.h3 },
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: colors.textMuted,
+    tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+  };
+};
 
 function AuthStack(): React.JSX.Element {
   return (
@@ -217,6 +222,16 @@ function AppStack(): React.JSX.Element {
     <AppTabsNav.Navigator screenOptions={tabScreenOptions}>
       <AppTabsNav.Screen name="Home" component={HomeStack} options={{ headerShown: false }} />
       <AppTabsNav.Screen name="Groups" component={GroupsStack} options={{ headerShown: false }} />
+      {/*
+        Center action button, not a destination: tabPress is intercepted and
+        routed to Home -> CreateGame, so this route is never focused.
+      */}
+      <AppTabsNav.Screen
+        name="Create"
+        component={CreateTabScreen}
+        options={{ tabBarButton: CreateTabButton }}
+        listeners={createTabListeners}
+      />
       <AppTabsNav.Screen
         name="Tournaments"
         component={TournamentsStack}
