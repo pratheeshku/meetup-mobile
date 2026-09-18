@@ -195,3 +195,31 @@ Generalizable lessons only; entries below are new or refine an entry above.
 **Why it matters.** Shared responsibilities (safe-area insets, keyboard avoidance, scroll padding, focus management) usually have exactly one owner by convention; a change of owner is a visual regression that unit tests rarely catch, and it only shows on a device.
 
 **Suggested addition** — *Gate 3 — Task confirmation*: "If the change adds a component that will own a layout responsibility (insets, status-bar spacing, safe areas), grep for every current owner (`useSafeAreaInsets`, `insets.`, `StatusBar`, `headerShown`) and list the hand-over explicitly: who owned it before, who owns it now, and what was removed. Add the resulting on-device check (no double/zero padding) to the report's pending device verification."
+
+---
+
+# Session 6 (2026-09-19) — Create Game moved to a tab-bar FAB
+
+## 19. A "touch only these files" rule needs its blast radius measured *before* editing, then one question — not silent breakage or silent expansion
+
+**What happened.** The brief restricted edits to two files, but removing a component prop, adding a route to a shared param-list type, and adding a key to an exhaustive `Record<keyof …>` each break other files (callers, type-checked records, and tests asserting the removed behaviour). Neither obeying the rule (red type-check/tests) nor ignoring it (unrequested edits) was acceptable on its own.
+
+**Why it matters.** Scope rules and "keep the build green" are both real requirements and will collide whenever a change touches a shared type or a public prop. Discovering the collision after editing forces a rework; resolving it silently overrides the requester.
+
+**Suggested addition** — *Gate 3 — Task confirmation*: "If the brief restricts the files you may touch, grep callers of every prop/type/route you will change and list tests that assert the removed behaviour *before* editing. If that list extends past the allowed files, ask once with the concrete list and a recommended option; record the answer as the approval reference for the Deviation."
+
+## 20. Read the library's source for defaults that decide whether a layout trick works
+
+**What happened.** A raised button that overhangs its container depends on whether every ancestor allows overflow (and, on Android, on touch hit-testing outside bounds). The tab library's item wrapper is `overflow: 'visible'` only for one of its two variants, and the default variant is the good one — knowable only by reading the installed source, since docs and types don't state it.
+
+**Why it matters.** Layout tricks (negative margins, overhangs, absolute positioning) silently depend on clipping defaults in third-party wrappers. A wrong assumption produces a visual/touch bug that unit tests cannot see.
+
+**Suggested addition** — *Gate 3 — Task confirmation*: "For any layout that relies on content overflowing its parent, read the installed wrapper components' source for `overflow`/clipping defaults and record the finding. State explicitly in the report which behaviours (touch outside bounds, elevation clipping) are device-only and unverified."
+
+## 21. The prior lesson about quoted globs recurred within the same session — put the rule where the command is written
+
+**What happened.** The Completion Proof grep used an unquoted `--include=*.ts` under zsh and aborted with "no matches found" — the exact failure documented as lesson 1 earlier the same day. It was caught only because the output visibly contained an error line.
+
+**Why it matters.** A rule recorded in a lessons file is not applied at the moment a command is composed. Repeat failures of a known class mean the rule lives in the wrong place.
+
+**Suggested addition** — *Completion Proof*: put the ready-made, correctly quoted proof commands (`--include='*.ts'`) in the proof template itself, and require reading the raw output for shell errors (`no matches found`, `command not found`) before pasting it as evidence.
