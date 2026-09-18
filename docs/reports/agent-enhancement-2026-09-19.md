@@ -251,3 +251,39 @@ Generalizable lessons only; entries below are new or refine an entry above.
 **Why it matters.** "Verified against the schema" and "verified against the server" are different claims; conflating them is how contract bugs ship. Test-data hygiene rules should shape *what* verification is possible, and the report should name the residual gap rather than leave it implied.
 
 **Suggested addition** — *Test data hygiene* / *Completion Proof*: "If a write path cannot be exercised without leaving residue, do not exercise it against a shared environment. Record 'schema-verified only; live round-trip pending' as a known gap with the exact manual step to close it, and use mutation checks on the payload-building code as the substitute evidence."
+
+---
+
+# Session 8 (2026-09-19) — Consolidated fix: hooks violation, FAB menu, display name
+
+## 25. A hook inside a callback-typed navigation option is a Rules-of-Hooks bug; unit tests that render it "as a component" hide it
+
+**What happened.** A header action was built as a module-level component that called `useNavigation()`, then handed to the navigator as `headerRight: Component`. The navigator does not render that option as a component — it calls it as a plain function inside its own hook, so the inner hook joined the *host's* hook list, and only after a layout effect installed the option. The device logged "change in the order of Hooks". Existing tests passed because they did `render(<HeaderRight />)` on a mocked `useNavigation`, which is exactly the one calling convention the framework does not use.
+
+**Why it matters.** Any option typed `() => ReactNode` (`headerRight`, `tabBarButton`, `tabBarIcon`, `drawerContent` variants) is a render *function*, not a component. Tests that supply their own calling convention, and mocks that make hooks work anywhere, prove nothing about the real one.
+
+**Suggested addition** — *Debugging discipline* / testing: "Options typed as render functions must contain no hooks; close over props/`navigation` instead. Test them by calling them the way the framework does, and add one test that mounts the screen in the real navigator and fails on any console error matching /order of Hooks|Invalid hook call/. Make the mocked hook throw so a reintroduced hook fails loudly."
+
+## 26. Prove a regression test is not vacuous by running it against the old code — and expect deduplicated warnings to make the second case pass falsely
+
+**What happened.** A two-case test (Groups, Tournaments) failed on the old code for the first case and *passed* for the second. React reports a hook-order change once per component name per module registry, so the second screen's identical bug was never logged. Splitting the cases into separate test files made both fail on the old code.
+
+**Why it matters.** Asserting on console output is only sound when the warning can fire more than once. A green negative-control check is what exposed it; without restoring the old code and re-running, two "regression tests" would have shipped and one would have guarded nothing.
+
+**Suggested addition** — *Test requirements*: "For every regression test, restore the pre-fix code and confirm the test fails, per case. When asserting on framework warnings, put each case in its own test file (or reset modules), since many warnings are logged once per process."
+
+## 27. Verify what a brief calls 'possibly already fixed' from the code and commit history before touching it
+
+**What happened.** The brief listed missing screen registration as a live console error. The registration had been added in an earlier commit; the error matched an older on-device build. Nothing needed changing, so the right output was evidence (the `Screen name=` lines, type-checked against the param list) rather than an edit.
+
+**Why it matters.** Consolidated bug lists mix stale and current findings. Editing to "fix" an already-fixed item adds churn and risk; silently skipping it hides whether the claim was checked.
+
+**Suggested addition** — *Gate 3*: "For each item in a multi-issue brief, record one of already-fixed / fixed-now / not-reproducible with the file+line or commit that proves it. Ask whether the device was running a build older than that commit before assuming a code defect."
+
+## 28. When fixing a display field, fix the state that feeds it, not just the render
+
+**What happened.** Switching the Home greeting to `display_name` would still have shown the old name after the user edited it on Profile, because the greeting reads a cached auth user that nothing refreshed. A small `updateUser` merge on the auth context, called after the save, closed it.
+
+**Why it matters.** A field that is editable in one screen and displayed in another has two copies (server and in-memory cache); changing only the display code leaves a stale-until-restart bug that no static check catches.
+
+**Suggested addition** — *Gate 3 — edge cases*: "For any user-editable value shown elsewhere, name every in-memory copy and how each is refreshed after an edit; add a test asserting the refresh call happens on save and does not happen on failure."
