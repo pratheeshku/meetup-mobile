@@ -65,3 +65,27 @@ Generalizable lessons only. Each entry: what happened → why it matters → sug
 **Why it matters.** "Don't change behaviour" is a claim that needs evidence; a targeted diff of logic-bearing lines is cheap and much stronger than "I was careful".
 
 **Suggested addition** — *Fidelity rules* (Smallest change set): "For presentation-only changes to large files, prefer bounded-region replacement over full-file regeneration, and include in the report a normalized diff of logic-bearing lines (state, handlers, API and auth calls) against the prior commit showing no change."
+
+## 9. Check a brief's description of the "current state" against the repo before building
+
+**What happened.** The brief said the new layout replaces an "icon-circle/progress-bar approach from the prior task". The card in the repo had neither — the only icon circle was in an unrelated empty-state component, and there was no progress bar anywhere. The brief also specified a data field (skill level) that the data model does not have. Both were discovered only because the existing code and types were read before writing anything.
+
+**Why it matters.** A brief's claims about existing code, and about which data is available, come from memory or from another surface (here, the web app). Acting on them literally either deletes the wrong thing or invents fields to satisfy the spec. Neither is visible in tests, which only test what was built.
+
+**Suggested addition** — *Pre-code gates → Gate 3 (Task confirmation)*: "For every 'replace/remove X' instruction, grep for X and record what was actually found. For every displayed value in the spec, name the model field that supplies it; if none exists, omit the element and report it as a gap — never add a field or placeholder."
+
+## 10. Provenance of "verified" claims must be recorded, not inherited
+
+**What happened.** The brief asked the report to state the layout was "verified against the actual live web app, not inferred". The implementing agent never viewed the web app; the user did and relayed the result as text.
+
+**Why it matters.** A report that says "verified" without saying by whom converts a second-hand statement into apparent first-hand evidence, which downstream review will trust.
+
+**Suggested addition** — *Implementation Report → Verification results*: "Every 'verified'/'observed' statement names the verifier and the medium (e.g. 'supplied by the user from direct inspection; not independently viewed by the implementer'). The implementer may only claim verification it performed itself."
+
+## 11. In react-test-renderer, `.parent` of a host node is usually a composite wrapper
+
+**What happened.** Tests that read a pill's background via `textNode.parent.props.style` got `undefined`: the parent of the host `Text` was the composite `Text` component, not the enclosing `View`. Three tests failed for a test-helper reason, not a product reason.
+
+**Why it matters.** The failure looks like a component bug (style "missing"), which invites changing correct code to satisfy a wrong test.
+
+**Suggested addition** — *Debugging discipline*: "When a style/prop assertion on a rendered tree returns undefined, first check whether the traversal landed on a composite wrapper rather than the host node; walk up to the nearest host element by type before touching the component."
