@@ -8,7 +8,7 @@ Design: DES-MEETUP-MOBILE, APPROVED 2026-09-13, tier T1.
 - Report `docs/reports/IMPL-DES-MEETUP-MOBILE-fixes-hooks-fab-displayname.md`; reflection #25-#28
 
 ### In Progress
-- Push to origin/main
+- none (pushed: 8b68464..433e6f2 main -> main)
 
 ### Pending
 - On-device verification (report §6); testing-agent pass; conformance review
