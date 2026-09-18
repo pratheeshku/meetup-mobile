@@ -16,11 +16,14 @@
  * only so the screens contain no remaining magic numbers; none of the
  * specified values were altered.
  *
- * Contrast notes (WCAG 2.x, measured — not asserted):
- * - `textMuted` on `surface` is 2.92:1 and on `background` 2.65:1, i.e. it
- *   FAILS AA for body-size text. It is used only where the task specifies
- *   it (inactive tab tint) and for non-text UI; never for readable copy or
- *   placeholders (`textSecondary`, 5.35:1 on `surface`, is used there).
+ * Contrast notes (WCAG 2.x, measured — not asserted; enforced by
+ * `src/theme/__tests__/tokens.test.ts`):
+ * - `textMuted` is #5E6D94: 5.13:1 on `surface`, 4.67:1 on `background`
+ *   (AA needs 4.5:1). The original #8B97B5 measured 2.92:1 / 2.65:1 and
+ *   failed AA. The page `background` is the binding constraint, not white.
+ *   Trade-off: AA at this hue leaves `textMuted` almost as dark as
+ *   `textSecondary` (#5C6B8A, 5.35:1 / 4.86:1), so the two tones are now
+ *   close — hierarchy between them is weak.
  * - `warning` on `warningLight` is 2.47:1 (fail), so warning badges use
  *   `textPrimary` text on `warningLight` instead (15.4:1).
  */
@@ -33,7 +36,7 @@ export const colors = {
   surface: '#FFFFFF',
   textPrimary: '#0D1B3E',
   textSecondary: '#5C6B8A',
-  textMuted: '#8B97B5',
+  textMuted: '#5E6D94',
   border: '#E0E6F5',
   success: '#2E7D32',
   successLight: '#E8F5E9',
@@ -79,6 +82,18 @@ export const shadows = {
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
+  },
+  /**
+   * Additive: floating overlays (e.g. the in-app notification banner). The
+   * same values that banner used before conversion (heavier than `card`),
+   * with the shadow colour taken from the palette instead of `#000`.
+   */
+  overlay: {
+    shadowColor: colors.textPrimary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 10,
   },
 };
 

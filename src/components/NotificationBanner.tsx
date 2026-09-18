@@ -31,6 +31,7 @@ import {
   resolveNotificationTarget,
   navigateToNotificationTarget,
 } from '../notifications/notificationRouting';
+import { colors, radius, shadows, spacing, typography } from '../theme/tokens';
 
 const AUTO_DISMISS_MS = 4000;
 // A swipe of at least this many px (in any horizontal or upward direction)
@@ -128,7 +129,7 @@ export default function NotificationBanner(): React.JSX.Element | null {
         onPress={dismissBanner}
         accessibilityRole="button"
         accessibilityLabel="Dismiss notification"
-        hitSlop={12}
+        hitSlop={spacing.md}
       >
         <Text style={styles.dismissText}>✕</Text>
       </Pressable>
@@ -139,24 +140,20 @@ export default function NotificationBanner(): React.JSX.Element | null {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: spacing.md,
+    right: spacing.md,
     zIndex: 1000,
-    elevation: 10,
-    backgroundColor: '#1f2937',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    backgroundColor: colors.textPrimary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
+    ...shadows.overlay,
   },
-  pressable: { flex: 1, marginRight: 8 },
-  title: { color: '#fff', fontWeight: '700', fontSize: 15, marginBottom: 2 },
-  body: { color: '#e5e7eb', fontSize: 13 },
-  dismissButton: { padding: 4 },
-  dismissText: { color: '#e5e7eb', fontSize: 16, fontWeight: '600' },
+  pressable: { flex: 1, marginRight: spacing.sm },
+  title: { ...typography.bodyBold, color: colors.white, marginBottom: spacing.xs },
+  body: { ...typography.caption, color: colors.primaryLight },
+  dismissButton: { padding: spacing.xs },
+  dismissText: { ...typography.button, color: colors.primaryLight },
 });
