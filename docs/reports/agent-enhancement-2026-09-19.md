@@ -135,3 +135,15 @@ Generalizable lessons only; entries below are new or refine an entry above.
 **Why it matters.** The status file and reports are read as ground truth by later sessions. A negative about the environment ("no device", "no network", "tool not installed") drawn from one probe of one mechanism is a guess, and it directly shapes how much verification gets skipped.
 
 **Suggested addition** — *Live status file / Implementation Report*: "State environment capabilities only from a probe of the capability itself (e.g. list attached devices), not of one particular binary. Write 'not verified' rather than 'not available' unless the direct probe was negative, and state the actual reason verification was skipped (e.g. needs credentials, would modify the user's device)."
+
+---
+
+# Session 3 (2026-09-19) — follow-up fix to a bug flagged in the previous session
+
+## 13. A fix that un-hides a control must be traced one hop downstream — and re-verified at the primary source
+
+**What happened.** The task scope was a gating bug: a button never appeared because a flag was stubbed. The fix itself was three lines. But the control had been unreachable, so the action behind it had never been exercised; a prior audit noted that the action's backend call is rejected (required request body missing). Correcting the gate would therefore have shipped a visible control that cannot succeed. The task text described only the gate; the risk sat one hop downstream. The audit's claim came from an earlier session, so the live API schema (public, one read-only GET) was re-checked directly — it confirmed the claim and also confirmed the two identifiers being compared share a format.
+
+**Why it matters.** Bugs that hide code paths shield everything behind them. Fixing the gate promotes every latent defect downstream to user-visible at once. The existing contract-verification rule covers endpoints a task *touches*; a task that merely *exposes* one is easy to scope past. And an earlier report is a claim, not evidence — when the primary source is cheap to read, read it.
+
+**Suggested addition** — *Pre-code gates → Contract verification*: "When a fix makes a previously unreachable control, screen or code path reachable, treat every endpoint behind it as touched: verify its method, path and required body/fields against the primary source (live schema/OpenAPI when public) before finishing, not against a prior report. If the downstream call is known-broken, do not silently absorb it and do not silently widen scope: do what was asked, leave the call unchanged, state the consequence first in the report and the hand-off, and offer the smallest reversible alternative (e.g. hiding the control)."
