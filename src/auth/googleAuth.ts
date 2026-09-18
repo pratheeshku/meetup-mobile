@@ -98,7 +98,7 @@ export async function signIn(): Promise<UserProfile> {
   }
 
   const { data } = await apiClient.post<AuthResponse>('/auth/oauth/google/callback', {
-    idToken: response.data.idToken,
+    id_token: response.data.idToken,
   });
 
   await saveTokens(data.access_token, data.refresh_token);
