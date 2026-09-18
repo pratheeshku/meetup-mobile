@@ -175,3 +175,23 @@ Generalizable lessons only; entries below are new or refine an entry above.
 **Why it matters.** A contract has one authoritative statement and many restatements: code, comments, tests, design doc, prior reports, status files. Fixing the code alone makes the restatements silently contradict it. Historical reports should be left as records but flagged; authoritative documents need a routed correction.
 
 **Suggested addition** — *Contract verification*: "After changing a request/response contract, grep the whole repo (source, tests, design docs, reports, status files) for the old path and field names. Fix comments and tests in scope; for authoritative docs you may not edit, raise a routed doc-correction item; for historical reports, note them as stale in the new report rather than rewriting them."
+
+---
+
+# Session 5 (2026-09-19) — app header + placeholder screen (UI-only task)
+
+## 17. A Jest pass does not prove the app bundles — run the bundler when no device/emulator check is in scope
+
+**What happened.** A UI change added components, a navigator option and route types. Jest, `tsc` and ESLint were all clean, but Jest transforms files individually and mocks native modules, so none of them exercise the real module graph or the bundler's resolver. A one-command production bundle (`react-native bundle --platform android`, output to scratch) compiled the whole app and let a grep confirm the new strings were in the output. It took seconds, needed no emulator, and was the only check that ran the real entry point. A physical device was attached, but installing onto a user's device is a side effect the brief did not ask for.
+
+**Why it matters.** "Green tests" for mobile UI work overstates confidence: the untested layer (bundler, navigator wiring, native rendering) is exactly where UI tasks fail. A bundle build is a cheap middle tier between unit tests and a device run, and the report can then state precisely what remains device-only.
+
+**Suggested addition** — *Completion Proof → Build evidence*: "For React Native / bundler-based frontends, 'build evidence' means a real production bundle of the entry point (paste the tail, and grep the output for one new symbol), not only tests. Do not install to an attached device unless the brief asks; list rendering, spacing, emoji glyphs and gestures as 'device verification pending'."
+
+## 18. When a new component takes over a layout responsibility, remove it from the old owner in the same change
+
+**What happened.** The Home screen had hidden its navigator header and applied the status-bar inset itself. Replacing the hidden header with a custom one that must also apply the inset would have double-padded the top of the screen, and no test would have failed because the tests mock the inset provider. The only signal was reading the old owner's comment ("the greeting is the header, so the top safe-area inset is applied here").
+
+**Why it matters.** Shared responsibilities (safe-area insets, keyboard avoidance, scroll padding, focus management) usually have exactly one owner by convention; a change of owner is a visual regression that unit tests rarely catch, and it only shows on a device.
+
+**Suggested addition** — *Gate 3 — Task confirmation*: "If the change adds a component that will own a layout responsibility (insets, status-bar spacing, safe areas), grep for every current owner (`useSafeAreaInsets`, `insets.`, `StatusBar`, `headerShown`) and list the hand-over explicitly: who owned it before, who owns it now, and what was removed. Add the resulting on-device check (no double/zero padding) to the report's pending device verification."
