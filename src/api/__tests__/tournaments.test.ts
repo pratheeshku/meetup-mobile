@@ -5,13 +5,14 @@
  * (`TournamentResponse`, `TournamentRegistrationResponse`).
  */
 import { apiClient } from '../client';
-import { getRegistrations, getTournament, getTournaments } from '../tournaments';
+import { createTournament, getRegistrations, getTournament, getTournaments } from '../tournaments';
 
 jest.mock('../client', () => ({
-  apiClient: { get: jest.fn() },
+  apiClient: { get: jest.fn(), post: jest.fn() },
 }));
 
 const mockedGet = apiClient.get as jest.Mock;
+const mockedPost = apiClient.post as jest.Mock;
 
 afterEach(() => {
   mockedGet.mockReset();
@@ -131,5 +132,72 @@ describe('getRegistrations', () => {
       nickname: 'The Strikers',
       status: 'registered',
     });
+  });
+});
+
+describe('createTournament', () => {
+  const response = {
+    id: 't-new',
+    organizer_id: 'org-1',
+    sport: 'football',
+    title: 'Summer Cup',
+    name: null,
+    description: null,
+    format: 'knockout',
+    capacity: 8,
+    registration_closes_at: null,
+    starts_at: '2026-10-01T10:00:00Z',
+    status: 'upcoming',
+    created_at: '2026-09-19T00:00:00Z',
+  };
+
+  afterEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('POSTs the TournamentCreate field names to /tournaments with the correlation id', async () => {
+    mockedPost.mockResolvedValueOnce({ data: response });
+    const input = {
+      title: 'Summer Cup',
+      sport: 'football',
+      participation_mode: 'individual' as const,
+      format: 'knockout' as const,
+      capacity: 8,
+      starts_at: '2026-10-01T10:00:00.000Z',
+      registration_closes_at: '2026-09-30T10:00:00.000Z',
+    };
+
+    await createTournament(input, { correlationId: 'cid-2' });
+
+    expect(mockedPost).toHaveBeenCalledWith('/tournaments', input, { correlationId: 'cid-2' });
+  });
+
+  it('maps the TournamentResponse (title -> name, capacity -> max_participants)', async () => {
+    mockedPost.mockResolvedValueOnce({ data: response });
+
+    const created = await createTournament({
+      title: 'Summer Cup',
+      sport: 'football',
+      participation_mode: 'team',
+      format: 'knockout',
+      capacity: 8,
+      starts_at: '2026-10-01T10:00:00.000Z',
+    });
+
+    expect(created).toMatchObject({ id: 't-new', name: 'Summer Cup', max_participants: 8 });
+  });
+
+  it('propagates a failed request to the caller', async () => {
+    mockedPost.mockRejectedValueOnce(new Error('boom'));
+    await expect(
+      createTournament({
+        title: 'T',
+        sport: 'football',
+        participation_mode: 'team',
+        format: 'knockout',
+        capacity: 8,
+        starts_at: '2026-10-01T10:00:00.000Z',
+      }),
+    ).rejects.toThrow('boom');
   });
 });

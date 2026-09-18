@@ -91,8 +91,10 @@ import CreateGameScreen from '../screens/CreateGameScreen';
 import EventDetailScreen from '../screens/EventDetailScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
+import CreateGroupScreen from '../screens/CreateGroupScreen';
 import TournamentsScreen from '../screens/TournamentsScreen';
 import TournamentDetailScreen from '../screens/TournamentDetailScreen';
+import CreateTournamentScreen from '../screens/CreateTournamentScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
 import NotificationBanner from '../components/NotificationBanner';
@@ -183,6 +185,11 @@ function GroupsStack(): React.JSX.Element {
         component={GroupDetailScreen}
         options={{ title: 'Group' }}
       />
+      <GroupsStackNav.Screen
+        name="CreateGroup"
+        component={CreateGroupScreen}
+        options={{ title: 'Create Group' }}
+      />
     </GroupsStackNav.Navigator>
   );
 }
@@ -199,6 +206,11 @@ function TournamentsStack(): React.JSX.Element {
         name="TournamentDetail"
         component={TournamentDetailScreen}
         options={{ title: 'Tournament' }}
+      />
+      <TournamentsStackNav.Screen
+        name="CreateTournament"
+        component={CreateTournamentScreen}
+        options={{ title: 'Create Tournament' }}
       />
     </TournamentsStackNav.Navigator>
   );

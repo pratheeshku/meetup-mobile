@@ -118,3 +118,36 @@ export interface TournamentsListResponse {
   page: number;
   page_size: number;
 }
+
+/**
+ * Values documented in the live OpenAPI `TournamentCreate` field
+ * descriptions (`format`: 'knockout', 'round_robin', or 'group_stage';
+ * `participation_mode`: 'individual' or 'team'). The schema types both as
+ * plain strings — the values below are the documented ones, not a
+ * schema-enforced enum.
+ */
+export type TournamentFormat = 'knockout' | 'round_robin' | 'group_stage';
+export type TournamentParticipationMode = 'individual' | 'team';
+
+/**
+ * `POST /tournaments` request body, a subset of the live `TournamentCreate`
+ * schema. Schema `required`: `sport`, `participation_mode`. `title` has a
+ * server default of "Test Tourney" and `capacity` a default of 8, so this
+ * client always sends `title` explicitly. `starts_at` is not in the
+ * schema's `required` list but has no default and is non-nullable — this
+ * client always sends it. Optional fields not offered by the form
+ * (description, visibility, group_id, venue_*, ends_at, structured_rules)
+ * are omitted so the server defaults apply.
+ */
+export interface CreateTournamentInput {
+  title: string;
+  sport: string;
+  participation_mode: TournamentParticipationMode;
+  format: TournamentFormat;
+  /** Integer, schema `exclusiveMinimum: 1` (i.e. at least 2). */
+  capacity: number;
+  /** ISO 8601 date-time. */
+  starts_at: string;
+  /** ISO 8601 date-time; optional/nullable in the schema. */
+  registration_closes_at?: string;
+}

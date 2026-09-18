@@ -17,16 +17,25 @@ export type HomeStackParamList = {
   CreateGame: undefined;
 };
 
-/** Groups tab's nested stack route params (§4.4 — Groups list, Group Detail). */
+/**
+ * Groups tab's nested stack route params (§4.4 — Groups list, Group Detail,
+ * Create Group). `refreshKey` is set by Create Group on success (via
+ * `popTo`) so the list re-fetches; any new value triggers one refresh.
+ */
 export type GroupsStackParamList = {
-  GroupsList: undefined;
+  GroupsList: { refreshKey?: number } | undefined;
   GroupDetail: { groupId: string };
+  CreateGroup: undefined;
 };
 
-/** Tournaments tab's nested stack route params (§4.5 — Tournaments list, Tournament Detail). */
+/**
+ * Tournaments tab's nested stack route params (§4.5 — Tournaments list,
+ * Tournament Detail, Create Tournament). `refreshKey` works as on Groups.
+ */
 export type TournamentsStackParamList = {
-  TournamentsList: undefined;
+  TournamentsList: { refreshKey?: number } | undefined;
   TournamentDetail: { tournamentId: string };
+  CreateTournament: undefined;
 };
 
 /**

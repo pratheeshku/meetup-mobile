@@ -5,14 +5,15 @@
  * (`GroupResponse`, `GroupMembershipResponse`).
  */
 import { apiClient } from '../client';
-import { getGroup, getMyGroups, updateMemberRole } from '../groups';
+import { createGroup, getGroup, getMyGroups, updateMemberRole } from '../groups';
 
 jest.mock('../client', () => ({
-  apiClient: { get: jest.fn(), patch: jest.fn() },
+  apiClient: { get: jest.fn(), patch: jest.fn(), post: jest.fn() },
 }));
 
 const mockedGet = apiClient.get as jest.Mock;
 const mockedPatch = apiClient.patch as jest.Mock;
+const mockedPost = apiClient.post as jest.Mock;
 
 describe('getMyGroups', () => {
   afterEach(() => {
@@ -140,5 +141,62 @@ describe('updateMemberRole', () => {
       { role: 'admin' },
       expect.anything(),
     );
+  });
+});
+
+describe('createGroup', () => {
+  const created = {
+    id: 'g-new',
+    name: 'Sunday Footballers',
+    description: null,
+    owner_id: 'u-1',
+    members_can_invite: true,
+    created_at: '2026-09-19T00:00:00Z',
+  };
+
+  afterEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('POSTs exactly the GroupCreate body (name only when description is empty) and threads the correlation id', async () => {
+    mockedPost.mockResolvedValueOnce({ data: created });
+
+    await createGroup({ name: 'Sunday Footballers', description: '' }, { correlationId: 'cid-1' });
+
+    expect(mockedPost).toHaveBeenCalledTimes(1);
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/groups',
+      { name: 'Sunday Footballers' },
+      { correlationId: 'cid-1' },
+    );
+  });
+
+  it('includes description when given, and never sends members_can_invite (not in GroupCreate)', async () => {
+    mockedPost.mockResolvedValueOnce({ data: created });
+
+    await createGroup({ name: 'G', description: 'Weekly kickabout' });
+
+    const body = mockedPost.mock.calls[0][1];
+    expect(body).toEqual({ name: 'G', description: 'Weekly kickabout' });
+    expect(body).not.toHaveProperty('members_can_invite');
+  });
+
+  it('maps the GroupResponse to a Group owned by the caller', async () => {
+    mockedPost.mockResolvedValueOnce({ data: created });
+
+    const group = await createGroup({ name: 'Sunday Footballers' });
+
+    expect(group).toMatchObject({
+      id: 'g-new',
+      name: 'Sunday Footballers',
+      description: '',
+      owner_id: 'u-1',
+      current_user_role: 'owner',
+    });
+  });
+
+  it('propagates a failed request to the caller', async () => {
+    mockedPost.mockRejectedValueOnce(new Error('boom'));
+    await expect(createGroup({ name: 'G' })).rejects.toThrow('boom');
   });
 });

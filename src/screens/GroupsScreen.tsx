@@ -5,9 +5,10 @@
  * mount, via `getMyGroups()` — see `src/api/groups.ts` for the
  * `/settings/groups-owned` + `/settings/groups-member` sourcing note.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getMyGroups } from '../api/groups';
 import Badge from '../components/Badge';
@@ -15,6 +16,7 @@ import type { BadgeVariant } from '../components/Badge';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import ErrorView from '../components/ErrorView';
+import HeaderAddButton from '../components/HeaderAddButton';
 import LoadingView from '../components/LoadingView';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Group, GroupRole } from '../types/group';
@@ -36,7 +38,17 @@ const ROLE_BADGE_VARIANT: Record<GroupRole, BadgeVariant> = {
   none: 'neutral',
 };
 
-export default function GroupsScreen({ navigation }: Props): React.JSX.Element {
+/**
+ * The header "+" — a module-level component (React Navigation renders it, so
+ * it gets `navigation` from context rather than props) so its identity is
+ * stable across renders.
+ */
+function GroupsHeaderAction(): React.JSX.Element {
+  const navigation = useNavigation<NativeStackNavigationProp<GroupsStackParamList>>();
+  return <HeaderAddButton label="Create Group" onPress={() => navigation.navigate('CreateGroup')} />;
+}
+
+export default function GroupsScreen({ navigation, route }: Props): React.JSX.Element {
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -63,6 +75,21 @@ export default function GroupsScreen({ navigation }: Props): React.JSX.Element {
   useEffect(() => {
     loadGroups(false);
   }, [loadGroups]);
+
+  // Create Group/Tournament pops back here with a fresh `refreshKey` on
+  // success; re-fetch once per new key (the initial mount load is above).
+  const refreshKey = route.params?.refreshKey;
+  useEffect(() => {
+    if (refreshKey !== undefined) {
+      loadGroups(true);
+    }
+  }, [refreshKey, loadGroups]);
+
+  // Direct create entry point in this tab's own header. Set here (not in
+  // the navigator) so it shows in the loading and error states too.
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerRight: GroupsHeaderAction });
+  }, [navigation]);
 
   if (isLoading) {
     return <LoadingView />;

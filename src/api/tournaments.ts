@@ -21,6 +21,7 @@
  */
 import { apiClient } from './client';
 import type {
+  CreateTournamentInput,
   Tournament,
   TournamentFixture,
   TournamentRegistration,
@@ -191,4 +192,20 @@ export async function cancelTournament(id: string, options?: RequestOptions): Pr
   await apiClient.post(`/tournaments/${id}/cancel`, undefined, {
     correlationId: options?.correlationId,
   });
+}
+
+/**
+ * `POST /tournaments` (DES §4.5, §7.7; R-040). Body is a subset of the live
+ * `TournamentCreate` schema (see `CreateTournamentInput`). Optional
+ * `registration_closes_at` is omitted when absent so the server default
+ * (null) applies.
+ */
+export async function createTournament(
+  input: CreateTournamentInput,
+  options?: RequestOptions,
+): Promise<Tournament> {
+  const { data } = await apiClient.post<TournamentApiItem>('/tournaments', input, {
+    correlationId: options?.correlationId,
+  });
+  return mapTournamentApiItem(data);
 }

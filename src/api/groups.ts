@@ -27,6 +27,7 @@
  */
 import { apiClient } from './client';
 import type {
+  CreateGroupInput,
   Group,
   GroupDetail,
   GroupMember,
@@ -190,4 +191,24 @@ export async function removeMember(
   await apiClient.delete(`/groups/${groupId}/members/${userId}`, {
     correlationId: options?.correlationId,
   });
+}
+
+/**
+ * `POST /groups` (DES §4.4, §7.3; R-030). Request body is the live
+ * `GroupCreate` schema — `{ name, description? }` only. The caller becomes
+ * the owner, so the returned `Group` is mapped with `current_user_role:
+ * 'owner'`. An empty description is omitted rather than sent as `""`.
+ */
+export async function createGroup(
+  input: CreateGroupInput,
+  options?: RequestOptions,
+): Promise<Group> {
+  const body: { name: string; description?: string } = { name: input.name };
+  if (input.description) {
+    body.description = input.description;
+  }
+  const { data } = await apiClient.post<GroupApiItem>('/groups', body, {
+    correlationId: options?.correlationId,
+  });
+  return mapGroupApiItem(data, 'owner');
 }

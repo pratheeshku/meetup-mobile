@@ -77,3 +77,14 @@ export interface GroupsListResponse {
   page: number;
   page_size: number;
 }
+
+/**
+ * `POST /groups` request body — the live OpenAPI `GroupCreate` schema:
+ * `name` (required, 1–100 chars) and `description` (optional, nullable).
+ * There is no `members_can_invite` on the create request (it exists only on
+ * `GroupResponse`).
+ */
+export interface CreateGroupInput {
+  name: string;
+  description?: string;
+}

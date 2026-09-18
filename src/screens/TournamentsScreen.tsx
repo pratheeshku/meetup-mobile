@@ -1,9 +1,10 @@
 /**
  * Tournaments list (DES-MEETUP-MOBILE.md §4.5, §7.7; R-041).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getTournaments } from '../api/tournaments';
 import Badge from '../components/Badge';
@@ -11,6 +12,7 @@ import type { BadgeVariant } from '../components/Badge';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import ErrorView from '../components/ErrorView';
+import HeaderAddButton from '../components/HeaderAddButton';
 import LoadingView from '../components/LoadingView';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentRegistrationStatus } from '../types/tournament';
@@ -30,7 +32,17 @@ const REGISTRATION_BADGE_VARIANT: Record<TournamentRegistrationStatus, BadgeVari
   withdrawn: 'warning',
 };
 
-export default function TournamentsScreen({ navigation }: Props): React.JSX.Element {
+/**
+ * The header "+" — a module-level component (React Navigation renders it, so
+ * it gets `navigation` from context rather than props) so its identity is
+ * stable across renders.
+ */
+function TournamentsHeaderAction(): React.JSX.Element {
+  const navigation = useNavigation<NativeStackNavigationProp<TournamentsStackParamList>>();
+  return <HeaderAddButton label="Create Tournament" onPress={() => navigation.navigate('CreateTournament')} />;
+}
+
+export default function TournamentsScreen({ navigation, route }: Props): React.JSX.Element {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -57,6 +69,21 @@ export default function TournamentsScreen({ navigation }: Props): React.JSX.Elem
   useEffect(() => {
     loadTournaments(false);
   }, [loadTournaments]);
+
+  // Create Group/Tournament pops back here with a fresh `refreshKey` on
+  // success; re-fetch once per new key (the initial mount load is above).
+  const refreshKey = route.params?.refreshKey;
+  useEffect(() => {
+    if (refreshKey !== undefined) {
+      loadTournaments(true);
+    }
+  }, [refreshKey, loadTournaments]);
+
+  // Direct create entry point in this tab's own header. Set here (not in
+  // the navigator) so it shows in the loading and error states too.
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerRight: TournamentsHeaderAction });
+  }, [navigation]);
 
   if (isLoading) {
     return <LoadingView />;
