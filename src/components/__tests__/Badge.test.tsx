@@ -32,7 +32,8 @@ function findHost(
   renderer: ReactTestRenderer.ReactTestRenderer,
   hostType: 'View' | 'Text',
 ): ReactTestRenderer.ReactTestInstance {
-  return renderer.root.findAll(node => node.type === hostType)[0];
+  // `type` is typed as ElementType but is the host name string for host nodes.
+  return renderer.root.findAll(node => (node.type as unknown) === hostType)[0];
 }
 
 const VARIANTS: BadgeVariant[] = ['primary', 'success', 'warning', 'error', 'neutral'];

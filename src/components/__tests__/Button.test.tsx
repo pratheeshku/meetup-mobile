@@ -35,7 +35,8 @@ function findPressable(root: Instance): Instance {
 
 /** Host `Text` nodes (one per rendered label). */
 function findTexts(root: Instance): Instance[] {
-  return root.findAll(node => node.type === 'Text');
+  // `type` is typed as ElementType but is the host name string for host nodes.
+  return root.findAll(node => (node.type as unknown) === 'Text');
 }
 
 function hasSpinner(root: Instance): boolean {
