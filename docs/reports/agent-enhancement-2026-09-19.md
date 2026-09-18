@@ -223,3 +223,31 @@ Generalizable lessons only; entries below are new or refine an entry above.
 **Why it matters.** A rule recorded in a lessons file is not applied at the moment a command is composed. Repeat failures of a known class mean the rule lives in the wrong place.
 
 **Suggested addition** — *Completion Proof*: put the ready-made, correctly quoted proof commands (`--include='*.ts'`) in the proof template itself, and require reading the raw output for shell errors (`no matches found`, `command not found`) before pasting it as evidence.
+
+---
+
+# Session 7 (2026-09-19) — Create Group / Create Tournament forms
+
+## 22. Verify the brief's statements about prior work against the code before building on them
+
+**What happened.** The brief said an earlier deliverable "offers Game/Group/Tournament creation as a menu". The repository showed the earlier deliverable does something simpler (a single direct action). The brief also guessed a request field that does not exist in the real contract. Both were discoverable in minutes, before any code depended on them.
+
+**Why it matters.** Requirements text is written from memory of the plan, not from the current state of the code. Building on a false premise either produces unrequested work or silently diverges from what the requester believes exists.
+
+**Suggested addition** — *Gate 3 — Task confirmation*: "Extract every factual claim the brief makes about existing behaviour ('X already does Y') and grep/read to confirm each. Where a claim is false, do not build to it or around it silently: state the mismatch in the report's first section and either ask or proceed with the smallest correct reading."
+
+## 23. For create/write forms, tabulate every request field as required / default / nullable and treat placeholder-like defaults as "always send"
+
+**What happened.** The live schema's `required` list held only two of the tournament fields, yet one non-required field defaulted to a junk value ("Test Tourney"), another had no default and was non-nullable but was also absent from `required`, and valid values for three fields existed only in free-text descriptions. Reading only `required` would have produced a form that could create a mislabelled record or omit a needed field.
+
+**Why it matters.** `required` is only one of three signals; a default that is a test artefact is a data-quality hazard, and "not required but not nullable and no default" is an ambiguity the requester must hear about. Fields with prose-only value sets are effectively unvalidated contracts.
+
+**Suggested addition** — *Contract verification*: "For any create/update form, produce a per-field table from the machine-readable schema (required, default, nullable, bounds, enum-or-prose) before coding. Always send fields whose defaults look like test/placeholder data; prefill only fields with a documented default; list every ambiguity (required-ness, prose-only enums) in the report as a numbered flag."
+
+## 24. Never create data on a shared/production backend to 'prove' a write path — say plainly that the round-trip is unverified
+
+**What happened.** The only way to prove a create endpoint end-to-end is to create a record, but the environment forbids deleting data, so a real create would leave permanent test rows. Read-only calls and one unauthenticated request (rejected with 401) were used instead, and the report states that the first real create is untested.
+
+**Why it matters.** "Verified against the schema" and "verified against the server" are different claims; conflating them is how contract bugs ship. Test-data hygiene rules should shape *what* verification is possible, and the report should name the residual gap rather than leave it implied.
+
+**Suggested addition** — *Test data hygiene* / *Completion Proof*: "If a write path cannot be exercised without leaving residue, do not exercise it against a shared environment. Record 'schema-verified only; live round-trip pending' as a known gap with the exact manual step to close it, and use mutation checks on the payload-building code as the substitute evidence."
