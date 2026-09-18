@@ -263,3 +263,15 @@ Hex-bearing lines per screen, before (`d3952ce`) → after:
 1. Run the app on a device/emulator (light **and** system dark mode) and review each screen — the single most important next step.
 2. Decide on D1 (`NotificationBanner`) and G2 (`textMuted`).
 3. Testing-agent pass in a fresh session, then conformance-review (needs this report + the Test Report).
+
+
+---
+
+## Addendum — 2026-09-19: D1 and G2 addressed (commit `85da015`)
+
+The sections above are left as the original as-built record. Two items they list as open were resolved afterwards:
+
+- **D1 (`NotificationBanner.tsx` not converted) — resolved.** All 5 hex literals (incl. the off-palette `#1f2937`) and all sizing literals now use tokens; a new additive `shadows.overlay` token carries the banner's previous heavier shadow values. Only the import and one `hitSlop` literal changed outside the stylesheet (diffed against the prior commit) — no pan-responder, timer, or handler change. Geometry was snapped to the token scale (inset/padding 12–14 → 16, radius 12 → 10, title weight 700 → 600), so it differs slightly from before; not visually verified (G1 still applies). The repo-wide hex grep outside `tokens.ts` and tests is now empty (positive controls: 21 hits in `tokens.ts`, 5 in the pre-fix banner).
+- **G2 (`textMuted` fails AA) — resolved.** `#8B97B5` (2.92:1 / 2.65:1) → `#5E6D94`, computed from the token file: **5.13:1 on `surface` (#FFFFFF), 4.67:1 on `background` (#F0F4FF)**. The page background is the binding constraint. Trade-off: at AA, `textMuted` is nearly as dark as `textSecondary` (#5C6B8A: 5.35:1 / 4.86:1), so the hierarchy between the two text tones is weak. A regression guard (`src/theme/__tests__/tokens.test.ts`) asserts AA for all three text tokens on both surfaces, with a negative control on the old value; a banner render test covers its palette use and legibility. Both guards were mutation-checked (old values restored → they fail).
+
+Final-state evidence for this addendum: `tsc --noEmit` exit 0, `eslint . --ext .ts,.tsx` exit 0, `jest` 11 suites / 44 tests passed on each of 3 runs. Still not done: visual verification on a device (G1), and the testing-agent / conformance-review passes.
