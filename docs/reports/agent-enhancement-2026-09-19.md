@@ -89,3 +89,49 @@ Generalizable lessons only. Each entry: what happened → why it matters → sug
 **Why it matters.** The failure looks like a component bug (style "missing"), which invites changing correct code to satisfy a wrong test.
 
 **Suggested addition** — *Debugging discipline*: "When a style/prop assertion on a rendered tree returns undefined, first check whether the traversal landed on a composite wrapper rather than the host node; walk up to the nearest host element by type before touching the component."
+
+---
+
+# Session 2 (2026-09-19) — feature built on top of existing API adapters
+
+Generalizable lessons only; entries below are new or refine an entry above.
+
+## 8. Trace every field a new feature branches on back to its producer before designing on it
+
+**What happened.** A task's filtering rules were written in terms of a domain field ("exclude events the user organises", keyed on a boolean). The field existed in the type and looked usable, but the API adapter that produces it hard-codes a constant default (the endpoint never returns it), documented only in a comment. Building on the flag alone would have compiled, passed shallow tests, and silently done nothing. Checking the producer also exposed an *existing* consumer elsewhere that already depended on the same dead field, so a shipped feature had been broken all along.
+
+**Why it matters.** A field present in a type is not evidence it carries data. Adapters often stub fields "inert for now", and that stops being true the moment a new consumer arrives. The existing "one dead feature → check its siblings" rule triggers only after something is seen to fail; here nothing had visibly failed.
+
+**Suggested addition** — *Pre-code gates → Contract verification*: "For every field the task filters, sorts, gates or counts on, open its producer (API mapper/adapter) and confirm it maps real wire data rather than a hard-coded default. If it is stubbed, derive the value from real data at the point of use, write a test whose fixture keeps the stub value, and grep existing consumers of the same field — report any that are silently broken instead of assuming they work."
+
+## 9. Read what a library renders by default for the slot you are filling
+
+**What happened.** The brief asked for emoji "in the tab labels". The tab library, when no icon is supplied, renders a placeholder glyph above every label. Putting the emoji in the label alone would have produced placeholder-plus-emoji on every tab. The library source showed this in one grep; nothing in the app's own code hinted at it.
+
+**Why it matters.** Requests are phrased in terms of the visible result the author imagines, not the library's slot model. Following the wording literally can produce a visibly wrong result that no unit test on the app's own code would flag.
+
+**Suggested addition** — *Fidelity rules (UI work)*: "Before adding decoration to a third-party component slot (icon, label, header), read the library's default rendering for that slot when unconfigured. If the literal wording of the request would collide with a default, implement the intent through the slot that gives the intended visible result, and list it as a deviation."
+
+## 10. A specified control with no destination: choose a working minimum or an honest disabled state — never a silent no-op
+
+**What happened.** The brief specified three affordances whose targets don't exist yet ("Create Game", "View all →", a "tap to manage" tile). A silently inert-but-enabled control looks broken to a user and is easy to forget; building a placeholder screen invents scope.
+
+**Why it matters.** This recurs whenever a UI is specified ahead of the screens behind it. Without a rule, each instance gets an ad hoc answer and the inert ones are never recorded.
+
+**Suggested addition** — *Propose & Proceed*: "For a specified control whose destination does not exist: (a) if a small, genuinely working behaviour is available within the same screen, use it and never render the control when it would do nothing; else (b) render it visibly disabled with the handler as an optional prop so wiring is one line later. Never ship an enabled control that does nothing. Record each as a numbered assumption and a follow-up, and flag any specified copy that now misdescribes the control (e.g. 'tap to manage' on an inert tile)."
+
+## 11. Refinement of #1 — the positive control must exercise the same command shape, and the search must report how many inputs it read
+
+**What happened.** Despite lesson #1, an audit grep again produced an empty "(none)" that meant nothing. The control was run against a *different* invocation (a literal path), while the real command took its file list from a shell variable that the shell did not word-split, so grep received one nonexistent filename and searched nothing. Only the stderr warning, easy to skim past beside a friendly "(none)", revealed it.
+
+**Why it matters.** A control that doesn't share the failure surface of the real command can pass while the real command is broken. Any wrapper that appends "(none)" on a non-zero exit also converts a *tool error* into a clean result.
+
+**Suggested addition** — *Completion Proof* (extends the positive-control rule): "Run the positive control through the identical command form (same variable/array expansion), not a hand-typed equivalent. Print the count of input files actually searched next to the result. Use arrays, not strings, for file lists in zsh. Never use `|| echo none` fallbacks; distinguish grep exit 1 (no match) from exit 2 (error)."
+
+## 12. Do not write an environment negative into a status record from a single probe
+
+**What happened.** The status file recorded "no emulator on this machine" after one `which emulator` returned nothing. A later `adb devices` listed a physical device that had been attached all along. The claim was corrected before it reached the report, but it had already been written down as fact.
+
+**Why it matters.** The status file and reports are read as ground truth by later sessions. A negative about the environment ("no device", "no network", "tool not installed") drawn from one probe of one mechanism is a guess, and it directly shapes how much verification gets skipped.
+
+**Suggested addition** — *Live status file / Implementation Report*: "State environment capabilities only from a probe of the capability itself (e.g. list attached devices), not of one particular binary. Write 'not verified' rather than 'not available' unless the direct probe was negative, and state the actual reason verification was skipped (e.g. needs credentials, would modify the user's device)."
