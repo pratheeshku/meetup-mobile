@@ -15,9 +15,24 @@ export function formatEventDate(isoString: string): string {
   });
 }
 
-export function formatEventTimeRange(startsAtIso: string, endsAtIso: string): string {
+/**
+ * `endsAtIso` may be null/undefined: the backend's `EventResponse.ends_at`
+ * is nullable (an event may have no defined end time). An absent or
+ * unparseable end time renders the start time only — no dash, never
+ * "Invalid Date".
+ */
+export function formatEventTimeRange(
+  startsAtIso: string,
+  endsAtIso?: string | null,
+): string {
   const timeOptions: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
   const start = new Date(startsAtIso).toLocaleTimeString(undefined, timeOptions);
-  const end = new Date(endsAtIso).toLocaleTimeString(undefined, timeOptions);
-  return `${start} – ${end}`;
+  if (!endsAtIso) {
+    return start;
+  }
+  const endDate = new Date(endsAtIso);
+  if (Number.isNaN(endDate.getTime())) {
+    return start;
+  }
+  return `${start} – ${endDate.toLocaleTimeString(undefined, timeOptions)}`;
 }

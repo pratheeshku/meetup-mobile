@@ -59,6 +59,37 @@ describe('getEvents', () => {
     });
   });
 
+  it('passes a null ends_at through as null (not an empty string)', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'evt-2',
+          organizer_id: 'org-1',
+          sport: 'Football',
+          title: 'Open-ended session',
+          description: null,
+          visibility: 'public',
+          capacity: 10,
+          starts_at: '2026-09-20T10:00:00Z',
+          ends_at: null,
+          estimated_cost_cents: null,
+          recurrence_rule_id: null,
+          status: 'upcoming',
+          venue_name: null,
+          venue_address: null,
+          organizer_nickname: null,
+          organizer_display_name: null,
+          going_count: 0,
+          user_rsvp_status: null,
+        },
+      ],
+    });
+
+    const result = await getEvents();
+
+    expect(result.items[0].ends_at).toBeNull();
+  });
+
   it('never resolves an undefined items array, even for an empty feed', async () => {
     mockedGet.mockResolvedValueOnce({ data: [] });
 

@@ -107,7 +107,9 @@ function mapEventApiItem(raw: EventApiItem): Event {
     sport: raw.sport,
     location: raw.venue_name ?? '',
     starts_at: raw.starts_at,
-    ends_at: raw.ends_at ?? '',
+    // Pass null through unchanged. Coercing it to '' made the display layer
+    // call `new Date('')` → "Invalid Date" on events with no end time.
+    ends_at: raw.ends_at,
     capacity: raw.capacity,
     participant_count: raw.going_count,
     waitlist_count: 0,

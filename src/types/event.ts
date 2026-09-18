@@ -20,7 +20,11 @@ export interface Event {
   sport: string;
   location: string;
   starts_at: string;
-  ends_at: string;
+  /**
+   * Nullable per the live OpenAPI schema (`EventResponse.ends_at` is
+   * `date-time | null`): an event may have no defined end time.
+   */
+  ends_at: string | null;
   capacity: number;
   participant_count: number;
   waitlist_count: number;
