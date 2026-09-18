@@ -15,6 +15,14 @@
  * with the signed-in user's id (same derivation as `TournamentDetailScreen`
  * and the Home dashboard).
  *
+ * Cancel Event is intentionally NOT rendered (fix/events RSVP-withdraw
+ * contract task). `POST /events/{id}/cancel` requires a `reason` body
+ * (`EventCancelRequest`, 1–500 chars) and there is no cancellation-reason UI
+ * yet, so the previous button could only ever 422. `cancelEvent()` is kept in
+ * `src/api/events.ts` but not called from here. FOLLOW-UP: build the reason
+ * input UI, send `{ reason }`, then restore an organiser-only Cancel action
+ * (previously gated on `isOrganiser && status in upcoming|active`).
+ *
  * Proposed Assumption: the brief specifies "'Join' if status is none"
  * without naming a button state for `withdrawn`. Treated the same as
  * `none` (offers "Join" again) — a user who withdrew must be able to
@@ -24,7 +32,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { cancelEvent, getEvent, rsvpEvent, withdrawEvent } from '../api/events';
+import { getEvent, rsvpEvent, withdrawEvent } from '../api/events';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
 import Badge from '../components/Badge';
@@ -40,7 +48,7 @@ import { isOrganiserOf } from '../utils/homeDashboard';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 
-export default function EventDetailScreen({ route, navigation }: Props): React.JSX.Element {
+export default function EventDetailScreen({ route }: Props): React.JSX.Element {
   const { eventId } = route.params;
   const { user } = useAuth();
 
@@ -97,18 +105,6 @@ export default function EventDetailScreen({ route, navigation }: Props): React.J
     }
   };
 
-  const handleCancel = async (): Promise<void> => {
-    setActionError(null);
-    setIsActionLoading(true);
-    try {
-      await cancelEvent(eventId);
-      navigation.goBack();
-    } catch {
-      setActionError('Could not cancel this event. Please try again.');
-      setIsActionLoading(false);
-    }
-  };
-
   if (isLoading) {
     return <LoadingView />;
   }
@@ -123,8 +119,6 @@ export default function EventDetailScreen({ route, navigation }: Props): React.J
   const isGoingOrWaitlisted =
     event.current_user_rsvp_status === 'going' || event.current_user_rsvp_status === 'waitlisted';
   const isAtCapacity = event.participant_count >= event.capacity;
-  const isCancelVisible =
-    isOrganiser && (event.status === 'upcoming' || event.status === 'active');
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -173,15 +167,6 @@ export default function EventDetailScreen({ route, navigation }: Props): React.J
         />
       ) : null}
 
-      {isCancelVisible ? (
-        <Button
-          label="Cancel Event"
-          variant="destructive"
-          onPress={handleCancel}
-          loading={isActionLoading}
-          style={styles.button}
-        />
-      ) : null}
     </ScrollView>
   );
 }

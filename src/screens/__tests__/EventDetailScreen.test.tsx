@@ -10,10 +10,10 @@
  * runs, so the fixture carries the exact stub value production produces
  * instead of a hand-set `is_organiser`. Signed-in user id: `user-me`.
  *
- * Scope note: `cancelEvent` is mocked at the HTTP layer, so these tests do
- * NOT prove the cancel request is accepted by the backend. It is not: the
- * live schema requires a `reason` body that the app does not send (see the
- * Implementation Report).
+ * RSVP/withdraw contract fix: Join and Leave both POST `/events/{id}/rsvp`
+ * with `{ action: "going" }` / `{ action: "withdrawn" }` (no `/withdraw`
+ * path exists). Cancel Event is NOT rendered for anyone until a
+ * cancellation-reason UI exists (`EventCancelRequest.reason` is required).
  */
 import React from 'react';
 
@@ -84,23 +84,23 @@ beforeEach(() => {
 });
 
 describe('organiser (organizer_id === signed-in user id)', () => {
-  it('sees "Cancel Event" and does NOT see "Join"', async () => {
+  it('does NOT see "Join" or "Cancel Event" (Cancel hidden until reason UI exists)', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    expect(has(root, 'Cancel Event')).toBe(true);
+    expect(has(root, 'Cancel Event')).toBe(false);
     expect(has(root, 'Join')).toBe(false);
     expect(has(root, 'Leave')).toBe(false);
   });
 
-  it('sees Cancel and no RSVP control even when they also have an RSVP row (going)', async () => {
+  it('sees no RSVP control and no Cancel even when they also have an RSVP row (going)', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', user_rsvp_status: 'going' }));
-    expect(has(root, 'Cancel Event')).toBe(true);
+    expect(has(root, 'Cancel Event')).toBe(false);
     expect(has(root, 'Leave')).toBe(false);
     expect(has(root, 'Join')).toBe(false);
   });
 
-  it('sees Cancel for an in-progress (active) event', async () => {
+  it('does not see Cancel for an in-progress (active) event either', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', status: 'active' }));
-    expect(has(root, 'Cancel Event')).toBe(true);
+    expect(has(root, 'Cancel Event')).toBe(false);
   });
 
   it.each(['cancelled', 'completed'])(
@@ -163,24 +163,47 @@ describe('the stub it works around', () => {
   });
 });
 
-describe('Cancel Event action (reachable for the first time)', () => {
-  it('calls the cancel endpoint for this event and goes back on success', async () => {
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+describe('RSVP / withdraw contract', () => {
+  it('Join sends POST /events/{id}/rsvp with { action: "going" }', async () => {
+    const root = await mount(rawEvent({ user_rsvp_status: null }));
     await act(async () => {
-      pressableLabelled(root, 'Cancel Event').props.onPress();
+      pressableLabelled(root, 'Join').props.onPress();
     });
     expect(mockPost).toHaveBeenCalledTimes(1);
-    expect(mockPost.mock.calls[0][0]).toBe('/events/evt-1/cancel');
-    expect(goBack).toHaveBeenCalledTimes(1);
+    expect(mockPost.mock.calls[0][0]).toBe('/events/evt-1/rsvp');
+    expect(mockPost.mock.calls[0][1]).toEqual({ action: 'going' });
   });
 
-  it('shows the existing error and stays on screen when the request fails', async () => {
-    mockPost.mockRejectedValue(new Error('422'));
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+  it('Leave sends POST /events/{id}/rsvp with { action: "withdrawn" }', async () => {
+    const root = await mount(rawEvent({ user_rsvp_status: 'going' }));
     await act(async () => {
-      pressableLabelled(root, 'Cancel Event').props.onPress();
+      pressableLabelled(root, 'Leave').props.onPress();
     });
-    expect(has(root, 'Could not cancel this event. Please try again.')).toBe(true);
-    expect(goBack).not.toHaveBeenCalled();
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    expect(mockPost.mock.calls[0][0]).toBe('/events/evt-1/rsvp');
+    expect(mockPost.mock.calls[0][1]).toEqual({ action: 'withdrawn' });
+  });
+
+  it('Join and Leave hit the same endpoint; nothing ever calls /withdraw or /cancel', async () => {
+    const joinRoot = await mount(rawEvent({ user_rsvp_status: null }));
+    await act(async () => {
+      pressableLabelled(joinRoot, 'Join').props.onPress();
+    });
+    const leaveRoot = await mount(rawEvent({ user_rsvp_status: 'going' }));
+    await act(async () => {
+      pressableLabelled(leaveRoot, 'Leave').props.onPress();
+    });
+    const paths = mockPost.mock.calls.map(call => call[0]);
+    expect(paths).toEqual(['/events/evt-1/rsvp', '/events/evt-1/rsvp']);
+    expect(paths.some((p: string) => p.includes('/withdraw') || p.includes('/cancel'))).toBe(false);
+  });
+
+  it('shows the join error when the RSVP request fails', async () => {
+    mockPost.mockRejectedValue(new Error('422'));
+    const root = await mount(rawEvent({ user_rsvp_status: null }));
+    await act(async () => {
+      pressableLabelled(root, 'Join').props.onPress();
+    });
+    expect(has(root, 'Could not join this event. Please try again.')).toBe(true);
   });
 });

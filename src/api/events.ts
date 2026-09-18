@@ -152,36 +152,30 @@ export async function getEvent(id: string, options?: RequestOptions): Promise<Ev
 }
 
 /**
- * BLOCKED — needs an architect decision, not fixed here (do not guess):
- * confirmed against the live OpenAPI schema that `POST /events/{event_id}/rsvp`
- * requires a body matching `RSVPRequest { action: string }` (`action` is
- * REQUIRED, no enum of accepted values is documented anywhere in the
- * schema or the design excerpt). This call currently sends no body at
- * all, so every RSVP attempt against the real backend gets a 422
- * Validation Error. Guessing a value for `action` risks silently doing
- * the wrong thing (e.g. if it also encodes "withdraw"/"decline" verbs).
- * See docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md for the full
- * write-up and the two questions the architect needs to answer.
+ * RSVP and withdraw share ONE endpoint: `POST /events/{id}/rsvp` with body
+ * `RSVPRequest { action: string }`, where `action` must be exactly `"going"`
+ * or `"withdrawn"` (confirmed by the architect directly against the backend's
+ * `events/schemas.py` and `events/router.py`). There is no separate withdraw
+ * path — `POST /events/{id}/withdraw` does not exist (404).
+ *
+ * - Join  -> `{ action: "going" }`
+ * - Leave -> `{ action: "withdrawn" }`
  */
 export async function rsvpEvent(id: string, options?: RequestOptions): Promise<void> {
-  await apiClient.post(`/events/${id}/rsvp`, undefined, {
-    correlationId: options?.correlationId,
-  });
+  await apiClient.post(
+    `/events/${id}/rsvp`,
+    { action: 'going' },
+    { correlationId: options?.correlationId },
+  );
 }
 
-/**
- * BLOCKED — needs an architect decision, not fixed here (do not guess):
- * confirmed against the live OpenAPI schema that `POST /events/{event_id}/withdraw`
- * does not exist on the real backend at all (404) — there is no
- * `/events/{event_id}/withdraw` path. The two plausible real mechanisms —
- * `POST /events/{event_id}/rsvp` with some `action` value (see `rsvpEvent`
- * above), or `DELETE /events/{event_id}/participants/{user_id}` — are
- * both unconfirmed. See the audit report for the full write-up.
- */
+/** Leave an event: same `POST /events/{id}/rsvp` endpoint as `rsvpEvent`, `action: "withdrawn"`. */
 export async function withdrawEvent(id: string, options?: RequestOptions): Promise<void> {
-  await apiClient.post(`/events/${id}/withdraw`, undefined, {
-    correlationId: options?.correlationId,
-  });
+  await apiClient.post(
+    `/events/${id}/rsvp`,
+    { action: 'withdrawn' },
+    { correlationId: options?.correlationId },
+  );
 }
 
 /**
@@ -193,6 +187,9 @@ export async function withdrawEvent(id: string, options?: RequestOptions): Promi
  * this needs a cancellation-reason UI (EventDetailScreen's cancel flow
  * has none today) — a UX/design decision beyond an API-layer adapter,
  * out of scope for this audit pass. See the audit report.
+ *
+ * Not called from any UI for now: `EventDetailScreen` no longer renders a
+ * Cancel Event button until a cancellation-reason UI exists (follow-up).
  */
 export async function cancelEvent(id: string, options?: RequestOptions): Promise<void> {
   await apiClient.post(`/events/${id}/cancel`, undefined, {

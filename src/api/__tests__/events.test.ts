@@ -7,13 +7,14 @@
  * `HomeScreen`'s `events.length` never sees `undefined`.
  */
 import { apiClient } from '../client';
-import { getEvents } from '../events';
+import { getEvents, rsvpEvent, withdrawEvent } from '../events';
 
 jest.mock('../client', () => ({
-  apiClient: { get: jest.fn() },
+  apiClient: { get: jest.fn(), post: jest.fn() },
 }));
 
 const mockedGet = apiClient.get as jest.Mock;
+const mockedPost = apiClient.post as jest.Mock;
 
 describe('getEvents', () => {
   afterEach(() => {
@@ -97,5 +98,32 @@ describe('getEvents', () => {
 
     expect(Array.isArray(result.items)).toBe(true);
     expect(result.items).toHaveLength(0);
+  });
+});
+
+describe('rsvpEvent / withdrawEvent (single POST /events/{id}/rsvp endpoint)', () => {
+  afterEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('rsvpEvent posts { action: "going" } to /events/{id}/rsvp', async () => {
+    mockedPost.mockResolvedValueOnce({ data: {} });
+    await rsvpEvent('evt-9', { correlationId: 'cid-1' });
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/events/evt-9/rsvp',
+      { action: 'going' },
+      { correlationId: 'cid-1' },
+    );
+  });
+
+  it('withdrawEvent posts { action: "withdrawn" } to the SAME /events/{id}/rsvp (no /withdraw path)', async () => {
+    mockedPost.mockResolvedValueOnce({ data: {} });
+    await withdrawEvent('evt-9', { correlationId: 'cid-2' });
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/events/evt-9/rsvp',
+      { action: 'withdrawn' },
+      { correlationId: 'cid-2' },
+    );
+    expect(mockedPost.mock.calls[0][0]).not.toContain('/withdraw');
   });
 });
