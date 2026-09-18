@@ -641,8 +641,10 @@ shows the standard banner and disables submission.
 `POST /events/{id}/invite-user`, `POST /events/{id}/invite-group`,
 `POST /events/{id}/invitations/{id}/accept`,
 `POST /events/{id}/invitations/{id}/decline`,
-`DELETE /events/{id}/invitations/{id}`, `POST /events/{id}/rsvp`,
-`POST /events/{id}/withdraw`, `POST /events/{id}/participants`,
+`DELETE /events/{id}/invitations/{id}`,
+`POST /events/{id}/rsvp` (Join sends body `{ action: "going" }`; withdraw sends
+`{ action: "withdrawn" }` — same endpoint, there is no separate withdraw path),
+`POST /events/{id}/participants`,
 `DELETE /events/{id}/participants/{user_id}`.
 
 **Role/permission gates**: Create — any authenticated user.
@@ -1006,8 +1008,7 @@ surfaced in Settings, crash reports, and the mobile push registration
 | POST | `/events/{id}/invitations/{id}/accept` | Yes | |
 | POST | `/events/{id}/invitations/{id}/decline` | Yes | |
 | DELETE | `/events/{id}/invitations/{id}` | Yes | Organiser only |
-| POST | `/events/{id}/rsvp` | Yes | |
-| POST | `/events/{id}/withdraw` | Yes | |
+| POST | `/events/{id}/rsvp` | Yes | Join and withdraw share this one endpoint; body `{ action: "going" }` to join, `{ action: "withdrawn" }` to withdraw. There is no separate `/withdraw` path |
 | POST | `/events/{id}/participants` | Yes | Organiser only |
 | DELETE | `/events/{id}/participants/{user_id}` | Yes | Organiser only |
 | POST | `/events/{id}/checkin` | Yes | Participant scans; verified six-step auth sequence; idempotent; own Circuit Breaker family (§3.3) |
