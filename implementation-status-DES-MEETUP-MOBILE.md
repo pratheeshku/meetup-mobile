@@ -1,22 +1,22 @@
-## Status — 2026-09-19 (ARCHIVED — EventDetailScreen organiser fix committed; awaiting testing-agent and conformance review)
+## Status — 2026-09-19 (RSVP/withdraw contract fix committed; report + docs correction in progress; awaiting testing-agent and conformance review)
 
-Task: fix EventDetailScreen organiser detection (stubbed `is_organiser`), follow-up to the Home dashboard work.
-Design: DES-MEETUP-MOBILE, APPROVED 2026-09-13, tier T1. Baseline before change: tsc 0, jest 139/139.
-Updated at milestones only (no timer available); the status file was not written at task start this time.
+Task: fix RSVP/withdraw to the single `POST /events/{id}/rsvp` endpoint with `action`, hide Cancel until a reason UI exists (architect brief).
+Design: DES-MEETUP-MOBILE, APPROVED 2026-09-13, tier T1. Baseline before change: tsc 0, jest 153/153.
+Process note: this file was NOT written at task start for this task (Implementation Report requested after the code push). Updated late, at milestones only.
 
 ### Completed
-- Code commit `2483a71`: `EventDetailScreen` uses `isOrganiserOf(event, user?.id)`; stale comment in `events.ts` corrected (comment-only)
-- Regression tests (14) through the real mapper; fail on the original code (5 failures), pass with the fix
-- tsc 0, eslint 0, jest 153/153 x3 after last code edit
-- Report `docs/reports/IMPL-DES-MEETUP-MOBILE-event-detail-organiser-fix.md`; reflection entry #13 in `docs/reports/agent-enhancement-2026-09-19.md`
+- Code commit `454c038` (pushed): `rsvpEvent` -> `{ action: 'going' }`, `withdrawEvent` -> `{ action: 'withdrawn' }`, both `POST /events/{id}/rsvp`; Cancel Event button removed from `EventDetailScreen`
+- Regression tests: API-level (2) + screen-level (4); organiser Cancel assertions flipped; tests fail on old code (8 failures), pass on the fix
+- tsc 0, eslint 0, jest 157/157 x3
+- Report `docs/reports/IMPL-DES-MEETUP-MOBILE-rsvp-withdraw-fix.md`; reflection entries #14-#16 in `docs/reports/agent-enhancement-2026-09-19.md`
 
 ### In Progress
-- None
+- Architect-directed docs correction: `/withdraw` references in `docs/DES-MEETUP-MOBILE.md` (separate commit)
 
 ### Pending
 - Testing-agent pass (fresh session), then conformance-review
-- DECISION for user: Cancel is now visible but the live API requires a `reason` body the app does not send -> expected 422. Join (rsvp needs `action` body -> 422) and Leave (no `/withdraw` route -> 404) are blocked too (report §0)
-- Follow-ups: cancel-reason UI (+ confirmation), remove dead `Event.is_organiser`, extract `isOrganiserOf` to a neutral module
+- DECISION for user: commit `454c038` carries a Co-Authored-By trailer (standing-rule breach, report D1); already pushed, fix needs a human history rewrite
+- Follow-ups: cancel-reason UI (+ confirmation) then restore organiser Cancel; live/on-device check of Join/Leave (action values are unconfirmed by the OpenAPI schema); remove dead `Event.is_organiser`
 
 ### Blocked
-- Join, Leave and Cancel Event cannot succeed against the live API (pre-existing blocks from the 2026-09-18 API audit, re-verified against the live schema; not changed by this task)
+- Cancel Event cannot succeed against the live API until `cancelEvent` sends a `reason` (intentionally hidden)
