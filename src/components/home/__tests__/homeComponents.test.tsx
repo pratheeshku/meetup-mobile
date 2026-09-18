@@ -31,18 +31,18 @@ const fiveEvents = Array.from({ length: 5 }, (_, i) =>
 
 describe('GreetingHeader', () => {
   it('shows the muted greeting and the personalised headline', () => {
-    const t = texts(render(<GreetingHeader nickname="Sam" />));
+    const t = texts(render(<GreetingHeader name="Sam" />));
     expect(t).toContain('Good to see you 👋');
     expect(t).toContain('Ready to play, Sam?');
   });
 
-  it('drops the name (no "undefined" / stray comma) when the nickname is missing or blank', () => {
+  it('drops the name (no "undefined" / stray comma) when the name is missing or blank', () => {
     expect(texts(render(<GreetingHeader />))).toContain('Ready to play?');
-    expect(texts(render(<GreetingHeader nickname="   " />))).toContain('Ready to play?');
+    expect(texts(render(<GreetingHeader name="   " />))).toContain('Ready to play?');
   });
 
   it('renders no Create Game control (it lives in the tab bar now)', () => {
-    const root = render(<GreetingHeader nickname="Sam" />);
+    const root = render(<GreetingHeader name="Sam" />);
     expect(texts(root).some(text => text.includes('Create Game'))).toBe(false);
     expect(pressables(root)).toHaveLength(0);
   });

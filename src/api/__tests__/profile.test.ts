@@ -5,10 +5,10 @@
  * schema.
  */
 import { apiClient } from '../client';
-import { getProfile } from '../profile';
+import { getProfile, updateProfile } from '../profile';
 
 jest.mock('../client', () => ({
-  apiClient: { get: jest.fn() },
+  apiClient: { get: jest.fn(), patch: jest.fn() },
 }));
 
 const mockedGet = apiClient.get as jest.Mock;
@@ -82,5 +82,14 @@ describe('getProfile', () => {
 
     const result = await getProfile();
     expect(result.skill_levels).toEqual([]);
+  });
+});
+
+describe('updateProfile', () => {
+  it('PATCHes /users/me with display_name only (nickname is read-only)', async () => {
+    const patch = apiClient.patch as jest.Mock;
+    patch.mockResolvedValue({});
+    await updateProfile({ display_name: 'Pat H' }, { correlationId: 'c-1' });
+    expect(patch).toHaveBeenCalledWith('/users/me', { display_name: 'Pat H' }, { correlationId: 'c-1' });
   });
 });

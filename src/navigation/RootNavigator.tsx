@@ -70,7 +70,7 @@ import type {
   TournamentsStackParamList,
 } from './types';
 import HomeHeader from './HomeHeader';
-import { CreateTabButton, CreateTabScreen, createTabListeners } from './CreateTabButton';
+import { CreateTabButton, CreateTabScreen } from './CreateTabButton';
 import { TAB_EMOJI, TabEmoji } from './tabIcons';
 import {
   navigationRef,
@@ -235,14 +235,13 @@ function AppStack(): React.JSX.Element {
       <AppTabsNav.Screen name="Home" component={HomeStack} options={{ headerShown: false }} />
       <AppTabsNav.Screen name="Groups" component={GroupsStack} options={{ headerShown: false }} />
       {/*
-        Center action button, not a destination: tabPress is intercepted and
-        routed to Home -> CreateGame, so this route is never focused.
+        Center action button, not a destination: it opens the Create menu
+        (Game / Group / Tournament) and never selects this route.
       */}
       <AppTabsNav.Screen
         name="Create"
         component={CreateTabScreen}
         options={{ tabBarButton: CreateTabButton }}
-        listeners={createTabListeners}
       />
       <AppTabsNav.Screen
         name="Tournaments"

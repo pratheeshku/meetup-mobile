@@ -7,12 +7,18 @@ import TournamentsScreen from '../TournamentsScreen';
 
 type Props = React.ComponentProps<typeof TournamentsScreen>;
 
-jest.mock('@react-navigation/native', () => ({ useNavigation: () => ({ navigate: mockNavigate }) }));
+// Regression guard (Rules of Hooks): React Navigation calls `headerRight` as a
+// plain function inside its own header hook, so it must never call a hook.
+// Any `useNavigation()` from this screen's header now fails the test loudly.
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => {
+    throw new Error('headerRight must not call hooks such as useNavigation');
+  },
+}));
 jest.mock('../../api/tournaments', () => ({ getTournaments: jest.fn() }));
 
 const mockGetTournaments = getTournaments as jest.MockedFunction<typeof getTournaments>;
-const mockNavigate = jest.fn();
-const navigate = mockNavigate;
+const navigate = jest.fn();
 const setOptions = jest.fn();
 const EMPTY = { items: [], total: 0, page: 1, page_size: 0 };
 
@@ -30,8 +36,9 @@ beforeEach(() => {
 describe('TournamentsScreen create entry point', () => {
   it('puts a labelled "+" in the header that opens Create Tournament', async () => {
     await renderAsync(element());
-    const { headerRight: HeaderRight } = setOptions.mock.calls[0][0];
-    const button = render(<HeaderRight />);
+    const { headerRight } = setOptions.mock.calls[0][0];
+    // Invoked as a plain function, exactly as React Navigation does.
+    const button = render(headerRight());
     act(() => pressableLabelled(button, 'Create Tournament').props.onPress());
     expect(navigate).toHaveBeenCalledWith('CreateTournament');
   });

@@ -31,8 +31,9 @@ import HomeScreen from '../HomeScreen';
 
 jest.mock('../../api/events', () => ({ getEvents: jest.fn() }));
 jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn() }));
+const mockUser: { current: Record<string, unknown> } = { current: {} };
 jest.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'user-me', nickname: 'Sam', email: 'sam@example.com' } }),
+  useAuth: () => ({ user: mockUser.current }),
 }));
 
 const mockGetEvents = getEvents as jest.MockedFunction<typeof getEvents>;
@@ -91,16 +92,28 @@ function cardTitles(root: Instance, prefix: RegExp): string[] {
 }
 
 beforeEach(() => {
+  mockUser.current = {
+    id: 'user-me',
+    nickname: 'sam99',
+    display_name: 'Sam Smith',
+    email: 'sam@example.com',
+  };
   navigate.mockReset();
   mockGetEvents.mockReset().mockResolvedValue(eventsResponse(FEED));
   mockGetMyGroups.mockReset().mockResolvedValue(groupsResponse(2));
 });
 
 describe('HomeScreen dashboard', () => {
-  it('greets the signed-in user by nickname', async () => {
+  it('greets the signed-in user by display name, not nickname', async () => {
     const root = await mount();
     expect(texts(root)).toContain('Good to see you 👋');
-    expect(texts(root)).toContain('Ready to play, Sam?');
+    expect(texts(root)).toContain('Ready to play, Sam Smith?');
+    expect(texts(root).some(text => text.includes('sam99'))).toBe(false);
+  });
+
+  it('falls back to the nickname only when display name is empty', async () => {
+    mockUser.current = { ...mockUser.current, display_name: '  ' };
+    expect(texts(await mount())).toContain('Ready to play, sam99?');
   });
 
   it('has no Create Game control on the dashboard (it is the tab bar FAB now)', async () => {
@@ -219,7 +232,7 @@ describe('HomeScreen data loading', () => {
     await act(async () => {
       pressablesRetry(root).props.onPress();
     });
-    expect(texts(root)).toContain('Ready to play, Sam?');
+    expect(texts(root)).toContain('Ready to play, Sam Smith?');
     expect(mockGetEvents).toHaveBeenCalledTimes(2);
   });
 
@@ -228,7 +241,7 @@ describe('HomeScreen data loading', () => {
     const root = await mount();
     const all = texts(root);
     expect(all).not.toContain('Could not load events. Please try again.');
-    expect(all).toContain('Ready to play, Sam?');
+    expect(all).toContain('Ready to play, Sam Smith?');
     expect(all).toContain('4 active · tap to manage');
     expect(all).toContain('Tap to manage');
   });

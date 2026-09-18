@@ -1,6 +1,7 @@
 /**
  * Home header: small muted greeting and a large bold "Ready to play,
- * <nickname>?" headline.
+ * <name>?" headline. The name is the user's display name (see
+ * `utils/displayName`), resolved by the caller.
  *
  * Create Game no longer lives here — it is the raised center button in the
  * bottom tab bar (see `navigation/CreateTabButton`).
@@ -11,13 +12,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, typography } from '../../theme/tokens';
 
 interface GreetingHeaderProps {
-  /** Signed-in user's nickname; the headline drops it when empty. */
-  nickname?: string;
+  /** Signed-in user's display name; the headline drops it when empty. */
+  name?: string;
 }
 
-export default function GreetingHeader({ nickname }: GreetingHeaderProps): React.JSX.Element {
-  const name = nickname?.trim();
-  const headline = name ? `Ready to play, ${name}?` : 'Ready to play?';
+export default function GreetingHeader({ name }: GreetingHeaderProps): React.JSX.Element {
+  const trimmed = name?.trim();
+  const headline = trimmed ? `Ready to play, ${trimmed}?` : 'Ready to play?';
 
   return (
     <View style={styles.row}>

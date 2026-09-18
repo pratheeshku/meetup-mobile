@@ -80,19 +80,13 @@ export interface UserProfile {
 }
 
 /**
- * BLOCKED — needs an architect decision, not fixed here (do not guess):
- * confirmed against the live OpenAPI schema that `PATCH /users/me`'s real
- * body (`UserUpdate`) only accepts `{ display_name?, theme_preference? }`
- * — neither `nickname` nor `avatar_url` is an accepted field.
- * `ProfileScreen`'s "Edit nickname" flow currently sends `{ nickname }`,
- * which the real backend silently ignores (or rejects) — the feature is
- * a no-op/broken against the real backend today. Renaming `nickname` to
- * `display_name` in the payload would silently conflate two fields the
- * backend keeps distinct (`PrivateUserProfile` has both `nickname` and
- * `display_name`) — a product/design decision, not a mechanical rename.
- * See docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md.
+ * Body of `PATCH /users/me` (live `UserUpdate` schema: `{ display_name?,
+ * theme_preference? }`). `display_name` is the editable name used to address
+ * the user; `nickname` is a separate, unique, read-only field the backend
+ * does not accept here, so it is deliberately not part of this payload.
+ * (`avatar_url` was removed: the backend has no such field either — see the
+ * `UserProfile.avatar_url` note above.)
  */
 export interface UpdateProfilePayload {
-  nickname?: string;
-  avatar_url?: string;
+  display_name?: string;
 }

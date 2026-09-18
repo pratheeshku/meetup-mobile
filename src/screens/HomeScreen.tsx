@@ -39,6 +39,7 @@ import SportFilterPills from '../components/home/SportFilterPills';
 import UpcomingGamesSection from '../components/home/UpcomingGamesSection';
 import LoadingView from '../components/LoadingView';
 import { colors, spacing } from '../theme/tokens';
+import { getDisplayName } from '../utils/displayName';
 import type { Event } from '../types/event';
 import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
 import {
@@ -140,7 +141,7 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
       }
     >
       <View style={styles.block}>
-        <GreetingHeader nickname={user?.nickname} />
+        <GreetingHeader name={getDisplayName(user)} />
       </View>
       <View style={styles.pills}>
         <SportFilterPills sports={sports} selectedKey={activeSport} onSelect={setSelectedSport} />

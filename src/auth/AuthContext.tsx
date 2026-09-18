@@ -32,6 +32,13 @@ interface AuthContextValue {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   registerWithEmail: (email: string, password: string, nickname: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /**
+   * Merges fields into the in-memory user (e.g. a `display_name` the user
+   * just saved on Profile) so screens reading `useAuth().user` — the Home
+   * greeting — reflect it without a restart. Purely local; the backend is
+   * already updated by the caller.
+   */
+  updateUser: (patch: Partial<UserProfile>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -92,9 +99,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     setUser(null);
   }, []);
 
+  const updateUser = useCallback((patch: Partial<UserProfile>) => {
+    setUser(current => (current ? { ...current, ...patch } : current));
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoading, signInWithGoogle, signInWithEmail, registerWithEmail, signOut }),
-    [user, isLoading, signInWithGoogle, signInWithEmail, registerWithEmail, signOut],
+    () => ({
+      user,
+      isLoading,
+      signInWithGoogle,
+      signInWithEmail,
+      registerWithEmail,
+      signOut,
+      updateUser,
+    }),
+    [user, isLoading, signInWithGoogle, signInWithEmail, registerWithEmail, signOut, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -45,6 +45,7 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import { getDisplayName } from '../utils/displayName';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { SkillLevelValue, UserProfile } from '../types/user';
 import type { ProfileStackParamList } from '../navigation/types';
@@ -54,16 +55,16 @@ const SKILL_LEVEL_OPTIONS: SkillLevelValue[] = ['Beginner', 'Intermediate', 'Exp
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
 export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
-  const { signOut } = useAuth();
+  const { signOut, updateUser } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [isEditingNickname, setIsEditingNickname] = useState(false);
-  const [nicknameDraft, setNicknameDraft] = useState('');
-  const [isSavingNickname, setIsSavingNickname] = useState(false);
-  const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+  const [displayNameDraft, setDisplayNameDraft] = useState('');
+  const [isSavingDisplayName, setIsSavingDisplayName] = useState(false);
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
 
   const [isEditingSkillLevel, setIsEditingSkillLevel] = useState(false);
   const [sportDraft, setSportDraft] = useState('');
@@ -97,37 +98,40 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
     loadProfile();
   }, [loadProfile]);
 
-  const handleStartEditNickname = (): void => {
+  const handleStartEditDisplayName = (): void => {
     if (!profile) {
       return;
     }
-    setNicknameError(null);
-    setNicknameDraft(profile.nickname);
-    setIsEditingNickname(true);
+    setDisplayNameError(null);
+    setDisplayNameDraft(getDisplayName(profile));
+    setIsEditingDisplayName(true);
   };
 
-  const handleCancelEditNickname = (): void => {
-    setIsEditingNickname(false);
-    setNicknameError(null);
+  const handleCancelEditDisplayName = (): void => {
+    setIsEditingDisplayName(false);
+    setDisplayNameError(null);
   };
 
-  const handleSaveNickname = async (): Promise<void> => {
-    if (!nicknameDraft.trim()) {
-      setNicknameError('Nickname cannot be empty.');
+  const handleSaveDisplayName = async (): Promise<void> => {
+    if (!displayNameDraft.trim()) {
+      setDisplayNameError('Display name cannot be empty.');
       return;
     }
-    setNicknameError(null);
-    setIsSavingNickname(true);
+    setDisplayNameError(null);
+    setIsSavingDisplayName(true);
     try {
       await withCorrelationId(async correlationId => {
-        await updateProfile({ nickname: nicknameDraft.trim() }, { correlationId });
-        setProfile(await getProfile({ correlationId }));
+        await updateProfile({ display_name: displayNameDraft.trim() }, { correlationId });
+        const refreshed = await getProfile({ correlationId });
+        setProfile(refreshed);
+        // Keep the auth user (Home greeting) in step with what was saved.
+        updateUser({ display_name: refreshed.display_name });
       });
-      setIsEditingNickname(false);
+      setIsEditingDisplayName(false);
     } catch {
-      setNicknameError('Could not save your nickname. Please try again.');
+      setDisplayNameError('Could not save your display name. Please try again.');
     } finally {
-      setIsSavingNickname(false);
+      setIsSavingDisplayName(false);
     }
   };
 
@@ -256,44 +260,50 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         ) : (
           <View style={[styles.avatar, styles.avatarPlaceholder]}>
             <Text style={styles.avatarPlaceholderText}>
-              {profile.nickname.charAt(0).toUpperCase()}
+              {getDisplayName(profile).charAt(0).toUpperCase()}
             </Text>
           </View>
         )}
 
-        {isEditingNickname ? (
+        {isEditingDisplayName ? (
           <View style={styles.editRow}>
             <TextField
               style={styles.input}
-              value={nicknameDraft}
-              onChangeText={setNicknameDraft}
-              editable={!isSavingNickname}
+              value={displayNameDraft}
+              onChangeText={setDisplayNameDraft}
+              editable={!isSavingDisplayName}
+              accessibilityLabel="Display name"
+              placeholder="Display name"
               autoFocus
             />
-            {nicknameError ? <Text style={styles.errorText}>{nicknameError}</Text> : null}
+            {displayNameError ? <Text style={styles.errorText}>{displayNameError}</Text> : null}
             <View style={styles.editActionsRow}>
               <Button
                 label="Save"
                 size="sm"
-                onPress={handleSaveNickname}
-                loading={isSavingNickname}
+                onPress={handleSaveDisplayName}
+                loading={isSavingDisplayName}
                 style={styles.actionSpacing}
               />
               <Button
                 label="Cancel"
                 size="sm"
                 variant="secondary"
-                onPress={handleCancelEditNickname}
-                disabled={isSavingNickname}
+                onPress={handleCancelEditDisplayName}
+                disabled={isSavingDisplayName}
               />
             </View>
           </View>
         ) : (
-          <View style={styles.nicknameRow}>
-            <Text style={styles.nickname}>{profile.nickname}</Text>
-            <TextLink label="Edit" onPress={handleStartEditNickname} />
+          <View style={styles.displayNameRow}>
+            <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
+            <TextLink label="Edit" onPress={handleStartEditDisplayName} />
           </View>
         )}
+
+        <Text style={styles.nicknameLine}>
+          Nickname: {profile.nickname} <Text style={styles.nicknameHint}>(can't be changed)</Text>
+        </Text>
 
         <Text style={styles.email}>{profile.email}</Text>
       </Card>
@@ -454,8 +464,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarPlaceholderText: { ...typography.h1, color: colors.white },
-  nicknameRow: { flexDirection: 'row', alignItems: 'center' },
-  nickname: { ...typography.h2, color: colors.textPrimary, marginRight: spacing.sm },
+  displayNameRow: { flexDirection: 'row', alignItems: 'center' },
+  displayName: { ...typography.h2, color: colors.textPrimary, marginRight: spacing.sm },
+  nicknameLine: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  nicknameHint: { ...typography.caption, color: colors.textMuted },
   email: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   section: { marginBottom: spacing.md },
   sectionHeaderRow: {

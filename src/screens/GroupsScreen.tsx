@@ -7,8 +7,7 @@
  */
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getMyGroups } from '../api/groups';
 import Badge from '../components/Badge';
@@ -16,7 +15,7 @@ import type { BadgeVariant } from '../components/Badge';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import ErrorView from '../components/ErrorView';
-import HeaderAddButton from '../components/HeaderAddButton';
+import { headerAddButton } from '../components/HeaderAddButton';
 import LoadingView from '../components/LoadingView';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Group, GroupRole } from '../types/group';
@@ -37,16 +36,6 @@ const ROLE_BADGE_VARIANT: Record<GroupRole, BadgeVariant> = {
   member: 'neutral',
   none: 'neutral',
 };
-
-/**
- * The header "+" — a module-level component (React Navigation renders it, so
- * it gets `navigation` from context rather than props) so its identity is
- * stable across renders.
- */
-function GroupsHeaderAction(): React.JSX.Element {
-  const navigation = useNavigation<NativeStackNavigationProp<GroupsStackParamList>>();
-  return <HeaderAddButton label="Create Group" onPress={() => navigation.navigate('CreateGroup')} />;
-}
 
 export default function GroupsScreen({ navigation, route }: Props): React.JSX.Element {
   const [groups, setGroups] = useState<Group[]>([]);
@@ -87,8 +76,17 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
 
   // Direct create entry point in this tab's own header. Set here (not in
   // the navigator) so it shows in the loading and error states too.
+  //
+  // `headerRight` must NOT call hooks: React Navigation invokes it as a plain
+  // function inside its own header-config hook (not as a component), and it
+  // only appears after this layout effect runs — so a hook here (e.g.
+  // `useNavigation`) is an extra hook on the second render and triggers
+  // "change in the order of Hooks called by SceneView". It closes over the
+  // `navigation` prop instead.
   useLayoutEffect(() => {
-    navigation.setOptions({ headerRight: GroupsHeaderAction });
+    navigation.setOptions({
+      headerRight: headerAddButton('Create Group', () => navigation.navigate('CreateGroup')),
+    });
   }, [navigation]);
 
   if (isLoading) {

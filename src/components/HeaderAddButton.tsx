@@ -28,6 +28,18 @@ export default function HeaderAddButton({ label, onPress }: HeaderAddButtonProps
   );
 }
 
+/**
+ * Builds a `headerRight` render function. React Navigation calls
+ * `headerRight` as a plain function inside its own header hook, so what it
+ * returns must be a ready element with no hooks of its own — callers close
+ * over `navigation` in `onPress` instead of calling `useNavigation()`.
+ * Module-level (not an inline arrow in a screen) so it isn't a component
+ * defined during render.
+ */
+export function headerAddButton(label: string, onPress: () => void): () => React.JSX.Element {
+  return () => <HeaderAddButton label={label} onPress={onPress} />;
+}
+
 const styles = StyleSheet.create({
   button: {
     minWidth: sizes.touchTarget,

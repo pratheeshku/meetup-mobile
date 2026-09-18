@@ -97,13 +97,10 @@ export async function getProfile(options?: RequestOptions): Promise<UserProfile>
 }
 
 /**
- * BLOCKED — needs an architect decision, not fixed here (do not guess):
- * confirmed against the live OpenAPI schema that `PATCH /users/me`'s real
- * body (`UserUpdate`) only accepts `{ display_name?, theme_preference? }`.
- * Neither `nickname` nor `avatar_url` (this function's only params) is
- * accepted — every call today is effectively a no-op against the real
- * backend. See `../types/user.ts`'s `UpdateProfilePayload` comment and
- * docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md.
+ * `PATCH /users/me` — body `UserUpdate` accepts `{ display_name?,
+ * theme_preference? }` (confirmed against the live OpenAPI schema). The app
+ * only sends `display_name`; `nickname` is unique and read-only, and there
+ * is no `avatar_url` field. See `../types/user.ts`'s `UpdateProfilePayload`.
  */
 export async function updateProfile(
   payload: UpdateProfilePayload,

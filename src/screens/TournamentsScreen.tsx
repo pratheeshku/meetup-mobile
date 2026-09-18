@@ -3,8 +3,7 @@
  */
 import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getTournaments } from '../api/tournaments';
 import Badge from '../components/Badge';
@@ -12,7 +11,7 @@ import type { BadgeVariant } from '../components/Badge';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import ErrorView from '../components/ErrorView';
-import HeaderAddButton from '../components/HeaderAddButton';
+import { headerAddButton } from '../components/HeaderAddButton';
 import LoadingView from '../components/LoadingView';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentRegistrationStatus } from '../types/tournament';
@@ -31,16 +30,6 @@ const REGISTRATION_BADGE_VARIANT: Record<TournamentRegistrationStatus, BadgeVari
   registered: 'success',
   withdrawn: 'warning',
 };
-
-/**
- * The header "+" — a module-level component (React Navigation renders it, so
- * it gets `navigation` from context rather than props) so its identity is
- * stable across renders.
- */
-function TournamentsHeaderAction(): React.JSX.Element {
-  const navigation = useNavigation<NativeStackNavigationProp<TournamentsStackParamList>>();
-  return <HeaderAddButton label="Create Tournament" onPress={() => navigation.navigate('CreateTournament')} />;
-}
 
 export default function TournamentsScreen({ navigation, route }: Props): React.JSX.Element {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -81,8 +70,17 @@ export default function TournamentsScreen({ navigation, route }: Props): React.J
 
   // Direct create entry point in this tab's own header. Set here (not in
   // the navigator) so it shows in the loading and error states too.
+  //
+  // `headerRight` must NOT call hooks: React Navigation invokes it as a plain
+  // function inside its own header-config hook (not as a component), and it
+  // only appears after this layout effect runs — so a hook here (e.g.
+  // `useNavigation`) is an extra hook on the second render and triggers
+  // "change in the order of Hooks called by SceneView". It closes over the
+  // `navigation` prop instead.
   useLayoutEffect(() => {
-    navigation.setOptions({ headerRight: TournamentsHeaderAction });
+    navigation.setOptions({
+      headerRight: headerAddButton('Create Tournament', () => navigation.navigate('CreateTournament')),
+    });
   }, [navigation]);
 
   if (isLoading) {

@@ -62,8 +62,9 @@ export type ProfileStackParamList = {
  * (§3.6, §4.8, R-073).
  *
  * `Create` is not a destination: it is the raised center action button
- * (`CreateTabButton`). Pressing it is intercepted and routed to
- * Home -> CreateGame, so it never becomes the focused tab.
+ * (`CreateTabButton`). Pressing it opens the Create menu (Game / Group /
+ * Tournament) and never selects this route, so it never becomes the
+ * focused tab.
  */
 export type AppTabParamList = {
   Home: NavigatorScreenParams<HomeStackParamList>;

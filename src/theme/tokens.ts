@@ -45,6 +45,8 @@ export const colors = {
   error: '#C62828',
   errorLight: '#FFEBEE',
   white: '#FFFFFF',
+  /** Additive: modal backdrop — `textPrimary` at 50% opacity. */
+  scrim: 'rgba(13, 27, 62, 0.5)',
 };
 
 export const spacing = {
