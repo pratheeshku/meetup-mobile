@@ -36,12 +36,14 @@ import type {
   NotificationType,
 } from '../types/notification';
 
-/** Human-readable labels for each of the 12 confirmed types (§4.8). */
+/** Human-readable labels for every known notification type (§4.8 + the two participant types). */
 const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   global: 'Announcements',
   event_invite: 'Event invitations',
   event_changed: 'Event changes',
   event_cancelled: 'Event cancellations',
+  event_participant_added: 'Added to an event',
+  event_participant_removed: 'Removed from an event',
   waitlist_promoted: 'Waitlist promotions',
   group_invite: 'Group invitations',
   tournament_match_scheduled: 'Tournament match scheduled',

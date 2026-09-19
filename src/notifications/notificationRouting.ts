@@ -55,8 +55,8 @@ export type NotificationTarget =
 
 /**
  * Resolves a notification type + entity id to a concrete navigation
- * target. Exhaustive over `NotificationType` (§4.8's "all 12 confirmed
- * types") — the `never` fallthrough in `default` makes an unhandled type
+ * target. Exhaustive over `NotificationType` (the 12 from §4.8 plus the two
+ * participant types) — the `never` fallthrough in `default` makes an unhandled type
  * a compile error, not a silent no-op, satisfying the task brief's "no
  * unhandled types" rule at the type-checker level.
  */
@@ -72,6 +72,26 @@ export function resolveNotificationTarget(
     case 'event_changed':
     case 'event_cancelled':
     case 'waitlist_promoted':
+      return {
+        tab: 'Home',
+        screen: 'EventDetail',
+        params: { eventId: entityId },
+      };
+
+    // Added after the design's 12 (see `types/notification.ts`). ASSUMPTION,
+    // UNVERIFIED: `entity_id` is the event id — the server-side payload
+    // builders were not reachable when this was written, and the live OpenAPI
+    // does not document push payloads. If the server sends something else
+    // (e.g. the participant's user id), the event screen's existing load-error
+    // state shows rather than crashing. Unlike the older event types, an
+    // absent/blank `entity_id` falls back to the events list instead of
+    // opening `EventDetail` with an empty id (whose `GET /events/` would hit
+    // the list route, not a single event).
+    case 'event_participant_added':
+    case 'event_participant_removed':
+      if (entityId.trim() === '') {
+        return { tab: 'Home', screen: 'EventsList' };
+      }
       return {
         tab: 'Home',
         screen: 'EventDetail',

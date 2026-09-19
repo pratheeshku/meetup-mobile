@@ -8,15 +8,21 @@
  * `GroupMemberRole`) uses string unions, never the `enum` keyword — kept
  * consistent with that established convention rather than introducing the
  * only runtime `enum` in the codebase. The set of literal values below is
- * exactly the 12 confirmed types from the task brief, cross-checked against
- * DES-MEETUP-MOBILE.md §4.8's notification-type → deep-link mapping table,
- * which lists the identical 12 values.
+ * the 12 confirmed types from the original task brief (cross-checked against
+ * DES-MEETUP-MOBILE.md §4.8's notification-type → deep-link mapping table)
+ * plus `event_participant_added` / `event_participant_removed`, which the
+ * backend can send but §4.8's table does not list. Those two were added by
+ * explicit instruction; the design needs to ratify them (deviation from
+ * §4.8's "all 12 confirmed types"). What their `entity_id` holds is
+ * unverified — see `notificationRouting.ts`.
  */
 export type NotificationType =
   | 'global'
   | 'event_invite'
   | 'event_changed'
   | 'event_cancelled'
+  | 'event_participant_added'
+  | 'event_participant_removed'
   | 'waitlist_promoted'
   | 'group_invite'
   | 'tournament_match_scheduled'
@@ -26,12 +32,14 @@ export type NotificationType =
   | 'tournament_standings_published'
   | 'team_invite';
 
-/** All 12 confirmed notification types, in the order given by the task brief. */
+/** All 14 known notification types (the 12 from the task brief, plus the two participant types). */
 export const NOTIFICATION_TYPES: NotificationType[] = [
   'global',
   'event_invite',
   'event_changed',
   'event_cancelled',
+  'event_participant_added',
+  'event_participant_removed',
   'waitlist_promoted',
   'group_invite',
   'tournament_match_scheduled',

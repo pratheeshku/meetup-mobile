@@ -161,8 +161,8 @@ function isKnownNotificationType(value: unknown): value is NotificationType {
 
 /**
  * Extracts a typed `PushNotificationPayload` from a raw FCM
- * `RemoteMessage`, or `null` if the message doesn't carry one of the 12
- * confirmed notification types (§4.8) — e.g. a malformed/unexpected
+ * `RemoteMessage`, or `null` if the message doesn't carry one of the known
+ * notification types (`NOTIFICATION_TYPES`) — e.g. a malformed/unexpected
  * payload, which is dropped rather than crashing the handler.
  *
  * `title`/`body` come from `data` first (the backend-authored payload

@@ -10,7 +10,9 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ReactTestRenderer from 'react-test-renderer';
 
 import NotificationBanner from '../NotificationBanner';
-import { dismissBanner, showBanner } from '../../notifications/notificationBannerStore';
+import { dismissBanner, getBannerState, showBanner } from '../../notifications/notificationBannerStore';
+import { navigationRef } from '../../notifications/notificationRouting';
+import { pressableWithText } from '../../test-utils/render';
 import { colors } from '../../theme/tokens';
 
 const METRICS = {
@@ -109,5 +111,88 @@ describe('NotificationBanner', () => {
     textColors.forEach(color => {
       expect(contrastRatio(color, colors.textPrimary)).toBeGreaterThanOrEqual(4.5);
     });
+  });
+});
+
+describe('NotificationBanner — participant notifications', () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+  let navigate: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.spyOn(navigationRef, 'isReady').mockReturnValue(true);
+    navigate = jest.spyOn(navigationRef, 'navigate').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    ReactTestRenderer.act(() => {
+      renderer?.unmount();
+      dismissBanner();
+    });
+    renderer = undefined;
+    jest.restoreAllMocks();
+  });
+
+  function mountWith(
+    notification_type: 'event_participant_added' | 'event_participant_removed',
+    entity_id: string,
+    title: string,
+  ): ReactTestRenderer.ReactTestRenderer {
+    ReactTestRenderer.act(() => {
+      showBanner({ notification_type, entity_id, title, body: 'Sunday football' });
+    });
+    ReactTestRenderer.act(() => {
+      renderer = ReactTestRenderer.create(
+        <SafeAreaProvider initialMetrics={METRICS}>
+          <NotificationBanner />
+        </SafeAreaProvider>,
+      );
+    });
+    return renderer as ReactTestRenderer.ReactTestRenderer;
+  }
+
+  it.each([
+    ['event_participant_added', 'You were added to an event'],
+    ['event_participant_removed', 'You were removed from an event'],
+  ] as const)('%s: shows the banner text', (type, title) => {
+    const tree = mountWith(type, 'evt-1', title);
+    const texts = hostNodes(tree, 'Text').map(node => node.props.children);
+
+    expect(texts).toContain(title);
+    expect(texts).toContain('Sunday football');
+  });
+
+  it.each([
+    ['event_participant_added', 'You were added to an event'],
+    ['event_participant_removed', 'You were removed from an event'],
+  ] as const)('%s: tapping opens Event Detail and dismisses the banner', (type, title) => {
+    const tree = mountWith(type, 'evt-1', title);
+
+    ReactTestRenderer.act(() => {
+      pressableWithText(tree.root, title).props.onPress();
+    });
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith('Home', {
+      screen: 'EventDetail',
+      params: { eventId: 'evt-1' },
+    });
+    expect(getBannerState()).toBeNull();
+  });
+
+  it.each([
+    ['event_participant_added', 'You were added to an event'],
+    ['event_participant_removed', 'You were removed from an event'],
+  ] as const)('%s: a missing entity_id taps through to the events list, not a blank event', (type, title) => {
+    const tree = mountWith(type, '', title);
+
+    expect(() =>
+      ReactTestRenderer.act(() => {
+        pressableWithText(tree.root, title).props.onPress();
+      }),
+    ).not.toThrow();
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith('Home', { screen: 'EventsList' });
+    expect(getBannerState()).toBeNull();
   });
 });
