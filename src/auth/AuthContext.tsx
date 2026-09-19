@@ -8,6 +8,11 @@
  * (§3.4/§3.5's refresh-and-retry flow exhausted), clears `user` — the
  * root navigator (§7 wiring) reacts to `user` becoming `null` by
  * switching back to the Auth Stack.
+ *
+ * Push registration (§3.6) is driven from here: whenever a session exists
+ * — fresh sign-in by any method or a restored session — permission +
+ * device-token registration start, and they stop when the session ends
+ * (sign-out, `auth-expired`, unmount). See `notifications/pushRegistration`.
  */
 import React, {
   createContext,
@@ -15,6 +20,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -23,6 +29,7 @@ import { authEvents } from '../api/authEvents';
 import { getAccessToken } from '../storage/tokens';
 import { configureGoogleSignIn, signIn as googleSignIn, signOut as sharedSignOut } from './googleAuth';
 import { login as emailLogin, register as emailRegister } from './emailAuth';
+import { startPushRegistration } from '../notifications/pushRegistration';
 import type { UserProfile } from '../types/user';
 
 interface AuthContextValue {
@@ -46,6 +53,8 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const stopPushRegistrationRef = useRef<(() => void) | null>(null);
+  const userId = user?.id ?? null;
 
   const restoreSession = useCallback(async () => {
     configureGoogleSignIn();
@@ -76,6 +85,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     return unsubscribe;
   }, [restoreSession]);
 
+  // Keyed on the user id, not the user object, so `updateUser` patches
+  // (e.g. a new display name) do not restart registration.
+  useEffect(() => {
+    if (userId === null) {
+      return undefined;
+    }
+    const stop = startPushRegistration();
+    stopPushRegistrationRef.current = stop;
+    return () => {
+      stop();
+      stopPushRegistrationRef.current = null;
+    };
+  }, [userId]);
+
   const signInWithGoogle = useCallback(async () => {
     const profile = await googleSignIn();
     setUser(profile);
@@ -95,8 +118,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   );
 
   const signOut = useCallback(async () => {
-    await sharedSignOut();
-    setUser(null);
+    // Stop first: a foreground event between the token de-registration and
+    // the user clearing must not re-register this device.
+    stopPushRegistrationRef.current?.();
+    try {
+      await sharedSignOut();
+    } finally {
+      // Local state always clears, even if a local step of sign-out failed.
+      setUser(null);
+    }
   }, []);
 
   const updateUser = useCallback((patch: Partial<UserProfile>) => {

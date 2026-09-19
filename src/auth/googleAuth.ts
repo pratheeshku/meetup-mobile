@@ -42,6 +42,7 @@ import { apiClient } from '../api/client';
 import { saveTokens, clearTokens } from '../storage/tokens';
 import { withCorrelationId } from '../api/correlationId';
 import { deregisterDeviceToken } from '../notifications/fcm';
+import { describeError } from '../utils/logSafeError';
 import type { AuthResponse } from './types';
 import type { UserProfile } from '../types/user';
 
@@ -106,21 +107,63 @@ export async function signIn(): Promise<UserProfile> {
 }
 
 /**
+ * Per-call budget for the two best-effort network steps of sign-out. The
+ * shared client's default is 30 s per call, which would leave a signed-out
+ * user staring at a spinner on a dead connection.
+ */
+const SIGN_OUT_NETWORK_TIMEOUT_MS = 5_000;
+
+/**
+ * Rejects if `promise` has not settled within `ms`. Needed for
+ * `deregisterDeviceToken`, whose first step (`getToken()` from the Firebase
+ * SDK) is not covered by the axios request timeout. The underlying work is
+ * not cancelled; its late outcome is ignored.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/**
  * Signs the user out (R-013), regardless of which method they originally
- * signed in with. Order matches §3.5/§5.2 exactly: de-register the FCM
- * device token first (best-effort, R-030/OI-2), then revoke the session
- * server-side, then clear the local Google session, then clear Keystore.
+ * signed in with. Order matches §3.5/§5.2: de-register the FCM device token
+ * first (best-effort, R-030/OI-2), then revoke the session server-side, then
+ * clear the local Google session, then clear Keystore.
+ *
+ * Offline-safe: both network steps are best-effort and time-boxed
+ * (`SIGN_OUT_NETWORK_TIMEOUT_MS`). Any failure of either is logged (status /
+ * code only, never the error object) and swallowed, so the local steps —
+ * `GoogleSignin.signOut()` and `clearTokens()` — always run. A dropped
+ * `POST /auth/logout` leaves the server session to expire on its own; the
+ * device no longer holds any token for it.
  */
 export async function signOut(): Promise<void> {
-  await withCorrelationId(async correlationId => {
-    try {
-      await deregisterDeviceToken({ correlationId });
-    } catch {
-      // Best-effort only — accepted T1 residual risk (§5.2, OI-2). A
-      // failed de-registration must never block the rest of sign-out.
-    }
-    await apiClient.post('/auth/logout', undefined, { correlationId });
-  });
+  try {
+    await withCorrelationId(async correlationId => {
+      const requestConfig = { correlationId, timeout: SIGN_OUT_NETWORK_TIMEOUT_MS };
+      try {
+        await withTimeout(deregisterDeviceToken(requestConfig), SIGN_OUT_NETWORK_TIMEOUT_MS);
+      } catch (error) {
+        // Best-effort only — accepted T1 residual risk (§5.2, OI-2). A
+        // failed de-registration must never block the rest of sign-out.
+        console.log('[auth] device token de-registration skipped', describeError(error));
+      }
+      await apiClient.post('/auth/logout', undefined, requestConfig);
+    });
+  } catch (error) {
+    console.log('[auth] server logout failed; clearing local session', describeError(error));
+  }
 
   try {
     await GoogleSignin.signOut();

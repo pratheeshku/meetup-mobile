@@ -1,17 +1,20 @@
-## Status — 2026-09-19 (consolidated fix: hooks, registration, FAB menu, display name)
+# Implementation status — DES-MEETUP-MOBILE (FCM client wiring)
 
-Task: fix Rules-of-Hooks on Groups/Tournaments header, verify CreateGroup/CreateTournament registration, FAB menu, display_name vs nickname.
-Design: DES-MEETUP-MOBILE, APPROVED 2026-09-13, tier T1.
+## Status — 2026-09-19 (task complete, committed, not pushed)
+
+Design doc: DES-MEETUP-MOBILE, APPROVED (architect-approved 2026-09-13), §3.6 / R-070–R-077.
+Baseline before any change: jest 35 suites / 268 tests; tsc clean; eslint clean.
+After: jest 41 suites / 318 tests (3 consecutive runs); tsc clean; eslint clean.
 
 ### Completed
-- Code commit `52250ae`; tsc 0, eslint 0, jest 268/268 x3, Android bundle compiles
-- Report `docs/reports/IMPL-DES-MEETUP-MOBILE-fixes-hooks-fab-displayname.md`; reflection #25-#28
+- Permission (once-only rationale, R-072), registration, token refresh, deregistration path encoding,
+  offline-safe sign-out, top-level background handler, unit tests.
 
 ### In Progress
-- none (pushed: 8b68464..433e6f2 main -> main)
+- None
 
 ### Pending
-- On-device verification (report §6); testing-agent pass; conformance review
+- On-device verification (needs a physical device/emulator with Google Play services)
 
 ### Blocked
-- none
+- None

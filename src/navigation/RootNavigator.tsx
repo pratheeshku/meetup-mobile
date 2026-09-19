@@ -81,7 +81,6 @@ import {
   getInitialNotification,
   onMessage,
   onNotificationOpenedApp,
-  registerBackgroundMessageHandler,
 } from '../notifications/fcm';
 
 import LoginScreen from '../screens/LoginScreen';
@@ -294,9 +293,9 @@ export default function RootNavigator(): React.JSX.Element {
   // Foreground banner display and background-tap routing (§3.6, §4.8):
   // registered once, independent of auth state — harmless to set up
   // before a session exists, and required to be in place before any
-  // message can arrive.
+  // message can arrive. (The FCM background handler is registered at top
+  // level in `index.js`, not here.)
   useEffect(() => {
-    registerBackgroundMessageHandler();
     const unsubscribeMessage = onMessage();
     const unsubscribeOpenedApp = onNotificationOpenedApp(payload => {
       navigateToNotificationTarget(

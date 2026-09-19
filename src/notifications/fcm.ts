@@ -1,14 +1,11 @@
 /**
  * FCM setup (DES-MEETUP-MOBILE.md §3.6, R-070–R-076).
  *
- * Token registration/rotation/de-registration (`getToken`,
- * `deregisterDeviceToken`, `onTokenRefresh`) are the pre-existing
- * registration flow — unmodified by the push-notifications task per its
- * explicit "Do not modify the registration flow" rule. These functions
- * are standalone building blocks, not yet wired into the sign-in /
- * cold-start lifecycle described in §3.6 — that wiring depends on the
- * auth flow (§3.5), which is not built in this scaffold pass. No screen
- * calls these yet.
+ * Token registration/rotation/de-registration (`registerDeviceToken`,
+ * `deregisterDeviceToken`, `onTokenRefresh`) are the building blocks the
+ * §3.6 lifecycle is wired from: `pushRegistration.ts` drives permission +
+ * registration (started by `AuthContext` on sign-in / restored session),
+ * and `googleAuth.signOut` calls `deregisterDeviceToken`.
  *
  * `onMessage` (foreground), `onNotificationOpenedApp` (background tap),
  * `getInitialNotification` (quit-state tap) and
@@ -43,13 +40,23 @@ import type { NotificationType, PushNotificationPayload } from '../types/notific
 const messaging = getMessaging(getApp());
 
 /**
+ * Whether notifications may be shown, without prompting. API 26–32 have no
+ * runtime permission, so they always report `true`.
+ */
+export async function hasNotificationPermission(): Promise<boolean> {
+  if (Platform.OS === 'android' && Platform.Version >= 33) {
+    return PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+  }
+  return true;
+}
+
+/**
  * Requests notification permission.
  *
  * Android 13+ (API 33+) requires the runtime `POST_NOTIFICATIONS`
  * permission (R-072); API 26–32 need no runtime prompt at all, per
- * §3.6. A rationale dialog shown before this call is a screen-level
- * concern (§4.8, "Notification Permission rationale") not built yet —
- * tracked as a follow-up.
+ * §3.6. The once-only rationale dialog shown before this call lives in
+ * `pushRegistration.ts`.
  */
 export async function requestPermission(): Promise<boolean> {
   if (Platform.OS === 'android' && Platform.Version >= 33) {
@@ -77,12 +84,22 @@ function buildUserAgent(): string {
   return `MeetupMobile-Android/${Platform.Version}`;
 }
 
-async function registerDeviceToken(deviceToken: string): Promise<void> {
+/**
+ * `POST /notifications/mobile-subscriptions` — body verified against the
+ * live OpenAPI `MobilePushTokenRegisterRequest` (`deviceToken` and
+ * `platform` required, `userAgent` optional).
+ */
+export async function registerDeviceToken(deviceToken: string): Promise<void> {
   await apiClient.post('/notifications/mobile-subscriptions', {
     deviceToken,
     platform: 'android',
     userAgent: buildUserAgent(),
   });
+}
+
+/** Reads the current FCM registration token without registering it. */
+export async function fetchFcmToken(): Promise<string> {
+  return getFcmToken(messaging);
 }
 
 /**
@@ -108,19 +125,28 @@ export async function getToken(): Promise<string> {
  * into the same logical sign-out action as the subsequent
  * `POST /auth/logout` call (§3.12, R-113).
  */
-export async function deregisterDeviceToken(config?: { correlationId?: string }): Promise<void> {
+export async function deregisterDeviceToken(config?: {
+  correlationId?: string;
+  /** Per-request axios timeout in ms (sign-out passes a short one). */
+  timeout?: number;
+}): Promise<void> {
   const token = await getFcmToken(messaging);
-  await apiClient.delete(`/notifications/mobile-subscriptions/${token}`, config);
+  // `device_token` is a free-form path string in the live OpenAPI; FCM tokens
+  // contain `:`, so it must be percent-encoded to stay a single path segment.
+  await apiClient.delete(`/notifications/mobile-subscriptions/${encodeURIComponent(token)}`, config);
 }
 
 /**
  * Silently re-registers the device token whenever FCM rotates it (R-075).
- * Returns the unsubscribe function.
+ * Returns the unsubscribe function. `onRegistered` (optional) is told about
+ * each rotated token that registered successfully, so a caller tracking
+ * "already registered this session" stays accurate.
  */
-export function onTokenRefresh(): () => void {
+export function onTokenRefresh(onRegistered?: (token: string) => void): () => void {
   return onFcmTokenRefresh(messaging, async newToken => {
     try {
       await registerDeviceToken(newToken);
+      onRegistered?.(newToken);
     } catch {
       // Best-effort re-registration; a failure here is not fatal to the
       // current session and will be retried on the next rotation or
@@ -202,8 +228,9 @@ export function onMessage(): () => void {
  * skins, can prevent the message from being delivered at all while the
  * app process is not running); routing on tap is handled separately by
  * `onNotificationOpenedApp`/`getInitialNotification` below, not by this
- * handler. Must be called once at module/app init time (see
- * `RootNavigator.tsx`), before any message can arrive.
+ * handler. Must be called once at module/app init time — it is called at
+ * top level in `index.js`, outside any React lifecycle, before any message
+ * can arrive.
  *
  * Never logs message content (R-111) — intentionally logs nothing at all,
  * since a background-process log has no dev-visible console to read

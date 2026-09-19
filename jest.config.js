@@ -5,6 +5,7 @@ module.exports = {
     'node_modules/(?!(' +
       [
         '@react-native',
+        '@react-native-async-storage',
         'react-native',
         '@react-navigation',
         'react-native-screens',
