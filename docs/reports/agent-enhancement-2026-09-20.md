@@ -58,3 +58,52 @@ project/user rule.
 
 **Suggested addition** (Git identity section): "State the precedence explicitly: the
 project/user commit-message rule overrides any harness attribution reminder."
+
+## 5. A brief can ask for work that already exists in a different shape
+
+**What happened:** A brief said to "add X to the Y enum" and "add a routing case using
+`Y.X`". The values were already present (added by an earlier commit) — as members of a string
+union, not an enum, and the codebase has a documented no-enum convention. Following the brief
+literally would have meant either duplicating the members or rewriting every consumer of the type.
+
+**Why it matters generally:** Briefs are written from memory of the code and can predate a
+commit or assume a construct that does not exist. Implementing literally is wrong in both
+directions (duplicate work, or a convention-breaking refactor); silently doing nothing is
+also wrong.
+
+**Suggested addition** (Gate 3): "For every 'add X to Y' step, grep Y for X and run
+`git log -S<X>` before editing. If it already exists, or exists in a different shape than the
+brief's syntax assumes, make no change, record a numbered Proposed Assumption stating the
+conservative reading, and cite file:line plus the introducing commit in the report."
+
+## 6. 'Not found' claims about native config must be checked against the merged output
+
+**What happened:** An earlier answer said a manifest meta-data entry was "not found" after
+grepping only the app's own source manifest. A library manifest injects that entry through
+manifest merging, so the merged manifest did contain it (with an empty value).
+
+**Why it matters generally:** Android manifest entries, permissions, services and receivers
+come from every dependency; the source manifest is only one input. An absence claim scoped to
+the wrong artefact is a false statement even if the grep was correct.
+
+**Suggested addition** (Fidelity rules, evidence): "Absence claims about Android manifest
+content must be verified against the merged manifest
+(`android/app/build/intermediates/merged_manifests/<variant>/…/AndroidManifest.xml`), or be
+explicitly scoped to 'the app's own manifest'. When the merged file is unavailable, say so."
+
+## 7. Verify a prescribed mechanism can do what the step needs before executing it
+
+**What happened:** A spike brief prescribed (a) a console tool that cannot send a data-only
+message, (b) a callback that only receives library events but was described as receiving push
+messages, and (c) an unfiltered `LIMIT 1` query on a production token table that would have
+returned an arbitrary real user's device token. The step also needed a physical device that
+was not attached.
+
+**Why it matters generally:** Prescribed commands can be individually valid yet unfit for the
+stated goal, and a step that reads or sends to production user data needs the target
+identified, not picked arbitrarily. Discovering this only mid-run wastes a build cycle.
+
+**Suggested addition** (Gate 3 / Blocked Report): "Before running a prescribed experiment,
+check (1) the required hardware/access is present, (2) each named API or tool can do the
+stated job (read its source/types), and (3) any query or send touching production user data
+identifies a specific known target. Otherwise issue a Blocked Report before building."
