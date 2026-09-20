@@ -37,6 +37,12 @@ local.properties
 
 # Signing / secrets — never committed (P10, DES-MEETUP-MOBILE §3.11)
 android/key.properties
+**/key.properties
+**/keystore.properties
+*.jks
+*.p12
+*.pfx
+/keys/
 android/app/google-services.json
 *.env
 .env

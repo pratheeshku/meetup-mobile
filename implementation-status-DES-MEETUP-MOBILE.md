@@ -1,20 +1,20 @@
-# Implementation status — DES-MEETUP-MOBILE (FCM client wiring)
+# Implementation status — DES-MEETUP-MOBILE (Shuttlr release shell, Option A)
 
-## Status — 2026-09-19 (task complete, committed, not pushed)
+Authorisation: architect-approved deviation (identity org.duckdns.meetups, label Shuttlr,
+auto versionCode, new upload keystore). docs/ amendment deferred by architect.
 
-Design doc: DES-MEETUP-MOBILE, APPROVED (architect-approved 2026-09-13), §3.6 / R-070–R-077.
-Baseline before any change: jest 35 suites / 268 tests; tsc clean; eslint clean.
-After: jest 41 suites / 318 tests (3 consecutive runs); tsc clean; eslint clean.
+## Status — 2026-09-20 (in progress)
 
 ### Completed
-- Permission (once-only rationale, R-072), registration, token refresh, deregistration path encoding,
-  offline-safe sign-out, top-level background handler, unit tests.
+- Step 0 discovery; targetSdk source verified (Play requires >=36 from 2026-08-31; repo already 36).
 
 ### In Progress
-- None
+- Gradle identity/versioning/signing wiring, build script, keystore generation.
 
 ### Pending
-- On-device verification (needs a physical device/emulator with Google Play services)
+- google-services.json for org.duckdns.meetups (external: Firebase console)
+- Signed AAB build, verification, report, reflection
 
 ### Blocked
-- None
+- Release build needs android/app/google-services.json containing a client for
+  org.duckdns.meetups (current file only has com.meetupmobile).

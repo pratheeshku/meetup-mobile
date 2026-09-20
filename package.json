@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "build:aab": "bash scripts/build-release-aab.sh",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",

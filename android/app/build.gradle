@@ -16,10 +16,37 @@ import java.io.FileInputStream
 // file (or the equivalent secrets) at build time only — see
 // DES-MEETUP-MOBILE.md §3.11. Locally, the file is a real developer
 // keystore reference and must never be logged or printed.
+//
+// The signing properties file defaults to android/key.properties, but the
+// KEY_PROPERTIES_FILE environment variable (absolute path) overrides it.
+// scripts/build-release-aab.sh sets it to ~/keys/shuttlr/key.properties so a
+// stale android/key.properties can never silently sign a Shuttlr release.
+// If KEY_PROPERTIES_FILE is set but the file is missing, fail rather than fall
+// back to another key.
 def keystoreProperties = new Properties()
-def keystorePropertiesFile = rootProject.file("key.properties")
+def keyPropertiesOverride = System.getenv("KEY_PROPERTIES_FILE")
+def keystorePropertiesFile = keyPropertiesOverride ? new File(keyPropertiesOverride) : rootProject.file("key.properties")
+if (keyPropertiesOverride && !keystorePropertiesFile.exists()) {
+    throw new GradleException("KEY_PROPERTIES_FILE is set but the file does not exist: ${keyPropertiesOverride}")
+}
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+// versionName / versionCode come from android/version.properties (committed).
+// versionCode is incremented by scripts/build-release-aab.sh before each
+// release build, so it strictly increases and is never hardcoded per release.
+// Plain debug builds read the current value without changing it (floor of 1).
+def versionProperties = new Properties()
+def versionPropertiesFile = rootProject.file("version.properties")
+if (!versionPropertiesFile.exists()) {
+    throw new GradleException("android/version.properties is missing")
+}
+versionProperties.load(new FileInputStream(versionPropertiesFile))
+def appVersionName = versionProperties.getProperty("versionName")
+def appVersionCode = Math.max((versionProperties.getProperty("versionCode") ?: "0").toInteger(), 1)
+if (!appVersionName) {
+    throw new GradleException("android/version.properties must define versionName")
 }
 
 /**
@@ -97,18 +124,20 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    // `namespace` is the source-code package (Kotlin files, generated
+    // BuildConfig/R) and is intentionally unchanged; `applicationId` is the
+    // Play/device identity. They differ since the Shuttlr identity change.
     namespace "com.meetupmobile"
     defaultConfig {
-        applicationId "com.meetupmobile"
+        applicationId "org.duckdns.meetups"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
-        // Explicit per react-native-config's "Advanced Android Setup": this
-        // project's namespace and applicationId are already identical, so
-        // the library's automatic BuildConfig-package resolution would find
-        // this without it — set explicitly anyway for robustness against a
-        // future flavor/applicationIdSuffix split.
+        versionCode appVersionCode
+        versionName appVersionName
+        // react-native-config locates the generated BuildConfig class via
+        // this value. BuildConfig is generated in the *namespace* package,
+        // not the applicationId, and the two now differ — so this MUST stay
+        // the namespace ("com.meetupmobile"), not the applicationId.
         resValue "string", "build_config_package", "com.meetupmobile"
     }
     signingConfigs {
