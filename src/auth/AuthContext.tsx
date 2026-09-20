@@ -27,6 +27,7 @@ import React, {
 import { apiClient, endSession, refreshAccessToken, SessionEndedError } from '../api/client';
 import { authEvents } from '../api/authEvents';
 import { getAccessToken } from '../storage/tokens';
+import { describeError } from '../utils/logSafeError';
 import { configureGoogleSignIn, signIn as googleSignIn, signOut as sharedSignOut } from './googleAuth';
 import { login as emailLogin, register as emailRegister } from './emailAuth';
 import { startPushRegistration } from '../notifications/pushRegistration';
@@ -67,10 +68,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   const stopPushRegistrationRef = useRef<(() => void) | null>(null);
   const userId = user?.id ?? null;
 
-  const restoreSession = useCallback(async () => {
+  const restoreStoredSession = useCallback(async () => {
     configureGoogleSignIn();
 
-    const accessToken = await getAccessToken();
+    let accessToken: string | null = null;
+    try {
+      accessToken = await getAccessToken();
+    } catch (error) {
+      // The Keychain/Keystore read itself failed (e.g. an invalidated key).
+      // Treat it as "no stored session" and carry on to the login screen —
+      // never let it stall start-up. Only an error tag is logged, never a value.
+      console.log('[auth] stored token unreadable; treating as signed out', describeError(error));
+    }
     if (!accessToken) {
       // No access token, but the 30-day refresh cookie may still be alive
       // (mirrors the PWA's silent refresh on load). Only the networking layer
@@ -107,8 +116,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         setUser(null);
       }
     }
-    setIsLoading(false);
   }, []);
+
+  const restoreSession = useCallback(async () => {
+    try {
+      await restoreStoredSession();
+    } catch (error) {
+      // Fail closed: an unexpected start-up error means "signed out", not a crash.
+      console.log('[auth] session restore failed; continuing signed out', describeError(error));
+    } finally {
+      // Whatever happens above, never leave the splash hanging.
+      setIsLoading(false);
+    }
+  }, [restoreStoredSession]);
 
   useEffect(() => {
     restoreSession();

@@ -9,12 +9,14 @@
  *   401                      -> a cookie existed but was rejected: notice
  */
 import React from 'react';
+import * as Keychain from 'react-native-keychain';
 import ReactTestRenderer from 'react-test-renderer';
 
 import { clearCookieJar } from '../../api/cookies';
 import { ACCESS_SERVICE, installFakeBackend } from '../../test-utils/apiHarness';
 import type { FakeBackend, FakeReply } from '../../test-utils/apiHarness';
 import { AuthProvider, useAuth } from '../AuthContext';
+import * as googleAuth from '../googleAuth';
 
 jest.mock('../../api/cookies', () => ({ clearCookieJar: jest.fn() }));
 jest.mock('../../notifications/fcm', () => ({ deregisterDeviceToken: jest.fn() }));
@@ -145,5 +147,50 @@ describe('with a stored access token', () => {
 
     expect(backend.urls()).toEqual(['/users/me']);
     expect(auth.user).toEqual(USER);
+  });
+});
+
+describe('the Keychain read throws during start-up', () => {
+  // e.g. an invalidated Keystore key: reading the stored token rejects.
+  beforeEach(() => {
+    (Keychain.getGenericPassword as jest.Mock).mockRejectedValue(new Error('keystore key invalidated'));
+  });
+
+  it.each([
+    ['the network is down', { network: true }],
+    ['there is no cookie ({ access_token: null })', { data: { access_token: null } }],
+    ['a live cookie renews the session (later Keychain reads still fail)', { data: { access_token: 'fresh' } }],
+  ])('treats it as no stored session and reaches the login screen when %s', async (_label, refreshReply) => {
+    serve(refreshReply);
+
+    await mount();
+
+    expect(auth.isLoading).toBe(false); // the splash is released
+    expect(auth.user).toBeNull(); // login screen
+    expect(auth.sessionExpired).toBe(false);
+  });
+
+  it('logs only an error tag, never a value', async () => {
+    const log = jest.spyOn(console, 'log').mockImplementation(() => {});
+    serve({ data: { access_token: null } });
+
+    await mount();
+
+    const logged = log.mock.calls.map(call => call.join(' ')).join('\n');
+    expect(logged).toContain('stored token unreadable');
+    expect(logged).not.toContain('keystore key invalidated');
+  });
+
+  it('an unexpected start-up error still releases the splash (signed out, no crash)', async () => {
+    // A throw OUTSIDE the guarded token read, at the very start of restore.
+    const configure = jest.spyOn(googleAuth, 'configureGoogleSignIn').mockImplementation(() => {
+      throw new Error('native module unavailable');
+    });
+
+    await mount();
+
+    expect(configure).toHaveBeenCalled(); // the failure path really ran
+    expect(auth.isLoading).toBe(false);
+    expect(auth.user).toBeNull();
   });
 });

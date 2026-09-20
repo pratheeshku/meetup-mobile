@@ -81,11 +81,6 @@ export async function getAccessToken(): Promise<string | null> {
   return result ? result.password : null;
 }
 
-export async function getRefreshToken(): Promise<string | null> {
-  const result = await Keychain.getGenericPassword({ service: REFRESH_TOKEN_SERVICE });
-  return result ? result.password : null;
-}
-
 export async function clearTokens(): Promise<void> {
   await Promise.all([
     Keychain.resetGenericPassword({ service: ACCESS_TOKEN_SERVICE }),
