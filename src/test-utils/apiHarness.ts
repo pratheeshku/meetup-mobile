@@ -1,5 +1,6 @@
 /**
- * Test-only fake backend for the REAL `apiClient` / `refreshClient`.
+ * Test-only fake backend for the REAL `apiClient` / `refreshClient` /
+ * `versionPolicyClient`.
  *
  * Stubs only the transport (the axios adapter of both instances) and the
  * native Keychain, so the production interceptors, single-flight refresh and
@@ -14,15 +15,21 @@ import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import * as Keychain from 'react-native-keychain';
 
 import { apiClient, refreshClient } from '../api/client';
+import { versionPolicyClient } from '../api/versionPolicy';
 
 export const ACCESS_SERVICE = 'com.meetupmobile.auth.accessToken';
 export const REFRESH_SERVICE = 'com.meetupmobile.auth.refreshToken';
 
-/** What the fake server answers. `network: true` simulates no connectivity. */
+/**
+ * What the fake server answers. `network: true` simulates no connectivity;
+ * `timeout: true` simulates axios giving up after the request's `timeout`
+ * (`ECONNABORTED`), which is what the real transport reports.
+ */
 export interface FakeReply {
   status?: number;
   data?: unknown;
   network?: boolean;
+  timeout?: boolean;
 }
 
 export type Route = (config: InternalAxiosRequestConfig) => FakeReply | Promise<FakeReply>;
@@ -38,6 +45,8 @@ export interface RecordedRequest {
   data: unknown;
   withCredentials: boolean | undefined;
   authorization: string | undefined;
+  baseURL: string | undefined;
+  timeout: number | undefined;
 }
 
 export interface FakeBackend {
@@ -58,6 +67,11 @@ export interface FakeBackend {
 function toResponse(config: InternalAxiosRequestConfig, reply: FakeReply): Promise<AxiosResponse> {
   if (reply.network) {
     return Promise.reject(new AxiosError('Network Error', 'ERR_NETWORK', config));
+  }
+  if (reply.timeout) {
+    return Promise.reject(
+      new AxiosError(`timeout of ${config.timeout}ms exceeded`, 'ECONNABORTED', config),
+    );
   }
   const status = reply.status ?? 200;
   const response = { status, statusText: String(status), data: reply.data ?? {}, headers: {}, config } as AxiosResponse;
@@ -87,11 +101,14 @@ export function installFakeBackend(): FakeBackend {
       data: config.data,
       withCredentials: config.withCredentials,
       authorization: backend.authorizationOf(config),
+      baseURL: config.baseURL,
+      timeout: config.timeout,
     });
     return toResponse(config, await backend.route(config));
   });
   apiClient.defaults.adapter = adapter;
   refreshClient.defaults.adapter = adapter;
+  versionPolicyClient.defaults.adapter = adapter;
 
   (Keychain.getGenericPassword as jest.Mock).mockImplementation(async (options: { service: string }) =>
     backend.stored[options.service] ? { password: backend.stored[options.service] } : false,
