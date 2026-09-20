@@ -41,12 +41,12 @@ function logStorageBacking(label: string, storage: Keychain.STORAGE_TYPE | undef
 /**
  * Persists the session tokens.
  *
- * STOPPAGE (internal testing only — architect-authorised Option A): the
- * backend's `TokenResponse` carries no `refresh_token`, so `refresh` may be
- * absent (`undefined`, `null` or empty). In that case only the access token is
- * written and the Keychain refresh entry is left untouched — writing an empty
- * password is rejected natively, which used to fail an otherwise successful
- * sign-in after the access token had already been stored.
+ * The backend's `TokenResponse` carries no `refresh_token`: the refresh token
+ * is an HttpOnly cookie held by the networking layer (see `api/client.ts`,
+ * `api/cookies.ts`), so in normal operation only the access token is stored
+ * here. `refresh` stays optional — when absent (`undefined`, `null` or empty)
+ * only the access token is written and the Keychain refresh entry is left
+ * untouched, because writing an empty password is rejected natively.
  */
 export async function saveTokens(access: string, refresh?: string | null): Promise<void> {
   const writes: Array<ReturnType<typeof Keychain.setGenericPassword>> = [

@@ -17,7 +17,24 @@ import { apiClient } from '../../api/client';
 import { renderAsync, act } from '../../test-utils/render';
 import { AuthProvider, useAuth } from '../AuthContext';
 
-jest.mock('../../api/client', () => ({ apiClient: { get: jest.fn(), post: jest.fn() } }));
+jest.mock('../../api/client', () => {
+  class SessionEndedStub extends Error {
+    reason: 'no-session' | 'rejected';
+    constructor(reason: 'no-session' | 'rejected') {
+      super(reason);
+      this.reason = reason;
+    }
+  }
+  return {
+    apiClient: { get: jest.fn(), post: jest.fn() },
+    // App-start silent refresh: no cookie, so no session to restore.
+    refreshAccessToken: jest.fn(async () => {
+      throw new SessionEndedStub('no-session');
+    }),
+    endSession: jest.fn(),
+    SessionEndedError: SessionEndedStub,
+  };
+});
 jest.mock('../../notifications/fcm', () => ({ deregisterDeviceToken: jest.fn() }));
 jest.mock('../../notifications/pushRegistration', () => ({
   startPushRegistration: jest.fn(() => jest.fn()),

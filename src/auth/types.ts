@@ -24,12 +24,11 @@ import type { UserProfile } from '../types/user';
  * `POST /auth/register` (§7.1) return an access token plus the signed-in
  * user's profile in one response.
  *
- * `refresh_token` is OPTIONAL: the live backend's `TokenResponse` (OpenAPI,
- * verified 2026-09-20) is `{ access_token, user }` only. The original
- * assumption that a refresh token is always present made a successful
- * sign-in fail after the access token was stored. Internal-testing stopgap
- * (architect-authorised Option A) — the real refresh mechanism is still an
- * open contract question; see `storage/tokens.ts`.
+ * `refresh_token` is OPTIONAL and, against the live backend, never present:
+ * its `TokenResponse` (OpenAPI, verified 2026-09-20) is `{ access_token, user
+ * }`. The refresh token travels as an HttpOnly cookie handled by the
+ * networking layer, not by JavaScript — see `api/client.ts`. The field is kept
+ * optional only so the shared sign-in code paths stay untouched.
  */
 export interface AuthResponse {
   access_token: string;

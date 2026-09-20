@@ -5,7 +5,7 @@
  */
 import React from 'react';
 
-import { apiClient } from '../../api/client';
+import { apiClient, refreshAccessToken, SessionEndedError } from '../../api/client';
 import { authEvents } from '../../api/authEvents';
 import { getAccessToken } from '../../storage/tokens';
 import { startPushRegistration } from '../../notifications/pushRegistration';
@@ -14,7 +14,21 @@ import { AuthProvider, useAuth } from '../AuthContext';
 import { signOut as sharedSignOut } from '../googleAuth';
 import { login as emailLogin } from '../emailAuth';
 
-jest.mock('../../api/client', () => ({ apiClient: { get: jest.fn() } }));
+jest.mock('../../api/client', () => {
+  class SessionEndedStub extends Error {
+    reason: 'no-session' | 'rejected';
+    constructor(reason: 'no-session' | 'rejected') {
+      super(reason);
+      this.reason = reason;
+    }
+  }
+  return {
+    apiClient: { get: jest.fn() },
+    refreshAccessToken: jest.fn(),
+    endSession: jest.fn(),
+    SessionEndedError: SessionEndedStub,
+  };
+});
 jest.mock('../../storage/tokens', () => ({ getAccessToken: jest.fn() }));
 jest.mock('../googleAuth', () => ({
   configureGoogleSignIn: jest.fn(),
@@ -25,6 +39,7 @@ jest.mock('../emailAuth', () => ({ login: jest.fn(), register: jest.fn() }));
 jest.mock('../../notifications/pushRegistration', () => ({ startPushRegistration: jest.fn() }));
 
 const mockGet = apiClient.get as jest.Mock;
+const mockRefresh = refreshAccessToken as jest.Mock;
 const mockGetAccessToken = getAccessToken as jest.Mock;
 const mockStart = startPushRegistration as jest.Mock;
 const mockSharedSignOut = sharedSignOut as jest.Mock;
@@ -52,6 +67,8 @@ beforeEach(() => {
   stop = jest.fn();
   mockStart.mockReturnValue(stop);
   mockGetAccessToken.mockResolvedValue(null);
+  // Signed out: the app-start silent refresh finds no session (no cookie).
+  mockRefresh.mockRejectedValue(new SessionEndedError('no-session'));
   mockSharedSignOut.mockResolvedValue(undefined);
 });
 

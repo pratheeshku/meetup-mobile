@@ -39,6 +39,7 @@ import {
 
 import { ENV } from '../../config/env';
 import { apiClient } from '../api/client';
+import { clearCookieJar } from '../api/cookies';
 import { saveTokens, clearTokens } from '../storage/tokens';
 import { withCorrelationId } from '../api/correlationId';
 import { deregisterDeviceToken } from '../notifications/fcm';
@@ -139,7 +140,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  * Signs the user out (R-013), regardless of which method they originally
  * signed in with. Order matches §3.5/§5.2: de-register the FCM device token
  * first (best-effort, R-030/OI-2), then revoke the session server-side, then
- * clear the local Google session, then clear Keystore.
+ * clear the local Google session, then clear Keystore and the cookie jar.
  *
  * Offline-safe: both network steps are best-effort and time-boxed
  * (`SIGN_OUT_NETWORK_TIMEOUT_MS`). Any failure of either is logged (status /
@@ -172,4 +173,8 @@ export async function signOut(): Promise<void> {
   }
 
   await clearTokens();
+  // The refresh token lives in an HttpOnly cookie only the networking layer
+  // can touch. `POST /auth/logout` (above) asks the server to revoke it and
+  // clear it; this drops whatever is left locally. Best-effort, never throws.
+  await clearCookieJar();
 }

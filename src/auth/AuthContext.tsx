@@ -24,7 +24,7 @@ import React, {
   useState,
 } from 'react';
 
-import { apiClient } from '../api/client';
+import { apiClient, endSession, refreshAccessToken, SessionEndedError } from '../api/client';
 import { authEvents } from '../api/authEvents';
 import { getAccessToken } from '../storage/tokens';
 import { configureGoogleSignIn, signIn as googleSignIn, signOut as sharedSignOut } from './googleAuth';
@@ -71,7 +71,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     configureGoogleSignIn();
 
     const accessToken = await getAccessToken();
-    if (accessToken) {
+    if (!accessToken) {
+      // No access token, but the 30-day refresh cookie may still be alive
+      // (mirrors the PWA's silent refresh on load). Only the networking layer
+      // can see that cookie, so ask the backend once.
+      try {
+        await refreshAccessToken();
+        hadSessionRef.current = true;
+        const { data } = await apiClient.get<UserProfile>('/users/me');
+        setUser(data);
+      } catch (error) {
+        if (error instanceof SessionEndedError && error.reason === 'rejected') {
+          // A cookie existed and the backend rejected it (invalid, expired or
+          // reused): a real session just ended, so tell the user. A null
+          // token (`no-session`) is simply "never signed in" — no notice.
+          hadSessionRef.current = true;
+          await endSession();
+        }
+        hadSessionRef.current = false;
+        setUser(null);
+      }
+    } else {
       hadSessionRef.current = true;
       try {
         const { data } = await apiClient.get<UserProfile>('/users/me');

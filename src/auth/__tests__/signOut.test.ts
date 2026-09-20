@@ -7,16 +7,19 @@
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import { apiClient } from '../../api/client';
+import { clearCookieJar } from '../../api/cookies';
 import { clearTokens } from '../../storage/tokens';
 import { deregisterDeviceToken } from '../../notifications/fcm';
 import { signOut } from '../googleAuth';
 
 jest.mock('../../api/client', () => ({ apiClient: { post: jest.fn() } }));
+jest.mock('../../api/cookies', () => ({ clearCookieJar: jest.fn() }));
 jest.mock('../../storage/tokens', () => ({ clearTokens: jest.fn(), saveTokens: jest.fn() }));
 jest.mock('../../notifications/fcm', () => ({ deregisterDeviceToken: jest.fn() }));
 
 const mockPost = apiClient.post as jest.Mock;
 const mockClearTokens = clearTokens as jest.Mock;
+const mockClearCookieJar = clearCookieJar as jest.Mock;
 const mockDeregister = deregisterDeviceToken as jest.Mock;
 const mockGoogleSignOut = GoogleSignin.signOut as jest.Mock;
 
@@ -28,6 +31,7 @@ beforeEach(() => {
   mockPost.mockResolvedValue({ status: 200 });
   mockGoogleSignOut.mockResolvedValue(null);
   mockClearTokens.mockResolvedValue(undefined);
+  mockClearCookieJar.mockResolvedValue(true);
   logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 });
 
@@ -44,7 +48,7 @@ function axiosNetworkError(): Error {
 }
 
 describe('signOut', () => {
-  it('runs deregister -> logout -> Google sign-out -> clearTokens, sharing one correlation id and a short timeout', async () => {
+  it('runs deregister -> logout -> Google sign-out -> clearTokens -> clearCookieJar, sharing one correlation id and a short timeout', async () => {
     await signOut();
 
     const [deregisterConfig] = mockDeregister.mock.calls[0];
@@ -61,6 +65,7 @@ describe('signOut', () => {
       mockPost.mock.invocationCallOrder[0],
       mockGoogleSignOut.mock.invocationCallOrder[0],
       mockClearTokens.mock.invocationCallOrder[0],
+      mockClearCookieJar.mock.invocationCallOrder[0],
     ];
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
