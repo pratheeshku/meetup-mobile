@@ -21,11 +21,18 @@ import type { UserProfile } from '../types/user';
 /**
  * Shared response shape for the three endpoints that establish a session:
  * `POST /auth/oauth/google/callback`, `POST /auth/login`, and
- * `POST /auth/register` (§7.1) all return fresh tokens plus the
- * signed-in user's profile in one response.
+ * `POST /auth/register` (§7.1) return an access token plus the signed-in
+ * user's profile in one response.
+ *
+ * `refresh_token` is OPTIONAL: the live backend's `TokenResponse` (OpenAPI,
+ * verified 2026-09-20) is `{ access_token, user }` only. The original
+ * assumption that a refresh token is always present made a successful
+ * sign-in fail after the access token was stored. Internal-testing stopgap
+ * (architect-authorised Option A) — the real refresh mechanism is still an
+ * open contract question; see `storage/tokens.ts`.
  */
 export interface AuthResponse {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string;
   user: UserProfile;
 }

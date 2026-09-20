@@ -38,24 +38,42 @@ function logStorageBacking(label: string, storage: Keychain.STORAGE_TYPE | undef
   }
 }
 
-export async function saveTokens(access: string, refresh: string): Promise<void> {
-  const [accessResult, refreshResult] = await Promise.all([
+/**
+ * Persists the session tokens.
+ *
+ * STOPPAGE (internal testing only — architect-authorised Option A): the
+ * backend's `TokenResponse` carries no `refresh_token`, so `refresh` may be
+ * absent (`undefined`, `null` or empty). In that case only the access token is
+ * written and the Keychain refresh entry is left untouched — writing an empty
+ * password is rejected natively, which used to fail an otherwise successful
+ * sign-in after the access token had already been stored.
+ */
+export async function saveTokens(access: string, refresh?: string | null): Promise<void> {
+  const writes: Array<ReturnType<typeof Keychain.setGenericPassword>> = [
     Keychain.setGenericPassword(ACCESS_TOKEN_USERNAME, access, {
       ...KEYCHAIN_OPTIONS,
       service: ACCESS_TOKEN_SERVICE,
     }),
-    Keychain.setGenericPassword(REFRESH_TOKEN_USERNAME, refresh, {
-      ...KEYCHAIN_OPTIONS,
-      service: REFRESH_TOKEN_SERVICE,
-    }),
-  ]);
+  ];
+  if (refresh) {
+    writes.push(
+      Keychain.setGenericPassword(REFRESH_TOKEN_USERNAME, refresh, {
+        ...KEYCHAIN_OPTIONS,
+        service: REFRESH_TOKEN_SERVICE,
+      }),
+    );
+  }
 
-  if (!accessResult || !refreshResult) {
+  const [accessResult, refreshResult] = await Promise.all(writes);
+
+  if (!accessResult || (refresh && !refreshResult)) {
     throw new Error('Failed to persist tokens to secure storage');
   }
 
   logStorageBacking('access token', accessResult.storage);
-  logStorageBacking('refresh token', refreshResult.storage);
+  if (refreshResult) {
+    logStorageBacking('refresh token', refreshResult.storage);
+  }
 }
 
 export async function getAccessToken(): Promise<string | null> {

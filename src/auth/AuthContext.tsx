@@ -35,6 +35,12 @@ import type { UserProfile } from '../types/user';
 interface AuthContextValue {
   user: UserProfile | null;
   isLoading: boolean;
+  /**
+   * True after a signed-in session was ended by `auth-expired` (the API client
+   * could not renew it). The Sign In screen shows `SESSION_EXPIRED_MESSAGE`.
+   * Never set by a failed sign-in attempt or a user-initiated sign-out.
+   */
+  sessionExpired: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   registerWithEmail: (email: string, password: string, nickname: string) => Promise<void>;
@@ -53,6 +59,11 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  // True while a session exists or is being restored. `auth-expired` also
+  // fires for a 401 on a sign-in attempt (wrong password), which is not an
+  // expired session and must not raise the notice.
+  const hadSessionRef = useRef(false);
   const stopPushRegistrationRef = useRef<(() => void) | null>(null);
   const userId = user?.id ?? null;
 
@@ -61,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
 
     const accessToken = await getAccessToken();
     if (accessToken) {
+      hadSessionRef.current = true;
       try {
         const { data } = await apiClient.get<UserProfile>('/users/me');
         setUser(data);
@@ -69,7 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         // error, or a persistent 401 already handled by the client's
         // refresh-and-retry flow (which emits `auth-expired`, handled
         // below). Fail closed either way: no user is set, and the root
-        // navigator falls back to the Auth Stack.
+        // navigator falls back to the Auth Stack. Any `auth-expired` has
+        // already been handled synchronously by the time this runs.
+        hadSessionRef.current = false;
         setUser(null);
       }
     }
@@ -80,6 +94,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     restoreSession();
 
     const unsubscribe = authEvents.on('auth-expired', () => {
+      if (hadSessionRef.current) {
+        hadSessionRef.current = false;
+        setSessionExpired(true);
+      }
       setUser(null);
     });
     return unsubscribe;
@@ -99,32 +117,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     };
   }, [userId]);
 
-  const signInWithGoogle = useCallback(async () => {
-    const profile = await googleSignIn();
+  // Common tail of every successful sign-in: a session now exists.
+  const establishSession = useCallback((profile: UserProfile) => {
+    hadSessionRef.current = true;
+    setSessionExpired(false);
     setUser(profile);
   }, []);
 
-  const signInWithEmail = useCallback(async (email: string, password: string) => {
-    const profile = await emailLogin(email, password);
-    setUser(profile);
-  }, []);
+  const signInWithGoogle = useCallback(async () => {
+    setSessionExpired(false);
+    establishSession(await googleSignIn());
+  }, [establishSession]);
+
+  const signInWithEmail = useCallback(
+    async (email: string, password: string) => {
+      setSessionExpired(false);
+      establishSession(await emailLogin(email, password));
+    },
+    [establishSession],
+  );
 
   const registerWithEmail = useCallback(
     async (email: string, password: string, nickname: string) => {
-      const profile = await emailRegister(email, password, nickname);
-      setUser(profile);
+      setSessionExpired(false);
+      establishSession(await emailRegister(email, password, nickname));
     },
-    [],
+    [establishSession],
   );
 
   const signOut = useCallback(async () => {
     // Stop first: a foreground event between the token de-registration and
     // the user clearing must not re-register this device.
     stopPushRegistrationRef.current?.();
+    // A user-initiated sign-out is not an expiry, even if the best-effort
+    // `POST /auth/logout` hits a 401 and the client emits `auth-expired`.
+    hadSessionRef.current = false;
     try {
       await sharedSignOut();
     } finally {
       // Local state always clears, even if a local step of sign-out failed.
+      setSessionExpired(false);
       setUser(null);
     }
   }, []);
@@ -137,13 +169,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     () => ({
       user,
       isLoading,
+      sessionExpired,
       signInWithGoogle,
       signInWithEmail,
       registerWithEmail,
       signOut,
       updateUser,
     }),
-    [user, isLoading, signInWithGoogle, signInWithEmail, registerWithEmail, signOut, updateUser],
+    [
+      user,
+      isLoading,
+      sessionExpired,
+      signInWithGoogle,
+      signInWithEmail,
+      registerWithEmail,
+      signOut,
+      updateUser,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

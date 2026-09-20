@@ -12,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
 import { GoogleSignInCancelledError } from '../auth/googleAuth';
+import { SESSION_EXPIRED_MESSAGE } from '../auth/messages';
 import Button from '../components/Button';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
@@ -21,7 +22,7 @@ import type { AuthStackParamList } from '../navigation/types';
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props): React.JSX.Element {
-  const { signInWithGoogle, signInWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, sessionExpired } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -65,6 +66,8 @@ export default function LoginScreen({ navigation }: Props): React.JSX.Element {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Sign In</Text>
+
+      {sessionExpired ? <Text style={styles.notice}>{SESSION_EXPIRED_MESSAGE}</Text> : null}
 
       <GoogleSigninButton
         size={GoogleSigninButton.Size.Wide}
@@ -117,6 +120,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
   title: {
     ...typography.h1,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  notice: {
+    ...typography.body,
     color: colors.textPrimary,
     marginBottom: spacing.lg,
     textAlign: 'center',
