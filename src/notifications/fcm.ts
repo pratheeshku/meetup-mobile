@@ -34,6 +34,10 @@ import {
 
 import { apiClient } from '../api/client';
 import { showBanner } from './notificationBannerStore';
+import {
+  displayParticipantNotification,
+  isParticipantNotificationType,
+} from './participantHandler';
 import { NOTIFICATION_TYPES } from '../types/notification';
 import type { NotificationType, PushNotificationPayload } from '../types/notification';
 
@@ -191,11 +195,31 @@ function extractPushPayload(remoteMessage: RemoteMessage): PushNotificationPaylo
 }
 
 /**
+ * Narrows an FCM `data` map (values typed `string | object`) to the
+ * `Record<string, string>` `displayParticipantNotification` takes. FCM data
+ * payload values are always strings on the wire; anything else is dropped.
+ */
+function toStringRecord(data: RemoteMessage['data']): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data ?? {})) {
+    if (typeof value === 'string') {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/**
  * Foreground message handler (§3.6, §4.8; R-073). Shows the in-app
  * `NotificationBanner` (`notificationBannerStore.ts`) instead of an OS
  * notification, per the task brief's Step 3 ("do not use OS notification
  * for foreground") — this is the deviation from §3.6's `notifee` decision
  * recorded in `notificationBannerStore.ts`'s file header.
+ *
+ * Exception: `event_participant_added` / `event_participant_removed` are
+ * delivered data-only and rendered as a local notification with View/OK
+ * action buttons (`participantHandler.ts`); they return early and never
+ * reach `showBanner`.
  *
  * Logs only the message id and notification type (a fixed backend enum
  * value, not user content) — never title/body/entity id (R-111, task
@@ -208,6 +232,15 @@ export function onMessage(): () => void {
       notificationType: remoteMessage.data?.notification_type,
     });
 
+    if (isParticipantNotificationType(remoteMessage.data?.notification_type)) {
+      displayParticipantNotification(toStringRecord(remoteMessage.data)).catch(() => {
+        // Display failure (e.g. notification permission revoked) must not
+        // surface as an unhandled rejection; nothing user-actionable here.
+        console.log('[fcm] participant notification display failed');
+      });
+      return;
+    }
+
     const payload = extractPushPayload(remoteMessage);
     if (payload) {
       showBanner(payload);
@@ -219,26 +252,39 @@ export function onMessage(): () => void {
  * Registers the FCM background message handler (§3.6 "Background/killed
  * -state messages via FCM's native background handler").
  *
- * Deliberately a no-op body: this app's push messages always carry a
- * `notification` block (server-controlled), which Android's FCM SDK
- * displays in the system tray automatically while the app is
- * backgrounded or killed — no client code is needed to *display* it.
+ * Most of this app's push messages carry a `notification` block
+ * (server-controlled), which Android's FCM SDK displays in the system tray
+ * automatically while the app is backgrounded or killed — no client code is
+ * needed to *display* those, so the handler does nothing for them.
  * Registering the handler is still required by the Firebase Android SDK
  * (an unregistered handler logs a native warning and, on some OEM
  * skins, can prevent the message from being delivered at all while the
  * app process is not running); routing on tap is handled separately by
  * `onNotificationOpenedApp`/`getInitialNotification` below, not by this
- * handler. Must be called once at module/app init time — it is called at
- * top level in `index.js`, outside any React lifecycle, before any message
- * can arrive.
+ * handler.
+ *
+ * Exception: `event_participant_added` / `event_participant_removed` are
+ * data-only (the server suppresses their `notification` block), so nothing
+ * displays them unless this handler does — it builds the local notification
+ * with View/OK actions via `participantHandler.ts`.
+ *
+ * Must be called once at module/app init time — it is called at top level in
+ * `index.js`, outside any React lifecycle, before any message can arrive.
  *
  * Never logs message content (R-111) — intentionally logs nothing at all,
  * since a background-process log has no dev-visible console to read
  * anyway.
  */
 export function registerBackgroundMessageHandler(): void {
-  setFcmBackgroundMessageHandler(messaging, async () => {
-    // Intentionally empty — see file comment above.
+  setFcmBackgroundMessageHandler(messaging, async remoteMessage => {
+    if (isParticipantNotificationType(remoteMessage.data?.notification_type)) {
+      try {
+        await displayParticipantNotification(toStringRecord(remoteMessage.data));
+      } catch {
+        // Best-effort: a display failure in a headless task has nowhere
+        // useful to surface, and must not reject the FCM handler.
+      }
+    }
   });
 }
 

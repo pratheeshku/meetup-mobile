@@ -76,3 +76,25 @@ jest.mock('@react-native-firebase/messaging', () => ({
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest'),
 );
+
+// react-native-notify-kit (drop-in for the archived @notifee/react-native)
+// wraps a native module with no Jest-environment equivalent, and is pulled
+// into the tree via src/notifications/fcm.ts → participantHandler.ts. Its own
+// shipped `jest-mock.js` is ESM source under node_modules, so an explicit
+// mock is used instead of widening transformIgnorePatterns. Enum values match
+// the library's real ones (EventType: DISMISSED=0, PRESS=1, ACTION_PRESS=2;
+// AndroidImportance.HIGH=4) so tests can't pass on a wrong constant. Add to
+// this mock — not a new ad hoc one per test file — if new APIs are used.
+jest.mock('react-native-notify-kit', () => ({
+  __esModule: true,
+  default: {
+    createChannel: jest.fn(async () => 'plan'),
+    displayNotification: jest.fn(async () => 'mock-notification-id'),
+    cancelNotification: jest.fn(async () => undefined),
+    getInitialNotification: jest.fn(async () => null),
+    onBackgroundEvent: jest.fn(),
+    onForegroundEvent: jest.fn(() => () => {}),
+  },
+  EventType: { DISMISSED: 0, PRESS: 1, ACTION_PRESS: 2, DELIVERED: 3 },
+  AndroidImportance: { DEFAULT: 3, HIGH: 4 },
+}));

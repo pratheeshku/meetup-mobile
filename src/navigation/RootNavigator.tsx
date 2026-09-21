@@ -35,6 +35,13 @@
  * - Background (app alive, not foregrounded): `onNotificationOpenedApp`.
  * - Quit state (app launched by the tap): `getInitialNotification`, a
  *   one-shot check run once navigation is ready and a session exists.
+ * - `event_participant_added`/`_removed` are the exception: they arrive
+ *   data-only and are built locally by notify-kit (`participantHandler.ts`),
+ *   so FCM never sees their taps. Their View button / body tap is routed by
+ *   `registerParticipantForegroundHandler` (app active), the top-level
+ *   background handler in `index.js` (app backgrounded), and
+ *   `getInitialParticipantNotification` (quit state, folded into the same
+ *   one-shot check above).
  *
  * Deviation (recorded for the Implementation Report, needs architect
  * ratification): the task brief's Step 4 says to implement background/
@@ -82,6 +89,10 @@ import {
   onMessage,
   onNotificationOpenedApp,
 } from '../notifications/fcm';
+import {
+  getInitialParticipantNotification,
+  registerParticipantForegroundHandler,
+} from '../notifications/participantHandler';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -276,7 +287,11 @@ export default function RootNavigator(): React.JSX.Element {
     }
     hasCheckedInitialNotification.current = true;
 
-    const payload = await getInitialNotification();
+    // FCM covers taps on OS-displayed notifications; participant
+    // notifications are built locally by notify-kit (data-only FCM), so a
+    // quit-state launch from one of them is only visible to notify-kit.
+    const payload =
+      (await getInitialNotification()) ?? (await getInitialParticipantNotification());
     // Known limitation (consistent with §3.9's own "unauthenticated deep
     // links" note, which this codebase hasn't built the
     // `pendingDestination` mechanism for either): a quit-state tap that
@@ -303,9 +318,15 @@ export default function RootNavigator(): React.JSX.Element {
       );
     });
 
+    // Participant notification View/OK presses while the app is active
+    // (background/quit presses are handled by the top-level handler in
+    // `index.js`).
+    const unsubscribeParticipantEvents = registerParticipantForegroundHandler();
+
     return () => {
       unsubscribeMessage();
       unsubscribeOpenedApp();
+      unsubscribeParticipantEvents();
     };
   }, []);
 
