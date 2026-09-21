@@ -107,6 +107,7 @@ import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 import CreateTournamentScreen from '../screens/CreateTournamentScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
+import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
 import NotificationBanner from '../components/NotificationBanner';
 
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
@@ -181,6 +182,11 @@ function HomeStack(): React.JSX.Element {
         name="CreateGame"
         component={CreateGameScreen}
         options={{ title: 'Create Game' }}
+      />
+      <HomeStackNav.Screen
+        name="NotificationHistory"
+        component={NotificationHistoryScreen}
+        options={{ title: 'Notifications' }}
       />
     </HomeStackNav.Navigator>
   );

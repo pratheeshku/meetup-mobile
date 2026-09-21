@@ -17,6 +17,7 @@ import * as firebaseMessaging from '@react-native-firebase/messaging';
 import { onMessage } from '../fcm';
 import { PLAN_CHANNEL_ID } from '../channels';
 import { dismissBanner, getBannerState } from '../notificationBannerStore';
+import { getUnreadBadgeCount, setUnreadBadgeCount } from '../unreadCountStore';
 
 jest.mock('../../api/client', () => ({ apiClient: { post: jest.fn(), delete: jest.fn() } }));
 
@@ -28,6 +29,7 @@ let deliver: Handler;
 
 beforeEach(() => {
   mockDisplayNotification.mockClear();
+  setUnreadBadgeCount(0);
   jest.spyOn(console, 'log').mockImplementation(() => {});
   mockOnMessage.mockImplementation((_messaging: unknown, cb: Handler) => {
     deliver = cb;
@@ -135,4 +137,27 @@ it('still drops a type the app does not know (unchanged behaviour)', () => {
 
   expect(getBannerState()).toBeNull();
   expect(mockDisplayNotification).not.toHaveBeenCalled();
+});
+
+describe('unread badge count', () => {
+  it('increments by 1 for a banner-type message', () => {
+    deliver({
+      messageId: 'm1',
+      data: { notification_type: 'event_changed', entity_id: 'e1', title: 't', body: 'b' },
+    });
+    expect(getUnreadBadgeCount()).toBe(1);
+  });
+
+  it('increments by 1 for a participant (data-only) message too', () => {
+    deliver({
+      messageId: 'm2',
+      data: { notification_type: 'event_participant_added', entity_id: 'e1', title: 't', body: 'b' },
+    });
+    expect(getUnreadBadgeCount()).toBe(1);
+  });
+
+  it('does not increment for a message with no notification_type', () => {
+    deliver({ messageId: 'm3', data: { something: 'else' } });
+    expect(getUnreadBadgeCount()).toBe(0);
+  });
 });

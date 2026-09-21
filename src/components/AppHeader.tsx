@@ -3,12 +3,8 @@
  * the right (matching the live web app's header).
  *
  * Visual layer only — the caller owns navigation (`onNotificationsPress`)
- * and the unread count. There is no notifications-list screen or
- * unread-count API/state in this codebase yet (DES-MEETUP-MOBILE.md §4.8
- * lists only Notification Permission rationale + Notification
- * Preferences), so callers pass no `unreadCount` today and the badge stays
- * hidden; nothing here fabricates a count. The badge renders only for a
- * count > 0 and caps its label at "99+".
+ * and the unread count (`HomeHeader` supplies both). The badge renders only
+ * for a count > 0 and caps its label at "99+".
  *
  * Rendered as a custom native-stack header, where the status-bar inset is
  * not applied for us (Android edge-to-edge), so the top inset is added here

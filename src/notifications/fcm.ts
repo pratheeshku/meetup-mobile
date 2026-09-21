@@ -34,6 +34,7 @@ import {
 
 import { apiClient } from '../api/client';
 import { showBanner } from './notificationBannerStore';
+import { incrementUnreadBadgeCount } from './unreadCountStore';
 import {
   displayParticipantNotification,
   isParticipantNotificationType,
@@ -231,6 +232,13 @@ export function onMessage(): () => void {
       messageId: remoteMessage.messageId,
       notificationType: remoteMessage.data?.notification_type,
     });
+
+    // Bell badge (Home header): every foreground push carrying a
+    // notification type is a new stored notification the server counts as
+    // unread. The header re-syncs with the server on focus.
+    if (typeof remoteMessage.data?.notification_type === 'string') {
+      incrementUnreadBadgeCount();
+    }
 
     if (isParticipantNotificationType(remoteMessage.data?.notification_type)) {
       displayParticipantNotification(toStringRecord(remoteMessage.data)).catch(() => {

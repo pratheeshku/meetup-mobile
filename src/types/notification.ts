@@ -78,3 +78,34 @@ export interface PushNotificationPayload {
   title: string;
   body: string;
 }
+
+/**
+ * One stored notification (`GET /notifications/history` item). Shape taken
+ * from the live OpenAPI `NotificationHistoryItem` (verified 2026-09-22), which
+ * differs from the original brief in two ways that matter at runtime:
+ * `notification_type` is a plain string (the backend may send a type this app
+ * build does not know, so callers must guard before routing), and `title`,
+ * `body`, `entity_id` and `entity_type` are all nullable.
+ */
+export interface NotificationHistoryItem {
+  id: string;
+  notification_type: string;
+  title: string | null;
+  body: string | null;
+  entity_id: string | null;
+  entity_type: string | null;
+  /** ISO 8601 date-time. */
+  created_at: string;
+  /** ISO 8601 date-time; `null` while unread. */
+  read_at: string | null;
+}
+
+/**
+ * `GET /notifications/history` response (`NotificationHistoryResponse`).
+ * `next_cursor` is the `created_at` of the last item of this page — pass it
+ * back as `cursor` for the next page; null/absent means no more pages.
+ */
+export interface NotificationHistoryPage {
+  items: NotificationHistoryItem[];
+  next_cursor?: string | null;
+}

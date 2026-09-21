@@ -11,6 +11,7 @@
  */
 import { apiClient } from './client';
 import type {
+  NotificationHistoryPage,
   NotificationPreference,
   NotificationType,
 } from '../types/notification';
@@ -62,4 +63,35 @@ export async function updatePreference(
     { enabled },
     { correlationId: options?.correlationId },
   );
+}
+
+/**
+ * `GET /notifications/history` — verified against the live OpenAPI schema
+ * (2026-09-22): optional `cursor` query param (a date-time, the previous
+ * page's `next_cursor`), returns `NotificationHistoryResponse`.
+ */
+export async function getNotificationHistory(
+  cursor?: string,
+): Promise<NotificationHistoryPage> {
+  const { data } = await apiClient.get<NotificationHistoryPage>(
+    '/notifications/history',
+    { params: cursor ? { cursor } : undefined },
+  );
+  return data;
+}
+
+/**
+ * `POST /notifications/{notification_id}/read` — live OpenAPI: `notification_id`
+ * is a uuid path param, no body, `204` on success.
+ */
+export async function markNotificationRead(id: string): Promise<void> {
+  await apiClient.post(`/notifications/${encodeURIComponent(id)}/read`);
+}
+
+/** `GET /notifications/unread-count` — live OpenAPI `UnreadCountResponse`. */
+export async function getUnreadCount(): Promise<{ count: number }> {
+  const { data } = await apiClient.get<{ count: number }>(
+    '/notifications/unread-count',
+  );
+  return data;
 }
