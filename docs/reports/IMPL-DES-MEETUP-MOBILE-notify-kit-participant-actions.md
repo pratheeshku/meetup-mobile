@@ -98,3 +98,25 @@ index.js:25:registerParticipantBackgroundHandler();
 8. Design §3.6 says foreground uses notifee; all *other* types still use the in-app banner (existing, previously recorded deviation) — architect ratification pending.
 9. `jest.setup.js` ESLint `no-undef` errors (pre-existing) — needs a jest env override for that file.
 10. Working tree carried an uncommitted `package.json`/`package-lock.json` (notify-kit add) from before this session; committed here as Step 1.
+
+## 7. Addendum — second pass (pre-install fixes), 2026-09-21
+
+User-requested fixes; gaps 3 and 4 above are now closed, gap 9 is narrowed.
+
+| Fix | Change | Where |
+|---|---|---|
+| 1 BigText | `android.style = { type: AndroidStyle.BIGTEXT, text: data.body }`, added **only when `body` is a non-empty string** | `participantHandler.ts` (display) |
+| 2 Cancel on View | After routing, `notifee.cancelNotification(detail.notification.id)` on a View **button** press (`ACTION_PRESS`). Implemented in the shared `handleParticipantNotificationEvent`, which both `registerParticipantBackgroundHandler` and `registerParticipantForegroundHandler` register, so it applies in every app state. A body tap is unchanged (auto-cancel). | `participantHandler.ts` (event handler) |
+| 3 ESLint | 7 new `no-undef` errors removed with a `/* eslint-disable no-undef */ … /* eslint-enable no-undef */` pair scoped to the notify-kit mock (lines 92–107). The 24 pre-existing errors (lines 5–76) are untouched. | `jest.setup.js` |
+| 4 Nav helper | Confirmed identical to `event_changed` routing; no change | — |
+
+Proposed Assumptions (second pass):
+10. **BigText is conditional.** notify-kit's `validateAndroidBigTextStyle` throws on empty/undefined `text`, which would reject `displayNotification` and suppress the whole notification. The brief's unconditional `text: data.body` would have turned a malformed/empty-body payload from "shows title only" into "shows nothing".
+11. **Cancel lives in the shared handler**, not in `registerParticipantBackgroundHandler` itself (which only registers the handler), so the foreground listener behaves the same way.
+12. **Scoped lint suppression** rather than a jest env for the file, because the brief said not to touch the pre-existing errors. The brief said 14 pre-existing; measured 24 at `c82e3df~1` (before the mock), 31 after it.
+
+Test change (spec-mandated): the earlier View test asserted `cancelNotification` was *not* called; Fix 2 reverses that, so it now asserts the cancel (and ordering: navigate, then cancel). New tests cover BigText present/omitted, cancel without an id, and body-tap not cancelling.
+
+Verification: `npx jest` → 58 suites / 615 tests passed; `npx tsc --noEmit` exit 0; `npx eslint . --ext .ts,.tsx` exit 0; `npx eslint jest.setup.js` exit 1 with 24 errors, all pre-existing, none inside the new block.
+
+Open device checks: (a) killed-state View now cancels the notification before the app finishes launching — confirm `getInitialNotification()` still returns the press (it reads the launch intent, so it should); (b) confirm BigText renders `\n` line breaks when expanded.

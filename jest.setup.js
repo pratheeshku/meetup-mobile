@@ -85,6 +85,11 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 // the library's real ones (EventType: DISMISSED=0, PRESS=1, ACTION_PRESS=2;
 // AndroidImportance.HIGH=4) so tests can't pass on a wrong constant. Add to
 // this mock — not a new ad hoc one per test file — if new APIs are used.
+//
+// `no-undef` is disabled for this block only: ESLint has no jest env for this
+// file, so every `jest.` reference is flagged. Scoped (not `eslint-env jest`)
+// so the file's older `jest.` references are deliberately left as they were.
+/* eslint-disable no-undef */
 jest.mock('react-native-notify-kit', () => ({
   __esModule: true,
   default: {
@@ -97,4 +102,6 @@ jest.mock('react-native-notify-kit', () => ({
   },
   EventType: { DISMISSED: 0, PRESS: 1, ACTION_PRESS: 2, DELIVERED: 3 },
   AndroidImportance: { DEFAULT: 3, HIGH: 4 },
+  AndroidStyle: { BIGPICTURE: 0, BIGTEXT: 1, INBOX: 2, MESSAGING: 3 },
 }));
+/* eslint-enable no-undef */

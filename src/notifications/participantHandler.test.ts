@@ -8,7 +8,7 @@
  * `EventType.ACTION_PRESS` — not `PRESS` — and View needs an explicit
  * `launchActivity` to open the app.
  */
-import notifee, { EventType } from 'react-native-notify-kit';
+import notifee, { AndroidStyle, EventType } from 'react-native-notify-kit';
 import type { Event } from 'react-native-notify-kit';
 
 import { PLAN_CHANNEL_ID } from './channels';
@@ -91,6 +91,30 @@ describe('displayParticipantNotification', () => {
     expect(mockDisplayNotification.mock.calls[0][0].data).toEqual(PARTICIPANT_DATA);
   });
 
+  it('uses BigText style with the full body so a multi-line body is shown when expanded', async () => {
+    await displayParticipantNotification(PARTICIPANT_DATA);
+
+    expect(mockDisplayNotification.mock.calls[0][0].android.style).toEqual({
+      type: AndroidStyle.BIGTEXT,
+      text: PARTICIPANT_DATA.body,
+    });
+    expect(AndroidStyle.BIGTEXT).toBe(1);
+  });
+
+  it.each([
+    ['empty', { ...PARTICIPANT_DATA, body: '' }],
+    ['missing', { notification_type: 'event_participant_added', entity_id: 'evt-42', title: 't' }],
+  ])(
+    'omits the style (rather than passing empty text, which notify-kit rejects) when body is %s',
+    async (_label, data) => {
+      await displayParticipantNotification(data);
+
+      expect(mockDisplayNotification).toHaveBeenCalledTimes(1);
+      expect(mockDisplayNotification.mock.calls[0][0].android).not.toHaveProperty('style');
+      expect(mockDisplayNotification.mock.calls[0][0].android.channelId).toBe(PLAN_CHANNEL_ID);
+    },
+  );
+
   it('makes View launch the app (launchActivity) but OK not — OK must never open the app', async () => {
     await displayParticipantNotification(PARTICIPANT_DATA);
 
@@ -118,6 +142,36 @@ describe('registerParticipantBackgroundHandler', () => {
       screen: 'EventDetail',
       params: { eventId: 'evt-42' },
     });
+  });
+
+  it('also clears the tray entry on a View press: navigates first, then cancels by notification id', async () => {
+    const handler = registerAndGetHandler();
+    const order: string[] = [];
+    navigateSpy.mockImplementation(() => {
+      order.push('navigate');
+    });
+    mockCancelNotification.mockImplementationOnce(async () => {
+      order.push('cancel');
+    });
+
+    await handler(makeEvent(EventType.ACTION_PRESS, 'view'));
+
+    expect(mockCancelNotification).toHaveBeenCalledTimes(1);
+    expect(mockCancelNotification).toHaveBeenCalledWith('notif-1');
+    expect(order).toEqual(['navigate', 'cancel']);
+  });
+
+  it('does not throw on a View press when the notification has no id (nothing to cancel)', async () => {
+    const handler = registerAndGetHandler();
+
+    await expect(
+      handler({
+        type: EventType.ACTION_PRESS,
+        detail: { pressAction: { id: 'view' }, notification: { data: PARTICIPANT_DATA } },
+      } as Event),
+    ).resolves.toBeUndefined();
+
+    expect(navigateSpy).toHaveBeenCalledTimes(1);
     expect(mockCancelNotification).not.toHaveBeenCalled();
   });
 
@@ -146,6 +200,9 @@ describe('registerParticipantBackgroundHandler', () => {
       screen: 'EventDetail',
       params: { eventId: 'evt-42' },
     });
+    // Body tap is left to the notification's own auto-cancel; only the View
+    // button cancels explicitly.
+    expect(mockCancelNotification).not.toHaveBeenCalled();
   });
 
   it('cancels the notification on an OK press and makes no navigation (negative)', async () => {

@@ -30,7 +30,7 @@
  *
  * Never logs notification title/body/entity id (R-111).
  */
-import notifee, { EventType } from 'react-native-notify-kit';
+import notifee, { AndroidStyle, EventType } from 'react-native-notify-kit';
 import type { Event, Notification } from 'react-native-notify-kit';
 
 import { PLAN_CHANNEL_ID } from './channels';
@@ -78,6 +78,11 @@ export async function displayParticipantNotification(
     data,
     android: {
       channelId: PLAN_CHANNEL_ID,
+      // BigText so a multi-line body (`\n`) is shown in full when expanded.
+      // notify-kit's validator throws on empty/undefined `text`, which would
+      // suppress the whole notification, so the style is only set when the
+      // body is a non-empty string.
+      ...(data.body ? { style: { type: AndroidStyle.BIGTEXT, text: data.body } } : {}),
       pressAction: { id: DEFAULT_PRESS_ID },
       actions: [
         // launchActivity: see file header — required for View to open the app.
@@ -117,6 +122,7 @@ function toParticipantPayload(
  *   the event. If the navigation container is not ready (headless/quit
  *   state) `navigateToNotificationTarget` drops the call by design; the
  *   quit-state launch is picked up by `getInitialParticipantNotification`.
+ *   The View button additionally cancels the notification (after routing).
  * - OK button (`ACTION_PRESS`, id `ok`) or `DISMISSED`: cancel the
  *   notification. No API call.
  */
@@ -132,6 +138,12 @@ export async function handleParticipantNotificationEvent({ type, detail }: Event
       navigateToNotificationTarget(
         resolveNotificationTarget(payload.notification_type, payload.entity_id),
       );
+    }
+    // The View button opens the event AND clears its tray entry (an action
+    // button does not auto-cancel). A body tap (`PRESS`) is left to the
+    // notification's own auto-cancel.
+    if (type === EventType.ACTION_PRESS && detail.notification?.id) {
+      await notifee.cancelNotification(detail.notification.id);
     }
     return;
   }
