@@ -1,5 +1,10 @@
 /**
- * Create menu opened by the center "+" button: Game / Group / Tournament.
+ * Create menu opened by the center "+" button: Game / Group.
+ *
+ * Create Flow Amendment (DES-MEETUP-MOBILE.md §4.3, architect-approved
+ * 2026-09-22): "Create Tournament" removed as a separate entry —
+ * tournament creation moved into the Create Game screen's Casual/
+ * Tournament toggle (`CreateGameScreen.tsx`).
  *
  * Presentational only (core `Modal` + `View`, no dependency): the caller owns
  * `visible` and what each choice does. Dismissing — backdrop tap, the Close
@@ -16,12 +21,11 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Button from '../components/Button';
 import { colors, opacity, radius, shadows, sizes, spacing, typography } from '../theme/tokens';
 
-export type CreateTarget = 'game' | 'group' | 'tournament';
+export type CreateTarget = 'game' | 'group';
 
 export const CREATE_MENU_ITEMS: ReadonlyArray<{ target: CreateTarget; emoji: string; label: string }> = [
   { target: 'game', emoji: '🎮', label: 'Create Game' },
   { target: 'group', emoji: '👥', label: 'Create Group' },
-  { target: 'tournament', emoji: '🏆', label: 'Create Tournament' },
 ];
 
 interface CreateMenuProps {

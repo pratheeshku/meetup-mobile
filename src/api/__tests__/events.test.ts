@@ -7,7 +7,7 @@
  * `HomeScreen`'s `events.length` never sees `undefined`.
  */
 import { apiClient } from '../client';
-import { getEvents, rsvpEvent, withdrawEvent } from '../events';
+import { createEvent, getEvents, rsvpEvent, withdrawEvent } from '../events';
 
 jest.mock('../client', () => ({
   apiClient: { get: jest.fn(), post: jest.fn() },
@@ -125,5 +125,64 @@ describe('rsvpEvent / withdrawEvent (single POST /events/{id}/rsvp endpoint)', (
       { correlationId: 'cid-2' },
     );
     expect(mockedPost.mock.calls[0][0]).not.toContain('/withdraw');
+  });
+});
+
+describe('createEvent (Create Flow Amendment, §4.3 — POST /events, EventCreate)', () => {
+  afterEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('POSTs the EventCreate body to /events with the correlation id and maps the response', async () => {
+    mockedPost.mockResolvedValueOnce({
+      data: {
+        id: 'evt-new',
+        organizer_id: 'org-1',
+        sport: 'football',
+        title: 'Friday Futsal',
+        description: null,
+        visibility: 'public',
+        capacity: 10,
+        starts_at: '2026-10-01T18:30:00Z',
+        ends_at: null,
+        estimated_cost_cents: null,
+        recurrence_rule_id: null,
+        status: 'upcoming',
+        venue_name: null,
+        venue_address: null,
+        organizer_nickname: null,
+        organizer_display_name: null,
+        going_count: 0,
+        user_rsvp_status: null,
+      },
+    });
+
+    const input = {
+      title: 'Friday Futsal',
+      visibility: 'public' as const,
+      skill_level_requirement: 'all_levels' as const,
+      capacity: 10,
+      starts_at: '2026-10-01T18:30:00.000Z',
+      ends_at: null,
+    };
+
+    const created = await createEvent(input, { correlationId: 'cid-3' });
+
+    expect(mockedPost).toHaveBeenCalledWith('/events', input, { correlationId: 'cid-3' });
+    expect(created).toMatchObject({ id: 'evt-new', title: 'Friday Futsal', visibility: 'public' });
+  });
+
+  it('propagates a failed request to the caller', async () => {
+    mockedPost.mockRejectedValueOnce(new Error('boom'));
+    await expect(
+      createEvent({
+        title: 'Futsal',
+        visibility: 'invite_only',
+        skill_level_requirement: 'beginner',
+        capacity: 10,
+        starts_at: '2026-10-01T18:30:00.000Z',
+        ends_at: null,
+      }),
+    ).rejects.toThrow('boom');
   });
 });

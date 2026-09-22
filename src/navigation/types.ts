@@ -8,11 +8,18 @@ export type AuthStackParamList = {
 
 /**
  * Home tab's nested stack route params (§4.3 — Events feed, Event Detail,
- * Create Game, Notification History — the bell's destination). `CreateGame` is a placeholder until real event creation
- * (§4.3 "Create/Edit Event") is built.
+ * Create Game, Notification History — the bell's destination).
+ *
+ * `CreateGame` (Create Flow Amendment, §4.3, architect-approved
+ * 2026-09-22): a single merged screen with a Casual Game/Tournament
+ * toggle — replaces the former placeholder and, for the Tournament side,
+ * `CreateTournamentScreen`/`TournamentsStackParamList.CreateTournament`
+ * (retired). `EventsList`'s `refreshKey` works as on Groups/Tournaments:
+ * set by a successful Casual Game create (via `popTo`) so the list
+ * re-fetches.
  */
 export type HomeStackParamList = {
-  EventsList: undefined;
+  EventsList: { refreshKey?: number } | undefined;
   EventDetail: { eventId: string };
   CreateGame: undefined;
   NotificationHistory: undefined;
@@ -31,12 +38,18 @@ export type GroupsStackParamList = {
 
 /**
  * Tournaments tab's nested stack route params (§4.5 — Tournaments list,
- * Tournament Detail, Create Tournament). `refreshKey` works as on Groups.
+ * Tournament Detail). `refreshKey` works as on Groups.
+ *
+ * `CreateTournament` removed (Create Flow Amendment, §4.3/§4.5,
+ * architect-approved 2026-09-22): tournament creation moved into the
+ * Home tab's merged `CreateGame` screen (Tournament toggle). A
+ * successful Tournament create still lands here via `refreshKey`
+ * (navigated cross-tab, since creation no longer happens inside this
+ * stack).
  */
 export type TournamentsStackParamList = {
   TournamentsList: { refreshKey?: number } | undefined;
   TournamentDetail: { tournamentId: string };
-  CreateTournament: undefined;
 };
 
 /**

@@ -111,7 +111,7 @@ describe('EventCard', () => {
 
   it('labels each visibility as a category pill', () => {
     expect(texts(render({ visibility: 'group' })).map(textOf)).toContain('Group');
-    expect(texts(render({ visibility: 'invite' })).map(textOf)).toContain('Invite');
+    expect(texts(render({ visibility: 'invite_only' })).map(textOf)).toContain('Private');
   });
 
   describe('RSVP pill', () => {

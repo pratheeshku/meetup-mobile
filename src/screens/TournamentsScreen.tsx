@@ -1,7 +1,7 @@
 /**
  * Tournaments list (DES-MEETUP-MOBILE.md §4.5, §7.7; R-041).
  */
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -11,7 +11,6 @@ import type { BadgeVariant } from '../components/Badge';
 import Card from '../components/Card';
 import EmptyState from '../components/EmptyState';
 import ErrorView from '../components/ErrorView';
-import { headerAddButton } from '../components/HeaderAddButton';
 import LoadingView from '../components/LoadingView';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentRegistrationStatus } from '../types/tournament';
@@ -68,20 +67,12 @@ export default function TournamentsScreen({ navigation, route }: Props): React.J
     }
   }, [refreshKey, loadTournaments]);
 
-  // Direct create entry point in this tab's own header. Set here (not in
-  // the navigator) so it shows in the loading and error states too.
-  //
-  // `headerRight` must NOT call hooks: React Navigation invokes it as a plain
-  // function inside its own header-config hook (not as a component), and it
-  // only appears after this layout effect runs — so a hook here (e.g.
-  // `useNavigation`) is an extra hook on the second render and triggers
-  // "change in the order of Hooks called by SceneView". It closes over the
-  // `navigation` prop instead.
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: headerAddButton('Create Tournament', () => navigation.navigate('CreateTournament')),
-    });
-  }, [navigation]);
+  // Direct create entry point removed (Create Flow Amendment, §4.3/§4.5,
+  // architect-approved 2026-09-22): tournament creation moved into the
+  // Home tab's merged Create Game screen (Tournament toggle) — this
+  // tab's own header no longer has a "+" of its own. This screen still
+  // re-fetches via `refreshKey` when a tournament is created there (see
+  // the effect above).
 
   if (isLoading) {
     return <LoadingView />;

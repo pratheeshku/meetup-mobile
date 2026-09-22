@@ -163,7 +163,7 @@ describe('getRecommendedGames', () => {
     const events = [
       makeEvent({ id: 'p2', visibility: 'public' }),
       makeEvent({ id: 'group', visibility: 'group' }),
-      makeEvent({ id: 'invite', visibility: 'invite' }),
+      makeEvent({ id: 'invite', visibility: 'invite_only' }),
       makeEvent({ id: 'going', current_user_rsvp_status: 'going' }),
       makeEvent({ id: 'wait', current_user_rsvp_status: 'waitlisted' }),
       makeEvent({ id: 'p1', visibility: 'public' }),

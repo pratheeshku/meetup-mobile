@@ -160,6 +160,7 @@ describe('createTournament', () => {
     const input = {
       title: 'Summer Cup',
       sport: 'football',
+      visibility: 'public' as const,
       participation_mode: 'individual' as const,
       format: 'knockout' as const,
       capacity: 8,
@@ -178,6 +179,7 @@ describe('createTournament', () => {
     const created = await createTournament({
       title: 'Summer Cup',
       sport: 'football',
+      visibility: 'public',
       participation_mode: 'team',
       format: 'knockout',
       capacity: 8,
@@ -193,6 +195,7 @@ describe('createTournament', () => {
       createTournament({
         title: 'T',
         sport: 'football',
+        visibility: 'public',
         participation_mode: 'team',
         format: 'knockout',
         capacity: 8,

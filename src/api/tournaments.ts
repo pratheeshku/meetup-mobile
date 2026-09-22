@@ -195,10 +195,11 @@ export async function cancelTournament(id: string, options?: RequestOptions): Pr
 }
 
 /**
- * `POST /tournaments` (DES §4.5, §7.7; R-040). Body is a subset of the live
- * `TournamentCreate` schema (see `CreateTournamentInput`). Optional
- * `registration_closes_at` is omitted when absent so the server default
- * (null) applies.
+ * `POST /tournaments` (DES §4.3 Create Flow Amendment, §4.5, §7.7; R-040).
+ * Body is a subset of the live `TournamentCreate` schema, extended by the
+ * amendment to include `visibility`/`group_id`/`description`/`venue_name`
+ * (see `CreateTournamentInput`). Optional fields are omitted by the caller
+ * when absent so server defaults/nulls apply.
  */
 export async function createTournament(
   input: CreateTournamentInput,

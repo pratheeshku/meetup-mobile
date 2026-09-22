@@ -16,7 +16,14 @@
  * fallback.
  */
 import { apiClient } from './client';
-import type { Event, EventsListResponse, EventVisibility, EventStatus, RsvpStatus } from '../types/event';
+import type {
+  CreateEventInput,
+  Event,
+  EventsListResponse,
+  EventVisibility,
+  EventStatus,
+  RsvpStatus,
+} from '../types/event';
 
 export interface GetEventsParams {
   sport?: string;
@@ -146,6 +153,22 @@ export async function getEvents(
 
 export async function getEvent(id: string, options?: RequestOptions): Promise<Event> {
   const { data } = await apiClient.get<EventApiItem>(`/events/${id}`, {
+    correlationId: options?.correlationId,
+  });
+  return mapEventApiItem(data);
+}
+
+/**
+ * `POST /events` (Create Flow Amendment, §4.3; `EventCreate` schema). Body
+ * is a subset of the live schema (see `CreateEventInput`) — a direct port
+ * of the web app's Casual Game submit handler (`frontend/app.js`,
+ * `submitCreateEvent`), including always sending `ends_at: null`.
+ */
+export async function createEvent(
+  input: CreateEventInput,
+  options?: RequestOptions,
+): Promise<Event> {
+  const { data } = await apiClient.post<EventApiItem>('/events', input, {
     correlationId: options?.correlationId,
   });
   return mapEventApiItem(data);

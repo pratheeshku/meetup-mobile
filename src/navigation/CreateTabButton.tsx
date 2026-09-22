@@ -1,7 +1,8 @@
 /**
  * Raised center "+" action button for the bottom tab bar. Tapping it opens
- * the Create menu (`CreateMenu`: Game / Group / Tournament); choosing an
- * entry navigates to that screen inside its own tab's stack.
+ * the Create menu (`CreateMenu`: Game / Group — see the Create Flow
+ * Amendment, DES-MEETUP-MOBILE.md §4.3); choosing an entry navigates to
+ * that screen inside its own tab's stack.
  *
  * It is an action, not a destination: the `Create` tab exists only so the
  * button has a slot in the middle of the bar. The button never calls the tab
@@ -57,9 +58,6 @@ export function navigateToCreate(
     case 'group':
       navigation.navigate('Groups', { screen: 'CreateGroup', initial: false });
       break;
-    case 'tournament':
-      navigation.navigate('Tournaments', { screen: 'CreateTournament', initial: false });
-      break;
   }
 }
 
@@ -90,7 +88,7 @@ function CreateFab({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Create"
-        accessibilityHint="Opens a menu to create a game, group or tournament"
+        accessibilityHint="Opens a menu to create a game or group"
         testID={testID}
         onPress={() => setMenuOpen(true)}
         style={({ pressed }) => [styles.fab, pressed ? styles.pressed : null]}

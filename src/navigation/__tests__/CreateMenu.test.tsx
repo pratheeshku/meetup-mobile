@@ -1,4 +1,8 @@
-/** Create menu: three entries, and every dismissal path avoids selecting one. */
+/**
+ * Create menu: two entries (Create Flow Amendment, §4.3, architect-approved
+ * 2026-09-22 — Tournament removed as a separate entry), and every
+ * dismissal path avoids selecting one.
+ */
 import React from 'react';
 
 import { act, pressableLabelled, render, texts } from '../../test-utils/render';
@@ -12,20 +16,15 @@ function mount(visible = true) {
 }
 
 describe('CreateMenu', () => {
-  it('offers exactly Game, Group and Tournament with their emoji', () => {
+  it('offers exactly Game and Group with their emoji', () => {
     const { root } = mount();
-    expect(CREATE_MENU_ITEMS.map(item => item.label)).toEqual([
-      'Create Game',
-      'Create Group',
-      'Create Tournament',
-    ]);
-    expect(texts(root)).toEqual(expect.arrayContaining(['🎮', '👥', '🏆']));
+    expect(CREATE_MENU_ITEMS.map(item => item.label)).toEqual(['Create Game', 'Create Group']);
+    expect(texts(root)).toEqual(expect.arrayContaining(['🎮', '👥']));
   });
 
   it.each([
     ['Create Game', 'game'],
     ['Create Group', 'group'],
-    ['Create Tournament', 'tournament'],
   ])('"%s" reports %s and does not close by itself', (label, target) => {
     const { root, onSelect, onClose } = mount();
     act(() => pressableLabelled(root, label).props.onPress());

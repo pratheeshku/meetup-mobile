@@ -40,16 +40,18 @@ const PILL_COLORS: Record<PillTone, { background: string; text: string }> = {
 };
 
 /**
- * Proposed Assumption: the web reference lists PUBLIC / GROUP / TOURNAMENT.
- * Events have no tournament category (tournaments are a separate feed), and
- * `EventVisibility` also has `invite`, which the reference doesn't show —
- * it is labelled INVITE (the enum value) rather than dropped, since the
- * category pill is "always present".
+ * Correction (Create Flow Amendment research, 2026-09-22): the prior
+ * `invite` key was never reachable — `EventVisibility`'s real third value
+ * is `invite_only` (see `types/event.ts`). Confirmed directly against
+ * `frontend/app.js`'s event card/detail rendering (`pratheeshku/meetup`),
+ * which special-cases `visibility === "invite_only"` to display "PRIVATE"
+ * rather than the raw enum value — matched here rather than the previous
+ * "labelled INVITE, the enum value" guess.
  */
 const CATEGORY_LABEL: Record<EventVisibility, string> = {
   public: 'Public',
   group: 'Group',
-  invite: 'Invite',
+  invite_only: 'Private',
 };
 
 /**

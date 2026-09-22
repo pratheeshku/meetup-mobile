@@ -120,28 +120,64 @@ export interface TournamentsListResponse {
 }
 
 /**
- * Values documented in the live OpenAPI `TournamentCreate` field
- * descriptions (`format`: 'knockout', 'round_robin', or 'group_stage';
- * `participation_mode`: 'individual' or 'team'). The schema types both as
- * plain strings — the values below are the documented ones, not a
- * schema-enforced enum.
+ * Values confirmed against `tournaments/schemas.py`
+ * (`TournamentCreate.validate_format`, a `field_validator`): the schema
+ * itself enforces exactly `'knockout'`, `'round_robin'`, or
+ * `'group_stage'`.
+ *
+ * `'group_stage'` is deliberately excluded from the client-facing type
+ * (Create Flow Amendment, 2026-09-22 — Deferred: Tournament Format Group
+ * Stage). `format='group_stage'` requires `participation_mode='team'`
+ * AND a populated `structured_rules` object (`validate_group_stage_
+ * constraints`, same file) — a real, enforced backend contract, but no
+ * UI populates `structured_rules` on web (`frontend/app.js`'s Format
+ * `<select>` has no `group_stage` `<option>` to reach it — its
+ * `toggleTournamentFormat()`/`t-group-stage-rules` panel logic is
+ * orphaned) or, as of this amendment, mobile. Mobile's prior 3rd Format
+ * chip offered `group_stage` without ever collecting `structured_rules`,
+ * which meant every such submission got a guaranteed 422 — removing it
+ * here is a bug fix, not a regression. Re-add only once a
+ * `structured_rules` UI is designed on web first.
  */
-export type TournamentFormat = 'knockout' | 'round_robin' | 'group_stage';
+export type TournamentFormat = 'knockout' | 'round_robin';
 export type TournamentParticipationMode = 'individual' | 'team';
 
 /**
+ * `TournamentCreate.visibility` (`tournaments/schemas.py`): documented via
+ * the field's `description` ("'public', 'group', or 'invite'"), not a
+ * `field_validator` — unlike `EventVisibility`, the backend does not
+ * actually enforce this at the schema level, but `frontend/app.js`'s
+ * `t-visibility` `<select>` sends exactly these three values, confirmed
+ * as the correct ones to send. Note the third value is `'invite'`, not
+ * Event's `'invite_only'` — a different literal for the same concept on
+ * a different endpoint, confirmed in both `schemas.py` and `app.js`.
+ */
+export type TournamentVisibility = 'public' | 'invite' | 'group';
+
+/**
  * `POST /tournaments` request body, a subset of the live `TournamentCreate`
- * schema. Schema `required`: `sport`, `participation_mode`. `title` has a
- * server default of "Test Tourney" and `capacity` a default of 8, so this
- * client always sends `title` explicitly. `starts_at` is not in the
- * schema's `required` list but has no default and is non-nullable — this
- * client always sends it. Optional fields not offered by the form
- * (description, visibility, group_id, venue_*, ends_at, structured_rules)
- * are omitted so the server defaults apply.
+ * schema, extended by the Create Flow Amendment (2026-09-22) to match the
+ * web app's tournament form (`frontend/app.js`, `tournamentCreateFormHtml`/
+ * `submitCreateTournament`). Schema `required`: `sport`,
+ * `participation_mode`. `title` has a server default of "Test Tourney"
+ * and `capacity` a default of 8, so this client always sends `title`
+ * explicitly. `starts_at` is not in the schema's `required` list but has
+ * no default and is non-nullable — this client always sends it.
+ * `group_id` is required by `validate_group_visibility` when
+ * `visibility === 'group'`, rejected otherwise — omitted unless that
+ * condition holds, matching web. `venue_address`, `skill_level`,
+ * `ends_at`, and `structured_rules` are not offered by the form (the
+ * first two confirmed absent from web's tournament form despite existing
+ * on `EventCreate`/nowhere on `TournamentCreate` respectively; the last
+ * two per the Deferred note above) — omitted so server defaults/nulls
+ * apply.
  */
 export interface CreateTournamentInput {
   title: string;
   sport: string;
+  description?: string;
+  visibility: TournamentVisibility;
+  group_id?: string;
   participation_mode: TournamentParticipationMode;
   format: TournamentFormat;
   /** Integer, schema `exclusiveMinimum: 1` (i.e. at least 2). */
@@ -150,4 +186,5 @@ export interface CreateTournamentInput {
   starts_at: string;
   /** ISO 8601 date-time; optional/nullable in the schema. */
   registration_closes_at?: string;
+  venue_name?: string;
 }

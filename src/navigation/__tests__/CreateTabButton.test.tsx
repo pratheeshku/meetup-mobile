@@ -1,7 +1,8 @@
 /**
  * Create center action button: an action, not a destination. Tapping it opens
- * a three-option menu (Game / Group / Tournament); it must never select the
- * `Create` tab, and dismissing the menu must never navigate.
+ * a two-option menu (Game / Group — Create Flow Amendment, §4.3,
+ * architect-approved 2026-09-22); it must never select the `Create` tab,
+ * and dismissing the menu must never navigate.
  *
  * The end-to-end block mounts real navigators (tab bar + nested stacks) so
  * the framework-internal parts — `useNavigation()` resolving from inside the
@@ -75,11 +76,11 @@ describe('CreateTabButton', () => {
     expect(pressable.props['aria-selected']).toBeUndefined();
   });
 
-  it('opens the three-option menu on tap without touching the tab bar or navigating', () => {
+  it('opens the two-option menu on tap without touching the tab bar or navigating', () => {
     const { root, onPress } = renderButton();
     expect(() => pressableLabelled(root, 'Create Group')).toThrow(/found 0/);
     act(() => pressableLabelled(root, 'Create').props.onPress());
-    expect(texts(root)).toEqual(expect.arrayContaining(['Create Game', 'Create Group', 'Create Tournament']));
+    expect(texts(root)).toEqual(expect.arrayContaining(['Create Game', 'Create Group']));
     expect(onPress).not.toHaveBeenCalled();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
@@ -87,7 +88,6 @@ describe('CreateTabButton', () => {
   it.each([
     ['Create Game', 'Home', { screen: 'CreateGame', initial: false }],
     ['Create Group', 'Groups', { screen: 'CreateGroup', initial: false }],
-    ['Create Tournament', 'Tournaments', { screen: 'CreateTournament', initial: false }],
   ])('"%s" closes the menu and navigates to %s', (label, tab, params) => {
     const { root } = renderButton();
     act(() => pressableLabelled(root, 'Create').props.onPress());
@@ -129,7 +129,6 @@ describe('end-to-end with real navigators', () => {
   const Tabs = createBottomTabNavigator();
   const HomeStack = createNativeStackNavigator();
   const GroupsStack = createNativeStackNavigator();
-  const TournamentsStack = createNativeStackNavigator();
 
   const Home = () => (
     <HomeStack.Navigator>
@@ -142,12 +141,6 @@ describe('end-to-end with real navigators', () => {
       <GroupsStack.Screen name="GroupsList" component={Stub('groups')} />
       <GroupsStack.Screen name="CreateGroup" component={Stub('create-group')} />
     </GroupsStack.Navigator>
-  );
-  const Tournaments = () => (
-    <TournamentsStack.Navigator>
-      <TournamentsStack.Screen name="TournamentsList" component={Stub('tournaments')} />
-      <TournamentsStack.Screen name="CreateTournament" component={Stub('create-tournament')} />
-    </TournamentsStack.Navigator>
   );
 
   let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
@@ -171,7 +164,6 @@ describe('end-to-end with real navigators', () => {
             <Tabs.Screen name="Home" component={Home} />
             <Tabs.Screen name="Groups" component={Groups} />
             <Tabs.Screen name="Create" component={CreateTabScreen} options={{ tabBarButton: CreateTabButton }} />
-            <Tabs.Screen name="Tournaments" component={Tournaments} />
           </Tabs.Navigator>
         </NavigationContainer>,
       );
@@ -192,7 +184,6 @@ describe('end-to-end with real navigators', () => {
   it.each([
     ['Create Game', 'Home', ['EventsList', 'CreateGame']],
     ['Create Group', 'Groups', ['GroupsList', 'CreateGroup']],
-    ['Create Tournament', 'Tournaments', ['TournamentsList', 'CreateTournament']],
   ])('"%s" opens %s > create screen with the list underneath, never focusing Create', async (label, tab, stack) => {
     const { ref, root } = await mount();
     await act(async () => pressableLabelled(root, 'Create').props.onPress());

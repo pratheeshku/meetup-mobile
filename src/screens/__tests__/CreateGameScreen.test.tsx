@@ -1,16 +1,364 @@
+/**
+ * Create Game — merged Casual Game/Tournament screen (Create Flow
+ * Amendment, DES-MEETUP-MOBILE.md §4.3, architect-approved 2026-09-22).
+ * Field names/limits/enum values checked against the live `EventCreate`/
+ * `TournamentCreate` contracts (see `CreateEventInput`/`CreateTournamentInput`
+ * type comments for the exact source). API and navigation mocked.
+ */
 import React from 'react';
 
-import { pressables, render, texts } from '../../test-utils/render';
+import { createEvent } from '../../api/events';
+import { getMyGroups } from '../../api/groups';
+import { getSports } from '../../api/sports';
+import { createTournament } from '../../api/tournaments';
+import { act, pressableLabelled, renderAsync, texts } from '../../test-utils/render';
+import type { Instance } from '../../test-utils/render';
 import CreateGameScreen from '../CreateGameScreen';
 
-describe('CreateGameScreen (placeholder)', () => {
-  it('shows the Coming Soon title and an explanatory subtitle', () => {
-    const t = texts(render(<CreateGameScreen />));
-    expect(t).toContain('Create Game — Coming Soon');
-    expect(t.some(text => /still being built/i.test(text))).toBe(true);
+type Props = React.ComponentProps<typeof CreateGameScreen>;
+
+jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
+jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn() }));
+jest.mock('../../api/events', () => ({ createEvent: jest.fn() }));
+jest.mock('../../api/tournaments', () => ({ createTournament: jest.fn() }));
+
+const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
+const mockGetMyGroups = getMyGroups as jest.MockedFunction<typeof getMyGroups>;
+const mockCreateEvent = createEvent as jest.MockedFunction<typeof createEvent>;
+const mockCreateTournament = createTournament as jest.MockedFunction<typeof createTournament>;
+const popTo = jest.fn();
+const navigate = jest.fn();
+
+const SPORTS = [
+  { name: 'badminton', display_name: 'Badminton' },
+  { name: 'football', display_name: 'Football' },
+];
+const GROUPS = {
+  items: [{ id: 'g-1', name: 'Sunday Footballers', description: '', owner_id: 'me', created_at: '', current_user_role: 'owner' as const }],
+  total: 1,
+  page: 1,
+  page_size: 1,
+};
+
+async function mount(): Promise<Instance> {
+  const props = { navigation: { popTo, navigate }, route: { params: undefined } };
+  return renderAsync(<CreateGameScreen {...(props as unknown as Props)} />);
+}
+
+const input = (root: Instance, placeholder: string): Instance =>
+  root.find(node => (node.type as unknown) === 'TextInput' && node.props.placeholder === placeholder);
+const capacityInput = (root: Instance): Instance =>
+  root.findAll(node => (node.type as unknown) === 'TextInput' && node.props.keyboardType === 'number-pad')[0];
+const type = (field: Instance, value: string): void => {
+  act(() => {
+    field.props.onChangeText(value);
+  });
+};
+const choose = (root: Instance, label: string): void => {
+  act(() => {
+    pressableLabelled(root, label).props.onPress();
+  });
+};
+const START_DT = 'YYYY-MM-DD HH:mm';
+const START_D = 'YYYY-MM-DD';
+
+beforeEach(() => {
+  mockGetSports.mockReset().mockResolvedValue(SPORTS);
+  mockGetMyGroups.mockReset().mockResolvedValue(GROUPS);
+  mockCreateEvent.mockReset();
+  mockCreateTournament.mockReset();
+  popTo.mockReset();
+  navigate.mockReset();
+});
+
+describe('CreateGameScreen — toggle', () => {
+  it('defaults to Casual Game and offers a Tournament toggle', async () => {
+    const root = await mount();
+    expect(pressableLabelled(root, '🎮 Casual Game').props.accessibilityState.selected).toBe(true);
+    expect(pressableLabelled(root, '🏆 Tournament').props.accessibilityState.selected).toBe(false);
+    expect(texts(root)).toContain('Create Game');
   });
 
-  it('offers no actions (it is an honest placeholder, not a form)', () => {
-    expect(pressables(render(<CreateGameScreen />))).toHaveLength(0);
+  it('switching to Tournament shows the tournament form and hides the casual one, without losing typed casual values', async () => {
+    const root = await mount();
+    type(input(root, 'e.g. Sunday 5-a-side Football'), 'Friday Futsal');
+    choose(root, '🏆 Tournament');
+
+    expect(() => input(root, 'e.g. Sunday 5-a-side Football')).toThrow();
+    expect(pressableLabelled(root, 'Create Tournament')).toBeDefined();
+
+    choose(root, '🎮 Casual Game');
+    expect(input(root, 'e.g. Sunday 5-a-side Football').props.value).toBe('Friday Futsal');
+  });
+});
+
+describe('CreateGameScreen — Casual Game form contract', () => {
+  it('offers the amended field set with public visibility and all-levels skill pre-selected', async () => {
+    const root = await mount();
+    for (const label of ['Title', 'Sport', 'Visibility', 'Skill Level', 'Capacity', 'Venue Name', 'Venue Address', 'Description']) {
+      expect(texts(root)).toContain(label);
+    }
+    expect(pressableLabelled(root, '🌍 Public').props.accessibilityState.selected).toBe(true);
+    expect(pressableLabelled(root, 'All Levels').props.accessibilityState.selected).toBe(true);
+  });
+
+  it('shows the conditional Group picker only when Visibility = Group', async () => {
+    const root = await mount();
+    expect(texts(root)).not.toContain('Group');
+    choose(root, '👥 Group');
+    expect(pressableLabelled(root, 'Sunday Footballers')).toBeDefined();
+  });
+
+  it('rejects submit with Visibility = Group and no group chosen', async () => {
+    const root = await mount();
+    type(input(root, 'e.g. Sunday 5-a-side Football'), 'Futsal');
+    type(capacityInput(root), '10');
+    type(root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_DT)[0], '2026-10-01 18:30');
+    choose(root, '👥 Group');
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+    expect(texts(root)).toContain('Choose a group.');
+    expect(mockCreateEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['blank title', (root: Instance) => { type(capacityInput(root), '10'); }, 'Enter a game title.'],
+  ])('%s', async (_name, setup, message) => {
+    const root = await mount();
+    setup(root);
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+    expect(texts(root)).toContain(message);
+    expect(mockCreateEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(['1', '201', '', 'abc'])('rejects capacity %p (2–200, matching web)', async value => {
+    const root = await mount();
+    type(input(root, 'e.g. Sunday 5-a-side Football'), 'Futsal');
+    type(capacityInput(root), value);
+    type(root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_DT)[0], '2026-10-01 18:30');
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+    expect(texts(root)).toContain('Capacity must be a whole number between 2 and 200.');
+    expect(mockCreateEvent).not.toHaveBeenCalled();
+  });
+
+  it('fills the date portion of Start Date & Time from the quick-select chips, keeping any typed time', async () => {
+    const root = await mount();
+    const start = () => root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_DT)[0];
+    type(start(), '2000-01-01 20:15');
+    choose(root, 'Today');
+    expect(start().props.value).toMatch(/^\d{4}-\d{2}-\d{2} 20:15$/);
+    expect(start().props.value.endsWith('20:15')).toBe(true);
+  });
+});
+
+describe('CreateGameScreen — Casual Game submit', () => {
+  function fillValid(root: Instance): void {
+    type(input(root, 'e.g. Sunday 5-a-side Football'), '  Friday Futsal ');
+    type(capacityInput(root), '10');
+    type(root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_DT)[0], '2026-10-01 18:30');
+  }
+
+  it('sends the minimal EventCreate payload (no sport chosen, defaults, ends_at null) and pops back with a refresh key', async () => {
+    mockCreateEvent.mockResolvedValueOnce({} as never);
+    const root = await mount();
+    fillValid(root);
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+
+    expect(mockCreateEvent).toHaveBeenCalledWith(
+      {
+        title: 'Friday Futsal',
+        visibility: 'public',
+        skill_level_requirement: 'all_levels',
+        capacity: 10,
+        starts_at: new Date(2026, 9, 1, 18, 30).toISOString(),
+        ends_at: null,
+      },
+      { correlationId: expect.any(String) },
+    );
+    expect(popTo).toHaveBeenCalledWith('EventsList', { refreshKey: expect.any(Number) });
+  });
+
+  it('includes sport, skill level, venue, description and group_id when set', async () => {
+    mockCreateEvent.mockResolvedValueOnce({} as never);
+    const root = await mount();
+    fillValid(root);
+    choose(root, 'Football');
+    choose(root, 'Beginner');
+    choose(root, '👥 Group');
+    choose(root, 'Sunday Footballers');
+    type(input(root, 'e.g. Bishan Sports Hall'), 'Bishan Sports Hall');
+    type(input(root, 'e.g. 5 Bishan St 14, Singapore'), '5 Bishan St 14');
+    type(input(root, 'Optional description...'), 'Bring your own bib');
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+
+    expect(mockCreateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sport: 'football',
+        skill_level_requirement: 'beginner',
+        visibility: 'group',
+        group_id: 'g-1',
+        venue_name: 'Bishan Sports Hall',
+        venue_address: '5 Bishan St 14',
+        description: 'Bring your own bib',
+      }),
+      { correlationId: expect.any(String) },
+    );
+  });
+
+  it('shows the backend validation message inline on a 422 and stays on the form', async () => {
+    mockCreateEvent.mockRejectedValueOnce({
+      response: { status: 422, data: { detail: [{ loc: ['body', 'visibility'], msg: 'invalid', type: 'x' }] } },
+    });
+    const root = await mount();
+    fillValid(root);
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+    expect(texts(root)).toContain('visibility: invalid');
+    expect(popTo).not.toHaveBeenCalled();
+  });
+});
+
+describe('CreateGameScreen — Tournament form contract', () => {
+  async function toTournament(): Promise<Instance> {
+    const root = await mount();
+    choose(root, '🏆 Tournament');
+    return root;
+  }
+
+  it('offers the amended field set, pre-fills format=knockout and capacity=8, and excludes Group Stage', async () => {
+    const root = await toTournament();
+    for (const label of ['Tournament Title', 'Tournament Start Date', 'Sport', 'Visibility', 'Participation', 'Format', 'Venue Name']) {
+      expect(texts(root)).toContain(label);
+    }
+    expect(pressableLabelled(root, 'Knockout').props.accessibilityState.selected).toBe(true);
+    expect(capacityInput(root).props.value).toBe('8');
+    expect(() => pressableLabelled(root, 'Group stage')).toThrow();
+    expect(texts(root).some(t => /venue address/i.test(t))).toBe(false);
+    expect(texts(root).some(t => /skill level/i.test(t))).toBe(false);
+  });
+
+  it('shows the conditional Group picker only when Visibility = Group Only', async () => {
+    const root = await toTournament();
+    choose(root, 'Group Only');
+    expect(pressableLabelled(root, 'Sunday Footballers')).toBeDefined();
+  });
+});
+
+describe('CreateGameScreen — Tournament submit', () => {
+  async function toTournament(): Promise<Instance> {
+    const root = await mount();
+    choose(root, '🏆 Tournament');
+    return root;
+  }
+
+  function fillValid(root: Instance): void {
+    type(input(root, 'e.g. Summer League'), '  Summer Cup ');
+    choose(root, 'Football');
+    choose(root, 'Team');
+    type(root.find(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_D), '2026-10-01');
+  }
+
+  it.each([
+    ['blank title', (root: Instance) => { choose(root, 'Football'); choose(root, 'Team'); }, 'Enter a tournament title.'],
+    ['no sport', (root: Instance) => { type(input(root, 'e.g. Summer League'), 'Cup'); choose(root, 'Team'); }, 'Choose a sport.'],
+    ['no participation mode', (root: Instance) => { type(input(root, 'e.g. Summer League'), 'Cup'); choose(root, 'Football'); }, 'Choose individual or team participation.'],
+  ])('%s', async (_name, setup, message) => {
+    const root = await toTournament();
+    setup(root);
+    await act(async () => pressableLabelled(root, 'Create Tournament').props.onPress());
+    expect(texts(root)).toContain(message);
+    expect(mockCreateTournament).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed tournament start date (date-only, no time)', async () => {
+    const root = await toTournament();
+    type(input(root, 'e.g. Summer League'), 'Cup');
+    choose(root, 'Football');
+    choose(root, 'Team');
+    type(root.find(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_D), '2026-10-01 18:30');
+    await act(async () => pressableLabelled(root, 'Create Tournament').props.onPress());
+    expect(texts(root)).toContain('Enter the tournament start date as YYYY-MM-DD.');
+    expect(mockCreateTournament).not.toHaveBeenCalled();
+  });
+
+  it('sends the TournamentCreate payload with public visibility default and no group_stage option available', async () => {
+    mockCreateTournament.mockResolvedValueOnce({} as never);
+    const root = await toTournament();
+    fillValid(root);
+    await act(async () => pressableLabelled(root, 'Create Tournament').props.onPress());
+
+    expect(mockCreateTournament).toHaveBeenCalledWith(
+      {
+        title: 'Summer Cup',
+        sport: 'football',
+        visibility: 'public',
+        participation_mode: 'team',
+        format: 'knockout',
+        capacity: 8,
+        starts_at: new Date(2026, 9, 1).toISOString(),
+      },
+      { correlationId: expect.any(String) },
+    );
+  });
+
+  it('includes description, venue_name and group_id (Visibility = Group Only) when set', async () => {
+    mockCreateTournament.mockResolvedValueOnce({} as never);
+    const root = await toTournament();
+    fillValid(root);
+    type(input(root, 'Details about rules, scheduling...'), 'Bring your own ball');
+    type(input(root, 'e.g. Sports Hub Court 3'), 'Sports Hub Court 3');
+    choose(root, 'Group Only');
+    choose(root, 'Sunday Footballers');
+    await act(async () => pressableLabelled(root, 'Create Tournament').props.onPress());
+
+    expect(mockCreateTournament).toHaveBeenCalledWith(
+      expect.objectContaining({
+        description: 'Bring your own ball',
+        venue_name: 'Sports Hub Court 3',
+        visibility: 'group',
+        group_id: 'g-1',
+      }),
+      { correlationId: expect.any(String) },
+    );
+  });
+
+  it('on success, navigates cross-tab to the Tournaments list with a refresh key (no local Tournaments route to popTo)', async () => {
+    mockCreateTournament.mockResolvedValueOnce({} as never);
+    const root = await toTournament();
+    fillValid(root);
+    await act(async () => pressableLabelled(root, 'Create Tournament').props.onPress());
+
+    expect(navigate).toHaveBeenCalledWith('Tournaments', {
+      screen: 'TournamentsList',
+      params: { refreshKey: expect.any(Number) },
+    });
+    expect(popTo).not.toHaveBeenCalled();
+  });
+
+  it('shows a generic message on a network failure and stays on the form', async () => {
+    mockCreateTournament.mockRejectedValueOnce(new Error('Network Error'));
+    const root = await toTournament();
+    fillValid(root);
+    await act(async () => pressableLabelled(root, 'Create Tournament').props.onPress());
+    expect(texts(root)).toContain('Could not create the tournament. Please try again.');
+    expect(navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe('CreateGameScreen — sports loading (shared by both modes)', () => {
+  it('shows an error with retry when sports cannot be loaded, and recovers on retry', async () => {
+    mockGetSports.mockReset().mockRejectedValueOnce(new Error('down')).mockResolvedValueOnce(SPORTS);
+    const root = await mount();
+    expect(texts(root)).toContain('Could not load the list of sports. Please try again.');
+
+    await act(async () => {
+      root.find(n => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function').props.onPress();
+    });
+    expect(pressableLabelled(root, 'Football')).toBeDefined();
+  });
+
+  it('degrades gracefully (empty group list, form still usable) when groups fail to load', async () => {
+    mockGetMyGroups.mockReset().mockRejectedValue(new Error('down'));
+    const root = await mount();
+    choose(root, '👥 Group');
+    expect(texts(root)).toContain("You don't belong to any groups yet.");
   });
 });

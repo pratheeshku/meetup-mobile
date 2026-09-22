@@ -54,7 +54,7 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<AppTabParamList, 'Home'>
 >;
 
-export default function HomeScreen({ navigation }: Props): React.JSX.Element {
+export default function HomeScreen({ navigation, route }: Props): React.JSX.Element {
   const { user } = useAuth();
 
   const [events, setEvents] = useState<Event[]>([]);
@@ -98,6 +98,17 @@ export default function HomeScreen({ navigation }: Props): React.JSX.Element {
   useEffect(() => {
     loadDashboard(false);
   }, [loadDashboard]);
+
+  // Create Game pops back here with a fresh `refreshKey` on success (Casual
+  // side only — Tournament creates from the same merged screen land on the
+  // Tournaments tab instead); re-fetch once per new key, same pattern as
+  // Groups/Tournaments (the initial mount load is above).
+  const refreshKey = route.params?.refreshKey;
+  useEffect(() => {
+    if (refreshKey !== undefined) {
+      loadDashboard(true);
+    }
+  }, [refreshKey, loadDashboard]);
 
   const userId = user?.id;
   const sports = useMemo(() => getSportOptions(events), [events]);
