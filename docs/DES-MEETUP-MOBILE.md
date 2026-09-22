@@ -1,7 +1,8 @@
 # DES-MEETUP-MOBILE — Meetup Android Mobile App: Solution Design
 
 **Doc ID**: DES-MEETUP-MOBILE
-**Status**: APPROVED — architect-approved 2026-09-13
+**Status**: APPROVED — architect-approved 2026-09-13; Create-flow
+amendment (§4.3/§4.5) architect-approved 2026-09-22
 **Tier**: T1
 **Requirements Baseline**: REQ-MEETUP-MOBILE — reconciled, single canonical file (APPROVED, architect-approved 2026-09-13; R-005 corrected 2026-09-13)
 **Parent Backend Design**: DES-MEETUP.md (DES-MEETUP-001), v1.66, APPROVED
@@ -634,7 +635,8 @@ shows the standard banner and disables submission.
 
 ### 4.3 Event Management
 
-**Screens**: Event List, Event Detail, Create/Edit Event, RSVP sheet.
+**Screens**: Event List, Event Detail, Create Game (merged
+Casual/Tournament — see Create Flow Amendment below), RSVP sheet.
 
 **API endpoints consumed**: `POST /events`, `GET /events`,
 `GET /events/{id}`, `PATCH /events/{id}`, `POST /events/{id}/cancel`,
@@ -656,6 +658,41 @@ server-side.
 
 **Offline behaviour**: Last-fetched data viewable (R-101); mutating
 controls disabled offline.
+
+**Create Flow Amendment (architect-approved 2026-09-22)**
+
+FAB "Create" menu (`CreateMenu.tsx`): two entries only — Create Game,
+Create Group. ("Create Tournament" removed as a separate entry; see §4.5.)
+
+`CreateGameScreen.tsx` becomes a single screen with a segmented toggle
+at top: **Casual Game | Tournament** (default: Casual Game). Toggle
+changes visible fields and submit target within the same screen.
+
+*Casual Game* → `POST /events` (`EventCreate`): Title* (1–150), Sport
+(from `GET /admin/sports/public`), Visibility* (`public`/`invite_only`/
+`group`, with conditional required Group picker when `group`), Skill
+Level (`all_levels`/`beginner`/`intermediate`/`expert`), Capacity*
+(2–200), Start Date & Time* (quick-select: Today/Tomorrow/This Sat/This
+Sun), Venue Name, Venue Address, Description. `ends_at` always `null`.
+
+*Tournament* → `POST /tournaments` (`TournamentCreate`): Tournament
+Title* (1–150), Tournament Start Date*, Sport* (from
+`GET /admin/sports/public`), Visibility* (`public`/`invite`/`group` —
+distinct literal from Event's `invite_only`, with conditional required
+Group picker when `group`), Description (optional), Participation Mode*
+(`individual`/`team`), Registration Closes At (optional), Format*
+(Knockout (Single Elimination) / Round Robin — Group Stage deliberately
+excluded, see below), Capacity* (min 2, default 8), Venue Name. No Venue
+Address, no Skill Level in Tournament mode (both confirmed absent from
+web's tournament form).
+
+*Deferred — Format: Group Stage.* `structured_rules` has a full backend
+contract (`tournaments/schemas.py`) but no UI populates it on web or
+mobile today; web's Format control has no reachable option for it.
+Mobile's prior 3rd Format chip (`group_stage`, no `structured_rules`
+sent) is removed — it always produced a guaranteed 422, so this is a bug
+fix, not a regression. Re-introduce only after a `structured_rules` UI is
+designed on web first — mobile does not lead web on this contract.
 
 ### 4.4 Groups & Teams
 
@@ -683,7 +720,8 @@ disabled offline.
 ### 4.5 Tournaments
 
 **Screens**: Tournament List, Tournament Detail (fixtures + standings
-tabs), Create Tournament, Fixture Result Entry.
+tabs), Fixture Result Entry. (Tournament creation moved into §4.3's
+merged Create Game screen — see Create Flow Amendment.)
 
 **API endpoints consumed**: `POST /tournaments`, `GET /tournaments`,
 `GET /tournaments/{id}`, `PATCH /tournaments/{id}`,
