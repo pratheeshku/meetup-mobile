@@ -25,6 +25,7 @@ import {
   texts,
 } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
+import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import EventDetailScreen from '../EventDetailScreen';
 
 jest.mock('../../api/client', () => ({
@@ -81,6 +82,24 @@ beforeEach(() => {
   goBack.mockReset();
   mockGet.mockReset();
   mockPost.mockReset().mockResolvedValue({ data: {} });
+  __resetSportDisplayNamesCacheForTests();
+});
+
+it('resolves the sport slug to its display_name from GET /admin/sports/public (BUG-M02)', async () => {
+  mockGet.mockImplementation((url: string) => {
+    if (url === '/admin/sports/public') {
+      return Promise.resolve({
+        data: [{ id: '1', name: 'badminton', slug: 'badminton', display_name: 'Badminton', is_active: true }],
+      });
+    }
+    return Promise.resolve({ data: rawEvent() });
+  });
+  const props = {
+    route: { key: 'k', name: 'EventDetail', params: { eventId: 'evt-1' } },
+    navigation: { goBack },
+  } as unknown as React.ComponentProps<typeof EventDetailScreen>;
+  const root = await renderAsync(<EventDetailScreen {...props} />);
+  expect(texts(root)).toContain('Badminton · Riverside Courts');
 });
 
 describe('organiser (organizer_id === signed-in user id)', () => {

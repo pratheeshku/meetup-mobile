@@ -8,6 +8,7 @@ import { getProfile, updateProfile, updateSkillLevel } from '../../api/profile';
 import { getSports } from '../../api/sports';
 import { act, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
+import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import type { UserProfile } from '../../types/user';
 import ProfileScreen from '../ProfileScreen';
 
@@ -70,6 +71,7 @@ beforeEach(() => {
   mockGetProfile.mockReset().mockResolvedValue(PROFILE);
   mockUpdateSkillLevel.mockReset().mockResolvedValue(undefined);
   mockGetSports.mockReset().mockResolvedValue(SPORTS);
+  __resetSportDisplayNamesCacheForTests();
 });
 
 describe('ProfileScreen names', () => {
@@ -175,5 +177,26 @@ describe('ProfileScreen skill-level sport picker (BUG-M05)', () => {
     mockGetSports.mockResolvedValue([]);
     const root = await startAdd();
     expect(texts(root)).toContain('No sports are available right now.');
+  });
+});
+
+describe('ProfileScreen skill-levels list sport display name (BUG-M02)', () => {
+  it('resolves each declared sport to its display_name instead of the raw slug', async () => {
+    mockGetProfile.mockResolvedValue({
+      ...PROFILE,
+      skill_levels: [{ sport: 'table_tennis', skill_level: 'Intermediate' }],
+    });
+    const root = await mount();
+    expect(texts(root)).toEqual(expect.arrayContaining(['Table Tennis', 'Intermediate']));
+    expect(texts(root)).not.toContain('table_tennis');
+  });
+
+  it('falls back to the raw slug for a declared sport not in the sports list', async () => {
+    mockGetProfile.mockResolvedValue({
+      ...PROFILE,
+      skill_levels: [{ sport: 'unlisted_sport', skill_level: 'Beginner' }],
+    });
+    const root = await mount();
+    expect(texts(root)).toContain('unlisted_sport');
   });
 });

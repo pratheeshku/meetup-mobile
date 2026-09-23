@@ -53,6 +53,7 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
+import { useSportDisplayName } from '../utils/labels';
 import type { TournamentsStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<TournamentsStackParamList, 'TournamentDetail'>;
@@ -78,6 +79,9 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'fixtures' | 'registrations'>('fixtures');
+  // Called before the loading/error early returns below (Rules of Hooks) —
+  // `tournament` is still possibly `null` here.
+  const sportLabel = useSportDisplayName(tournament?.sport ?? '');
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
@@ -204,7 +208,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
       <Card style={styles.infoCard}>
         <Text style={styles.title}>{tournament.name}</Text>
         <Text style={styles.meta}>
-          {tournament.sport} · {tournament.format}
+          {sportLabel} · {tournament.format}
         </Text>
         <Text style={styles.meta}>Status: {tournament.status}</Text>
         <Text style={styles.meta}>Organised by {tournament.organiser_nickname}</Text>

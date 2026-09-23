@@ -24,7 +24,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { Event, RsvpStatus } from '../types/event';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
-import { EVENT_VISIBILITY_LABELS } from '../utils/labels';
+import { EVENT_VISIBILITY_LABELS, useSportDisplayName } from '../utils/labels';
 import Card from './Card';
 
 interface EventCardProps {
@@ -78,11 +78,12 @@ export function buildMetaSegments(event: Event): string[] {
 
 export default function EventCard({ event, onPress }: EventCardProps): React.JSX.Element {
   const rsvp = RSVP_PILL[event.current_user_rsvp_status];
+  const sportLabel = useSportDisplayName(event.sport);
 
   return (
     <Card style={styles.card} onPress={onPress}>
       <View style={styles.tagRow}>
-        {event.sport ? <Pill label={event.sport} tone="tag" /> : null}
+        {event.sport ? <Pill label={sportLabel} tone="tag" /> : null}
         <Pill label={EVENT_VISIBILITY_LABELS[event.visibility]} tone="tag" />
         {rsvp ? <Pill label={rsvp.label} tone={rsvp.tone} /> : null}
       </View>

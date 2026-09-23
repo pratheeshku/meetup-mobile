@@ -14,6 +14,7 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentRegistrationStatus } from '../types/tournament';
+import { useSportDisplayName } from '../utils/labels';
 import type { TournamentsStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<TournamentsStackParamList, 'TournamentsList'>;
@@ -29,6 +30,43 @@ const REGISTRATION_BADGE_VARIANT: Record<TournamentRegistrationStatus, BadgeVari
   registered: 'success',
   withdrawn: 'warning',
 };
+
+/**
+ * A `FlatList` `renderItem` callback isn't itself a component React tracks
+ * hook state for, so `useSportDisplayName` (BUG-M02) can't be called
+ * directly inside one — extracted into its own component instead, one per
+ * row, which `renderItem` just instantiates.
+ */
+function TournamentRow({
+  tournament,
+  onPress,
+}: {
+  tournament: Tournament;
+  onPress: () => void;
+}): React.JSX.Element {
+  const sportLabel = useSportDisplayName(tournament.sport);
+  return (
+    <Card style={styles.card} onPress={onPress}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {tournament.name}
+        </Text>
+        <Badge
+          label={REGISTRATION_BADGE_LABEL[tournament.current_user_registration_status]}
+          variant={REGISTRATION_BADGE_VARIANT[tournament.current_user_registration_status]}
+          style={styles.badge}
+        />
+      </View>
+      <Text style={styles.cardMeta}>
+        {sportLabel} · {tournament.format}
+      </Text>
+      <Text style={styles.cardMeta}>Status: {tournament.status}</Text>
+      <Text style={styles.cardMeta}>
+        {tournament.participant_count}/{tournament.max_participants} registered
+      </Text>
+    </Card>
+  );
+}
 
 export default function TournamentsScreen({ navigation, route }: Props): React.JSX.Element {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -101,28 +139,10 @@ export default function TournamentsScreen({ navigation, route }: Props): React.J
         <EmptyState title="No tournaments yet" subtitle="Check back soon." />
       }
       renderItem={({ item }) => (
-        <Card
-          style={styles.card}
+        <TournamentRow
+          tournament={item}
           onPress={() => navigation.navigate('TournamentDetail', { tournamentId: item.id })}
-        >
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <Badge
-              label={REGISTRATION_BADGE_LABEL[item.current_user_registration_status]}
-              variant={REGISTRATION_BADGE_VARIANT[item.current_user_registration_status]}
-              style={styles.badge}
-            />
-          </View>
-          <Text style={styles.cardMeta}>
-            {item.sport} · {item.format}
-          </Text>
-          <Text style={styles.cardMeta}>Status: {item.status}</Text>
-          <Text style={styles.cardMeta}>
-            {item.participant_count}/{item.max_participants} registered
-          </Text>
-        </Card>
+        />
       )}
     />
   );

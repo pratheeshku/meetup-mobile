@@ -49,6 +49,7 @@ import type { ChipOption } from '../components/OptionChips';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { getDisplayName } from '../utils/displayName';
+import { useSportDisplayName } from '../utils/labels';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { SkillLevelValue, UserProfile } from '../types/user';
 import type { Sport } from '../types/sport';
@@ -57,6 +58,31 @@ import type { ProfileStackParamList } from '../navigation/types';
 const SKILL_LEVEL_OPTIONS: SkillLevelValue[] = ['Beginner', 'Intermediate', 'Expert'];
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
+
+/**
+ * `skillLevels.map(...)` can't call `useSportDisplayName` (BUG-M02) directly
+ * — a hook call count that varies with the list's length, inside the same
+ * component instance, violates the Rules of Hooks. Extracted into its own
+ * component instead, one per row, same fix as `TournamentsScreen`'s
+ * `TournamentRow`.
+ */
+function SkillLevelRow({
+  sport,
+  skillLevel,
+  onPress,
+}: {
+  sport: string;
+  skillLevel: SkillLevelValue;
+  onPress: () => void;
+}): React.JSX.Element {
+  const sportLabel = useSportDisplayName(sport);
+  return (
+    <Pressable style={styles.skillLevelRow} onPress={onPress} accessibilityRole="button">
+      <Text style={styles.skillLevelSport}>{sportLabel}</Text>
+      <Text style={styles.skillLevelValue}>{skillLevel}</Text>
+    </Pressable>
+  );
+}
 
 export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
   const { signOut, updateUser } = useAuth();
@@ -336,15 +362,12 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           <Text style={styles.emptyText}>No skill levels declared yet.</Text>
         ) : (
           skillLevels.map(item => (
-            <Pressable
+            <SkillLevelRow
               key={item.sport}
-              style={styles.skillLevelRow}
+              sport={item.sport}
+              skillLevel={item.skill_level}
               onPress={() => handleStartEditSkillLevel(item.sport, item.skill_level)}
-              accessibilityRole="button"
-            >
-              <Text style={styles.skillLevelSport}>{item.sport}</Text>
-              <Text style={styles.skillLevelValue}>{item.skill_level}</Text>
-            </Pressable>
+            />
           ))
         )}
 

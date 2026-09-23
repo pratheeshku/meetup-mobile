@@ -7,6 +7,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 
+import { getSports } from '../../../api/sports';
 import StatCard from '../../StatCard';
 import { colors } from '../../../theme/tokens';
 import { makeEvent } from '../../../test-utils/makeEvent';
@@ -16,6 +17,7 @@ import {
   pressables,
   pressableWithText,
   render,
+  renderAsync,
   texts,
 } from '../../../test-utils/render';
 import { getSportOptions } from '../../../utils/homeDashboard';
@@ -24,6 +26,20 @@ import MyGamesGroupsSection from '../MyGamesGroupsSection';
 import RecommendedSection from '../RecommendedSection';
 import SportFilterPills from '../SportFilterPills';
 import UpcomingGamesSection from '../UpcomingGamesSection';
+
+// `UpcomingGamesSection`/`RecommendedSection` render `EventCard`, which
+// resolves its sport label via `useSportDisplayName` (BUG-M02) — mocked so
+// these tests never make a real `GET /admin/sports/public` call. Warmed
+// once, before any test, with a real render+await (`renderAsync`); every
+// later `render()` call in this file is synchronous and only works because
+// `useSportDisplayName`'s module-wide cache is already resolved by then, so
+// no further state update happens outside `act()`.
+jest.mock('../../../api/sports', () => ({ getSports: jest.fn() }));
+const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
+beforeAll(async () => {
+  mockGetSports.mockResolvedValue([]);
+  await renderAsync(<UpcomingGamesSection events={[makeEvent()]} onEventPress={jest.fn()} />);
+});
 
 const fiveEvents = Array.from({ length: 5 }, (_, i) =>
   makeEvent({ id: `e${i}`, title: `Game ${i}` }),

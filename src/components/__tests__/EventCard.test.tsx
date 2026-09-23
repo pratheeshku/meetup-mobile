@@ -8,9 +8,26 @@ import React from 'react';
 import { StyleSheet } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 
+import { getSports } from '../../api/sports';
 import EventCard, { buildMetaSegments } from '../EventCard';
 import { borderWidth, colors, radius, spacing } from '../../theme/tokens';
 import type { Event } from '../../types/event';
+
+jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
+
+const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
+
+// `useSportDisplayName` (BUG-M02) resolves `sport` against this list, cached
+// module-wide — warmed ONCE below (before any test) so every synchronous
+// `render()` call in this file already sees the resolved 'Badminton', with
+// no per-test async wait needed. Only 'badminton' (default) and '' (empty,
+// no pill rendered) appear anywhere in this file's fixtures.
+beforeAll(async () => {
+  mockGetSports.mockResolvedValue([{ name: 'badminton', display_name: 'Badminton' }]);
+  await ReactTestRenderer.act(async () => {
+    ReactTestRenderer.create(<EventCard event={{ ...BASE_EVENT }} onPress={jest.fn()} />);
+  });
+});
 
 const BASE_EVENT: Event = {
   id: 'evt-1',
@@ -77,7 +94,7 @@ describe('EventCard', () => {
   it('renders sport and category pills (uppercase, primary on primaryLight) then title then one meta line', () => {
     const t = texts(render());
     expect(t.map(textOf)).toEqual([
-      'badminton',
+      'Badminton',
       'Public',
       'Friday night doubles',
       expect.stringContaining('📅'),
@@ -117,7 +134,7 @@ describe('EventCard', () => {
   describe('RSVP pill', () => {
     it('going → success pill as a third tag in row 1', () => {
       const t = texts(render({ current_user_rsvp_status: 'going' }));
-      expect(t.slice(0, 3).map(textOf)).toEqual(['badminton', 'Public', 'Going']);
+      expect(t.slice(0, 3).map(textOf)).toEqual(['Badminton', 'Public', 'Going']);
       expect(StyleSheet.flatten(t[2].props.style).color).toBe(colors.success);
       expect(pillBoxStyle(t[2]).backgroundColor).toBe(colors.successLight);
     });
@@ -171,6 +188,11 @@ describe('EventCard', () => {
   it('omits the sport pill (not an empty pill) when sport is empty', () => {
     const t = texts(render({ sport: '' })).map(textOf);
     expect(t.slice(0, 2)).toEqual(['Public', 'Friday night doubles']);
+  });
+
+  it('falls back to the raw sport slug for a sport not in GET /admin/sports/public (BUG-M02)', () => {
+    const t = texts(render({ sport: 'unlisted_sport' })).map(textOf);
+    expect(t[0]).toBe('unlisted_sport');
   });
 
   describe('container', () => {

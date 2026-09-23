@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { getEvents } from '../../api/events';
 import { getMyGroups } from '../../api/groups';
+import { getSports } from '../../api/sports';
 import { makeEvent } from '../../test-utils/makeEvent';
 import {
   act,
@@ -26,11 +27,17 @@ import {
   texts,
 } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
+import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import type { Event } from '../../types/event';
 import HomeScreen from '../HomeScreen';
 
 jest.mock('../../api/events', () => ({ getEvents: jest.fn() }));
 jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn() }));
+// The dashboard renders `EventCard`, which resolves its sport label via
+// `useSportDisplayName` (BUG-M02) — mocked so this file never makes a real
+// `GET /admin/sports/public` call. Resolves to `[]` (raw-slug fallback);
+// no assertion here cares about the resolved sport pill text.
+jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 const mockUser: { current: Record<string, unknown> } = { current: {} };
 jest.mock('../../auth/AuthContext', () => ({
   useAuth: () => ({ user: mockUser.current }),
@@ -38,6 +45,7 @@ jest.mock('../../auth/AuthContext', () => ({
 
 const mockGetEvents = getEvents as jest.MockedFunction<typeof getEvents>;
 const mockGetMyGroups = getMyGroups as jest.MockedFunction<typeof getMyGroups>;
+const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
 
 const FEED: Event[] = [
   makeEvent({ id: 'up1', title: 'Up one', sport: 'badminton', current_user_rsvp_status: 'going', starts_at: '2026-09-24T10:00:00Z' }),
@@ -101,6 +109,8 @@ beforeEach(() => {
   navigate.mockReset();
   mockGetEvents.mockReset().mockResolvedValue(eventsResponse(FEED));
   mockGetMyGroups.mockReset().mockResolvedValue(groupsResponse(2));
+  mockGetSports.mockReset().mockResolvedValue([]);
+  __resetSportDisplayNamesCacheForTests();
 });
 
 describe('HomeScreen dashboard', () => {

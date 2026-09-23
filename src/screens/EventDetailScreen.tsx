@@ -45,6 +45,7 @@ import type { Event } from '../types/event';
 import type { HomeStackParamList } from '../navigation/types';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import { isOrganiserOf } from '../utils/homeDashboard';
+import { useSportDisplayName } from '../utils/labels';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 
@@ -57,6 +58,12 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Called before the loading/error early returns below (Rules of Hooks) —
+  // `event` is still possibly `null` here, so this falls back to `''`,
+  // which itself falls back to `''` in the rendered meta line once `event`
+  // is guaranteed non-null past those returns.
+  const sportLabel = useSportDisplayName(event?.sport ?? '');
 
   const loadEvent = useCallback(async () => {
     setIsLoading(true);
@@ -135,7 +142,7 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
         ) : null}
 
         <Text style={styles.meta}>
-          {event.sport} · {event.location}
+          {sportLabel} · {event.location}
         </Text>
         <Text style={styles.meta}>{formatEventDate(event.starts_at)}</Text>
         <Text style={styles.meta}>{formatEventTimeRange(event.starts_at, event.ends_at)}</Text>
