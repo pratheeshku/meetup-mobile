@@ -36,10 +36,11 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
-import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import UserSearchPicker from '../components/UserSearchPicker';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { GroupDetail, GroupMember, GroupMemberRole } from '../types/group';
+import type { UserSearchResult } from '../types/user';
 import type { GroupsStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'GroupDetail'>;
@@ -66,7 +67,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [isInviteFormOpen, setIsInviteFormOpen] = useState(false);
-  const [inviteUserIdDraft, setInviteUserIdDraft] = useState('');
+  const [selectedInviteUser, setSelectedInviteUser] = useState<UserSearchResult | null>(null);
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
@@ -100,29 +101,30 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 
   const handleOpenInviteForm = (): void => {
     setInviteError(null);
-    setInviteUserIdDraft('');
+    setSelectedInviteUser(null);
     setIsInviteFormOpen(true);
   };
 
   const handleCancelInvite = (): void => {
     setIsInviteFormOpen(false);
     setInviteError(null);
+    setSelectedInviteUser(null);
   };
 
   const handleSendInvite = async (): Promise<void> => {
-    if (!inviteUserIdDraft.trim()) {
-      setInviteError('Enter a user ID.');
+    if (!selectedInviteUser) {
+      setInviteError('Search for and choose a user to invite.');
       return;
     }
     setInviteError(null);
     setIsInviting(true);
     try {
       await withCorrelationId(async correlationId => {
-        await inviteMember(groupId, inviteUserIdDraft.trim(), { correlationId });
+        await inviteMember(groupId, selectedInviteUser.id, { correlationId });
         setGroup(await getGroup(groupId, { correlationId }));
       });
       setIsInviteFormOpen(false);
-      setInviteUserIdDraft('');
+      setSelectedInviteUser(null);
     } catch {
       setInviteError('Could not send the invite. Please try again.');
     } finally {
@@ -254,15 +256,24 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 
         {isInviteFormOpen ? (
           <View style={styles.editRow}>
-            <TextField
-              style={styles.input}
-              placeholder="User ID"
-              value={inviteUserIdDraft}
-              onChangeText={setInviteUserIdDraft}
-              editable={!isInviting}
-              autoCapitalize="none"
-              autoFocus
-            />
+            {selectedInviteUser ? (
+              <View style={styles.selectedInviteRow}>
+                <Text style={styles.selectedInviteText}>
+                  {selectedInviteUser.nickname} ({selectedInviteUser.display_name})
+                </Text>
+                <TextLink
+                  label="Change"
+                  onPress={() => setSelectedInviteUser(null)}
+                  disabled={isInviting}
+                />
+              </View>
+            ) : (
+              <UserSearchPicker
+                onSelect={setSelectedInviteUser}
+                excludeGroupId={groupId}
+                disabled={isInviting}
+              />
+            )}
             {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
             <View style={styles.editActionsRow}>
               <Button
@@ -270,6 +281,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
                 size="sm"
                 onPress={handleSendInvite}
                 loading={isInviting}
+                disabled={!selectedInviteUser}
                 style={styles.actionSpacing}
               />
               <Button
@@ -410,7 +422,13 @@ const styles = StyleSheet.create({
   memberActionsRow: { flexDirection: 'row', marginTop: spacing.sm },
   linkSpacing: { marginRight: spacing.md },
   editRow: { marginTop: spacing.sm, width: '100%' },
-  input: { marginBottom: spacing.sm },
+  selectedInviteRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  selectedInviteText: { ...typography.body, color: colors.textPrimary, flexShrink: 1 },
   editActionsRow: { flexDirection: 'row', marginTop: spacing.xs },
   actionSpacing: { marginRight: spacing.sm },
   rolePickerRow: { flexDirection: 'row', marginBottom: spacing.sm },

@@ -90,3 +90,20 @@ export interface UserProfile {
 export interface UpdateProfilePayload {
   display_name?: string;
 }
+
+/**
+ * `GET /users/search` response item (`UserSearchResult(UserProfile)`,
+ * `users/schemas.py`) — verified directly against the live backend
+ * (`users/router.py`, BUG-M01), the same endpoint-not-in-the-local-design
+ * -excerpt-but-confirmed-live pattern already established for
+ * `GET /admin/sports/public` (this doc's own §7 provenance note).
+ * `pending`: true when an outstanding invite already exists for this user
+ * in the searching context (currently only meaningful for
+ * `exclude_team_id`; always `false` for group/event searches).
+ */
+export interface UserSearchResult {
+  id: string;
+  display_name: string;
+  nickname: string;
+  pending: boolean;
+}
