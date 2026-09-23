@@ -74,10 +74,10 @@ function eventsResponse(items: Event[]): Awaited<ReturnType<typeof getEvents>> {
 
 const navigate = jest.fn();
 
-async function mount(): Promise<Instance> {
+async function mount(params?: { filter?: 'mine' }): Promise<Instance> {
   const props = {
     navigation: { navigate },
-    route: { key: 'k', name: 'EventsList' },
+    route: { key: 'k', name: 'EventsList', params },
   } as unknown as React.ComponentProps<typeof HomeScreen>;
   return renderAsync(
     <SafeAreaProvider initialMetrics={METRICS}>
@@ -192,11 +192,10 @@ describe('HomeScreen dashboard', () => {
     expect(navigate).toHaveBeenCalledWith('Groups', { screen: 'GroupsList' });
   });
 
-  it('leaves My Games inert (no pressable, no navigation)', async () => {
+  it('switches to the filtered My Games view when the My Games tile is tapped (BUG-M04)', async () => {
     const root = await mount();
-    expect(() => pressableLabelled(root, 'My Games, 4 active · tap to manage')).toThrow(
-      /found 0/,
-    );
+    act(() => pressableLabelled(root, 'My Games, 4 active · tap to manage').props.onPress());
+    expect(navigate).toHaveBeenCalledWith('EventsList', { filter: 'mine' });
   });
 
   it('shows empty states, zero counts and only "All" for an empty feed', async () => {
@@ -209,6 +208,39 @@ describe('HomeScreen dashboard', () => {
     expect(all).toContain('0 active · tap to manage');
     expect(all).toContain('0 groups · tap to manage');
     expect(() => pressableLabelled(root, 'Badminton')).toThrow(/found 0/);
+  });
+});
+
+describe('HomeScreen — My Games filtered view (BUG-M04)', () => {
+  it('shows only organised-or-going events, soonest first, hiding the normal dashboard sections', async () => {
+    const root = await mount({ filter: 'mine' });
+    const all = texts(root);
+    // Sorted by starts_at: up2 (22nd), up1 (24th), own (25th), up4 (26th).
+    expect(cardTitles(root, /^(Up |My own)/)).toEqual([
+      'Up two',
+      'Up one',
+      'My own event',
+      'Up four',
+    ]);
+    expect(all).not.toContain('Rec one');
+    expect(all).not.toContain('Group only');
+    expect(all).not.toContain('Cancelled one');
+    expect(all).toContain('My Games');
+    expect(all).not.toContain('Your Upcoming Games');
+    expect(all).not.toContain('Recommended for You');
+    expect(all).not.toContain('My Games & Groups');
+  });
+
+  it('returns to the normal dashboard when "All" is tapped', async () => {
+    const root = await mount({ filter: 'mine' });
+    act(() => pressableWithText(root, '← All').props.onPress());
+    expect(navigate).toHaveBeenCalledWith('EventsList', { filter: undefined });
+  });
+
+  it('shows the empty-state copy when the user has no games', async () => {
+    mockGetEvents.mockResolvedValue(eventsResponse([]));
+    const root = await mount({ filter: 'mine' });
+    expect(texts(root)).toContain("You don't have any games yet — join one or create your own.");
   });
 });
 

@@ -1,10 +1,10 @@
 /**
  * "My Games & Groups": two side-by-side stat tiles.
  *
- * - My Games: count supplied by the screen (organises or going). INERT — the
- *   brief allows this because no dedicated "my games" screen exists. The
- *   tile is therefore not pressable, even though the specified copy says
- *   "tap to manage" (flagged in the Implementation Report).
+ * - My Games: count supplied by the screen (organises or going); tapping
+ *   switches the Home dashboard to a filtered "My Games" view (BUG-M04 —
+ *   previously inert, since no dedicated "my games" screen existed; the
+ *   dashboard now doubles as one via `EventsList`'s `filter` param).
  * - My Groups: count from `getMyGroups()`; tapping goes to the Groups tab.
  *   When the groups request failed (`groupsCount === null`) the count is
  *   dropped from the copy rather than showing a wrong "0".
@@ -19,12 +19,14 @@ interface MyGamesGroupsSectionProps {
   myGamesCount: number;
   /** `null` when the groups request failed. */
   groupsCount: number | null;
+  onPressMyGames: () => void;
   onPressMyGroups: () => void;
 }
 
 export default function MyGamesGroupsSection({
   myGamesCount,
   groupsCount,
+  onPressMyGames,
   onPressMyGroups,
 }: MyGamesGroupsSectionProps): React.JSX.Element {
   const groupsSubtitle =
@@ -42,6 +44,7 @@ export default function MyGamesGroupsSection({
           icon="🎮"
           title="My Games"
           subtitle={`${myGamesCount} active · tap to manage`}
+          onPress={onPressMyGames}
           style={styles.tile}
         />
         <StatCard

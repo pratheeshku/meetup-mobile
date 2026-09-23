@@ -17,9 +17,15 @@ export type AuthStackParamList = {
  * (retired). `EventsList`'s `refreshKey` works as on Groups/Tournaments:
  * set by a successful Casual Game create (via `popTo`) so the list
  * re-fetches.
+ *
+ * `EventsList.filter` (BUG-M04): `'mine'` switches the Home dashboard to a
+ * filtered "My Games" view (events the user organises or is going to,
+ * `getMyGames()`) — the Home tab's own equivalent of a "Games tab", since
+ * no separate one exists. Set by the Home dashboard's "My Games" tile;
+ * cleared by navigating back to `undefined`.
  */
 export type HomeStackParamList = {
-  EventsList: { refreshKey?: number } | undefined;
+  EventsList: { refreshKey?: number; filter?: 'mine' } | undefined;
   EventDetail: { eventId: string };
   CreateGame: undefined;
   NotificationHistory: undefined;

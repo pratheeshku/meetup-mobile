@@ -22,7 +22,7 @@
  * content here only needs ordinary top spacing.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -31,6 +31,7 @@ import { getEvents } from '../api/events';
 import { withCorrelationId } from '../api/correlationId';
 import { getMyGroups } from '../api/groups';
 import { useAuth } from '../auth/AuthContext';
+import EventCard from '../components/EventCard';
 import ErrorView from '../components/ErrorView';
 import GreetingHeader from '../components/home/GreetingHeader';
 import MyGamesGroupsSection from '../components/home/MyGamesGroupsSection';
@@ -38,12 +39,14 @@ import RecommendedSection from '../components/home/RecommendedSection';
 import SportFilterPills from '../components/home/SportFilterPills';
 import UpcomingGamesSection from '../components/home/UpcomingGamesSection';
 import LoadingView from '../components/LoadingView';
-import { colors, spacing } from '../theme/tokens';
+import TextLink from '../components/TextLink';
+import { colors, spacing, typography } from '../theme/tokens';
 import { getDisplayName } from '../utils/displayName';
 import type { Event } from '../types/event';
 import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
 import {
   countMyGames,
+  getMyGames,
   getRecommendedGames,
   getSportOptions,
   getUpcomingGames,
@@ -122,6 +125,14 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     [events, userId, activeSport],
   );
   const myGamesCount = useMemo(() => countMyGames(events, userId), [events, userId]);
+  // BUG-M04: the "My Games" tile switches this same screen (there is no
+  // separate "Games tab") to a filtered view via `EventsList`'s `filter`
+  // param, instead of the usual Upcoming/Recommended/tiles dashboard.
+  // Rendered directly with `EventCard` rather than `EventListSection` —
+  // that component caps a dashboard preview at `MAX_SECTION_ITEMS`, which
+  // would defeat the point of a "see all my games" view.
+  const isMyGamesFilterActive = route.params?.filter === 'mine';
+  const myGames = useMemo(() => getMyGames(events, userId), [events, userId]);
 
   const openEvent = useCallback(
     (event: Event) => navigation.navigate('EventDetail', { eventId: event.id }),
@@ -154,18 +165,45 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       <View style={styles.block}>
         <GreetingHeader name={getDisplayName(user)} />
       </View>
-      <View style={styles.pills}>
-        <SportFilterPills sports={sports} selectedKey={activeSport} onSelect={setSelectedSport} />
-      </View>
-      <View style={styles.block}>
-        <UpcomingGamesSection events={upcoming} onEventPress={openEvent} />
-        <RecommendedSection events={recommended} onEventPress={openEvent} />
-        <MyGamesGroupsSection
-          myGamesCount={myGamesCount}
-          groupsCount={groupsCount}
-          onPressMyGroups={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
-        />
-      </View>
+      {isMyGamesFilterActive ? (
+        <View style={styles.block}>
+          <TextLink
+            label="← All"
+            onPress={() => navigation.navigate('EventsList', { filter: undefined })}
+          />
+          <View style={styles.myGamesHeader}>
+            <Text style={styles.myGamesTitle} accessibilityRole="header">
+              My Games
+            </Text>
+            <Text style={styles.myGamesSubtitle}>Games you organise or are going to</Text>
+          </View>
+          {myGames.length === 0 ? (
+            <Text style={styles.myGamesEmpty}>
+              You don&apos;t have any games yet — join one or create your own.
+            </Text>
+          ) : (
+            myGames.map(event => (
+              <EventCard key={event.id} event={event} onPress={() => openEvent(event)} />
+            ))
+          )}
+        </View>
+      ) : (
+        <>
+          <View style={styles.pills}>
+            <SportFilterPills sports={sports} selectedKey={activeSport} onSelect={setSelectedSport} />
+          </View>
+          <View style={styles.block}>
+            <UpcomingGamesSection events={upcoming} onEventPress={openEvent} />
+            <RecommendedSection events={recommended} onEventPress={openEvent} />
+            <MyGamesGroupsSection
+              myGamesCount={myGamesCount}
+              groupsCount={groupsCount}
+              onPressMyGames={() => navigation.navigate('EventsList', { filter: 'mine' })}
+              onPressMyGroups={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
+            />
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -173,4 +211,13 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 const styles = StyleSheet.create({
   block: { paddingHorizontal: spacing.md },
   pills: { marginTop: spacing.md },
+  myGamesHeader: { marginTop: spacing.md, marginBottom: spacing.md },
+  myGamesTitle: { ...typography.h3, fontWeight: '700', color: colors.textPrimary },
+  myGamesSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
+  myGamesEmpty: {
+    ...typography.body,
+    color: colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: spacing.lg,
+  },
 });

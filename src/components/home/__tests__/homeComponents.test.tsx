@@ -155,7 +155,14 @@ describe.each([
 describe('MyGamesGroupsSection', () => {
   it('shows both tiles with the specified copy', () => {
     const t = texts(
-      render(<MyGamesGroupsSection myGamesCount={4} groupsCount={2} onPressMyGroups={jest.fn()} />),
+      render(
+        <MyGamesGroupsSection
+          myGamesCount={4}
+          groupsCount={2}
+          onPressMyGames={jest.fn()}
+          onPressMyGroups={jest.fn()}
+        />,
+      ),
     );
     expect(t).toEqual(
       expect.arrayContaining([
@@ -172,14 +179,28 @@ describe('MyGamesGroupsSection', () => {
 
   it('uses the singular for exactly one group', () => {
     const t = texts(
-      render(<MyGamesGroupsSection myGamesCount={0} groupsCount={1} onPressMyGroups={jest.fn()} />),
+      render(
+        <MyGamesGroupsSection
+          myGamesCount={0}
+          groupsCount={1}
+          onPressMyGames={jest.fn()}
+          onPressMyGroups={jest.fn()}
+        />,
+      ),
     );
     expect(t).toContain('1 group · tap to manage');
   });
 
   it('shows zero counts honestly', () => {
     const t = texts(
-      render(<MyGamesGroupsSection myGamesCount={0} groupsCount={0} onPressMyGroups={jest.fn()} />),
+      render(
+        <MyGamesGroupsSection
+          myGamesCount={0}
+          groupsCount={0}
+          onPressMyGames={jest.fn()}
+          onPressMyGroups={jest.fn()}
+        />,
+      ),
     );
     expect(t).toContain('0 active · tap to manage');
     expect(t).toContain('0 groups · tap to manage');
@@ -188,22 +209,44 @@ describe('MyGamesGroupsSection', () => {
   it('omits the count (rather than showing a wrong 0) when the groups request failed', () => {
     const t = texts(
       render(
-        <MyGamesGroupsSection myGamesCount={1} groupsCount={null} onPressMyGroups={jest.fn()} />,
+        <MyGamesGroupsSection
+          myGamesCount={1}
+          groupsCount={null}
+          onPressMyGames={jest.fn()}
+          onPressMyGroups={jest.fn()}
+        />,
       ),
     );
     expect(t).toContain('Tap to manage');
     expect(t.join(' ')).not.toMatch(/\d+ groups?/);
   });
 
-  it('makes only My Groups pressable; My Games is inert', () => {
+  it('makes both My Games and My Groups pressable (BUG-M04)', () => {
+    const onPressMyGames = jest.fn();
     const onPressMyGroups = jest.fn();
     const root = render(
-      <MyGamesGroupsSection myGamesCount={4} groupsCount={2} onPressMyGroups={onPressMyGroups} />,
+      <MyGamesGroupsSection
+        myGamesCount={4}
+        groupsCount={2}
+        onPressMyGames={onPressMyGames}
+        onPressMyGroups={onPressMyGroups}
+      />,
     );
     const pressable = pressables(root);
-    expect(pressable).toHaveLength(1);
-    expect(pressable[0].props.accessibilityLabel).toBe('My Groups, 2 groups · tap to manage');
-    act(() => pressable[0].props.onPress());
+    expect(pressable).toHaveLength(2);
+
+    const myGamesTile = pressable.find(
+      node => node.props.accessibilityLabel === 'My Games, 4 active · tap to manage',
+    );
+    const myGroupsTile = pressable.find(
+      node => node.props.accessibilityLabel === 'My Groups, 2 groups · tap to manage',
+    );
+    expect(myGamesTile).toBeDefined();
+    expect(myGroupsTile).toBeDefined();
+
+    act(() => myGamesTile?.props.onPress());
+    expect(onPressMyGames).toHaveBeenCalledTimes(1);
+    act(() => myGroupsTile?.props.onPress());
     expect(onPressMyGroups).toHaveBeenCalledTimes(1);
   });
 });
