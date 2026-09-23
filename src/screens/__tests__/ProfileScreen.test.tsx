@@ -4,7 +4,8 @@
  */
 import React from 'react';
 
-import { getProfile, updateProfile } from '../../api/profile';
+import { getProfile, updateProfile, updateSkillLevel } from '../../api/profile';
+import { getSports } from '../../api/sports';
 import { act, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import type { UserProfile } from '../../types/user';
@@ -23,9 +24,12 @@ jest.mock('../../api/profile', () => ({
   requestDeletion: jest.fn(),
   confirmDeletion: jest.fn(),
 }));
+jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 
 const mockGetProfile = getProfile as jest.MockedFunction<typeof getProfile>;
 const mockUpdateProfile = updateProfile as jest.MockedFunction<typeof updateProfile>;
+const mockUpdateSkillLevel = updateSkillLevel as jest.MockedFunction<typeof updateSkillLevel>;
+const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
 
 const PROFILE: UserProfile = {
   id: 'u-1',
@@ -35,16 +39,37 @@ const PROFILE: UserProfile = {
   skill_levels: [],
 };
 
+const SPORTS = [
+  { name: 'table_tennis', display_name: 'Table Tennis' },
+  { name: 'badminton', display_name: 'Badminton' },
+];
+
 const mount = (): Promise<Instance> =>
   renderAsync(<ProfileScreen {...({ navigation: { navigate: jest.fn() }, route: {} } as unknown as Props)} />);
 
 const displayNameInput = (root: Instance): Instance =>
   root.find(node => (node.type as unknown) === 'TextInput' && node.props.accessibilityLabel === 'Display name');
 
+/**
+ * The screen's own Beginner/Intermediate/Expert buttons carry no
+ * `accessibilityRole` (pre-existing, unrelated to BUG-M05), so the shared
+ * `pressableWithText`/`pressableLabelled` helpers (which require one) can't
+ * find them — matched here directly by their `onPress` + text content.
+ */
+const pressSkillLevelButton = (root: Instance, label: string): void => {
+  act(() => {
+    root
+      .find(node => typeof node.props.onPress === 'function' && texts(node).includes(label))
+      .props.onPress();
+  });
+};
+
 beforeEach(() => {
   mockUpdateUser.mockReset();
   mockUpdateProfile.mockReset().mockResolvedValue(undefined);
   mockGetProfile.mockReset().mockResolvedValue(PROFILE);
+  mockUpdateSkillLevel.mockReset().mockResolvedValue(undefined);
+  mockGetSports.mockReset().mockResolvedValue(SPORTS);
 });
 
 describe('ProfileScreen names', () => {
@@ -111,5 +136,44 @@ describe('ProfileScreen display name editing', () => {
     await act(async () => pressableWithText(root, 'Save').props.onPress());
     expect(texts(root)).toContain('Could not save your display name. Please try again.');
     expect(mockUpdateUser).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProfileScreen skill-level sport picker (BUG-M05)', () => {
+  async function startAdd(): Promise<Instance> {
+    const root = await mount();
+    await act(async () => pressableWithText(root, 'Add').props.onPress());
+    return root;
+  }
+
+  it('offers the sport list from GET /admin/sports/public as chips, not a free-text field', async () => {
+    const root = await startAdd();
+    expect(texts(root)).toEqual(expect.arrayContaining(['Table Tennis', 'Badminton']));
+    expect(root.findAll(node => (node.type as unknown) === 'TextInput')).toHaveLength(0);
+  });
+
+  it('saves the chosen sport’s name (not its display label) with the skill level', async () => {
+    const root = await startAdd();
+    act(() => pressableWithText(root, 'Table Tennis').props.onPress());
+    pressSkillLevelButton(root, 'Intermediate');
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
+    expect(mockUpdateSkillLevel).toHaveBeenCalledWith(
+      'table_tennis',
+      'Intermediate',
+      expect.anything(),
+    );
+  });
+
+  it('rejects saving without a chosen sport', async () => {
+    const root = await startAdd();
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
+    expect(texts(root)).toContain('Choose a sport.');
+    expect(mockUpdateSkillLevel).not.toHaveBeenCalled();
+  });
+
+  it('shows a hint instead of a broken empty picker when no sports are available', async () => {
+    mockGetSports.mockResolvedValue([]);
+    const root = await startAdd();
+    expect(texts(root)).toContain('No sports are available right now.');
   });
 });

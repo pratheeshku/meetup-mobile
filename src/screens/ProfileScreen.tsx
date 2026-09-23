@@ -39,15 +39,19 @@ import {
   updateProfile,
   updateSkillLevel,
 } from '../api/profile';
+import { getSports } from '../api/sports';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
+import OptionChips from '../components/OptionChips';
+import type { ChipOption } from '../components/OptionChips';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { getDisplayName } from '../utils/displayName';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { SkillLevelValue, UserProfile } from '../types/user';
+import type { Sport } from '../types/sport';
 import type { ProfileStackParamList } from '../navigation/types';
 
 const SKILL_LEVEL_OPTIONS: SkillLevelValue[] = ['Beginner', 'Intermediate', 'Expert'];
@@ -61,13 +65,20 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // BUG-M05: sport choices for the skill-level picker, reusing the same
+  // `GET /admin/sports/public` source and `OptionChips` component as
+  // `CreateGameScreen`. Secondary/non-blocking (same pattern as that
+  // screen's Group picker) — a failure just leaves the picker empty; it
+  // never blocks the rest of Profile from loading.
+  const [sports, setSports] = useState<Sport[]>([]);
+
   const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
   const [displayNameDraft, setDisplayNameDraft] = useState('');
   const [isSavingDisplayName, setIsSavingDisplayName] = useState(false);
   const [displayNameError, setDisplayNameError] = useState<string | null>(null);
 
   const [isEditingSkillLevel, setIsEditingSkillLevel] = useState(false);
-  const [sportDraft, setSportDraft] = useState('');
+  const [sportDraft, setSportDraft] = useState<string | null>(null);
   const [skillLevelDraft, setSkillLevelDraft] = useState<SkillLevelValue>('Beginner');
   const [isSavingSkillLevel, setIsSavingSkillLevel] = useState(false);
   const [skillLevelError, setSkillLevelError] = useState<string | null>(null);
@@ -96,6 +107,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
   useEffect(() => {
     loadProfile();
+    getSports().then(setSports, () => setSports([]));
   }, [loadProfile]);
 
   const handleStartEditDisplayName = (): void => {
@@ -137,7 +149,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
   const handleStartAddSkillLevel = (): void => {
     setSkillLevelError(null);
-    setSportDraft('');
+    setSportDraft(null);
     setSkillLevelDraft('Beginner');
     setIsEditingSkillLevel(true);
   };
@@ -155,15 +167,15 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   };
 
   const handleSaveSkillLevel = async (): Promise<void> => {
-    if (!sportDraft.trim()) {
-      setSkillLevelError('Enter a sport.');
+    if (!sportDraft) {
+      setSkillLevelError('Choose a sport.');
       return;
     }
     setSkillLevelError(null);
     setIsSavingSkillLevel(true);
     try {
       await withCorrelationId(async correlationId => {
-        await updateSkillLevel(sportDraft.trim(), skillLevelDraft, { correlationId });
+        await updateSkillLevel(sportDraft, skillLevelDraft, { correlationId });
         setProfile(await getProfile({ correlationId }));
       });
       setIsEditingSkillLevel(false);
@@ -251,6 +263,10 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   // consolidation, since the actual `GET /users/me` response always
   // includes it in practice (Proposed Assumption, unchanged).
   const skillLevels = profile.skill_levels ?? [];
+  const sportOptions: ChipOption<string>[] = sports.map(item => ({
+    value: item.name,
+    label: item.display_name,
+  }));
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -334,14 +350,16 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
         {isEditingSkillLevel ? (
           <View style={styles.editRow}>
-            <TextField
-              style={styles.input}
-              placeholder="Sport"
-              value={sportDraft}
-              onChangeText={setSportDraft}
-              editable={!isSavingSkillLevel}
-              autoCapitalize="none"
-            />
+            {sportOptions.length === 0 ? (
+              <Text style={styles.hint}>No sports are available right now.</Text>
+            ) : (
+              <OptionChips
+                options={sportOptions}
+                value={sportDraft}
+                onChange={setSportDraft}
+                disabled={isSavingSkillLevel}
+              />
+            )}
             <View style={styles.skillLevelPickerRow}>
               {SKILL_LEVEL_OPTIONS.map(option => (
                 <Pressable
@@ -478,6 +496,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { ...typography.h3, color: colors.textPrimary },
   emptyText: { ...typography.body, color: colors.textSecondary },
+  hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
   skillLevelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
