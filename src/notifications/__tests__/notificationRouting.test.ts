@@ -1,8 +1,11 @@
 /**
  * Routing for the two participant types (`event_participant_added` /
- * `event_participant_removed`) added after the design's original 12.
- * They open Event Detail with `entity_id` as the event id, like
- * `event_changed`; a blank `entity_id` must not open Event Detail.
+ * `event_participant_removed`) added after the design's original 12, plus
+ * `group_event_created` (mobile notify-kit task Part 3), added the same way.
+ * All three open Event Detail with `entity_id` as the event id;
+ * `event_participant_added`/`_removed` additionally guard against a blank
+ * `entity_id` (see below) — `group_event_created` does not, matching
+ * `event_invite`/`event_changed`'s existing (unguarded) behaviour.
  */
 import { NOTIFICATION_TYPES } from '../../types/notification';
 import {
@@ -14,10 +17,12 @@ import {
 const PARTICIPANT_TYPES = ['event_participant_added', 'event_participant_removed'] as const;
 
 describe('type list', () => {
-  it('contains both participant types, alongside the original 12 (14 total, no duplicates)', () => {
-    expect(NOTIFICATION_TYPES).toEqual(expect.arrayContaining([...PARTICIPANT_TYPES]));
-    expect(NOTIFICATION_TYPES).toHaveLength(14);
-    expect(new Set(NOTIFICATION_TYPES).size).toBe(14);
+  it('contains both participant types and group_event_created, alongside the original 12 (15 total, no duplicates)', () => {
+    expect(NOTIFICATION_TYPES).toEqual(
+      expect.arrayContaining([...PARTICIPANT_TYPES, 'group_event_created']),
+    );
+    expect(NOTIFICATION_TYPES).toHaveLength(15);
+    expect(new Set(NOTIFICATION_TYPES).size).toBe(15);
   });
 
   it('resolves every listed type without throwing (list and switch cannot drift)', () => {
@@ -44,6 +49,30 @@ describe.each(PARTICIPANT_TYPES)('resolveNotificationTarget(%s)', type => {
 
   it.each(['', '   '])('falls back to the events list for a blank entity id (%p)', blank => {
     expect(resolveNotificationTarget(type, blank)).toEqual({ tab: 'Home', screen: 'EventsList' });
+  });
+});
+
+describe('resolveNotificationTarget(group_event_created)', () => {
+  it('opens Event Detail for the entity id', () => {
+    expect(resolveNotificationTarget('group_event_created', 'evt-42')).toEqual({
+      tab: 'Home',
+      screen: 'EventDetail',
+      params: { eventId: 'evt-42' },
+    });
+  });
+
+  it('routes exactly like event_changed', () => {
+    expect(resolveNotificationTarget('group_event_created', 'evt-42')).toEqual(
+      resolveNotificationTarget('event_changed', 'evt-42'),
+    );
+  });
+
+  it('does NOT fall back to the events list for a blank entity id (unlike the participant types)', () => {
+    expect(resolveNotificationTarget('group_event_created', '')).toEqual({
+      tab: 'Home',
+      screen: 'EventDetail',
+      params: { eventId: '' },
+    });
   });
 });
 

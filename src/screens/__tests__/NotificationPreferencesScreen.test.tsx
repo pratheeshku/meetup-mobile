@@ -35,7 +35,7 @@ it('shows a row for every known type, with the two participant labels', async ()
   expect(labels).toContain('Removed from an event');
   const switches = root.findAllByType(Switch);
   expect(switches).toHaveLength(NOTIFICATION_TYPES.length);
-  expect(NOTIFICATION_TYPES.length).toBe(14);
+  expect(NOTIFICATION_TYPES.length).toBe(15);
 
   // Unlisted types default to on; a listed one keeps the server value.
   const added = NOTIFICATION_TYPES.indexOf('event_participant_added');

@@ -4,8 +4,12 @@
  * `event_participant_added` / `event_participant_removed` are delivered
  * data-only and rendered as a local notify-kit notification with View/OK
  * actions (`participantHandler.ts`); they return early and never reach the
- * in-app banner. Every other known type keeps its existing banner behaviour,
- * and an unknown type is still dropped.
+ * in-app banner. `group_event_created` (Join-only) / `event_changed`
+ * (View+OK) are the same kind of exception, added by the mobile notify-kit
+ * task Part 3 (`eventNotificationHandler.ts`) — `event_changed` previously
+ * fell through to the banner (see the "every other known type" test below,
+ * now using `event_invite` instead). Every other known type keeps its
+ * existing banner behaviour, and an unknown type is still dropped.
  *
  * (These participant cases previously asserted the banner; that behaviour was
  * deliberately replaced by the notify-kit action-button task, Step 4:
@@ -46,6 +50,8 @@ afterEach(() => {
 describe.each([
   ['event_participant_added', 'You were added', 'Sunday football'],
   ['event_participant_removed', 'You were removed', 'Sunday football'],
+  ['group_event_created', 'New event in your group', 'Sunday football, 6pm, Central Park'],
+  ['event_changed', 'Event updated', 'Venue changed: Central Park -> Riverside Courts'],
 ])('%s', (type, title, body) => {
   it('displays a local notification with the payload title, body and data — not the banner', () => {
     deliver({
@@ -101,11 +107,11 @@ describe.each([
 it('still shows the banner (and never notify-kit) for every other known type — unchanged behaviour', () => {
   deliver({
     messageId: 'm6',
-    data: { notification_type: 'event_changed', entity_id: 'evt-9', title: 't', body: 'b' },
+    data: { notification_type: 'event_invite', entity_id: 'evt-9', title: 't', body: 'b' },
   });
 
   expect(getBannerState()).toEqual({
-    notification_type: 'event_changed',
+    notification_type: 'event_invite',
     entity_id: 'evt-9',
     title: 't',
     body: 'b',
@@ -143,7 +149,7 @@ describe('unread badge count', () => {
   it('increments by 1 for a banner-type message', () => {
     deliver({
       messageId: 'm1',
-      data: { notification_type: 'event_changed', entity_id: 'e1', title: 't', body: 'b' },
+      data: { notification_type: 'event_invite', entity_id: 'e1', title: 't', body: 'b' },
     });
     expect(getUnreadBadgeCount()).toBe(1);
   });
@@ -152,6 +158,14 @@ describe('unread badge count', () => {
     deliver({
       messageId: 'm2',
       data: { notification_type: 'event_participant_added', entity_id: 'e1', title: 't', body: 'b' },
+    });
+    expect(getUnreadBadgeCount()).toBe(1);
+  });
+
+  it('increments by 1 for a group_event_created/event_changed (data-only) message too', () => {
+    deliver({
+      messageId: 'm4',
+      data: { notification_type: 'event_changed', entity_id: 'e1', title: 't', body: 'b' },
     });
     expect(getUnreadBadgeCount()).toBe(1);
   });

@@ -42,6 +42,10 @@
  *   background handler in `index.js` (app backgrounded), and
  *   `getInitialParticipantNotification` (quit state, folded into the same
  *   one-shot check above).
+ * - `group_event_created`/`event_changed` (mobile notify-kit task Part 3)
+ *   are the same kind of exception — Join-only / View+OK
+ *   (`eventNotificationHandler.ts`) — wired the same way via
+ *   `registerEventForegroundHandler` and `getInitialEventNotification`.
  *
  * Deviation (recorded for the Implementation Report, needs architect
  * ratification): the task brief's Step 4 says to implement background/
@@ -93,6 +97,10 @@ import {
   getInitialParticipantNotification,
   registerParticipantForegroundHandler,
 } from '../notifications/participantHandler';
+import {
+  getInitialEventNotification,
+  registerEventForegroundHandler,
+} from '../notifications/eventNotificationHandler';
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
@@ -287,11 +295,14 @@ export default function RootNavigator(): React.JSX.Element {
     }
     hasCheckedInitialNotification.current = true;
 
-    // FCM covers taps on OS-displayed notifications; participant
-    // notifications are built locally by notify-kit (data-only FCM), so a
-    // quit-state launch from one of them is only visible to notify-kit.
+    // FCM covers taps on OS-displayed notifications; participant and event
+    // notifications (group_event_created/event_changed) are built locally
+    // by notify-kit (data-only FCM), so a quit-state launch from one of
+    // them is only visible to notify-kit.
     const payload =
-      (await getInitialNotification()) ?? (await getInitialParticipantNotification());
+      (await getInitialNotification()) ??
+      (await getInitialParticipantNotification()) ??
+      (await getInitialEventNotification());
     // Known limitation (consistent with §3.9's own "unauthenticated deep
     // links" note, which this codebase hasn't built the
     // `pendingDestination` mechanism for either): a quit-state tap that
@@ -323,10 +334,15 @@ export default function RootNavigator(): React.JSX.Element {
     // `index.js`).
     const unsubscribeParticipantEvents = registerParticipantForegroundHandler();
 
+    // group_event_created (Join) / event_changed (View/OK) presses while
+    // the app is active — same pattern as the participant listener above.
+    const unsubscribeEventEvents = registerEventForegroundHandler();
+
     return () => {
       unsubscribeMessage();
       unsubscribeOpenedApp();
       unsubscribeParticipantEvents();
+      unsubscribeEventEvents();
     };
   }, []);
 

@@ -15,6 +15,13 @@
  * explicit instruction; the design needs to ratify them (deviation from
  * §4.8's "all 12 confirmed types"). What their `entity_id` holds is
  * unverified — see `notificationRouting.ts`.
+ *
+ * `group_event_created` (mobile notify-kit task, Part 3) is a third
+ * ratified addition beyond §4.8's 12, added by the same explicit-instruction
+ * mechanism as the two participant types above — the design still needs to
+ * formally ratify it. Its `entity_id` is stated by the task brief to be the
+ * event id (not the group id); unverified against a live backend payload,
+ * same caveat as the two participant types (see `notificationRouting.ts`).
  */
 export type NotificationType =
   | 'global'
@@ -23,6 +30,7 @@ export type NotificationType =
   | 'event_cancelled'
   | 'event_participant_added'
   | 'event_participant_removed'
+  | 'group_event_created'
   | 'waitlist_promoted'
   | 'group_invite'
   | 'tournament_match_scheduled'
@@ -32,7 +40,7 @@ export type NotificationType =
   | 'tournament_standings_published'
   | 'team_invite';
 
-/** All 14 known notification types (the 12 from the task brief, plus the two participant types). */
+/** All 15 known notification types (the 12 from the task brief, the two participant types, plus `group_event_created`). */
 export const NOTIFICATION_TYPES: NotificationType[] = [
   'global',
   'event_invite',
@@ -40,6 +48,7 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   'event_cancelled',
   'event_participant_added',
   'event_participant_removed',
+  'group_event_created',
   'waitlist_promoted',
   'group_invite',
   'tournament_match_scheduled',

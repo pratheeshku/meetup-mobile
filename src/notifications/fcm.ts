@@ -39,6 +39,10 @@ import {
   displayParticipantNotification,
   isParticipantNotificationType,
 } from './participantHandler';
+import {
+  displayEventNotification,
+  isEventNotificationType,
+} from './eventNotificationHandler';
 import { NOTIFICATION_TYPES } from '../types/notification';
 import type { NotificationType, PushNotificationPayload } from '../types/notification';
 
@@ -220,7 +224,10 @@ function toStringRecord(data: RemoteMessage['data']): Record<string, string> {
  * Exception: `event_participant_added` / `event_participant_removed` are
  * delivered data-only and rendered as a local notification with View/OK
  * action buttons (`participantHandler.ts`); they return early and never
- * reach `showBanner`.
+ * reach `showBanner`. `group_event_created` / `event_changed` are the same
+ * kind of exception (Join-only / View+OK — `eventNotificationHandler.ts`,
+ * mobile notify-kit task Part 3); see that file's header for the
+ * `event_changed` payload-shape assumption this depends on.
  *
  * Logs only the message id and notification type (a fixed backend enum
  * value, not user content) — never title/body/entity id (R-111, task
@@ -245,6 +252,15 @@ export function onMessage(): () => void {
         // Display failure (e.g. notification permission revoked) must not
         // surface as an unhandled rejection; nothing user-actionable here.
         console.log('[fcm] participant notification display failed');
+      });
+      return;
+    }
+
+    if (isEventNotificationType(remoteMessage.data?.notification_type)) {
+      displayEventNotification(toStringRecord(remoteMessage.data)).catch(() => {
+        // Display failure (e.g. notification permission revoked) must not
+        // surface as an unhandled rejection; nothing user-actionable here.
+        console.log('[fcm] event notification display failed');
       });
       return;
     }
@@ -274,7 +290,9 @@ export function onMessage(): () => void {
  * Exception: `event_participant_added` / `event_participant_removed` are
  * data-only (the server suppresses their `notification` block), so nothing
  * displays them unless this handler does — it builds the local notification
- * with View/OK actions via `participantHandler.ts`.
+ * with View/OK actions via `participantHandler.ts`. `group_event_created` /
+ * `event_changed` are the same kind of exception
+ * (`eventNotificationHandler.ts`, mobile notify-kit task Part 3).
  *
  * Must be called once at module/app init time — it is called at top level in
  * `index.js`, outside any React lifecycle, before any message can arrive.
@@ -288,6 +306,16 @@ export function registerBackgroundMessageHandler(): void {
     if (isParticipantNotificationType(remoteMessage.data?.notification_type)) {
       try {
         await displayParticipantNotification(toStringRecord(remoteMessage.data));
+      } catch {
+        // Best-effort: a display failure in a headless task has nowhere
+        // useful to surface, and must not reject the FCM handler.
+      }
+      return;
+    }
+
+    if (isEventNotificationType(remoteMessage.data?.notification_type)) {
+      try {
+        await displayEventNotification(toStringRecord(remoteMessage.data));
       } catch {
         // Best-effort: a display failure in a headless task has nowhere
         // useful to surface, and must not reject the FCM handler.
