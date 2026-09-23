@@ -53,6 +53,11 @@ import type {
 } from '../types/tournament';
 import { getApiErrorMessage } from '../utils/apiError';
 import {
+  EVENT_VISIBILITY_LABELS,
+  SKILL_LEVEL_LABELS,
+  TOURNAMENT_VISIBILITY_LABELS,
+} from '../utils/labels';
+import {
   applyQuickDate,
   LOCAL_DATE_PLACEHOLDER,
   LOCAL_DATE_TIME_PLACEHOLDER,
@@ -76,30 +81,35 @@ const MODE_OPTIONS: ChipOption<GameKind>[] = [
 
 /**
  * `EventCreate.visibility` (`events/schemas.py`, `validate_visibility`):
- * enforced enum. Labels match web's `event-visibility` `<select>`.
+ * enforced enum. Labels match web's `event-visibility` `<select>`; words
+ * sourced from the shared `EVENT_VISIBILITY_LABELS` (BUG-M02) so this
+ * picker and every read-only display (e.g. `EventCard`) stay in sync.
  */
 const CASUAL_VISIBILITY_OPTIONS: ChipOption<EventVisibility>[] = [
-  { value: 'public', label: '🌍 Public' },
-  { value: 'invite_only', label: '🔒 Private' },
-  { value: 'group', label: '👥 Group' },
+  { value: 'public', label: `🌍 ${EVENT_VISIBILITY_LABELS.public}` },
+  { value: 'invite_only', label: `🔒 ${EVENT_VISIBILITY_LABELS.invite_only}` },
+  { value: 'group', label: `👥 ${EVENT_VISIBILITY_LABELS.group}` },
 ];
 
 /** `EventCreate.skill_level_requirement` (`validate_skill`): enforced enum. */
 const SKILL_LEVEL_OPTIONS: ChipOption<EventSkillLevel>[] = [
-  { value: 'all_levels', label: 'All Levels' },
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'expert', label: 'Expert' },
+  { value: 'all_levels', label: SKILL_LEVEL_LABELS.all_levels },
+  { value: 'beginner', label: SKILL_LEVEL_LABELS.beginner },
+  { value: 'intermediate', label: SKILL_LEVEL_LABELS.intermediate },
+  { value: 'expert', label: SKILL_LEVEL_LABELS.expert },
 ];
 
 /**
  * `TournamentCreate.visibility` — documented values, distinct literal
- * (`invite`, not Event's `invite_only`) — see `types/tournament.ts`.
+ * (`invite`, not Event's `invite_only`) — see `types/tournament.ts`. Words
+ * sourced from the shared `TOURNAMENT_VISIBILITY_LABELS` (BUG-M02), kept
+ * as its own map since the two enums' literals (and this one's "Group
+ * Only" vs Event's "Group") genuinely differ.
  */
 const TOURNAMENT_VISIBILITY_OPTIONS: ChipOption<TournamentVisibility>[] = [
-  { value: 'public', label: 'Public' },
-  { value: 'invite', label: 'Private' },
-  { value: 'group', label: 'Group Only' },
+  { value: 'public', label: TOURNAMENT_VISIBILITY_LABELS.public },
+  { value: 'invite', label: TOURNAMENT_VISIBILITY_LABELS.invite },
+  { value: 'group', label: TOURNAMENT_VISIBILITY_LABELS.group },
 ];
 
 const PARTICIPATION_OPTIONS: ChipOption<TournamentParticipationMode>[] = [

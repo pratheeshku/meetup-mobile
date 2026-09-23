@@ -22,8 +22,9 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
-import type { Event, EventVisibility, RsvpStatus } from '../types/event';
+import type { Event, RsvpStatus } from '../types/event';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
+import { EVENT_VISIBILITY_LABELS } from '../utils/labels';
 import Card from './Card';
 
 interface EventCardProps {
@@ -37,21 +38,6 @@ const PILL_COLORS: Record<PillTone, { background: string; text: string }> = {
   tag: { background: colors.primaryLight, text: colors.primary },
   success: { background: colors.successLight, text: colors.success },
   warning: { background: colors.warningLight, text: colors.textPrimary },
-};
-
-/**
- * Correction (Create Flow Amendment research, 2026-09-22): the prior
- * `invite` key was never reachable — `EventVisibility`'s real third value
- * is `invite_only` (see `types/event.ts`). Confirmed directly against
- * `frontend/app.js`'s event card/detail rendering (`pratheeshku/meetup`),
- * which special-cases `visibility === "invite_only"` to display "PRIVATE"
- * rather than the raw enum value — matched here rather than the previous
- * "labelled INVITE, the enum value" guess.
- */
-const CATEGORY_LABEL: Record<EventVisibility, string> = {
-  public: 'Public',
-  group: 'Group',
-  invite_only: 'Private',
 };
 
 /**
@@ -97,7 +83,7 @@ export default function EventCard({ event, onPress }: EventCardProps): React.JSX
     <Card style={styles.card} onPress={onPress}>
       <View style={styles.tagRow}>
         {event.sport ? <Pill label={event.sport} tone="tag" /> : null}
-        <Pill label={CATEGORY_LABEL[event.visibility]} tone="tag" />
+        <Pill label={EVENT_VISIBILITY_LABELS[event.visibility]} tone="tag" />
         {rsvp ? <Pill label={rsvp.label} tone={rsvp.tone} /> : null}
       </View>
       <Text style={styles.title} numberOfLines={2}>

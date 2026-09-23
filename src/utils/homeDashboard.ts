@@ -138,6 +138,14 @@ export function getRecommendedGames(
   );
 }
 
+/** Shared "My Games" predicate: attendable events the user organises or is going to. */
+function isMyGame(event: Event, userId: string | undefined): boolean {
+  return (
+    isAttendable(event) &&
+    (isOrganiserOf(event, userId) || event.current_user_rsvp_status === 'going')
+  );
+}
+
 /**
  * "My Games" count: attendable events the user organises or is going to.
  * Deliberately independent of the sport filter (the brief filters only the
@@ -145,9 +153,18 @@ export function getRecommendedGames(
  * says organises OR `going`.
  */
 export function countMyGames(events: Event[], userId: string | undefined): number {
-  return events.filter(
-    event =>
-      isAttendable(event) &&
-      (isOrganiserOf(event, userId) || event.current_user_rsvp_status === 'going'),
-  ).length;
+  return events.filter(event => isMyGame(event, userId)).length;
+}
+
+/**
+ * The events behind the "My Games" count (BUG-M04), soonest first — same
+ * `isMyGame` predicate as `countMyGames`, feeding the tile's filtered view
+ * instead of just its number.
+ */
+export function getMyGames(events: Event[], userId: string | undefined): Event[] {
+  return events.filter(event => isMyGame(event, userId)).sort((a, b) => {
+    const aMs = startsAtMs(a);
+    const bMs = startsAtMs(b);
+    return aMs === bMs ? 0 : aMs < bMs ? -1 : 1;
+  });
 }
