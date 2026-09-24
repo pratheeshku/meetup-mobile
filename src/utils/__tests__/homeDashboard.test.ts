@@ -5,6 +5,7 @@
  * must work from `organiser_id` alone.
  */
 import { makeEvent } from '../../test-utils/makeEvent';
+import type { Sport } from '../../types/sport';
 import type { SkillLevel } from '../../types/user';
 import {
   DEFAULT_SPORT_EMOJI,
@@ -13,6 +14,7 @@ import {
   getPreselectedSportKey,
   getRecommendedGames,
   getSportOptions,
+  getSportOptionsFromAdminSports,
   getUpcomingGames,
   isOrganiserOf,
   sportEmoji,
@@ -83,6 +85,46 @@ describe('getSportOptions', () => {
 
   it('returns an empty list for an empty feed', () => {
     expect(getSportOptions([])).toEqual([]);
+  });
+});
+
+function adminSport(name: string, display_name: string): Sport {
+  return { name, display_name };
+}
+
+describe('getSportOptionsFromAdminSports (BUG-M06)', () => {
+  it('returns one option per admin sport, sorted by label, using display_name as-is', () => {
+    const options = getSportOptionsFromAdminSports([
+      adminSport('tennis', 'Tennis'),
+      adminSport('badminton', 'Badminton'),
+      adminSport('football', 'Football'),
+    ]);
+    expect(options).toEqual([
+      { key: 'badminton', label: 'Badminton', emoji: '🏸' },
+      { key: 'football', label: 'Football', emoji: '⚽' },
+      { key: 'tennis', label: 'Tennis', emoji: '🎾' },
+    ]);
+  });
+
+  it('includes a sport with no event in the feed at all — the point of BUG-M06', () => {
+    // No event data is involved here; the function only reads the admin list.
+    const options = getSportOptionsFromAdminSports([adminSport('volleyball', 'Volleyball')]);
+    expect(options).toEqual([{ key: 'volleyball', label: 'Volleyball', emoji: '🏐' }]);
+  });
+
+  it('falls back to DEFAULT_SPORT_EMOJI for an admin sport outside the existing SPORT_EMOJI map (accepted, not a defect, per BUG-M06 unblock)', () => {
+    const options = getSportOptionsFromAdminSports([adminSport('table_tennis', 'Table Tennis')]);
+    expect(options).toEqual([{ key: 'table_tennis', label: 'Table Tennis', emoji: DEFAULT_SPORT_EMOJI }]);
+  });
+
+  it('is sorted independently of API response order', () => {
+    const a = getSportOptionsFromAdminSports([adminSport('tennis', 'Tennis'), adminSport('football', 'Football')]);
+    const b = getSportOptionsFromAdminSports([adminSport('football', 'Football'), adminSport('tennis', 'Tennis')]);
+    expect(a).toEqual(b);
+  });
+
+  it('returns an empty list for an empty admin sports list', () => {
+    expect(getSportOptionsFromAdminSports([])).toEqual([]);
   });
 });
 

@@ -14,13 +14,19 @@
  *
  * Proposed Assumptions (recorded in the Implementation Report):
  * - Events whose status is `cancelled` or `completed` are excluded from
- *   every section, pill and count: "upcoming"/"recommended"/"active" must
+ *   every section and count: "upcoming"/"recommended"/"active" must
  *   not surface an event that can no longer be attended. Unknown status
  *   values pass through.
- * - Sport pills come from the whole loaded feed (not only the user's own
- *   events), so a pill can filter the Recommended section too.
+ *
+ * Sport pills (BUG-M06): pills are sourced from `GET /admin/sports/public`
+ * (`getSportOptionsFromAdminSports`), not from the loaded event feed —
+ * every admin-defined sport gets a pill regardless of whether the current
+ * feed has any events for it. `getSportOptions` (feed-derived) is kept
+ * only as a still-tested pure selector / test fixture helper; HomeScreen no
+ * longer calls it for the pill row.
  */
 import type { Event } from '../types/event';
+import type { Sport } from '../types/sport';
 import type { SkillLevel } from '../types/user';
 
 /** Max items a dashboard section shows before "View all". */
@@ -84,6 +90,10 @@ function startsAtMs(event: Event): number {
  * One option per distinct sport among attendable events, sorted by label so
  * the pill order does not change with feed order between refreshes. Events
  * with no sport contribute no pill (they still appear under "All").
+ *
+ * No longer HomeScreen's pill source as of BUG-M06 (see file header) — kept
+ * as a pure selector and as the fixture-building helper `homeComponents`
+ * tests use for `SportFilterPills`.
  */
 export function getSportOptions(events: Event[]): SportOption[] {
   const byKey = new Map<string, SportOption>();
@@ -94,6 +104,30 @@ export function getSportOptions(events: Event[]): SportOption[] {
     }
   }
   return [...byKey.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/**
+ * One option per sport returned by `GET /admin/sports/public` (BUG-M06),
+ * sorted by label for the same reason `getSportOptions` is: a stable pill
+ * order independent of API response order. `getSports()` already filters to
+ * `is_active` sports (`src/api/sports.ts`).
+ *
+ * Label comes straight from the admin `display_name` — the authoritative
+ * casing (same field `useSportDisplayName`/BUG-M02 resolves to) — rather
+ * than recomputing it from the slug via `sportLabel()`. Emoji reuses the
+ * existing `sportEmoji()`/`SPORT_EMOJI` map as-is (architect direction,
+ * BUG-M06 unblock): an admin sport outside that map's 5 entries renders
+ * with `DEFAULT_SPORT_EMOJI` ('🎯') — accepted, not a defect, for this
+ * ticket's scope.
+ */
+export function getSportOptionsFromAdminSports(sports: Sport[]): SportOption[] {
+  return sports
+    .map(sport => ({
+      key: sportKey(sport.name),
+      label: sport.display_name,
+      emoji: sportEmoji(sport.name),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /**
@@ -180,9 +214,10 @@ function updatedAtMs(row: SkillLevel): number {
  *
  * Returns a normalised `sportKey()`, matching `SportOption.key` — the
  * caller (`HomeScreen`) is responsible for falling back to `null` if the
- * returned key has no corresponding pill actually rendered by
- * `getSportOptions(events)` (§1.2's options-source boundary); this
- * function only knows about skill levels, not the current event feed.
+ * returned key has no corresponding pill actually rendered (as of BUG-M06,
+ * `getSportOptionsFromAdminSports(adminSports)` — the admin sports list,
+ * not the event feed); this function only knows about skill levels, not
+ * the current admin sports list or event feed.
  */
 export function getPreselectedSportKey(skillLevels: SkillLevel[]): string | null {
   let topTier = 0;

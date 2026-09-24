@@ -40,10 +40,11 @@ jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn() }));
 // (which would otherwise hang in this environment and stall every test —
 // same reasoning as the `api/sports` mock below).
 jest.mock('../../api/profile', () => ({ getSkillLevels: jest.fn() }));
-// The dashboard renders `EventCard`, which resolves its sport label via
-// `useSportDisplayName` (BUG-M02) — mocked so this file never makes a real
-// `GET /admin/sports/public` call. Resolves to `[]` (raw-slug fallback);
-// no assertion here cares about the resolved sport pill text.
+// Two independent things read `GET /admin/sports/public` here: `EventCard`
+// via `useSportDisplayName` (BUG-M02, its own module-wide cache in
+// `utils/labels.ts`), and — as of BUG-M06 — the sport pill row itself
+// (`HomeScreen` calls `getSports()` directly). Both share this one mock;
+// `beforeEach` below sets a default fixture the pill-row tests rely on.
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 const mockUser: { current: Record<string, unknown> } = { current: {} };
 jest.mock('../../auth/AuthContext', () => ({
@@ -71,6 +72,18 @@ const METRICS = {
   frame: { x: 0, y: 0, width: 360, height: 640 },
   insets: { top: 24, left: 0, right: 0, bottom: 0 },
 };
+
+// BUG-M06 default admin sports fixture: matches most of FEED's sports
+// (badminton, football, tennis), plus `basketball`, which deliberately has
+// NO event anywhere in FEED — this is what proves the pill row is
+// admin-sourced, not feed-derived. `sportEmoji()`'s real (untouched)
+// SPORT_EMOJI map supplies the emoji for all four.
+const ADMIN_SPORTS: Awaited<ReturnType<typeof getSports>> = [
+  { name: 'badminton', display_name: 'Badminton' },
+  { name: 'basketball', display_name: 'Basketball' },
+  { name: 'football', display_name: 'Football' },
+  { name: 'tennis', display_name: 'Tennis' },
+];
 
 function groupsResponse(count: number): Awaited<ReturnType<typeof getMyGroups>> {
   const items = Array.from({ length: count }, (_, i) => ({
@@ -121,7 +134,7 @@ beforeEach(() => {
   // unaffected default ("All" selected on load) unless it opts into
   // skill levels itself.
   mockGetSkillLevels.mockReset().mockResolvedValue([]);
-  mockGetSports.mockReset().mockResolvedValue([]);
+  mockGetSports.mockReset().mockResolvedValue(ADMIN_SPORTS);
   __resetSportDisplayNamesCacheForTests();
 });
 
@@ -167,12 +180,26 @@ describe('HomeScreen dashboard', () => {
     expect(texts(root)).toContain('2 groups · tap to manage');
   });
 
-  it('offers "All" (selected) plus one pill per sport in the feed, excluding cancelled-only sports', async () => {
+  it('offers "All" (selected) plus one pill per admin sport (BUG-M06), including one with no event in the feed', async () => {
     const root = await mount();
     // The pills are the only horizontal ScrollView on the screen.
     const pillRow = root.find(node => node.props.horizontal === true && node.props.showsHorizontalScrollIndicator === false);
-    expect(texts(pillRow)).toEqual(['All', '🏸 Badminton', '⚽ Football', '🎾 Tennis']);
+    // `basketball` is in ADMIN_SPORTS but has no event anywhere in FEED —
+    // its pill still renders, proving the row is admin-sourced, not
+    // feed-derived.
+    expect(texts(pillRow)).toEqual(['All', '🏸 Badminton', '🏀 Basketball', '⚽ Football', '🎾 Tennis']);
     expect(pressableLabelled(root, 'All sports').props.accessibilityState).toEqual({ selected: true });
+  });
+
+  it('falls through to the sections’ existing empty-state copy when a pill has zero matching events (BUG-M06)', async () => {
+    const root = await mount();
+    act(() => pressableLabelled(root, 'Basketball').props.onPress());
+    expect(pressableLabelled(root, 'Basketball').props.accessibilityState).toEqual({ selected: true });
+    expect(cardTitles(root, /^(Up |Rec )/)).toEqual([]);
+    expect(texts(root)).toContain('No upcoming games yet — join one below or create your own.');
+    expect(texts(root)).toContain('No public games to recommend right now.');
+    // My Games is deliberately independent of the sport filter.
+    expect(texts(root)).toContain('4 active · tap to manage');
   });
 
   it('filters both Upcoming and Recommended by the selected sport, but not the My Games count', async () => {
@@ -220,16 +247,29 @@ describe('HomeScreen dashboard', () => {
     expect(navigate).toHaveBeenCalledWith('EventsList', { filter: 'mine' });
   });
 
-  it('shows empty states, zero counts and only "All" for an empty feed', async () => {
+  it('shows empty states and zero counts for an empty feed, but still renders admin sport pills (BUG-M06)', async () => {
     mockGetEvents.mockResolvedValue(eventsResponse([]));
     mockGetMyGroups.mockResolvedValue(groupsResponse(0));
     const root = await mount();
-    const all = texts(root);
-    expect(all).toContain('No upcoming games yet — join one below or create your own.');
-    expect(all).toContain('No public games to recommend right now.');
-    expect(all).toContain('0 active · tap to manage');
-    expect(all).toContain('0 groups · tap to manage');
-    expect(() => pressableLabelled(root, 'Badminton')).toThrow(/found 0/);
+    expect(texts(root)).toContain('No upcoming games yet — join one below or create your own.');
+    expect(texts(root)).toContain('No public games to recommend right now.');
+    expect(texts(root)).toContain('0 active · tap to manage');
+    expect(texts(root)).toContain('0 groups · tap to manage');
+    // Pills are admin-sourced (BUG-M06), independent of the (empty) feed —
+    // Badminton still renders and is selectable, unlike the old
+    // feed-derived behaviour this replaces.
+    act(() => pressableLabelled(root, 'Badminton').props.onPress());
+    expect(pressableLabelled(root, 'Badminton').props.accessibilityState).toEqual({ selected: true });
+    expect(texts(root)).toContain('No upcoming games yet — join one below or create your own.');
+  });
+
+  it('shows only "All" when the admin sports fetch fails, degrading like the groups tile (Proposed Assumption)', async () => {
+    mockGetSports.mockRejectedValue(new Error('sports down'));
+    const root = await mount();
+    expect(texts(root)).not.toContain('Could not load events. Please try again.');
+    const pillRow = root.find(node => node.props.horizontal === true && node.props.showsHorizontalScrollIndicator === false);
+    expect(texts(pillRow)).toEqual(['All']);
+    expect(pressableLabelled(root, 'All sports').props.accessibilityState).toEqual({ selected: true });
   });
 });
 
@@ -267,14 +307,33 @@ describe('HomeScreen — My Games filtered view (BUG-M04)', () => {
 });
 
 describe('HomeScreen data loading', () => {
-  it('fetches events and groups under ONE shared correlation ID (§3.12)', async () => {
+  it('fetches events, groups and admin sports under ONE shared correlation ID (§3.12, BUG-M06)', async () => {
     await mount();
     expect(mockGetEvents).toHaveBeenCalledTimes(1);
     expect(mockGetMyGroups).toHaveBeenCalledTimes(1);
+    // `mockGetSports` is shared with `EventCard`'s independent
+    // `useSportDisplayName` (BUG-M02, its own module-wide cache in
+    // `utils/labels.ts`) — that call carries no `correlationId` at all, so
+    // it's filtered out here; only the pill row's own direct call
+    // (HomeScreen's `loadDashboard`) is asserted against §3.12.
+    expect(directSportsCalls(mockGetSports)).toHaveLength(1);
     const eventsId = mockGetEvents.mock.calls[0][1]?.correlationId;
     const groupsId = mockGetMyGroups.mock.calls[0][0]?.correlationId;
+    const sportsId = directSportsCalls(mockGetSports)[0][0]?.correlationId;
     expect(eventsId).toEqual(expect.stringMatching(/^[0-9a-f-]{36}$/));
     expect(groupsId).toBe(eventsId);
+    expect(sportsId).toBe(eventsId);
+  });
+
+  it('refetches admin sports on every refresh, unlike the one-shot skill-level pre-select (BUG-M06)', async () => {
+    const root = await mount();
+    // See the correlation-ID test above for why `EventCard`'s own,
+    // separately-cached `getSports()` call is filtered out here.
+    expect(directSportsCalls(mockGetSports)).toHaveLength(1);
+    await act(async () => {
+      root.findByType(RefreshControl).props.onRefresh();
+    });
+    expect(directSportsCalls(mockGetSports)).toHaveLength(2);
   });
 
   it('shows an error with retry when events fail, and recovers on retry', async () => {
@@ -300,7 +359,7 @@ describe('HomeScreen data loading', () => {
     expect(all).toContain('Tap to manage');
   });
 
-  it('falls back to "All" if a refresh removes the selected sport’s last event', async () => {
+  it('keeps the selected sport pill after a refresh removes its last event, showing the empty state instead of falling back to "All" (BUG-M06)', async () => {
     const root = await mount();
     act(() => pressableLabelled(root, 'Tennis').props.onPress());
     expect(cardTitles(root, /^Up /)).toEqual(['Up two']);
@@ -310,8 +369,29 @@ describe('HomeScreen data loading', () => {
       root.findByType(RefreshControl).props.onRefresh();
     });
 
+    // Tennis is admin-sourced (BUG-M06) and its pill still exists after
+    // refresh (ADMIN_SPORTS is unchanged), so the selection is preserved —
+    // it no longer resets to "All" just because the feed emptied out.
+    expect(pressableLabelled(root, 'Tennis').props.accessibilityState).toEqual({ selected: true });
+    expect(cardTitles(root, /^Up /)).toEqual([]);
+    expect(texts(root)).toContain('No upcoming games yet — join one below or create your own.');
+  });
+
+  it('falls back to "All" if a refresh drops the selected sport from the admin list itself', async () => {
+    const root = await mount();
+    act(() => pressableLabelled(root, 'Tennis').props.onPress());
+    expect(cardTitles(root, /^Up /)).toEqual(['Up two']);
+
+    mockGetSports.mockResolvedValue(ADMIN_SPORTS.filter(sport => sport.name !== 'tennis'));
+    await act(async () => {
+      root.findByType(RefreshControl).props.onRefresh();
+    });
+
     expect(pressableLabelled(root, 'All sports').props.accessibilityState).toEqual({ selected: true });
-    expect(cardTitles(root, /^Up /)).toEqual(['Up three', 'Up one', 'Up four']);
+    expect(() => pressableLabelled(root, 'Tennis')).toThrow(/found 0/);
+    // Capped at three (MAX_SECTION_ITEMS) — same cap as the "All" case
+    // elsewhere in this file; 'Up four' is past it.
+    expect(cardTitles(root, /^Up /)).toEqual(['Up two', 'Up three', 'Up one']);
   });
 });
 
@@ -329,9 +409,9 @@ describe('HomeScreen sport-filter pre-selection (ADDENDUM-MOBILE-SPORTS-FILTER-P
     expect(cardTitles(root, /^Up /)).toEqual(['Up two']);
   });
 
-  it('falls back to "All" when the pre-selected sport has no pill rendered by getSportOptions(events)', async () => {
-    // Volleyball: a real top-tier skill level, but no current event in FEED,
-    // so no pill exists for it (§1.2's options-source boundary).
+  it('falls back to "All" when the pre-selected sport has no matching admin sport pill (BUG-M06)', async () => {
+    // Volleyball: a real top-tier skill level, but not present in
+    // ADMIN_SPORTS (the mocked admin sports list), so no pill exists for it.
     mockGetSkillLevels.mockResolvedValue([skillLevel('volleyball', 'Expert')]);
     const root = await mount();
     expect(pressableLabelled(root, 'All sports').props.accessibilityState).toEqual({ selected: true });
@@ -364,6 +444,20 @@ describe('HomeScreen sport-filter pre-selection (ADDENDUM-MOBILE-SPORTS-FILTER-P
     expect(skillLevelsId).toBe(eventsId);
   });
 });
+
+/**
+ * `mockGetSports` is shared between HomeScreen's own direct pill-row fetch
+ * (BUG-M06, always called with `{ correlationId }`) and `EventCard`'s
+ * independent `useSportDisplayName` fetch (BUG-M02, called with no
+ * arguments at all, via its own module-wide cache in `utils/labels.ts`).
+ * This isolates the former so §3.12 correlation-ID / refetch-cadence
+ * assertions aren't thrown off by the latter, unrelated call.
+ */
+function directSportsCalls(
+  mock: jest.MockedFunction<typeof getSports>,
+): Parameters<typeof getSports>[] {
+  return mock.mock.calls.filter(call => call[0]?.correlationId !== undefined);
+}
 
 /** ErrorView's retry control. */
 function pressablesRetry(root: Instance): Instance {

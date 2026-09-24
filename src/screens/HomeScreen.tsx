@@ -9,11 +9,17 @@
  * flat events list; it adds no endpoint and no dependency.
  *
  * Data: one `getEvents()` response feeds the Upcoming and Recommended
- * sections, the sport pills and the "My Games" count (all partitioned
- * client-side by `src/utils/homeDashboard.ts`); `getMyGroups()` feeds the
- * groups tile. Both are fetched under a single
- * correlation ID (§3.12 — one ID per logical user action, here "load the
- * dashboard"). A failed groups request degrades only that tile; a failed
+ * sections and the "My Games" count (all partitioned client-side by
+ * `src/utils/homeDashboard.ts`); `getMyGroups()` feeds the groups tile.
+ * Sport pills (BUG-M06) come from `getSports()` (`GET
+ * /admin/sports/public`) instead — one pill per admin-defined sport,
+ * independent of what's actually in the loaded feed; selecting a pill with
+ * zero matching events falls through to the Upcoming/Recommended sections'
+ * existing empty-state copy, no new empty state needed. All three are
+ * fetched under a single correlation ID (§3.12 — one ID per logical user
+ * action, here "load the dashboard"). A failed groups or sports request
+ * degrades only that tile/row (sports falls back to an empty list, i.e.
+ * "All" only — Proposed Assumption, see Implementation Report); a failed
  * events request is a full error state, as before. Pagination beyond the
  * first page is still not built (unchanged from the previous list).
  *
@@ -23,10 +29,9 @@
  * `getPreselectedSportKey()` to set `selectedSport`'s *initial* value
  * instead of hardcoding `null`. This is a default only — the user may
  * still freely tap any pill, including "All", afterward, and a later
- * refresh never re-runs the pre-select. The existing "sport vanished from
- * the feed -> fall back to All" fallback below already also covers "the
- * pre-selected sport has no rendered pill" for free, since both read the
- * same `selectedSport` state.
+ * refresh never re-runs the pre-select. The existing "pre-selected sport
+ * has no matching admin-sport pill -> fall back to All" guard below also
+ * covers this for free, since both read the same `selectedSport` state.
  *
  * This screen's stack header is the branded `AppHeader` (see
  * `RootNavigator`), which applies the top safe-area inset itself, so the
@@ -42,6 +47,7 @@ import { getEvents } from '../api/events';
 import { withCorrelationId } from '../api/correlationId';
 import { getMyGroups } from '../api/groups';
 import { getSkillLevels } from '../api/profile';
+import { getSports } from '../api/sports';
 import { useAuth } from '../auth/AuthContext';
 import EventCard from '../components/EventCard';
 import ErrorView from '../components/ErrorView';
@@ -55,13 +61,14 @@ import TextLink from '../components/TextLink';
 import { colors, spacing, typography } from '../theme/tokens';
 import { getDisplayName } from '../utils/displayName';
 import type { Event } from '../types/event';
+import type { Sport } from '../types/sport';
 import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
 import {
   countMyGames,
   getMyGames,
   getPreselectedSportKey,
   getRecommendedGames,
-  getSportOptions,
+  getSportOptionsFromAdminSports,
   getUpcomingGames,
 } from '../utils/homeDashboard';
 
@@ -76,6 +83,10 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const [events, setEvents] = useState<Event[]>([]);
   // `null` = the groups request failed; the tile then omits the count.
   const [groupsCount, setGroupsCount] = useState<number | null>(null);
+  // BUG-M06: admin sports list backing the pill row. `[]` on a failed fetch
+  // (same swallow-to-degrade pattern as groups) — the row then shows only
+  // "All", it never blocks the rest of the dashboard.
+  const [adminSports, setAdminSports] = useState<Sport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,22 +108,34 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     setError(null);
     const shouldPreselectSport = !isRefresh && !hasAppliedSportPreselectRef.current;
     try {
-      const [eventsResponse, groupsTotal, skillLevels] = await withCorrelationId(correlationId =>
-        Promise.all([
-          getEvents(undefined, { correlationId }),
-          // Groups are secondary: swallow its failure into `null` so it
-          // cannot take the whole dashboard down.
-          getMyGroups({ correlationId }).then(
-            response => response.items.length,
-            () => null,
-          ),
-          // Only fetched for the one load that will actually use it — see
-          // `shouldPreselectSport` above.
-          shouldPreselectSport ? getSkillLevels({ correlationId }) : Promise.resolve(null),
-        ]),
+      const [eventsResponse, groupsTotal, skillLevels, sportsList] = await withCorrelationId(
+        correlationId =>
+          Promise.all([
+            getEvents(undefined, { correlationId }),
+            // Groups are secondary: swallow its failure into `null` so it
+            // cannot take the whole dashboard down.
+            getMyGroups({ correlationId }).then(
+              response => response.items.length,
+              () => null,
+            ),
+            // Only fetched for the one load that will actually use it — see
+            // `shouldPreselectSport` above.
+            shouldPreselectSport ? getSkillLevels({ correlationId }) : Promise.resolve(null),
+            // BUG-M06: the pill row's source. Refetched on every load
+            // (including pull-to-refresh), unlike the one-shot skill-level
+            // pre-select, so an admin adding/deactivating a sport reaches
+            // the row without an app restart. Secondary like groups: swallow
+            // its failure into `[]` (pill row degrades to "All" only) so it
+            // cannot take the whole dashboard down.
+            getSports({ correlationId }).then(
+              list => list,
+              () => [],
+            ),
+          ]),
       );
       setEvents(eventsResponse.items);
       setGroupsCount(groupsTotal);
+      setAdminSports(sportsList);
       if (shouldPreselectSport) {
         hasAppliedSportPreselectRef.current = true;
         setSelectedSport(getPreselectedSportKey(skillLevels ?? []));
@@ -141,8 +164,13 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   }, [refreshKey, loadDashboard]);
 
   const userId = user?.id;
-  const sports = useMemo(() => getSportOptions(events), [events]);
-  // A refresh can remove the selected sport's last event; fall back to "All"
+  // BUG-M06: admin-sourced, independent of the event feed — a sport with
+  // zero matching events still gets a pill; selecting it just lets the
+  // Upcoming/Recommended sections fall through to their existing empty
+  // states below (no new empty state needed).
+  const sports = useMemo(() => getSportOptionsFromAdminSports(adminSports), [adminSports]);
+  // Guards the pre-select (a skill-level sport absent from the admin list)
+  // and an admin sport disappearing between loads; fall back to "All"
   // instead of leaving the screen filtered by a pill that no longer exists.
   const activeSport = sports.some(sport => sport.key === selectedSport) ? selectedSport : null;
 
