@@ -334,7 +334,7 @@ export default function RootNavigator(): React.JSX.Element {
     // `index.js`).
     const unsubscribeParticipantEvents = registerParticipantForegroundHandler();
 
-    // group_event_created (Join) / event_changed (View/OK) presses while
+    // group_event_created (Join/OK) / event_changed (View/OK) presses while
     // the app is active — same pattern as the participant listener above.
     const unsubscribeEventEvents = registerEventForegroundHandler();
 

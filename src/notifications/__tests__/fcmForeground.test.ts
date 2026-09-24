@@ -4,7 +4,7 @@
  * `event_participant_added` / `event_participant_removed` are delivered
  * data-only and rendered as a local notify-kit notification with View/OK
  * actions (`participantHandler.ts`); they return early and never reach the
- * in-app banner. `group_event_created` (Join-only) / `event_changed`
+ * in-app banner. `group_event_created` (Join+OK) / `event_changed`
  * (View+OK) are the same kind of exception, added by the mobile notify-kit
  * task Part 3 (`eventNotificationHandler.ts`) — `event_changed` previously
  * fell through to the banner (see the "every other known type" test below,

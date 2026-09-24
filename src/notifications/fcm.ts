@@ -225,9 +225,10 @@ function toStringRecord(data: RemoteMessage['data']): Record<string, string> {
  * delivered data-only and rendered as a local notification with View/OK
  * action buttons (`participantHandler.ts`); they return early and never
  * reach `showBanner`. `group_event_created` / `event_changed` are the same
- * kind of exception (Join-only / View+OK — `eventNotificationHandler.ts`,
+ * kind of exception (Join+OK / View+OK — `eventNotificationHandler.ts`,
  * mobile notify-kit task Part 3); see that file's header for the
- * `event_changed` payload-shape assumption this depends on.
+ * `event_changed` and `group_event_created` payload-shape assumptions this
+ * depends on.
  *
  * Logs only the message id and notification type (a fixed backend enum
  * value, not user content) — never title/body/entity id (R-111, task

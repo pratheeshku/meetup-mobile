@@ -1,9 +1,9 @@
 /**
  * `group_event_created` / `event_changed` notifications
- * (`eventNotificationHandler.ts`): local notify-kit notification with a
- * single Join action (group_event_created) or View/OK actions
- * (event_changed, identical shape to `participantHandler.ts`'s two
- * participant types), and the press handling behind it.
+ * (`eventNotificationHandler.ts`): local notify-kit notification with
+ * Join/OK actions (group_event_created) or View/OK actions (event_changed)
+ * — same shape, differing only in the primary action's label/id — and the
+ * press handling behind it.
  *
  * Mirrors `participantHandler.test.ts`'s structure/coverage.
  */
@@ -70,7 +70,7 @@ afterAll(() => {
 });
 
 describe('displayEventNotification', () => {
-  it('calls notifee.displayNotification with channelId PLAN_CHANNEL_ID and a single Join action for group_event_created', async () => {
+  it('calls notifee.displayNotification with channelId PLAN_CHANNEL_ID and Join + OK actions for group_event_created', async () => {
     await displayEventNotification(GROUP_EVENT_DATA);
 
     expect(mockDisplayNotification).toHaveBeenCalledTimes(1);
@@ -79,12 +79,17 @@ describe('displayEventNotification', () => {
     expect(notification.body).toBe(GROUP_EVENT_DATA.body);
     expect(notification.android.channelId).toBe(PLAN_CHANNEL_ID);
     expect(notification.android.pressAction).toEqual({ id: 'default' });
-    expect(notification.android.actions).toHaveLength(1);
-    expect(notification.android.actions[0].title).toBe('Join');
-    expect(notification.android.actions[0].pressAction).toEqual({
-      id: 'join',
-      launchActivity: 'default',
-    });
+    expect(notification.android.actions).toHaveLength(2);
+    expect(notification.android.actions.map((a: { title: string }) => a.title)).toEqual([
+      'Join',
+      'OK',
+    ]);
+    expect(
+      notification.android.actions.map((a: { pressAction: { id: string } }) => a.pressAction.id),
+    ).toEqual(['join', 'ok']);
+    const [join, ok] = notification.android.actions;
+    expect(join.pressAction.launchActivity).toBe('default');
+    expect(ok.pressAction).not.toHaveProperty('launchActivity');
   });
 
   it('calls notifee.displayNotification with two actions (View, OK) for event_changed — same shape as participantHandler', async () => {
@@ -182,6 +187,16 @@ describe('registerEventBackgroundHandler', () => {
     // Body tap is left to the notification's own auto-cancel; only Join/View
     // cancel explicitly.
     expect(mockCancelNotification).not.toHaveBeenCalled();
+  });
+
+  it('cancels the notification on an OK press (group_event_created) and makes no navigation (negative)', async () => {
+    const handler = registerAndGetHandler();
+
+    await handler(makeEvent(EventType.ACTION_PRESS, 'ok', GROUP_EVENT_DATA));
+
+    expect(mockCancelNotification).toHaveBeenCalledTimes(1);
+    expect(mockCancelNotification).toHaveBeenCalledWith('notif-1');
+    expect(navigateSpy).not.toHaveBeenCalled();
   });
 
   it('navigates to EventDetailScreen on a View press for event_changed', async () => {
@@ -318,6 +333,15 @@ describe('getInitialEventNotification (quit-state launch)', () => {
   it('returns null when the initial press was the OK button (negative)', async () => {
     mockGetInitialNotification.mockResolvedValueOnce({
       notification: { id: 'n', data: EVENT_CHANGED_DATA },
+      pressAction: { id: 'ok' },
+    });
+
+    await expect(getInitialEventNotification()).resolves.toBeNull();
+  });
+
+  it('returns null when the initial press was the OK button on group_event_created (negative)', async () => {
+    mockGetInitialNotification.mockResolvedValueOnce({
+      notification: { id: 'n', data: GROUP_EVENT_DATA },
       pressAction: { id: 'ok' },
     });
 

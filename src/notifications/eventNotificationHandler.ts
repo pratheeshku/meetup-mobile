@@ -23,16 +23,18 @@
  * Flagged for conformance-review to verify against a live payload once the
  * corresponding backend change ships.
  *
- * Shapes (per task brief; each differs from the other and from
- * `participantHandler.ts`'s two participant types, which both use the
- * View+OK shape unchanged):
- * - `group_event_created`: a single "Join" action. Pressing it, or tapping
- *   the notification body, both navigate to Event Detail — the same target
+ * Shapes (per task brief, updated same-day per the architect's confirmed
+ * design: both types now use a primary action + OK, differing only in the
+ * primary action's label/id):
+ * - `group_event_created`: Join + OK. Pressing Join, or tapping the
+ *   notification body, both navigate to Event Detail — the same target
  *   `event_invite` already uses via `resolveNotificationTarget` — and are
- *   NOT a direct RSVP API call. The existing Event Detail RSVP button is
- *   untouched; joining still happens there. There is no OK/dismiss action
- *   for this type (explicit instruction — Android's own swipe-to-dismiss
- *   still works regardless).
+ *   NOT a direct RSVP API call (investigated and rejected for now; see
+ *   docs/reports/ for the direct-accept investigation — Keychain-under-lock
+ *   behaviour unverified, R-101 has no implementation in any context, iOS
+ *   background execution unconfirmed). The existing Event Detail RSVP
+ *   button is untouched; joining still happens there. OK dismisses only,
+ *   same as `event_changed`'s OK — it never opens the app.
  * - `event_changed`: View + OK, the identical shape `participantHandler.ts`
  *   already uses for the two participant types — View (or a body tap)
  *   navigates to Event Detail and clears the tray entry; OK dismisses only.
@@ -40,6 +42,17 @@
  *   new venue/time) is pre-built by the backend, same as every other
  *   locally-displayed type; this file only ever displays `data.title`/
  *   `data.body` verbatim.
+ *
+ * `group_event_created`'s body: the backend is expected to enrich it into a
+ * multi-line string (sport, organizer as "display_name (nickname)", date,
+ * time, venue, capacity — "Brief A"). No parsing of that shape happens
+ * here or needs to: `data.body` is always displayed verbatim through the
+ * same BigText mechanism `event_participant_added` already uses, which is
+ * agnostic to how many lines it contains. Proposed Assumption: since Brief A
+ * had not landed on the backend as of this change, the enriched shape is
+ * unverified against a live payload — flagged for conformance-review to
+ * confirm once it ships, same as this file's `event_changed` payload-shape
+ * assumption below.
  *
  * Library behaviour notes (see `participantHandler.ts` for the same,
  * verified against react-native-notify-kit 10.7.1 source):
@@ -94,9 +107,10 @@ const DEFAULT_PRESS_ID = 'default';
  * Builds and shows the notification from an FCM `data` payload.
  * `title`/`body` are pre-built by the server (`body` may contain `\n`).
  *
- * `group_event_created` gets a single "Join" action; every other type
- * handled by this file (`event_changed`) gets the View+OK pair, identical
- * to `participantHandler.ts`'s `displayParticipantNotification`.
+ * `group_event_created` gets Join + OK; every other type handled by this
+ * file (`event_changed`) gets View + OK — identical shape, differing only
+ * in the primary action's label/id, matching `participantHandler.ts`'s
+ * `displayParticipantNotification` for the OK half.
  *
  * The whole `data` map is attached to the notification so the press
  * handlers can recover `notification_type` and `entity_id` from
@@ -117,13 +131,15 @@ export async function displayEventNotification(data: Record<string, string>): Pr
       // body is a non-empty string.
       ...(data.body ? { style: { type: AndroidStyle.BIGTEXT, text: data.body } } : {}),
       pressAction: { id: DEFAULT_PRESS_ID },
-      actions: isJoinShape
-        ? [{ title: 'Join', pressAction: { id: JOIN_ACTION_ID, launchActivity: 'default' } }]
-        : [
-            // launchActivity: see file header — required for View to open the app.
-            { title: 'View', pressAction: { id: VIEW_ACTION_ID, launchActivity: 'default' } },
-            { title: 'OK', pressAction: { id: OK_ACTION_ID } },
-          ],
+      // launchActivity on the primary action: see file header — required
+      // for Join/View to open the app. OK deliberately omits it so it never
+      // launches the app (dismiss-only).
+      actions: [
+        isJoinShape
+          ? { title: 'Join', pressAction: { id: JOIN_ACTION_ID, launchActivity: 'default' } }
+          : { title: 'View', pressAction: { id: VIEW_ACTION_ID, launchActivity: 'default' } },
+        { title: 'OK', pressAction: { id: OK_ACTION_ID } },
+      ],
     },
   });
 }
@@ -159,9 +175,9 @@ function toEventPayload(notification: Notification | undefined): PushNotificatio
  *   notification (after routing) — a body tap is left to the
  *   notification's own auto-cancel.
  * - OK button (`ACTION_PRESS`, id `ok`) or `DISMISSED`: cancel the
- *   notification. No API call. (`group_event_created` has no OK action, so
- *   this branch only ever fires for `event_changed` presses or a swipe
- *   -dismiss of either type.)
+ *   notification. No API call, no navigation. Fires for either type — both
+ *   `group_event_created` and `event_changed` carry an OK action — or a
+ *   swipe-dismiss of either.
  */
 export async function handleEventNotificationEvent({ type, detail }: Event): Promise<void> {
   const pressActionId = detail.pressAction?.id;
