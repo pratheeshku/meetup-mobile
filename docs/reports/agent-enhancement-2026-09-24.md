@@ -155,3 +155,84 @@ origin/<branch>:<path>`) — only issue the Blocked Report if it is still
 absent after the fetch. This costs one cheap network round trip and
 directly prevents the single most avoidable false-positive block: the doc
 existed all along, just not yet pulled.
+
+## 8. A ticket's causal claim about "where X was built" needs git verification before either blocking or implementing on it
+
+**What happened:** A bug ticket instructed "reuse the sport emoji/label map
+built in [prior bug ticket]" and pre-committed to a specific fallback
+(blocked report) if that map didn't cover emoji. Investigation found the
+referenced prior ticket's actual commits built a *different* map (display-
+label casing/resolution only) than the one the current ticket assumed
+existed. A second, older map in the codebase did carry emoji, but predated
+the referenced ticket entirely — so neither "the map built in [prior
+ticket]" (as literally named) nor "don't invent a second list" resolved
+cleanly without checking `git log`/`git show` against the actual commits.
+
+**Why it matters generally:** Tickets are often written by someone
+recalling a past change from memory, not from the diff. A wrong premise
+about *which* artifact does *what* is easy to inherit silently — acting on
+the ticket's causal claim without checking it can either (a) implement
+against a map that doesn't exist, producing a runtime `undefined`, or (b)
+follow a stated fallback correctly but write it up in a way that
+implies the codebase state matches the ticket's description, when it
+doesn't. Either way, the write-up should say what's actually true, not
+just parrot the ticket's framing.
+
+**Suggested addition:** Under "Pre-code gates" / "Contract verification",
+add: when a task instruction attributes a specific artifact (a map, a
+function, a schema) to a specific prior ticket/commit by name, verify that
+attribution with `git log --oneline | grep <ticket-id>` and `git show
+<commit>` before either implementing against it or writing a blocked
+report about its absence — cite the actual commit(s) in the
+Blocked/Implementation Report rather than restating the ticket's
+unverified premise.
+
+## 9. A test double shared by two independent consumers of the same API can silently double-count in new call-count assertions
+
+**What happened:** Two unrelated code paths (a list-item component's own
+display-label hook, cached at module scope, and a screen's own direct data
+fetch) both called the same API function, which a single `jest.mock` had
+replaced with one shared mock. Adding new `toHaveBeenCalledTimes(1)` /
+correlation-ID assertions against that shared mock failed — not because
+the new code was wrong, but because the *other*, pre-existing consumer
+also called it, and its calls had always been invisible before because no
+prior test asserted a call count on that mock.
+
+**Why it matters generally:** When wiring a screen to an endpoint that
+some *other*, already-rendered child component also independently calls
+(via its own hook/cache), call-count and "same correlation ID" assertions
+against the endpoint's mock must first filter to the calls belonging to
+the code path under test (e.g. by a distinguishing argument shape), not
+assume the mock's call list belongs to one caller. This is easy to miss
+because the existing tests for the *other* consumer typically never
+assert a call count at all (they only assert on rendered output), so the
+collision is invisible until a new test tries to count.
+
+**Suggested addition:** Under "Test data hygiene" or a new "Shared mocks"
+note: before asserting call counts / call arguments on a mocked API
+function, grep the test file's other rendered components for the same
+import — if a child component independently calls the same mocked
+function (e.g. via its own cached hook), add a filter on the mock's
+`.mock.calls` (by a distinguishing argument such as a required option the
+other caller omits) rather than asserting on the raw call list.
+
+## 10. A section's display cap can invalidate a `toEqual([...])` list assertion that looks obviously correct
+
+**What happened:** A rewritten test asserted the exact list of titles
+rendered in a capped preview section after a filter changed, and initially
+listed one more item than the section's fixed display cap actually shows
+— the item existed in the underlying (correctly filtered) data, but the
+section component itself truncates to N before rendering, which the
+assertion didn't account for.
+
+**Why it matters generally:** When rewriting a `toEqual([...])` assertion
+against a capped/paginated list view (as opposed to the raw selector
+output), the cap is a second filter the test must account for separately
+from the domain logic being tested — easy to drop when focused on getting
+the filter/selection logic right.
+
+**Suggested addition:** Under "Debugging discipline" or "Fidelity rules":
+when writing/rewriting an exact-list (`toEqual`) assertion against a
+component that wraps a selector in a capped/paginated section, check the
+section's cap constant first and either assert against the capped slice
+explicitly or use a `toContain`/length-bounded assertion instead.
