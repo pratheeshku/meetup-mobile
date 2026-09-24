@@ -75,8 +75,14 @@ function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: Skil
  * end-to-end. Fetched defensively (falls back to `[]` on any failure,
  * including an unexpected shape) so an unconfirmed secondary endpoint
  * can never break the whole profile load.
+ *
+ * Exported (ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001 §4): `HomeScreen`
+ * also calls this directly, alongside `getEvents()`/`getMyGroups()`, to
+ * drive the sport-filter pre-selection default — it does not need the
+ * rest of `getProfile()`'s response, so it calls this endpoint on its own
+ * rather than fetching the whole profile just for `skill_levels`.
  */
-async function getSkillLevels(options?: RequestOptions): Promise<SkillLevel[]> {
+export async function getSkillLevels(options?: RequestOptions): Promise<SkillLevel[]> {
   try {
     const { data } = await apiClient.get<SkillLevel[]>('/users/me/skill-levels', {
       correlationId: options?.correlationId,

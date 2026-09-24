@@ -20,9 +20,21 @@
  */
 export type SkillLevelValue = 'Beginner' | 'Intermediate' | 'Expert';
 
+/**
+ * `updated_at` (ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001 §3): the
+ * addendum asserts this is an existing column on `GET
+ * /users/me/skill-levels`' response, used only as a tiebreak when the
+ * caller has multiple sports tied at the top skill tier. Optional here,
+ * same as `sport`/`skill_level` already are on this endpoint (see
+ * `getSkillLevels()` in `src/api/profile.ts` — the endpoint's whole
+ * response shape is an unverified Proposed Assumption, not confirmed
+ * end-to-end against a live authenticated call). Consumers must treat a
+ * missing/unparseable value defensively, not assume it is always present.
+ */
 export interface SkillLevel {
   sport: string;
   skill_level: SkillLevelValue;
+  updated_at?: string;
 }
 
 /**

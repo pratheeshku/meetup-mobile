@@ -119,3 +119,39 @@ additive/non-breaking regardless of the dependency's current state,
 proceed and document the verified state — reserve the Blocked Report for
 when the verification step itself is impossible to perform, or reveals a
 breaking contract change, not merely a still-pending one.
+
+## 7. A referenced governing doc missing from the local working tree can still exist unfetched on the remote — `git fetch` before issuing a Blocked Report on "the file doesn't exist"
+
+**What happened**: A task cited an APPROVED addendum by path
+(`docs/MOBILE-ADDENDUM-sports-filter-preselect.md`). It was absent from the
+working tree, every local branch, and full local git history — by every
+check available without touching the network, this looked exactly like "the
+architect never actually committed this," and a Blocked Report was
+correctly issued on that basis (per the Design document acceptance gate).
+The user's next message was just "can you get the latest from github" —
+`git fetch --all --prune` pulled exactly one new commit on `origin/main`
+that added the missing file, authored by the repo's own git user, dated
+minutes before the task arrived. The whole Blocked Report evaporated once
+`origin/main` was fetched and fast-forward-merged.
+
+**Why it matters generally**: "checked git log --all / git branch -a and
+found nothing" is not equivalent to "checked everything" — those commands
+only see refs this local clone already knows about, not what exists on the
+remote until a `fetch` runs. A governing-doc-authoring workflow that
+commits-and-pushes on a different machine/session (exactly what an
+architect approving a design doc would plausibly do) will be invisible
+locally no matter how thoroughly the local repo is searched, right up until
+a fetch. Declaring a cited doc "does not exist" without first fetching the
+remote risks a false Blocked Report on a task that was actually fully
+unblocked already — costing a round trip for something a single command
+would have resolved.
+
+**Suggested addition** (target: "Design document acceptance", before the
+existing checklist): before concluding a cited governing/design document
+does not exist (and before issuing a Blocked Report on that basis), run
+`git fetch --all --prune` and re-check for the file on the now-updated
+remote-tracking refs (`git log --all`, `git branch -a` again, or `git show
+origin/<branch>:<path>`) — only issue the Blocked Report if it is still
+absent after the fetch. This costs one cheap network round trip and
+directly prevents the single most avoidable false-positive block: the doc
+existed all along, just not yet pulled.

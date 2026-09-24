@@ -17,6 +17,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { getEvents } from '../../api/events';
 import { getMyGroups } from '../../api/groups';
+import { getSkillLevels } from '../../api/profile';
 import { getSports } from '../../api/sports';
 import { makeEvent } from '../../test-utils/makeEvent';
 import {
@@ -29,10 +30,16 @@ import {
 import type { Instance } from '../../test-utils/render';
 import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import type { Event } from '../../types/event';
+import type { SkillLevel } from '../../types/user';
 import HomeScreen from '../HomeScreen';
 
 jest.mock('../../api/events', () => ({ getEvents: jest.fn() }));
 jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn() }));
+// ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001: mocked so the sport-filter
+// pre-selection fetch never makes a real `GET /users/me/skill-levels` call
+// (which would otherwise hang in this environment and stall every test —
+// same reasoning as the `api/sports` mock below).
+jest.mock('../../api/profile', () => ({ getSkillLevels: jest.fn() }));
 // The dashboard renders `EventCard`, which resolves its sport label via
 // `useSportDisplayName` (BUG-M02) — mocked so this file never makes a real
 // `GET /admin/sports/public` call. Resolves to `[]` (raw-slug fallback);
@@ -45,6 +52,7 @@ jest.mock('../../auth/AuthContext', () => ({
 
 const mockGetEvents = getEvents as jest.MockedFunction<typeof getEvents>;
 const mockGetMyGroups = getMyGroups as jest.MockedFunction<typeof getMyGroups>;
+const mockGetSkillLevels = getSkillLevels as jest.MockedFunction<typeof getSkillLevels>;
 const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
 
 const FEED: Event[] = [
@@ -109,6 +117,10 @@ beforeEach(() => {
   navigate.mockReset();
   mockGetEvents.mockReset().mockResolvedValue(eventsResponse(FEED));
   mockGetMyGroups.mockReset().mockResolvedValue(groupsResponse(2));
+  // Zero rows by default: every existing test below asserts today's
+  // unaffected default ("All" selected on load) unless it opts into
+  // skill levels itself.
+  mockGetSkillLevels.mockReset().mockResolvedValue([]);
   mockGetSports.mockReset().mockResolvedValue([]);
   __resetSportDisplayNamesCacheForTests();
 });
@@ -300,6 +312,56 @@ describe('HomeScreen data loading', () => {
 
     expect(pressableLabelled(root, 'All sports').props.accessibilityState).toEqual({ selected: true });
     expect(cardTitles(root, /^Up /)).toEqual(['Up three', 'Up one', 'Up four']);
+  });
+});
+
+function skillLevel(sport: string, skill_level: SkillLevel['skill_level']): SkillLevel {
+  return { sport, skill_level };
+}
+
+describe('HomeScreen sport-filter pre-selection (ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001)', () => {
+  it('pre-selects the sport ranked highest by skill level on initial load', async () => {
+    mockGetSkillLevels.mockResolvedValue([skillLevel('tennis', 'Expert')]);
+    const root = await mount();
+    expect(pressableLabelled(root, 'Tennis').props.accessibilityState).toEqual({ selected: true });
+    expect(pressableLabelled(root, 'All sports').props.accessibilityState).toEqual({ selected: false });
+    // Filtering itself is unaffected — the same client-side filter as a manual tap.
+    expect(cardTitles(root, /^Up /)).toEqual(['Up two']);
+  });
+
+  it('falls back to "All" when the pre-selected sport has no pill rendered by getSportOptions(events)', async () => {
+    // Volleyball: a real top-tier skill level, but no current event in FEED,
+    // so no pill exists for it (§1.2's options-source boundary).
+    mockGetSkillLevels.mockResolvedValue([skillLevel('volleyball', 'Expert')]);
+    const root = await mount();
+    expect(pressableLabelled(root, 'All sports').props.accessibilityState).toEqual({ selected: true });
+    expect(() => pressableLabelled(root, 'Volleyball')).toThrow(/found 0/);
+    // The dashboard renders normally (unfiltered), not stuck in error/loading.
+    expect(cardTitles(root, /^Up /)).toEqual(['Up two', 'Up three', 'Up one']);
+  });
+
+  it('fetches skill levels once on initial load and never re-applies the pre-select on refresh, so a manual selection survives', async () => {
+    mockGetSkillLevels.mockResolvedValue([skillLevel('tennis', 'Expert')]);
+    const root = await mount();
+    expect(mockGetSkillLevels).toHaveBeenCalledTimes(1);
+    expect(pressableLabelled(root, 'Tennis').props.accessibilityState).toEqual({ selected: true });
+
+    // User freely taps a different pill, per item 5's requirement.
+    act(() => pressableLabelled(root, 'Badminton').props.onPress());
+    expect(pressableLabelled(root, 'Badminton').props.accessibilityState).toEqual({ selected: true });
+
+    await act(async () => {
+      root.findByType(RefreshControl).props.onRefresh();
+    });
+    expect(mockGetSkillLevels).toHaveBeenCalledTimes(1);
+    expect(pressableLabelled(root, 'Badminton').props.accessibilityState).toEqual({ selected: true });
+  });
+
+  it('shares the same correlation ID as getEvents()/getMyGroups() on the initial load', async () => {
+    await mount();
+    const eventsId = mockGetEvents.mock.calls[0][1]?.correlationId;
+    const skillLevelsId = mockGetSkillLevels.mock.calls[0][0]?.correlationId;
+    expect(skillLevelsId).toBe(eventsId);
   });
 });
 

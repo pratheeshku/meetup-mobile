@@ -5,10 +5,12 @@
  * must work from `organiser_id` alone.
  */
 import { makeEvent } from '../../test-utils/makeEvent';
+import type { SkillLevel } from '../../types/user';
 import {
   DEFAULT_SPORT_EMOJI,
   MAX_SECTION_ITEMS,
   countMyGames,
+  getPreselectedSportKey,
   getRecommendedGames,
   getSportOptions,
   getUpcomingGames,
@@ -229,5 +231,54 @@ describe('countMyGames', () => {
 
   it('is zero for an empty feed', () => {
     expect(countMyGames([], ME)).toBe(0);
+  });
+});
+
+/** `GET /users/me/skill-levels` row fixture (ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001). */
+function skillLevel(overrides: Partial<SkillLevel> = {}): SkillLevel {
+  return { sport: 'badminton', skill_level: 'Beginner', ...overrides };
+}
+
+describe('getPreselectedSportKey (ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001 §3)', () => {
+  it('pre-selects the single sport at the highest skill tier, ranking expert > intermediate > beginner', () => {
+    const rows = [
+      skillLevel({ sport: 'badminton', skill_level: 'Beginner' }),
+      skillLevel({ sport: 'tennis', skill_level: 'Intermediate' }),
+      skillLevel({ sport: 'football', skill_level: 'Expert' }),
+    ];
+    expect(getPreselectedSportKey(rows)).toBe('football');
+  });
+
+  it('breaks a tie at the top tier using the most recently updated row', () => {
+    const rows = [
+      skillLevel({ sport: 'tennis', skill_level: 'Expert', updated_at: '2026-01-01T00:00:00Z' }),
+      skillLevel({ sport: 'football', skill_level: 'Expert', updated_at: '2026-06-15T00:00:00Z' }),
+      // A lower tier is never in contention even if it is the most recent of all.
+      skillLevel({ sport: 'badminton', skill_level: 'Beginner', updated_at: '2026-09-20T00:00:00Z' }),
+    ];
+    expect(getPreselectedSportKey(rows)).toBe('football');
+  });
+
+  it('returns null for zero skill-level rows, leaving the default unchanged', () => {
+    expect(getPreselectedSportKey([])).toBeNull();
+  });
+
+  it('normalises the winning sport the same way pill keys are normalised', () => {
+    expect(getPreselectedSportKey([skillLevel({ sport: '  BadMinton ', skill_level: 'Expert' })])).toBe(
+      'badminton',
+    );
+  });
+
+  it('treats a missing/unparseable updated_at as older than any row with a valid one', () => {
+    const rows = [
+      skillLevel({ sport: 'tennis', skill_level: 'Expert', updated_at: undefined }),
+      skillLevel({ sport: 'football', skill_level: 'Expert', updated_at: '2026-01-01T00:00:00Z' }),
+    ];
+    expect(getPreselectedSportKey(rows)).toBe('football');
+  });
+
+  it('ignores rows with an unrecognised skill_level value rather than guessing a tier for them', () => {
+    const rows = [skillLevel({ sport: 'badminton', skill_level: 'unknown-value' as SkillLevel['skill_level'] })];
+    expect(getPreselectedSportKey(rows)).toBeNull();
   });
 });

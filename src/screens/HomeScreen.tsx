@@ -17,11 +17,22 @@
  * events request is a full error state, as before. Pagination beyond the
  * first page is still not built (unchanged from the previous list).
  *
+ * Sport filter default (ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001,
+ * R-MOBILE-SPORTS-FILTER-PRESELECT-1): the very first successful load also
+ * fetches `getSkillLevels()` (same correlation ID) and uses
+ * `getPreselectedSportKey()` to set `selectedSport`'s *initial* value
+ * instead of hardcoding `null`. This is a default only — the user may
+ * still freely tap any pill, including "All", afterward, and a later
+ * refresh never re-runs the pre-select. The existing "sport vanished from
+ * the feed -> fall back to All" fallback below already also covers "the
+ * pre-selected sport has no rendered pill" for free, since both read the
+ * same `selectedSport` state.
+ *
  * This screen's stack header is the branded `AppHeader` (see
  * `RootNavigator`), which applies the top safe-area inset itself, so the
  * content here only needs ordinary top spacing.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
@@ -30,6 +41,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { getEvents } from '../api/events';
 import { withCorrelationId } from '../api/correlationId';
 import { getMyGroups } from '../api/groups';
+import { getSkillLevels } from '../api/profile';
 import { useAuth } from '../auth/AuthContext';
 import EventCard from '../components/EventCard';
 import ErrorView from '../components/ErrorView';
@@ -47,6 +59,7 @@ import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
 import {
   countMyGames,
   getMyGames,
+  getPreselectedSportKey,
   getRecommendedGames,
   getSportOptions,
   getUpcomingGames,
@@ -68,6 +81,12 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const [error, setError] = useState<string | null>(null);
   // Sport filter (`null` = "All"), applied client-side to Upcoming and Recommended.
   const [selectedSport, setSelectedSport] = useState<string | null>(null);
+  // ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001 §4: the pre-select
+  // algorithm only ever sets the *initial* value — once it has run once
+  // (successfully or not), later loads (pull-to-refresh, the post-create
+  // refetch) must never re-run it and stomp a selection the user made in
+  // the meantime.
+  const hasAppliedSportPreselectRef = useRef(false);
 
   const loadDashboard = useCallback(async (isRefresh: boolean) => {
     if (isRefresh) {
@@ -76,8 +95,9 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       setIsLoading(true);
     }
     setError(null);
+    const shouldPreselectSport = !isRefresh && !hasAppliedSportPreselectRef.current;
     try {
-      const [eventsResponse, groupsTotal] = await withCorrelationId(correlationId =>
+      const [eventsResponse, groupsTotal, skillLevels] = await withCorrelationId(correlationId =>
         Promise.all([
           getEvents(undefined, { correlationId }),
           // Groups are secondary: swallow its failure into `null` so it
@@ -86,10 +106,17 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
             response => response.items.length,
             () => null,
           ),
+          // Only fetched for the one load that will actually use it — see
+          // `shouldPreselectSport` above.
+          shouldPreselectSport ? getSkillLevels({ correlationId }) : Promise.resolve(null),
         ]),
       );
       setEvents(eventsResponse.items);
       setGroupsCount(groupsTotal);
+      if (shouldPreselectSport) {
+        hasAppliedSportPreselectRef.current = true;
+        setSelectedSport(getPreselectedSportKey(skillLevels ?? []));
+      }
     } catch {
       setError('Could not load events. Please try again.');
     } finally {

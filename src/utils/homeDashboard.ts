@@ -21,6 +21,7 @@
  *   events), so a pill can filter the Recommended section too.
  */
 import type { Event } from '../types/event';
+import type { SkillLevel } from '../types/user';
 
 /** Max items a dashboard section shows before "View all". */
 export const MAX_SECTION_ITEMS = 3;
@@ -144,6 +145,65 @@ function isMyGame(event: Event, userId: string | undefined): boolean {
     isAttendable(event) &&
     (isOrganiserOf(event, userId) || event.current_user_rsvp_status === 'going')
   );
+}
+
+const SKILL_TIER: Record<string, number> = {
+  expert: 3,
+  intermediate: 2,
+  beginner: 1,
+};
+
+/** 0 for an unrecognised/malformed `skill_level` value — never guessed. */
+function skillTier(skillLevel: string): number {
+  return SKILL_TIER[skillLevel.trim().toLowerCase()] ?? 0;
+}
+
+/**
+ * `updated_at` is optional/unverified on this endpoint (see `SkillLevel` in
+ * `src/types/user.ts`) — a row missing or with an unparseable value sorts as
+ * older than any row with a valid one, so it only wins a tie against other
+ * equally-unparseable rows (Proposed Assumption).
+ */
+function updatedAtMs(row: SkillLevel): number {
+  const ms = row.updated_at ? Date.parse(row.updated_at) : NaN;
+  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+}
+
+/**
+ * Home screen sport-filter pre-selection default
+ * (ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001 §3,
+ * R-MOBILE-SPORTS-FILTER-PRESELECT-1). Ranks the caller's skill-level rows
+ * by tier (expert > intermediate > beginner): a single top-tier sport is
+ * pre-selected; a tie at the top tier is broken by the most recently
+ * updated row. Zero rows — or rows that are all an unrecognised tier —
+ * leaves the default at `null` ("All"), unchanged from today.
+ *
+ * Returns a normalised `sportKey()`, matching `SportOption.key` — the
+ * caller (`HomeScreen`) is responsible for falling back to `null` if the
+ * returned key has no corresponding pill actually rendered by
+ * `getSportOptions(events)` (§1.2's options-source boundary); this
+ * function only knows about skill levels, not the current event feed.
+ */
+export function getPreselectedSportKey(skillLevels: SkillLevel[]): string | null {
+  let topTier = 0;
+  for (const row of skillLevels) {
+    const tier = skillTier(row.skill_level);
+    if (tier > topTier) {
+      topTier = tier;
+    }
+  }
+  if (topTier === 0) {
+    return null;
+  }
+
+  const topRows = skillLevels.filter(row => skillTier(row.skill_level) === topTier);
+  let winner = topRows[0];
+  for (const row of topRows.slice(1)) {
+    if (updatedAtMs(row) > updatedAtMs(winner)) {
+      winner = row;
+    }
+  }
+  return sportKey(winner.sport);
 }
 
 /**
