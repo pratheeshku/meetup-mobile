@@ -4,9 +4,10 @@
 `REQ-MEETUP-MOBILE.md` / `DES-MEETUP-MOBILE.md`; precedent for this pattern:
 Addendum A began as a standalone `requirements-brief-addendum-admin.md` and
 was later consolidated into `REQ-MEETUP.md`, per that document's own history)
-**Status**: DRAFT — architect-authored, content approved; **IDs and section
-numbers below are placeholders**, not assigned against the real mobile docs
-(not uploaded to this session — see Merge Instructions)
+**Status**: APPROVED (2026-09-24, architect-directed) — content and scope
+approved for implementation against the placeholder IDs below; real IDs and
+section numbers are assigned at merge time (§5), not a precondition for
+building. Building against this file as-is is explicitly authorized.
 **Date**: 2026-09-24
 **Extends**: `REQ-MEETUP-001` Addendum D v1.11 (R-250.1, R-339) and
 `DES-MEETUP-001` v1.71 (`fn_has_active_tournament_registration`, §5.13) —
@@ -89,6 +90,8 @@ R-339.
 
 ---
 
-**Not yet dispatched as a build task.** Once merged with real IDs (or you
-confirm building against the placeholder is acceptable), the task brief
-follows the same shape as the web R-339 brief.
+**Approved for dispatch 2026-09-24.** Backend dependency (R-339:
+`DELETE /users/me/skill-level/{sport}`, `fn_has_active_tournament_registration`)
+must be confirmed merged/deployed before the mobile frontend task proceeds —
+`meetup-mobile` is a pure API client and cannot verify this from its own repo;
+confirmation must come from the architect or the backend repo.
