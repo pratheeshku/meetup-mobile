@@ -184,9 +184,18 @@ Your branch is ahead of 'origin/main' by 2 commits.
 ...
 ```
 
-(Push evidence captured after this report and the enhancement doc are
-committed — see final commit/push block appended below by the session, or
-`git log`/`git push` output in the session transcript.)
+### Push evidence
+
+```
+$ git log --oneline -3
+fd5ddc7 docs: implementation report, archived status, and enhancement notes for BUG-M06
+219271e fix(home): source sport filter pills from admin sports list (BUG-M06)
+27e8faa feat(home): pre-select sport filter from user skill levels
+
+$ git push
+To https://github.com/pratheeshku/meetup-mobile.git
+   2db67f4..fd5ddc7  main -> main
+```
 
 ## 6. Known gaps / follow-ups
 
