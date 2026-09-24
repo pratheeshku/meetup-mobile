@@ -5,10 +5,10 @@
  * schema.
  */
 import { apiClient } from '../client';
-import { getProfile, updateProfile } from '../profile';
+import { deleteSkillLevel, getProfile, updateProfile } from '../profile';
 
 jest.mock('../client', () => ({
-  apiClient: { get: jest.fn(), patch: jest.fn() },
+  apiClient: { get: jest.fn(), patch: jest.fn(), delete: jest.fn() },
 }));
 
 const mockedGet = apiClient.get as jest.Mock;
@@ -91,5 +91,23 @@ describe('updateProfile', () => {
     patch.mockResolvedValue({});
     await updateProfile({ display_name: 'Pat H' }, { correlationId: 'c-1' });
     expect(patch).toHaveBeenCalledWith('/users/me', { display_name: 'Pat H' }, { correlationId: 'c-1' });
+  });
+});
+
+describe('deleteSkillLevel (ADDENDUM-MOBILE-SKILL-DELETE-001)', () => {
+  it('DELETEs /users/me/skill-level/{sport}, threading the correlation ID', async () => {
+    const del = apiClient.delete as jest.Mock;
+    del.mockResolvedValue({ status: 204 });
+    await deleteSkillLevel('football', { correlationId: 'c-2' });
+    expect(del).toHaveBeenCalledWith('/users/me/skill-level/football', { correlationId: 'c-2' });
+  });
+
+  it('propagates a 409 guard rejection to the caller (not swallowed here)', async () => {
+    const del = apiClient.delete as jest.Mock;
+    const conflict = {
+      response: { status: 409, data: { detail: 'Active tournament registration exists.' } },
+    };
+    del.mockRejectedValue(conflict);
+    await expect(deleteSkillLevel('football')).rejects.toBe(conflict);
   });
 });

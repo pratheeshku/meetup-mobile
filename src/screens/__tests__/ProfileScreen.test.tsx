@@ -3,8 +3,9 @@
  * `nickname` is unique, read-only, and must never be editable or PATCHed.
  */
 import React from 'react';
+import { Alert } from 'react-native';
 
-import { getProfile, updateProfile, updateSkillLevel } from '../../api/profile';
+import { deleteSkillLevel, getProfile, updateProfile, updateSkillLevel } from '../../api/profile';
 import { getSports } from '../../api/sports';
 import { act, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
@@ -22,6 +23,7 @@ jest.mock('../../api/profile', () => ({
   getProfile: jest.fn(),
   updateProfile: jest.fn(),
   updateSkillLevel: jest.fn(),
+  deleteSkillLevel: jest.fn(),
   requestDeletion: jest.fn(),
   confirmDeletion: jest.fn(),
 }));
@@ -30,7 +32,23 @@ jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 const mockGetProfile = getProfile as jest.MockedFunction<typeof getProfile>;
 const mockUpdateProfile = updateProfile as jest.MockedFunction<typeof updateProfile>;
 const mockUpdateSkillLevel = updateSkillLevel as jest.MockedFunction<typeof updateSkillLevel>;
+const mockDeleteSkillLevel = deleteSkillLevel as jest.MockedFunction<typeof deleteSkillLevel>;
 const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
+
+/**
+ * `Alert.alert` has no test-env implementation (bare RN, no mock configured
+ * in `jest.setup.js` — nothing in this codebase confirms/dismisses a native
+ * alert). Spied here to capture the buttons array and invoke the
+ * destructive one directly, same as tapping "Remove" in the real dialog.
+ */
+function confirmAlert(buttonText: string): unknown {
+  const alertSpy = Alert.alert as unknown as jest.Mock;
+  const [, , buttons] = alertSpy.mock.calls[alertSpy.mock.calls.length - 1];
+  const button = (buttons as { text: string; onPress?: () => unknown }[]).find(
+    b => b.text === buttonText,
+  );
+  return button?.onPress?.();
+}
 
 const PROFILE: UserProfile = {
   id: 'u-1',
@@ -70,7 +88,9 @@ beforeEach(() => {
   mockUpdateProfile.mockReset().mockResolvedValue(undefined);
   mockGetProfile.mockReset().mockResolvedValue(PROFILE);
   mockUpdateSkillLevel.mockReset().mockResolvedValue(undefined);
+  mockDeleteSkillLevel.mockReset().mockResolvedValue(undefined);
   mockGetSports.mockReset().mockResolvedValue(SPORTS);
+  jest.spyOn(Alert, 'alert').mockReset();
   __resetSportDisplayNamesCacheForTests();
 });
 
@@ -198,5 +218,101 @@ describe('ProfileScreen skill-levels list sport display name (BUG-M02)', () => {
     });
     const root = await mount();
     expect(texts(root)).toContain('unlisted_sport');
+  });
+});
+
+describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', () => {
+  const WITH_ONE_SKILL_LEVEL: UserProfile = {
+    ...PROFILE,
+    skill_levels: [{ sport: 'table_tennis', skill_level: 'Intermediate' }],
+  };
+
+  it('tapping the row still opens the edit picker (delete affordance does not steal the tap target)', async () => {
+    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
+    const root = await mount();
+    expect(texts(root)).not.toContain('Save');
+
+    await act(async () => {
+      pressableWithText(root, 'Intermediate').props.onPress();
+    });
+
+    // Edit form now open, prefilled from the tapped row (Table Tennis /
+    // Intermediate), same as before this addendum's changes.
+    expect(texts(root)).toContain('Save');
+    expect(texts(root)).toContain('Cancel');
+  });
+
+  it('asks for confirmation before deleting', async () => {
+    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
+    const root = await mount();
+    act(() => {
+      pressableWithText(root, 'Remove').props.onPress();
+    });
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Remove Skill Level',
+      'Remove your Table Tennis skill level?',
+      expect.anything(),
+    );
+    expect(mockDeleteSkillLevel).not.toHaveBeenCalled();
+  });
+
+  it('on confirm: DELETEs the entry and removes it from the list via a re-fetch', async () => {
+    mockGetProfile.mockResolvedValueOnce(WITH_ONE_SKILL_LEVEL).mockResolvedValueOnce(PROFILE);
+    const root = await mount();
+    expect(texts(root)).toContain('Table Tennis');
+
+    act(() => {
+      pressableWithText(root, 'Remove').props.onPress();
+    });
+    await act(async () => {
+      await confirmAlert('Remove');
+    });
+
+    expect(mockDeleteSkillLevel).toHaveBeenCalledWith('table_tennis', expect.anything());
+    expect(mockGetProfile).toHaveBeenCalledTimes(2);
+    expect(texts(root)).not.toContain('Table Tennis');
+    expect(texts(root)).toContain('No skill levels declared yet.');
+  });
+
+  it('on 409: surfaces the guard message verbatim and leaves the entry in the list', async () => {
+    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
+    mockDeleteSkillLevel.mockRejectedValue({
+      response: {
+        status: 409,
+        data: { detail: 'Cannot remove: you have an active tournament registration for this sport.' },
+      },
+    });
+    const root = await mount();
+
+    act(() => {
+      pressableWithText(root, 'Remove').props.onPress();
+    });
+    await act(async () => {
+      await confirmAlert('Remove');
+    });
+
+    expect(texts(root)).toContain(
+      'Cannot remove: you have an active tournament registration for this sport.',
+    );
+    // Still in the list — no optimistic removal on a blocked delete.
+    expect(texts(root)).toContain('Table Tennis');
+    // Only the initial mount fetch — the guarded delete never re-fetches.
+    expect(mockGetProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to a generic message when the failure carries no usable detail (e.g. network error)', async () => {
+    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
+    mockDeleteSkillLevel.mockRejectedValue(new Error('network down'));
+    const root = await mount();
+
+    act(() => {
+      pressableWithText(root, 'Remove').props.onPress();
+    });
+    await act(async () => {
+      await confirmAlert('Remove');
+    });
+
+    expect(texts(root)).toContain('Could not remove this skill level. Please try again.');
+    expect(texts(root)).toContain('Table Tennis');
   });
 });

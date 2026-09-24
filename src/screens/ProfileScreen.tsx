@@ -34,6 +34,7 @@ import { useAuth } from '../auth/AuthContext';
 import { withCorrelationId } from '../api/correlationId';
 import {
   confirmDeletion,
+  deleteSkillLevel,
   getProfile,
   requestDeletion,
   updateProfile,
@@ -48,6 +49,7 @@ import OptionChips from '../components/OptionChips';
 import type { ChipOption } from '../components/OptionChips';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import { getApiErrorMessage } from '../utils/apiError';
 import { getDisplayName } from '../utils/displayName';
 import { useSportDisplayName } from '../utils/labels';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
@@ -65,22 +67,52 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
  * component instance, violates the Rules of Hooks. Extracted into its own
  * component instead, one per row, same fix as `TournamentsScreen`'s
  * `TournamentRow`.
+ *
+ * Delete affordance (ADDENDUM-MOBILE-SKILL-DELETE-001) reuses this app's
+ * existing destructive-action pattern verbatim — same as
+ * `GroupDetailScreen`'s per-row "Remove" member action: a `TextLink`
+ * `tone="destructive"` with a `loading` state, gated behind an
+ * `Alert.alert` yes/no confirmation whose destructive button fires the
+ * call. The confirmation is built here (not in the parent) because only
+ * this row owns the resolved `sportLabel` from `useSportDisplayName`.
  */
 function SkillLevelRow({
   sport,
   skillLevel,
   onPress,
+  onDelete,
+  isDeleting,
 }: {
   sport: string;
   skillLevel: SkillLevelValue;
   onPress: () => void;
+  onDelete: () => void;
+  isDeleting: boolean;
 }): React.JSX.Element {
   const sportLabel = useSportDisplayName(sport);
+
+  const handleDeletePress = (): void => {
+    Alert.alert('Remove Skill Level', `Remove your ${sportLabel} skill level?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: onDelete },
+    ]);
+  };
+
   return (
-    <Pressable style={styles.skillLevelRow} onPress={onPress} accessibilityRole="button">
-      <Text style={styles.skillLevelSport}>{sportLabel}</Text>
-      <Text style={styles.skillLevelValue}>{skillLevel}</Text>
-    </Pressable>
+    <View style={styles.skillLevelRow}>
+      <Pressable style={styles.skillLevelInfo} onPress={onPress} accessibilityRole="button">
+        <Text style={styles.skillLevelSport}>{sportLabel}</Text>
+        <Text style={styles.skillLevelValue}>{skillLevel}</Text>
+      </Pressable>
+      <TextLink
+        label="Remove"
+        tone="destructive"
+        onPress={handleDeletePress}
+        loading={isDeleting}
+        disabled={isDeleting}
+        style={styles.skillLevelRemoveLink}
+      />
+    </View>
   );
 }
 
@@ -108,6 +140,9 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const [skillLevelDraft, setSkillLevelDraft] = useState<SkillLevelValue>('Beginner');
   const [isSavingSkillLevel, setIsSavingSkillLevel] = useState(false);
   const [skillLevelError, setSkillLevelError] = useState<string | null>(null);
+
+  const [deletingSkillLevelSport, setDeletingSkillLevelSport] = useState<string | null>(null);
+  const [skillLevelDeleteError, setSkillLevelDeleteError] = useState<string | null>(null);
 
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -209,6 +244,31 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       setSkillLevelError('Could not save your skill level. Please try again.');
     } finally {
       setIsSavingSkillLevel(false);
+    }
+  };
+
+  /**
+   * ADDENDUM-MOBILE-SKILL-DELETE-001 §4: on 409 (active tournament
+   * registration guard), the backend's message is shown verbatim via
+   * `getApiErrorMessage` — not swallowed into a generic string — and the
+   * entry stays in the list (no optimistic removal). On success, re-fetch
+   * via `getProfile()`/`getSkillLevels()`, same refresh pattern already
+   * used by Add/Modify above.
+   */
+  const handleDeleteSkillLevel = async (sport: string): Promise<void> => {
+    setSkillLevelDeleteError(null);
+    setDeletingSkillLevelSport(sport);
+    try {
+      await withCorrelationId(async correlationId => {
+        await deleteSkillLevel(sport, { correlationId });
+        setProfile(await getProfile({ correlationId }));
+      });
+    } catch (e) {
+      setSkillLevelDeleteError(
+        getApiErrorMessage(e, 'Could not remove this skill level. Please try again.'),
+      );
+    } finally {
+      setDeletingSkillLevelSport(null);
     }
   };
 
@@ -358,6 +418,10 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           ) : null}
         </View>
 
+        {skillLevelDeleteError ? (
+          <Text style={styles.errorText}>{skillLevelDeleteError}</Text>
+        ) : null}
+
         {skillLevels.length === 0 ? (
           <Text style={styles.emptyText}>No skill levels declared yet.</Text>
         ) : (
@@ -367,6 +431,8 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
               sport={item.sport}
               skillLevel={item.skill_level}
               onPress={() => handleStartEditSkillLevel(item.sport, item.skill_level)}
+              onDelete={() => handleDeleteSkillLevel(item.sport)}
+              isDeleting={deletingSkillLevelSport === item.sport}
             />
           ))
         )}
@@ -529,6 +595,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: borderWidth.thin,
     borderBottomColor: colors.border,
   },
+  skillLevelInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  skillLevelRemoveLink: { marginLeft: spacing.sm },
   skillLevelSport: { ...typography.body, color: colors.textPrimary },
   skillLevelValue: { ...typography.bodyBold, color: colors.textSecondary },
   skillLevelPickerRow: {

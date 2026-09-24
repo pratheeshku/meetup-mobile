@@ -126,6 +126,22 @@ export async function updateSkillLevel(
 }
 
 /**
+ * `DELETE /users/me/skill-level/{sport}` (ADDENDUM-MOBILE-SKILL-DELETE-001,
+ * R-MOBILE-SKILL-DELETE-1; backend: `DES-MEETUP-001` v1.71 §5.1/§5.5/§5.13,
+ * R-339, `fn_has_active_tournament_registration`). Confirmed live against
+ * the real OpenAPI schema: bearer-auth required, 204 on success, 404 if no
+ * skill_level row exists for this sport, 409 if the caller has an active,
+ * unconcluded tournament registration for it. The 409's `detail` is
+ * surfaced verbatim to the user by the caller (`getApiErrorMessage`) — the
+ * backend is the sole authority on the guard message, not re-worded here.
+ */
+export async function deleteSkillLevel(sport: string, options?: RequestOptions): Promise<void> {
+  await apiClient.delete(`/users/me/skill-level/${sport}`, {
+    correlationId: options?.correlationId,
+  });
+}
+
+/**
  * BLOCKED — CRITICAL, needs an architect/product decision, not fixed
  * here (do not guess or invent a replacement endpoint): confirmed
  * against the live OpenAPI schema that neither `/users/me/deletion-request`
