@@ -55,3 +55,67 @@ old behavior across the repo, not only the primary file's usages."
 **Why it matters generally**: In component-level unit testing, looking up elements by composite type or top-level props often collides with outer component boundaries or fails silently when component layers change. Matching on behavioral props (e.g. `n.props.behavior === 'padding'` or `n.props.testID === testID && typeof n.props.onPress === 'function'`) targets the precise interactive layer without relying on fragile fiber type identities.
 
 **Suggested addition** (target: "Testing Requirements / Component Testing"): When writing unit tests with `react-test-renderer` for custom controls or React Native built-in composite components, query interactive elements using both `testID` and functional contract checks (e.g., `typeof n.props.onPress === 'function'`), and query layout containers using characteristic props (e.g. `behavior === 'padding'`) rather than attempting string comparison against composite component fiber types.
+
+## 5. A repo-local "contract audit" document can be stale by the time it's read — verify live, don't just cite it
+
+**What happened:** This task added a field to an existing endpoint's request
+body. Before writing code, `docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md`
+was found, which stated the exact endpoint (`POST
+/notifications/mobile-subscriptions`) "does not exist" on the real backend
+and was CRITICAL/architecturally blocked. Taking that at face value would
+have produced a Blocked Report on a task that was, in fact, safely
+implementable. A direct `curl` of the live `openapi.json` (same method the
+audit itself used) showed the endpoint now exists — it had been fixed
+server-side in the six days since the audit — and gave the precise, current
+answer to the actual open question (whether the new field was live yet):
+it wasn't, but the addition was additive/non-breaking, so the fix could
+ship now and activate automatically on backend deploy.
+
+**Why it matters generally:** Any written contract-audit artifact (an
+audit report, a "known gaps" doc, a stale OpenAPI dump saved to the repo)
+is a snapshot, not a live source of truth, and other work in the same
+codebase moves independently of it. Treating it as current without
+re-checking produces two symmetric failure modes: over-trusting a stale
+"broken" finding and needlessly blocking a task that's actually fine now,
+or under-trusting it and missing a genuine regression. Both are avoided by
+the same cheap step: re-run the audit's own verification method (a live
+`curl`/schema fetch) before deciding a contract-touching change is safe,
+blocked, or already fixed.
+
+**Suggested addition** (target: "Contract verification" under Pre-code
+gates): when a prior audit/report in the repo makes a specific claim about
+a live backend contract (endpoint exists/doesn't, field present/absent,
+required/optional) and the task depends on that claim, re-verify it
+directly against the live schema before either citing it as a blocker or
+building on it as settled — a document's age is not evidence of its
+current accuracy, and the verification is usually one command.
+
+## 6. A task brief that names its own uncertain dependency is not asking to be blocked on it
+
+**What happened:** The task brief explicitly said its client-side fix
+depended on a separately-dispatched backend change, and asked to "confirm
+backend deployment status before assuming the field is accepted" rather
+than assuming success. That phrasing already anticipates the dependency
+might not be deployed yet and tells the agent what to do about it
+(verify, don't assume) — it is not, by itself, a CRITICAL/HIGH gap
+requiring a Blocked Report under the Propose & Proceed rule, provided the
+change is additive/non-breaking either way (verified here: the live
+schema has no `additionalProperties: false`, so an extra field is safely
+ignored until the backend catches up).
+
+**Why it matters generally:** "Confirm X before assuming Y" in a task
+brief is an instruction to perform a specific verification step and act
+on its result, not a synonym for "this task is blocked until X is true."
+Conflating the two would turn every coordinated two-sided change (client
+change is safe to ship ahead of a corresponding backend change, verified
+additive) into an unnecessary stop, even when the brief already told the
+agent exactly how to de-risk it.
+
+**Suggested addition** (target: "Propose & Proceed (micro-gap exception)"):
+when a task brief names an external dependency and gives an explicit
+verification step for it (rather than asserting the dependency is already
+satisfied), perform that verification and, if the change is confirmed
+additive/non-breaking regardless of the dependency's current state,
+proceed and document the verified state — reserve the Blocked Report for
+when the verification step itself is impossible to perform, or reveals a
+breaking contract change, not merely a still-pending one.

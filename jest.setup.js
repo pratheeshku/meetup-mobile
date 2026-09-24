@@ -105,6 +105,19 @@ jest.mock('react-native-notify-kit', () => ({
   AndroidStyle: { BIGPICTURE: 0, BIGTEXT: 1, INBOX: 2, MESSAGING: 3 },
 }));
 
+// react-native-device-info wraps native platform-info APIs (Android ID,
+// etc.) with no Jest-environment equivalent. Added for the push-token
+// device-scoped-registration bug fix (src/notifications/deviceId.ts).
+// Centralised here per this file's established convention — add to this
+// mock, not a new ad hoc one per test file, if new APIs from this package
+// are used.
+jest.mock('react-native-device-info', () => ({
+  __esModule: true,
+  default: {
+    getAndroidId: jest.fn(async () => 'mock-android-id'),
+  },
+}));
+
 // @react-native-community/datetimepicker wraps native iOS/Android date/time
 // picker dialogs with no Jest-environment equivalent. Added to this centralised
 // mock per this file's established convention.

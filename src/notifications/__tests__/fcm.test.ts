@@ -8,6 +8,7 @@ import { PermissionsAndroid, Platform } from 'react-native';
 import * as firebaseMessaging from '@react-native-firebase/messaging';
 
 import { apiClient } from '../../api/client';
+import { __resetDeviceIdCacheForTests } from '../deviceId';
 import { deregisterDeviceToken, hasNotificationPermission, registerDeviceToken } from '../fcm';
 
 jest.mock('../../api/client', () => ({
@@ -22,6 +23,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.replaceProperty(Platform, 'OS', 'android');
   jest.spyOn(Platform, 'Version', 'get').mockReturnValue(34);
+  __resetDeviceIdCacheForTests();
 });
 
 afterEach(() => {
@@ -57,7 +59,7 @@ describe('deregisterDeviceToken', () => {
 });
 
 describe('registerDeviceToken', () => {
-  it('sends deviceToken, platform "android" and a userAgent', async () => {
+  it('sends deviceToken, platform "android", a userAgent and the stable deviceId', async () => {
     mockPost.mockResolvedValueOnce({ data: { id: 'x' } });
 
     await registerDeviceToken('tok');
@@ -66,7 +68,19 @@ describe('registerDeviceToken', () => {
       deviceToken: 'tok',
       platform: 'android',
       userAgent: 'MeetupMobile-Android/34',
+      deviceId: 'mock-android-id',
     });
+  });
+
+  it('sends the same deviceId across repeated registrations (rotation-stable)', async () => {
+    mockPost.mockResolvedValue({ data: { id: 'x' } });
+
+    await registerDeviceToken('tok-before-rotation');
+    await registerDeviceToken('tok-after-rotation');
+
+    expect(mockPost.mock.calls[0][1].deviceId).toBe('mock-android-id');
+    expect(mockPost.mock.calls[1][1].deviceId).toBe('mock-android-id');
+    expect(mockPost.mock.calls[0][1].deviceId).toBe(mockPost.mock.calls[1][1].deviceId);
   });
 });
 

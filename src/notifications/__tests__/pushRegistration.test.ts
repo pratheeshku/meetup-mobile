@@ -223,7 +223,7 @@ describe('registration (R-070)', () => {
     checkPermission.mockResolvedValue(true);
   });
 
-  it('POSTs the token with the live-schema body {deviceToken, platform, userAgent}', async () => {
+  it('POSTs the token with the live-schema body {deviceToken, platform, userAgent, deviceId}', async () => {
     const stop = startPushRegistration();
     await flush();
 
@@ -231,6 +231,7 @@ describe('registration (R-070)', () => {
       deviceToken: TOKEN,
       platform: 'android',
       userAgent: 'MeetupMobile-Android/34',
+      deviceId: 'mock-android-id',
     });
     stop();
   });

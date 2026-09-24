@@ -33,6 +33,7 @@ import {
 } from '@react-native-firebase/messaging';
 
 import { apiClient } from '../api/client';
+import { getDeviceId } from './deviceId';
 import { showBanner } from './notificationBannerStore';
 import { incrementUnreadBadgeCount } from './unreadCountStore';
 import {
@@ -97,12 +98,25 @@ function buildUserAgent(): string {
  * `POST /notifications/mobile-subscriptions` — body verified against the
  * live OpenAPI `MobilePushTokenRegisterRequest` (`deviceToken` and
  * `platform` required, `userAgent` optional).
+ *
+ * `deviceId` (bug fix, device-scoped token registration): re-checked
+ * against the live OpenAPI as of this change — `MobilePushTokenRegisterRequest`
+ * does not yet declare a `deviceId` property server-side (the paired
+ * backend change gating `fn_register_mobile_push_token` on it had not
+ * deployed at the time of this check). Sent anyway: FastAPI/Pydantic
+ * ignores unrecognized request fields by default (no
+ * `additionalProperties: false` on the live schema), so this is
+ * forward-compatible and starts working the moment the backend deploys,
+ * with no further mobile change required. See the Implementation Report
+ * for the verification evidence.
  */
 export async function registerDeviceToken(deviceToken: string): Promise<void> {
+  const deviceId = await getDeviceId();
   await apiClient.post('/notifications/mobile-subscriptions', {
     deviceToken,
     platform: 'android',
     userAgent: buildUserAgent(),
+    deviceId,
   });
 }
 
