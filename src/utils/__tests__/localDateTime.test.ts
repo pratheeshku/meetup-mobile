@@ -1,4 +1,13 @@
-import { applyQuickDate, parseLocalDate, parseLocalDateTime, quickDate } from '../localDateTime';
+import {
+  applyQuickDate,
+  formatDateOnly,
+  formatLocalDateTime,
+  localDateToDate,
+  localDateTimeToDate,
+  parseLocalDate,
+  parseLocalDateTime,
+  quickDate,
+} from '../localDateTime';
 
 describe('parseLocalDateTime', () => {
   it('reads the text as device-local time and returns the matching UTC ISO instant', () => {
@@ -75,5 +84,47 @@ describe('applyQuickDate', () => {
   it('defaults to 09:00 when the field was empty or unparsed', () => {
     expect(applyQuickDate('', '2026-09-23')).toBe('2026-09-23 09:00');
     expect(applyQuickDate('not a date', '2026-09-23')).toBe('2026-09-23 09:00');
+  });
+});
+
+describe('formatDateOnly and formatLocalDateTime', () => {
+  it('formats a date object as local YYYY-MM-DD', () => {
+    const d = new Date(2026, 4, 3);
+    expect(formatDateOnly(d)).toBe('2026-05-03');
+  });
+
+  it('formats a date object as local YYYY-MM-DD HH:mm', () => {
+    const d = new Date(2026, 4, 3, 9, 5);
+    expect(formatLocalDateTime(d)).toBe('2026-05-03 09:05');
+  });
+});
+
+describe('localDateTimeToDate and localDateToDate', () => {
+  it('parses valid local date time string into Date object', () => {
+    const d = localDateTimeToDate('2026-10-01 18:30');
+    expect(d).not.toBeNull();
+    expect(d?.getFullYear()).toBe(2026);
+    expect(d?.getMonth()).toBe(9);
+    expect(d?.getDate()).toBe(1);
+    expect(d?.getHours()).toBe(18);
+    expect(d?.getMinutes()).toBe(30);
+  });
+
+  it('returns null for invalid date time', () => {
+    expect(localDateTimeToDate('invalid')).toBeNull();
+    expect(localDateTimeToDate('2026-02-31 10:00')).toBeNull();
+  });
+
+  it('parses valid local date string into Date object (midnight)', () => {
+    const d = localDateToDate('2026-10-01');
+    expect(d).not.toBeNull();
+    expect(d?.getFullYear()).toBe(2026);
+    expect(d?.getMonth()).toBe(9);
+    expect(d?.getDate()).toBe(1);
+  });
+
+  it('returns null for invalid date', () => {
+    expect(localDateToDate('invalid')).toBeNull();
+    expect(localDateToDate('2026-02-31')).toBeNull();
   });
 });

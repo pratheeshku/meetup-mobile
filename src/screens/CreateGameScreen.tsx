@@ -25,7 +25,7 @@
  * breakdown and every Proposed Assumption below.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -36,6 +36,7 @@ import { getMyGroups } from '../api/groups';
 import { getSports } from '../api/sports';
 import { createTournament } from '../api/tournaments';
 import Button from '../components/Button';
+import DateTimePickerField from '../components/DateTimePickerField';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
@@ -342,8 +343,12 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <OptionChips options={MODE_OPTIONS} value={mode} onChange={setMode} disabled={isSubmitting} />
+    <KeyboardAvoidingView
+      style={styles.keyboardAvoid}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <OptionChips options={MODE_OPTIONS} value={mode} onChange={setMode} disabled={isSubmitting} />
 
       {mode === 'game' ? (
         <>
@@ -403,15 +408,14 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             onChange={which => setGStart(current => applyQuickDate(current, quickDate(which)))}
             disabled={isSubmitting}
           />
-          <TextField
-            style={styles.input}
+          <DateTimePickerField
+            accessibilityLabel="Start Date & Time"
+            testID="casual-start-date-time"
+            mode="datetime"
             placeholder={LOCAL_DATE_TIME_PLACEHOLDER}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="numbers-and-punctuation"
             value={gStart}
-            onChangeText={setGStart}
-            editable={!isSubmitting}
+            onChange={setGStart}
+            disabled={isSubmitting}
           />
 
           <Text style={styles.label}>Venue Name</Text>
@@ -464,15 +468,14 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           />
 
           <Text style={styles.label}>Tournament Start Date</Text>
-          <TextField
-            style={styles.input}
+          <DateTimePickerField
+            accessibilityLabel="Tournament Start Date"
+            testID="tournament-start-date"
+            mode="date"
             placeholder={LOCAL_DATE_PLACEHOLDER}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="numbers-and-punctuation"
             value={tStart}
-            onChangeText={setTStart}
-            editable={!isSubmitting}
+            onChange={setTStart}
+            disabled={isSubmitting}
           />
 
           <Text style={[styles.label, styles.section]}>Sport</Text>
@@ -511,15 +514,14 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           />
 
           <Text style={[styles.label, styles.section]}>Registration closes at (optional)</Text>
-          <TextField
-            style={styles.input}
+          <DateTimePickerField
+            accessibilityLabel="Registration closes at (optional)"
+            testID="tournament-reg-close"
+            mode="datetime"
             placeholder={LOCAL_DATE_TIME_PLACEHOLDER}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="numbers-and-punctuation"
             value={tRegClose}
-            onChangeText={setTRegClose}
-            editable={!isSubmitting}
+            onChange={setTRegClose}
+            disabled={isSubmitting}
           />
 
           <Text style={[styles.label, styles.section]}>Format</Text>
@@ -553,11 +555,13 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           <Button label="Create Tournament" onPress={handleSubmitTournament} loading={isSubmitting} />
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoid: { flex: 1 },
   container: { padding: spacing.lg },
   label: { ...typography.bodyBold, color: colors.textPrimary, marginBottom: spacing.xs },
   section: { marginTop: spacing.md },

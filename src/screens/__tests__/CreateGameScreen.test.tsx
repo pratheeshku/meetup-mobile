@@ -59,8 +59,26 @@ const choose = (root: Instance, label: string): void => {
     pressableLabelled(root, label).props.onPress();
   });
 };
-const START_DT = 'YYYY-MM-DD HH:mm';
-const START_D = 'YYYY-MM-DD';
+const pickDateTime = (root: Instance, testID: string, date: Date): void => {
+  act(() => {
+    const trigger = root.find(
+      n => n.props.testID === testID && typeof n.props.onPress === 'function',
+    );
+    trigger.props.onPress();
+  });
+  act(() => {
+    const picker = root.find(n => n.props.testID === `${testID}-picker`);
+    picker.props.onChange({ type: 'set' }, date);
+  });
+  act(() => {
+    const doneButtons = root.findAll(
+      n => n.props.accessibilityLabel === 'Done' && typeof n.props.onPress === 'function',
+    );
+    if (doneButtons.length > 0) {
+      doneButtons[0].props.onPress();
+    }
+  });
+};
 
 beforeEach(() => {
   mockGetSports.mockReset().mockResolvedValue(SPORTS);
@@ -113,7 +131,7 @@ describe('CreateGameScreen — Casual Game form contract', () => {
     const root = await mount();
     type(input(root, 'e.g. Sunday 5-a-side Football'), 'Futsal');
     type(capacityInput(root), '10');
-    type(root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_DT)[0], '2026-10-01 18:30');
+    pickDateTime(root, 'casual-start-date-time', new Date(2026, 9, 1, 18, 30));
     choose(root, '👥 Group');
     await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
     expect(texts(root)).toContain('Choose a group.');
@@ -134,19 +152,20 @@ describe('CreateGameScreen — Casual Game form contract', () => {
     const root = await mount();
     type(input(root, 'e.g. Sunday 5-a-side Football'), 'Futsal');
     type(capacityInput(root), value);
-    type(root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_DT)[0], '2026-10-01 18:30');
+    pickDateTime(root, 'casual-start-date-time', new Date(2026, 9, 1, 18, 30));
     await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
     expect(texts(root)).toContain('Capacity must be a whole number between 2 and 200.');
     expect(mockCreateEvent).not.toHaveBeenCalled();
   });
 
-  it('fills the date portion of Start Date & Time from the quick-select chips, keeping any typed time', async () => {
+  it('fills the date portion of Start Date & Time from the quick-select chips, keeping any selected time', async () => {
     const root = await mount();
-    const start = () => root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_DT)[0];
-    type(start(), '2000-01-01 20:15');
+    pickDateTime(root, 'casual-start-date-time', new Date(2000, 0, 1, 20, 15));
     choose(root, 'Today');
-    expect(start().props.value).toMatch(/^\d{4}-\d{2}-\d{2} 20:15$/);
-    expect(start().props.value.endsWith('20:15')).toBe(true);
+    const trigger = root.find(n => n.props.testID === 'casual-start-date-time');
+    const text = texts(trigger).join('');
+    expect(text).toMatch(/^\d{4}-\d{2}-\d{2} 20:15$/);
+    expect(text.endsWith('20:15')).toBe(true);
   });
 });
 
@@ -154,7 +173,7 @@ describe('CreateGameScreen — Casual Game submit', () => {
   function fillValid(root: Instance): void {
     type(input(root, 'e.g. Sunday 5-a-side Football'), '  Friday Futsal ');
     type(capacityInput(root), '10');
-    type(root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_DT)[0], '2026-10-01 18:30');
+    pickDateTime(root, 'casual-start-date-time', new Date(2026, 9, 1, 18, 30));
   }
 
   it('sends the minimal EventCreate payload (no sport chosen, defaults, ends_at null) and pops back with a refresh key', async () => {
@@ -253,7 +272,7 @@ describe('CreateGameScreen — Tournament submit', () => {
     type(input(root, 'e.g. Summer League'), '  Summer Cup ');
     choose(root, 'Football');
     choose(root, 'Team');
-    type(root.find(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_D), '2026-10-01');
+    pickDateTime(root, 'tournament-start-date', new Date(2026, 9, 1));
   }
 
   it.each([
@@ -268,12 +287,11 @@ describe('CreateGameScreen — Tournament submit', () => {
     expect(mockCreateTournament).not.toHaveBeenCalled();
   });
 
-  it('rejects a malformed tournament start date (date-only, no time)', async () => {
+  it('rejects an unselected tournament start date', async () => {
     const root = await toTournament();
     type(input(root, 'e.g. Summer League'), 'Cup');
     choose(root, 'Football');
     choose(root, 'Team');
-    type(root.find(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === START_D), '2026-10-01 18:30');
     await act(async () => pressableLabelled(root, 'Create Tournament').props.onPress());
     expect(texts(root)).toContain('Enter the tournament start date as YYYY-MM-DD.');
     expect(mockCreateTournament).not.toHaveBeenCalled();
@@ -360,5 +378,59 @@ describe('CreateGameScreen — sports loading (shared by both modes)', () => {
     const root = await mount();
     choose(root, '👥 Group');
     expect(texts(root)).toContain("You don't belong to any groups yet.");
+  });
+});
+
+describe('CreateGameScreen — keyboard avoidance and date/time picker integration', () => {
+  it('wraps the form in a KeyboardAvoidingView with padding behavior on iOS', async () => {
+    const root = await mount();
+    const kav = root.find(n => n.props.behavior === 'padding');
+    expect(kav).toBeDefined();
+    expect(kav.props.behavior).toBe('padding');
+  });
+
+  it('Casual Game: manual picker interaction produces the correct UTC ISO 8601 starts_at timestamp', async () => {
+    mockCreateEvent.mockResolvedValueOnce({} as never);
+    const root = await mount();
+    type(input(root, 'e.g. Sunday 5-a-side Football'), 'Saturday Kickoff');
+    type(capacityInput(root), '12');
+
+    // Pick 2026-11-15 14:45
+    pickDateTime(root, 'casual-start-date-time', new Date(2026, 10, 15, 14, 45));
+
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+
+    expect(mockCreateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Saturday Kickoff',
+        starts_at: new Date(2026, 10, 15, 14, 45).toISOString(),
+      }),
+      { correlationId: expect.any(String) },
+    );
+  });
+
+  it('Tournament: picking start date and optional registration close sends exact ISO timestamps', async () => {
+    mockCreateTournament.mockResolvedValueOnce({} as never);
+    const root = await mount();
+    choose(root, '🏆 Tournament');
+    type(input(root, 'e.g. Summer League'), 'Winter Open');
+    choose(root, 'Football');
+    choose(root, 'Individual');
+
+    // Tournament start date: 2026-12-01
+    pickDateTime(root, 'tournament-start-date', new Date(2026, 11, 1));
+    // Registration close: 2026-11-28 20:00
+    pickDateTime(root, 'tournament-reg-close', new Date(2026, 10, 28, 20, 0));
+
+    await act(async () => pressableLabelled(root, 'Create Tournament').props.onPress());
+
+    expect(mockCreateTournament).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Winter Open',
+        starts_at: new Date(2026, 11, 1).toISOString(),
+        registration_closes_at: new Date(2026, 10, 28, 20, 0).toISOString(),
+      }),
+      { correlationId: expect.any(String) },
+    );
   });
 });

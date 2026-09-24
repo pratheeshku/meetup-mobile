@@ -104,4 +104,29 @@ jest.mock('react-native-notify-kit', () => ({
   AndroidImportance: { DEFAULT: 3, HIGH: 4 },
   AndroidStyle: { BIGPICTURE: 0, BIGTEXT: 1, INBOX: 2, MESSAGING: 3 },
 }));
+
+// @react-native-community/datetimepicker wraps native iOS/Android date/time
+// picker dialogs with no Jest-environment equivalent. Added to this centralised
+// mock per this file's established convention.
+jest.mock('@react-native-community/datetimepicker', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const MockDateTimePicker = React.forwardRef((props, ref) => {
+    return React.createElement(View, {
+      ...props,
+      ref,
+      testID: props.testID || 'dateTimePicker',
+    });
+  });
+  MockDateTimePicker.displayName = 'MockDateTimePicker';
+
+  return {
+    __esModule: true,
+    default: MockDateTimePicker,
+    DateTimePickerAndroid: {
+      open: jest.fn(),
+      dismiss: jest.fn(),
+    },
+  };
+});
 /* eslint-enable no-undef */

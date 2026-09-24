@@ -52,11 +52,49 @@ export function parseLocalDate(input: string): string | null {
 }
 
 /** "YYYY-MM-DD" for a `Date`, in local time (no UTC conversion). */
-function formatDateOnly(date: Date): string {
+export function formatDateOnly(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/** "YYYY-MM-DD HH:mm" for a `Date`, in local time. */
+export function formatLocalDateTime(date: Date): string {
+  const datePart = formatDateOnly(date);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${datePart} ${hours}:${minutes}`;
+}
+
+/** Converts "YYYY-MM-DD HH:mm" to local `Date`, or `null` if malformed. */
+export function localDateTimeToDate(input: string): Date | null {
+  const match = PATTERN.exec(input.trim());
+  if (!match) {
+    return null;
+  }
+  const [year, month, day, hour, minute] = match.slice(1).map(Number);
+  const date = new Date(year, month - 1, day, hour, minute);
+  const roundTrips =
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day &&
+    date.getHours() === hour &&
+    date.getMinutes() === minute;
+  return roundTrips ? date : null;
+}
+
+/** Converts "YYYY-MM-DD" to local `Date` (midnight), or `null` if malformed. */
+export function localDateToDate(input: string): Date | null {
+  const match = DATE_PATTERN.exec(input.trim());
+  if (!match) {
+    return null;
+  }
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(year, month - 1, day);
+  const roundTrips =
+    date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  return roundTrips ? date : null;
 }
 
 export type QuickDate = 'today' | 'tomorrow' | 'sat' | 'sun';
