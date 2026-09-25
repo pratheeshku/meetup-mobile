@@ -7,14 +7,23 @@
  * `HomeScreen`'s `events.length` never sees `undefined`.
  */
 import { apiClient } from '../client';
-import { createEvent, getEvents, rsvpEvent, withdrawEvent } from '../events';
+import {
+  cancelEvent,
+  createEvent,
+  getEvents,
+  inviteGroupToEvent,
+  rsvpEvent,
+  updateEvent,
+  withdrawEvent,
+} from '../events';
 
 jest.mock('../client', () => ({
-  apiClient: { get: jest.fn(), post: jest.fn() },
+  apiClient: { get: jest.fn(), patch: jest.fn(), post: jest.fn() },
 }));
 
 const mockedGet = apiClient.get as jest.Mock;
 const mockedPost = apiClient.post as jest.Mock;
+const mockedPatch = apiClient.patch as jest.Mock;
 
 describe('getEvents', () => {
   afterEach(() => {
@@ -184,5 +193,127 @@ describe('createEvent (Create Flow Amendment, §4.3 — POST /events, EventCreat
         ends_at: null,
       }),
     ).rejects.toThrow('boom');
+  });
+});
+
+describe('cancelEvent (POST /events/{id}/cancel)', () => {
+  afterEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('posts { reason } to /events/{id}/cancel with correlationId', async () => {
+    mockedPost.mockResolvedValueOnce({ data: {} });
+    await cancelEvent('evt-1', 'Inclement weather', { correlationId: 'cid-c1' });
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/events/evt-1/cancel',
+      { reason: 'Inclement weather' },
+      { correlationId: 'cid-c1' },
+    );
+  });
+
+  it('propagates cancellation failure', async () => {
+    mockedPost.mockRejectedValueOnce(new Error('Cannot cancel'));
+    await expect(cancelEvent('evt-1', 'Weather')).rejects.toThrow('Cannot cancel');
+  });
+});
+
+describe('updateEvent (PATCH /events/{id})', () => {
+  afterEach(() => {
+    mockedPatch.mockReset();
+  });
+
+  it('patches only the supported EventUpdate fields and maps the response', async () => {
+    mockedPatch.mockResolvedValueOnce({
+      data: {
+        id: 'evt-1',
+        organizer_id: 'org-1',
+        sport: 'football',
+        title: 'Updated Kickabout',
+        description: 'New description',
+        visibility: 'public',
+        capacity: 14,
+        starts_at: '2026-10-02T10:00:00Z',
+        ends_at: '2026-10-02T12:00:00Z',
+        estimated_cost_cents: null,
+        recurrence_rule_id: null,
+        status: 'upcoming',
+        venue_name: 'Main Stadium',
+        venue_address: '456 Stadium Way',
+        organizer_nickname: 'Alex',
+        organizer_display_name: null,
+        going_count: 5,
+        user_rsvp_status: 'going',
+        skill_level_requirement: 'intermediate',
+      },
+    });
+
+    const updateInput = {
+      title: 'Updated Kickabout',
+      description: 'New description',
+      venue_name: 'Main Stadium',
+      venue_address: '456 Stadium Way',
+      skill_level_requirement: 'intermediate' as const,
+      capacity: 14,
+      starts_at: '2026-10-02T10:00:00Z',
+      ends_at: '2026-10-02T12:00:00Z',
+      visibility: 'public' as const,
+      // Unsupported backend fields should be omitted from PATCH body
+      sport: 'basketball',
+      allow_waitlist: true,
+      estimated_cost_cents: 1000,
+    };
+
+    const result = await updateEvent('evt-1', updateInput, { correlationId: 'cid-patch' });
+
+    expect(mockedPatch).toHaveBeenCalledWith(
+      '/events/evt-1',
+      {
+        title: 'Updated Kickabout',
+        description: 'New description',
+        venue_name: 'Main Stadium',
+        venue_address: '456 Stadium Way',
+        skill_level_requirement: 'intermediate',
+        capacity: 14,
+        starts_at: '2026-10-02T10:00:00Z',
+        ends_at: '2026-10-02T12:00:00Z',
+        visibility: 'public',
+      },
+      { correlationId: 'cid-patch' },
+    );
+    expect(result.title).toBe('Updated Kickabout');
+    expect(result.location).toBe('Main Stadium');
+    expect(result.venue_address).toBe('456 Stadium Way');
+    expect(result.skill_level_requirement).toBe('intermediate');
+  });
+
+  it('propagates PATCH failures (e.g. 409 conflict)', async () => {
+    mockedPatch.mockRejectedValueOnce(new Error('Visibility is immutable after creation'));
+    await expect(
+      updateEvent('evt-1', { visibility: 'group' }),
+    ).rejects.toThrow('Visibility is immutable after creation');
+  });
+});
+
+describe('inviteGroupToEvent (POST /events/{id}/invite-group)', () => {
+  afterEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('posts { group_id } to /events/{id}/invite-group and returns invitations', async () => {
+    const rawInvites = [
+      { id: 'inv-1', event_id: 'evt-1', invitee_user_id: 'user-1', status: 'pending' },
+      { id: 'inv-2', event_id: 'evt-1', invitee_user_id: 'user-2', status: 'pending' },
+    ];
+    mockedPost.mockResolvedValueOnce({ data: rawInvites });
+
+    const result = await inviteGroupToEvent('evt-1', 'grp-9', { correlationId: 'cid-grp' });
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/events/evt-1/invite-group',
+      { group_id: 'grp-9' },
+      { correlationId: 'cid-grp' },
+    );
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('inv-1');
   });
 });

@@ -19,10 +19,13 @@ import { apiClient } from './client';
 import type {
   CreateEventInput,
   Event,
+  EventInvitation,
   EventsListResponse,
+  EventSkillLevel,
   EventVisibility,
   EventStatus,
   RsvpStatus,
+  UpdateEventInput,
 } from '../types/event';
 
 export interface GetEventsParams {
@@ -81,6 +84,7 @@ interface EventApiItem {
   organizer_display_name: string | null;
   going_count: number;
   user_rsvp_status: string | null;
+  skill_level_requirement?: string | null;
 }
 
 /**
@@ -131,6 +135,9 @@ function mapEventApiItem(raw: EventApiItem): Event {
     cost: raw.estimated_cost_cents,
     current_user_rsvp_status: (raw.user_rsvp_status as RsvpStatus | null) ?? 'none',
     is_organiser: false,
+    venue_name: raw.venue_name ?? null,
+    venue_address: raw.venue_address ?? null,
+    skill_level_requirement: (raw.skill_level_requirement as EventSkillLevel | null) ?? null,
   };
 }
 
@@ -202,20 +209,65 @@ export async function withdrawEvent(id: string, options?: RequestOptions): Promi
 }
 
 /**
- * BLOCKED — needs an architect decision, not fixed here (do not guess):
- * confirmed against the live OpenAPI schema that `POST /events/{event_id}/cancel`
- * requires a body matching `EventCancelRequest { reason: string }` (1–500
- * chars, REQUIRED). This call currently sends no body, so every cancel
- * attempt against the real backend gets a 422 Validation Error. Fixing
- * this needs a cancellation-reason UI (EventDetailScreen's cancel flow
- * has none today) — a UX/design decision beyond an API-layer adapter,
- * out of scope for this audit pass. See the audit report.
- *
- * Not called from any UI for now: `EventDetailScreen` no longer renders a
- * Cancel Event button until a cancellation-reason UI exists (follow-up).
+ * Cancel an event: calls `POST /events/{id}/cancel` with `{ reason }`.
+ * Organiser-only action. Backend requires a reason (1–500 chars).
  */
-export async function cancelEvent(id: string, options?: RequestOptions): Promise<void> {
-  await apiClient.post(`/events/${id}/cancel`, undefined, {
+export async function cancelEvent(
+  id: string,
+  reason: string,
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.post(
+    `/events/${id}/cancel`,
+    { reason },
+    { correlationId: options?.correlationId },
+  );
+}
+
+/**
+ * Partial update for an owned event: calls `PATCH /events/{id}` (§5.9 Event Edit Lifecycle).
+ * Organiser-only action. Only fields present in `input` are sent.
+ * Note: backend schema EventUpdate accepts title, description, venue_name, venue_address,
+ * skill_level_requirement, capacity, starts_at, ends_at, visibility.
+ * Other fields (sport, allow_waitlist, cost) are omitted per verified live contract.
+ */
+export async function updateEvent(
+  id: string,
+  input: UpdateEventInput,
+  options?: RequestOptions,
+): Promise<Event> {
+  const payload: Record<string, unknown> = {};
+  if (input.title !== undefined) payload.title = input.title;
+  if (input.description !== undefined) payload.description = input.description;
+  if (input.venue_name !== undefined) payload.venue_name = input.venue_name;
+  if (input.venue_address !== undefined) payload.venue_address = input.venue_address;
+  if (input.skill_level_requirement !== undefined) {
+    payload.skill_level_requirement = input.skill_level_requirement;
+  }
+  if (input.capacity !== undefined) payload.capacity = input.capacity;
+  if (input.starts_at !== undefined) payload.starts_at = input.starts_at;
+  if (input.ends_at !== undefined) payload.ends_at = input.ends_at;
+  if (input.visibility !== undefined) payload.visibility = input.visibility;
+
+  const { data } = await apiClient.patch<EventApiItem>(`/events/${id}`, payload, {
     correlationId: options?.correlationId,
   });
+  return mapEventApiItem(data);
+}
+
+/**
+ * Invite group members to an event: calls `POST /events/{id}/invite-group`.
+ * Organiser-only action. Takes `{ group_id }`.
+ */
+export async function inviteGroupToEvent(
+  eventId: string,
+  groupId: string,
+  options?: RequestOptions,
+): Promise<EventInvitation[]> {
+  const { data } = await apiClient.post<EventInvitation[]>(
+    `/events/${eventId}/invite-group`,
+    { group_id: groupId },
+    { correlationId: options?.correlationId },
+  );
+  return data;
 }

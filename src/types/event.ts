@@ -58,6 +58,33 @@ export interface Event {
   cost: number | null;
   current_user_rsvp_status: RsvpStatus;
   is_organiser: boolean;
+  venue_name?: string | null;
+  venue_address?: string | null;
+  skill_level_requirement?: EventSkillLevel | null;
+}
+
+export interface UpdateEventInput {
+  title?: string;
+  description?: string | null;
+  venue_name?: string | null;
+  venue_address?: string | null;
+  skill_level_requirement?: EventSkillLevel | string | null;
+  capacity?: number;
+  starts_at?: string;
+  ends_at?: string | null;
+  visibility?: EventVisibility | string;
+  sport?: string;
+  allow_waitlist?: boolean;
+  estimated_cost_cents?: number | null;
+  estimated_cost_currency?: string | null;
+}
+
+export interface EventInvitation {
+  id: string;
+  event_id: string;
+  invitee_user_id: string;
+  status: string;
+  created_at?: string;
 }
 
 export interface EventsListResponse {
