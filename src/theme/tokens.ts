@@ -47,6 +47,18 @@ export const colors = {
   white: '#FFFFFF',
   accent: '#C2481F',
   accentLight: '#FBECE6',
+  /**
+   * Additive: the standing-rule primary-action blue (matches web's CTA
+   * blue exactly, verified against the reference mockup). Distinct from
+   * `primary` (#1565C0, already used broadly across nav/links/badges/the
+   * shared `Button` "primary" variant) — introduced narrowly for the two
+   * CTAs this task named (Edit Game button, Create Game/Create Tournament
+   * submit) rather than repointing every existing `primary` call site,
+   * which was out of scope. User-directed styling correction, not traced
+   * to a design section / R-ID — same provenance class as the rest of
+   * this file (see header).
+   */
+  ctaBlue: '#1D5FA3',
   track: '#EFECE6',
   /** Additive: modal backdrop — `textPrimary` at 50% opacity. */
   scrim: 'rgba(27, 25, 24, 0.5)',

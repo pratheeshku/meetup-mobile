@@ -6,11 +6,13 @@
  * type comments for the exact source). API and navigation mocked.
  */
 import React from 'react';
+import { Platform, StyleSheet } from 'react-native';
 
 import { createEvent } from '../../api/events';
 import { getMyGroups } from '../../api/groups';
 import { getSports } from '../../api/sports';
 import { createTournament } from '../../api/tournaments';
+import { colors, getSportColor } from '../../theme/tokens';
 import { act, pressableLabelled, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import CreateGameScreen from '../CreateGameScreen';
@@ -124,6 +126,8 @@ describe('CreateGameScreen — Casual Game form contract', () => {
     const root = await mount();
     expect(texts(root)).not.toContain('Group');
     choose(root, '👥 Group');
+    expect(pressableLabelled(root, 'Group')).toBeDefined();
+    choose(root, 'Group');
     expect(pressableLabelled(root, 'Sunday Footballers')).toBeDefined();
   });
 
@@ -203,6 +207,7 @@ describe('CreateGameScreen — Casual Game submit', () => {
     choose(root, 'Football');
     choose(root, 'Beginner');
     choose(root, '👥 Group');
+    choose(root, 'Group');
     choose(root, 'Sunday Footballers');
     type(input(root, 'e.g. Bishan Sports Hall'), 'Bishan Sports Hall');
     type(input(root, 'e.g. 5 Bishan St 14, Singapore'), '5 Bishan St 14');
@@ -235,6 +240,90 @@ describe('CreateGameScreen — Casual Game submit', () => {
   });
 });
 
+describe('CreateGameScreen — cost and currency (kept and restyled, EventCreate.estimated_cost_cents/currency)', () => {
+  function fillValid(root: Instance): void {
+    type(input(root, 'e.g. Sunday 5-a-side Football'), 'Friday Futsal');
+    type(capacityInput(root), '10');
+    pickDateTime(root, 'casual-start-date-time', new Date(2026, 9, 1, 18, 30));
+  }
+
+  it('omits cost/currency from the payload when left blank', async () => {
+    mockCreateEvent.mockResolvedValueOnce({} as never);
+    const root = await mount();
+    fillValid(root);
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+    const [payload] = mockCreateEvent.mock.calls[0];
+    expect(payload).not.toHaveProperty('estimated_cost_cents');
+    expect(payload).not.toHaveProperty('estimated_cost_currency');
+  });
+
+  it('converts a typed cost to integer cents and uppercases the currency code', async () => {
+    mockCreateEvent.mockResolvedValueOnce({} as never);
+    const root = await mount();
+    fillValid(root);
+    type(input(root, 'e.g. 15.00'), '12.5');
+    type(input(root, 'USD'), 'sgd');
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+
+    expect(mockCreateEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ estimated_cost_cents: 1250, estimated_cost_currency: 'SGD' }),
+      { correlationId: expect.any(String) },
+    );
+  });
+
+  it('rejects a negative or non-numeric cost', async () => {
+    const root = await mount();
+    fillValid(root);
+    type(input(root, 'e.g. 15.00'), '-5');
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+    expect(texts(root)).toContain('Estimated cost must be a non-negative number.');
+    expect(mockCreateEvent).not.toHaveBeenCalled();
+  });
+
+  it('rejects a currency code that is not exactly 3 letters', async () => {
+    const root = await mount();
+    fillValid(root);
+    type(input(root, 'USD'), 'US');
+    await act(async () => pressableLabelled(root, 'Create Game').props.onPress());
+    expect(texts(root)).toContain('Currency code must be 3 letters (e.g. USD, SGD).');
+    expect(mockCreateEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('CreateGameScreen — chip colors and CTA styling', () => {
+  function chipBackground(node: Instance): string | undefined {
+    const view = node.findAll(n => (n.type as unknown) === 'View')[0];
+    return StyleSheet.flatten(view.props.style)?.backgroundColor as string | undefined;
+  }
+
+  it("Sport chip selected state uses that sport's own color, not a neutral or the default primary", async () => {
+    const root = await mount();
+    choose(root, 'Football');
+    expect(chipBackground(pressableLabelled(root, 'Football'))).toBe(getSportColor('football'));
+  });
+
+  it('Skill Level and Visibility chips use the neutral #1B1918 selected color, not the sport color or default primary', async () => {
+    const root = await mount();
+    expect(chipBackground(pressableLabelled(root, 'All Levels'))).toBe(colors.textPrimary);
+    expect(chipBackground(pressableLabelled(root, '🌍 Public'))).toBe(colors.textPrimary);
+  });
+
+  it('the Create Game CTA uses the standing-rule blue (#1D5FA3), not the app-wide primary blue', async () => {
+    const root = await mount();
+    const button = pressableLabelled(root, 'Create Game');
+    const view = button.findAll(n => (n.type as unknown) === 'View')[0];
+    expect(StyleSheet.flatten(view.props.style)?.backgroundColor).toBe(colors.ctaBlue);
+  });
+
+  it('the Create Tournament CTA uses the standing-rule blue (#1D5FA3) too', async () => {
+    const root = await mount();
+    choose(root, '🏆 Tournament');
+    const button = pressableLabelled(root, 'Create Tournament');
+    const view = button.findAll(n => (n.type as unknown) === 'View')[0];
+    expect(StyleSheet.flatten(view.props.style)?.backgroundColor).toBe(colors.ctaBlue);
+  });
+});
+
 describe('CreateGameScreen — Tournament form contract', () => {
   async function toTournament(): Promise<Instance> {
     const root = await mount();
@@ -257,6 +346,7 @@ describe('CreateGameScreen — Tournament form contract', () => {
   it('shows the conditional Group picker only when Visibility = Group Only', async () => {
     const root = await toTournament();
     choose(root, 'Group Only');
+    choose(root, 'Group');
     expect(pressableLabelled(root, 'Sunday Footballers')).toBeDefined();
   });
 });
@@ -324,6 +414,7 @@ describe('CreateGameScreen — Tournament submit', () => {
     type(input(root, 'Details about rules, scheduling...'), 'Bring your own ball');
     type(input(root, 'e.g. Sports Hub Court 3'), 'Sports Hub Court 3');
     choose(root, 'Group Only');
+    choose(root, 'Group');
     choose(root, 'Sunday Footballers');
     await act(async () => pressableLabelled(root, 'Create Tournament').props.onPress());
 
@@ -382,11 +473,34 @@ describe('CreateGameScreen — sports loading (shared by both modes)', () => {
 });
 
 describe('CreateGameScreen — keyboard avoidance and date/time picker integration', () => {
+  const originalPlatform = Platform.OS;
+
+  afterEach(() => {
+    Platform.OS = originalPlatform;
+  });
+
   it('wraps the form in a KeyboardAvoidingView with padding behavior on iOS', async () => {
+    Platform.OS = 'ios';
     const root = await mount();
     const kav = root.find(n => n.props.behavior === 'padding');
     expect(kav).toBeDefined();
     expect(kav.props.behavior).toBe('padding');
+  });
+
+  // Regression test: this app ships Android only (CLAUDE.md), and the
+  // wrapper previously set `behavior={Platform.OS === 'ios' ? 'padding' :
+  // undefined}` — a no-op KeyboardAvoidingView on the one platform this
+  // app actually ships to, so a focused field at the bottom of the form
+  // (e.g. Description) stayed hidden behind the on-screen keyboard. The
+  // previous test above never caught this because it only ever asserted
+  // the iOS branch.
+  it('wraps the form in a KeyboardAvoidingView with height behavior on Android (the shipped platform)', async () => {
+    Platform.OS = 'android';
+    const root = await mount();
+    const kav = root.find(n => n.props.behavior === 'height');
+    expect(kav).toBeDefined();
+    expect(kav.props.behavior).toBe('height');
+    expect(() => root.find(n => n.props.behavior === 'padding')).toThrow();
   });
 
   it('Casual Game: manual picker interaction produces the correct UTC ISO 8601 starts_at timestamp', async () => {

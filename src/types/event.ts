@@ -140,4 +140,23 @@ export interface CreateEventInput {
   venue_name?: string;
   venue_address?: string;
   description?: string;
+  /**
+   * Contract-verification finding (Create Game screen rebuild task):
+   * `EventCreate` (`events/schemas.py`, `pratheeshku/meetup`, fetched
+   * live via `gh api` during this task) DOES declare
+   * `estimated_cost_cents: Optional[int] = Field(None, ge=0)` — this was
+   * previously absent from this interface and never sent on create
+   * (`createEvent()` only ever passed `CreateEventInput` through
+   * verbatim), even though `UpdateEventInput`/`Event` already had it.
+   * Whole currency units in the UI, converted to cents before sending.
+   */
+  estimated_cost_cents?: number | null;
+  /**
+   * Same schema: `estimated_cost_currency: Optional[str] = Field("USD",
+   * min_length=3, max_length=3)`, validated server-side against an ISO
+   * 4217 allowlist — client only checks length (3 letters), matching the
+   * existing edit-form precedent (`IMPL-DES-MEETUP-MOBILE-builds-a-b-c.md`
+   * BUILD B, before that field was hidden on Edit only).
+   */
+  estimated_cost_currency?: string | null;
 }

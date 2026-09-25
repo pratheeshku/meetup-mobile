@@ -12,6 +12,13 @@ import { borderWidth, colors, opacity, radius, sizes, spacing, typography } from
 export interface ChipOption<T extends string> {
   value: T;
   label: string;
+  /**
+   * Optional per-option selected background/border colour (e.g. each
+   * sport's own colour on a Sport chip group). Takes precedence over
+   * `selectedColor`; both fall back to `colors.primary` when omitted, so
+   * every existing call site is unaffected.
+   */
+  color?: string;
 }
 
 interface OptionChipsProps<T extends string> {
@@ -19,6 +26,13 @@ interface OptionChipsProps<T extends string> {
   value: T | readonly T[] | null;
   onChange: (value: T) => void;
   disabled?: boolean;
+  /**
+   * Group-wide override for the selected background/border colour, used
+   * by chip groups whose selected state is a neutral tone rather than the
+   * default `colors.primary` (e.g. Skill Level / Visibility). Ignored for
+   * any option that sets its own `color`.
+   */
+  selectedColor?: string;
 }
 
 export default function OptionChips<T extends string>({
@@ -26,6 +40,7 @@ export default function OptionChips<T extends string>({
   value,
   onChange,
   disabled = false,
+  selectedColor,
 }: OptionChipsProps<T>): React.JSX.Element {
   return (
     <View style={styles.row}>
@@ -33,6 +48,7 @@ export default function OptionChips<T extends string>({
         const selected = Array.isArray(value)
           ? value.includes(option.value)
           : option.value === value;
+        const activeColor = option.color ?? selectedColor ?? colors.primary;
         return (
           <Pressable
             key={option.value}
@@ -43,7 +59,9 @@ export default function OptionChips<T extends string>({
             onPress={() => onChange(option.value)}
             style={({ pressed }) => [
               styles.chip,
-              selected ? styles.chipSelected : styles.chipIdle,
+              selected
+                ? { backgroundColor: activeColor, borderColor: activeColor }
+                : styles.chipIdle,
               disabled ? styles.disabled : pressed ? styles.pressed : null,
             ]}
           >
@@ -68,7 +86,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipIdle: { backgroundColor: colors.surface, borderColor: colors.border },
-  chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   pressed: { opacity: opacity.pressed },
   disabled: { opacity: opacity.disabled },
   textIdle: { color: colors.textPrimary },

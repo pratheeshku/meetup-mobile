@@ -17,7 +17,7 @@
  * seamlessly when active.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
@@ -499,7 +499,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const overflowParticipantsCount = Math.max(0, event.participant_count - displayParticipants.length);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       {/* Back button */}
       {navigation?.goBack ? (
         <Pressable
@@ -980,10 +981,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         </View>
       </Card>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoid: { flex: 1 },
   container: {
     backgroundColor: colors.background,
     padding: spacing.md,
@@ -1124,8 +1127,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   editGameBtn: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
+    // Blue is exclusively for primary action buttons (same standing rule
+    // as web) — was `colors.accent`, corrected per direct instruction.
+    backgroundColor: colors.ctaBlue,
+    borderColor: colors.ctaBlue,
   },
   editGameBtnText: {
     color: colors.white,

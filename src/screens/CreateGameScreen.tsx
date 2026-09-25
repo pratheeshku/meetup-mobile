@@ -25,7 +25,7 @@
  * breakdown and every Proposed Assumption below.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -37,12 +37,13 @@ import { getSports } from '../api/sports';
 import { createTournament } from '../api/tournaments';
 import Button from '../components/Button';
 import DateTimePickerField from '../components/DateTimePickerField';
+import DropdownField from '../components/DropdownField';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
 import type { ChipOption } from '../components/OptionChips';
 import TextField from '../components/TextField';
-import { colors, spacing, typography } from '../theme/tokens';
+import { colors, getSportColor, spacing, typography } from '../theme/tokens';
 import type { CreateEventInput, EventSkillLevel, EventVisibility } from '../types/event';
 import type { Group } from '../types/group';
 import type { Sport } from '../types/sport';
@@ -153,6 +154,12 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   const [gVenueName, setGVenueName] = useState('');
   const [gVenueAddress, setGVenueAddress] = useState('');
   const [gDescription, setGDescription] = useState('');
+  // Cost/currency (EventCreate.estimated_cost_cents/estimated_cost_currency
+  // — verified against the live backend schema, see CreateEventInput's
+  // type comment). Both optional and independent, matching the pre-BUILD-B
+  // edit-form validation pattern this restyles from.
+  const [gCost, setGCost] = useState('');
+  const [gCurrency, setGCurrency] = useState('');
 
   // Tournament fields (TournamentCreate).
   const [tTitle, setTTitle] = useState('');
@@ -211,6 +218,25 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       return;
     }
 
+    let costCents: number | undefined;
+    if (gCost.trim()) {
+      const parsedCost = parseFloat(gCost.trim());
+      if (isNaN(parsedCost) || parsedCost < 0) {
+        setError('Estimated cost must be a non-negative number.');
+        return;
+      }
+      costCents = Math.round(parsedCost * 100);
+    }
+    let currencyCode: string | undefined;
+    if (gCurrency.trim()) {
+      const trimmedCurrency = gCurrency.trim().toUpperCase();
+      if (trimmedCurrency.length !== 3) {
+        setError('Currency code must be 3 letters (e.g. USD, SGD).');
+        return;
+      }
+      currencyCode = trimmedCurrency;
+    }
+
     const input: CreateEventInput = {
       title: trimmedTitle,
       ...(gSport ? { sport: gSport } : {}),
@@ -223,6 +249,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       ...(gVenueName.trim() ? { venue_name: gVenueName.trim() } : {}),
       ...(gVenueAddress.trim() ? { venue_address: gVenueAddress.trim() } : {}),
       ...(gDescription.trim() ? { description: gDescription.trim() } : {}),
+      ...(costCents !== undefined ? { estimated_cost_cents: costCents } : {}),
+      ...(currencyCode !== undefined ? { estimated_cost_currency: currencyCode } : {}),
     };
 
     setIsSubmitting(true);
@@ -322,6 +350,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   const sportOptions: ChipOption<string>[] = sports.map(item => ({
     value: item.name,
     label: item.display_name,
+    // Sport chip pickers: selected = that sport's own colour (matches web).
+    color: getSportColor(item.name),
   }));
   const groupOptions: ChipOption<string>[] = groups.map(item => ({
     value: item.id,
@@ -337,7 +367,14 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       {groupOptions.length === 0 ? (
         <Text style={styles.hint}>You don&apos;t belong to any groups yet.</Text>
       ) : (
-        <OptionChips options={groupOptions} value={value} onChange={onChange} disabled={isSubmitting} />
+        <DropdownField
+          options={groupOptions}
+          value={value}
+          onChange={onChange}
+          placeholder="Select a group"
+          accessibilityLabel="Group"
+          disabled={isSubmitting}
+        />
       )}
     </>
   );
@@ -345,7 +382,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   return (
     <KeyboardAvoidingView
       style={styles.keyboardAvoid}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <OptionChips options={MODE_OPTIONS} value={mode} onChange={setMode} disabled={isSubmitting} />
@@ -375,6 +412,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             value={gVisibility}
             onChange={setGVisibility}
             disabled={isSubmitting}
+            selectedColor={colors.textPrimary}
           />
           {gVisibility === 'group' ? renderGroupPicker(gGroupId, setGGroupId) : null}
 
@@ -384,6 +422,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             value={gSkill}
             onChange={setGSkill}
             disabled={isSubmitting}
+            selectedColor={colors.textPrimary}
           />
 
           <Text style={[styles.label, styles.section]}>Capacity</Text>
@@ -436,6 +475,29 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             editable={!isSubmitting}
           />
 
+          <Text style={[styles.label, styles.section]}>Cost (optional)</Text>
+          <View style={styles.costCurrencyRow}>
+            <TextField
+              style={[styles.input, styles.costField]}
+              placeholder="e.g. 15.00"
+              accessibilityLabel="Estimated Cost"
+              value={gCost}
+              onChangeText={setGCost}
+              keyboardType="decimal-pad"
+              editable={!isSubmitting}
+            />
+            <TextField
+              style={[styles.input, styles.currencyField]}
+              placeholder="USD"
+              accessibilityLabel="Currency"
+              value={gCurrency}
+              onChangeText={text => setGCurrency(text.toUpperCase())}
+              maxLength={3}
+              autoCapitalize="characters"
+              editable={!isSubmitting}
+            />
+          </View>
+
           <Text style={styles.label}>Description</Text>
           <TextField
             style={[styles.input, styles.multiline]}
@@ -453,7 +515,12 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             </Text>
           ) : null}
 
-          <Button label="Create Game" onPress={handleSubmitCasual} loading={isSubmitting} />
+          <Button
+            label="Create Game"
+            variant="cta"
+            onPress={handleSubmitCasual}
+            loading={isSubmitting}
+          />
         </>
       ) : (
         <>
@@ -491,6 +558,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             value={tVisibility}
             onChange={setTVisibility}
             disabled={isSubmitting}
+            selectedColor={colors.textPrimary}
           />
           {tVisibility === 'group' ? renderGroupPicker(tGroupId, setTGroupId) : null}
 
@@ -552,7 +620,12 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             </Text>
           ) : null}
 
-          <Button label="Create Tournament" onPress={handleSubmitTournament} loading={isSubmitting} />
+          <Button
+            label="Create Tournament"
+            variant="cta"
+            onPress={handleSubmitTournament}
+            loading={isSubmitting}
+          />
         </>
       )}
       </ScrollView>
@@ -567,6 +640,9 @@ const styles = StyleSheet.create({
   section: { marginTop: spacing.md },
   input: { marginBottom: spacing.md },
   multiline: { minHeight: spacing.xxl * 2 },
+  costCurrencyRow: { flexDirection: 'row', gap: spacing.sm },
+  costField: { flex: 2 },
+  currencyField: { flex: 1 },
   hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.md },
   error: { ...typography.body, color: colors.error, marginBottom: spacing.md },
 });

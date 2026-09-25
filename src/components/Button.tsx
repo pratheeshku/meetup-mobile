@@ -30,7 +30,7 @@ import {
   typography,
 } from '../theme/tokens';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'destructive';
+export type ButtonVariant = 'primary' | 'secondary' | 'destructive' | 'cta';
 export type ButtonSize = 'md' | 'sm';
 
 interface ButtonProps {
@@ -69,6 +69,19 @@ const VARIANTS: Record<ButtonVariant, VariantStyle> = {
   destructive: {
     background: colors.error,
     border: colors.error,
+    text: colors.white,
+  },
+  /**
+   * Additive: the standing-rule primary-action blue (`colors.ctaBlue`,
+   * #1D5FA3 — matches web exactly), distinct from `primary`'s existing
+   * `colors.primary` (#1565C0). Scoped to the specific CTAs this task
+   * named rather than repointing `primary` app-wide — see `theme/tokens.ts`.
+   * No `pressedBackground` (falls back to `opacity.pressed`), same as
+   * `destructive` above.
+   */
+  cta: {
+    background: colors.ctaBlue,
+    border: colors.ctaBlue,
     text: colors.white,
   },
 };

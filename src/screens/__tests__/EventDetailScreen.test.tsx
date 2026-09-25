@@ -8,8 +8,10 @@
  * - Sport label display lookup (BUG-M02)
  */
 import React from 'react';
+import { Platform, StyleSheet } from 'react-native';
 
 import { apiClient } from '../../api/client';
+import { colors } from '../../theme/tokens';
 import {
   act,
   pressableLabelled,
@@ -132,6 +134,15 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     expect(has(root, 'Invite Individual')).toBe(true);
     expect(has(root, 'Join')).toBe(false);
     expect(has(root, 'Leave')).toBe(false);
+  });
+
+  it('renders the Edit Game button in the standing-rule CTA blue (#1D5FA3), not the accent color', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    const button = pressableLabelled(root, 'Edit Game');
+    const view = button.findAll(n => (n.type as unknown) === 'View')[0];
+    const background = StyleSheet.flatten(view.props.style)?.backgroundColor;
+    expect(background).toBe(colors.ctaBlue);
+    expect(background).not.toBe(colors.accent);
   });
 
   it('sees organiser controls and no RSVP control even when they also have an RSVP row (going)', async () => {
@@ -871,5 +882,38 @@ describe('Mobile Artboard Stacked Cards Layout', () => {
     expect(has(root, 'Organizer')).toBe(true);
     expect(has(root, 'Rahul S')).toBe(true);
     expect(has(root, 'Going')).toBe(true);
+  });
+});
+
+describe('keyboard avoidance (same class of bug as Create Game — the Edit Event form has TextInputs and previously had no KeyboardAvoidingView wrapper at all)', () => {
+  const originalPlatform = Platform.OS;
+
+  afterEach(() => {
+    Platform.OS = originalPlatform;
+  });
+
+  it('wraps the screen in a KeyboardAvoidingView with padding behavior on iOS', async () => {
+    Platform.OS = 'ios';
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    const kav = root.find(n => n.props.behavior === 'padding');
+    expect(kav).toBeDefined();
+    expect(kav.props.behavior).toBe('padding');
+  });
+
+  it('wraps the screen in a KeyboardAvoidingView with height behavior on Android (the shipped platform)', async () => {
+    Platform.OS = 'android';
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    const kav = root.find(n => n.props.behavior === 'height');
+    expect(kav).toBeDefined();
+    expect(kav.props.behavior).toBe('height');
+    expect(() => root.find(n => n.props.behavior === 'padding')).toThrow();
+  });
+
+  it('the Edit Event form (with its TextInputs) renders inside that KeyboardAvoidingView', async () => {
+    Platform.OS = 'android';
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    act(() => pressableLabelled(root, 'Edit Game').props.onPress());
+    const kav = root.find(n => n.props.behavior === 'height');
+    expect(kav.findAll(n => (n.type as unknown) === 'TextInput').length).toBeGreaterThan(0);
   });
 });
