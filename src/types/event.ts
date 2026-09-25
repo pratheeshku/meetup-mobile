@@ -97,6 +97,17 @@ export interface EventsListResponse {
   page_size: number;
 }
 
+export interface EventParticipant {
+  id: string;
+  event_id?: string;
+  user_id: string;
+  status: 'going' | 'waitlisted' | string;
+  joined_at?: string;
+  user_display_name?: string | null;
+  user_nickname?: string;
+  is_checked_in?: boolean;
+}
+
 /**
  * `POST /events` request body — a subset of the live `EventCreate` schema
  * (`events/schemas.py`, DES §4.3 Create Flow Amendment), matching the

@@ -302,3 +302,17 @@ export async function inviteUserToEvent(
   return data;
 }
 
+/**
+  * Fetch event participants: calls `GET /events/{id}/participants`.
+  */
+export async function getEventParticipants(
+  eventId: string,
+  options?: RequestOptions,
+): Promise<import('../types/event').EventParticipant[]> {
+  const { data } = await apiClient.get<import('../types/event').EventParticipant[]>(
+    `/events/${eventId}/participants`,
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+

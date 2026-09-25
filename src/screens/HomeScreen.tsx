@@ -38,7 +38,7 @@
  * content here only needs ordinary top spacing.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -58,7 +58,7 @@ import SportFilterPills from '../components/home/SportFilterPills';
 import UpcomingGamesSection from '../components/home/UpcomingGamesSection';
 import LoadingView from '../components/LoadingView';
 import TextLink from '../components/TextLink';
-import { colors, spacing, typography } from '../theme/tokens';
+import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import { getDisplayName } from '../utils/displayName';
 import type { Event } from '../types/event';
 import type { Sport } from '../types/sport';
@@ -70,6 +70,7 @@ import {
   getRecommendedGames,
   getSportOptionsFromAdminSports,
   getUpcomingGames,
+  isOrganiserOf,
 } from '../utils/homeDashboard';
 
 type Props = CompositeScreenProps<
@@ -189,6 +190,29 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const isMyGamesFilterActive = route.params?.filter === 'mine';
   const myGames = useMemo(() => getMyGames(events, userId), [events, userId]);
 
+  type MyGamesFilterType = 'All' | 'Hosting' | 'Joined' | 'Waitlist';
+  const [myGamesFilter, setMyGamesFilter] = useState<MyGamesFilterType>('All');
+
+  const filteredMyGames = useMemo(() => {
+    const sortByStartsAt = (list: Event[]) =>
+      [...list].sort(
+        (a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime(),
+      );
+
+    if (myGamesFilter === 'Hosting') {
+      return sortByStartsAt(events.filter(e => isOrganiserOf(e, userId)));
+    }
+    if (myGamesFilter === 'Joined') {
+      return sortByStartsAt(
+        events.filter(e => e.current_user_rsvp_status === 'going' && !isOrganiserOf(e, userId)),
+      );
+    }
+    if (myGamesFilter === 'Waitlist') {
+      return sortByStartsAt(events.filter(e => e.current_user_rsvp_status === 'waitlisted'));
+    }
+    return myGames;
+  }, [events, myGames, myGamesFilter, userId]);
+
   const openEvent = useCallback(
     (event: Event) => navigation.navigate('EventDetail', { eventId: event.id }),
     [navigation],
@@ -212,7 +236,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
         <RefreshControl
           refreshing={isRefreshing}
           onRefresh={() => loadDashboard(true)}
-          colors={[colors.primary]}
+          colors={[colors.accent]}
           progressBackgroundColor={colors.surface}
         />
       }
@@ -230,14 +254,43 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
             <Text style={styles.myGamesTitle} accessibilityRole="header">
               My Games
             </Text>
-            <Text style={styles.myGamesSubtitle}>Games you organise or are going to</Text>
+            <Text style={styles.myGamesSubtitle}>
+              Everything you&apos;re playing and hosting, in one place.
+            </Text>
           </View>
-          {myGames.length === 0 ? (
+          <View style={styles.filterPillsRow}>
+            {(['All', 'Hosting', 'Joined', 'Waitlist'] as const).map(tab => {
+              const isSelected = myGamesFilter === tab;
+              return (
+                <Pressable
+                  key={tab}
+                  accessibilityRole="button"
+                  accessibilityLabel={tab}
+                  accessibilityState={{ selected: isSelected }}
+                  onPress={() => setMyGamesFilter(tab)}
+                  style={[
+                    styles.filterPill,
+                    isSelected ? styles.filterPillSelected : styles.filterPillIdle,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      isSelected ? styles.filterTextSelected : styles.filterTextIdle,
+                    ]}
+                  >
+                    {tab}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {filteredMyGames.length === 0 ? (
             <Text style={styles.myGamesEmpty}>
               You don&apos;t have any games yet — join one or create your own.
             </Text>
           ) : (
-            myGames.map(event => (
+            filteredMyGames.map(event => (
               <EventCard key={event.id} event={event} onPress={() => openEvent(event)} />
             ))
           )}
@@ -269,6 +322,37 @@ const styles = StyleSheet.create({
   myGamesHeader: { marginTop: spacing.md, marginBottom: spacing.md },
   myGamesTitle: { ...typography.h3, fontWeight: '700', color: colors.textPrimary },
   myGamesSubtitle: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  filterPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.full,
+    borderWidth: borderWidth.thin,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterPillSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  filterPillIdle: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterTextSelected: {
+    color: colors.white,
+  },
+  filterTextIdle: {
+    color: colors.textSecondary,
+  },
   myGamesEmpty: {
     ...typography.body,
     color: colors.textMuted,

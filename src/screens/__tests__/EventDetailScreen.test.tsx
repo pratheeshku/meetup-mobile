@@ -124,12 +124,12 @@ it('renders formatted cost with currency when estimated_cost_cents is set', asyn
 });
 
 describe('organiser (organizer_id === signed-in user id)', () => {
-  it('sees "Edit Event", "Invite Group", "Invite User", and "Cancel Event", but not "Join" or "Leave"', async () => {
+  it('sees "Edit Game", "Invite Group", "Invite Individual", and "Cancel Event", but not "Join" or "Leave"', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     expect(has(root, 'Cancel Event')).toBe(true);
-    expect(has(root, 'Edit Event')).toBe(true);
+    expect(has(root, 'Edit Game')).toBe(true);
     expect(has(root, 'Invite Group')).toBe(true);
-    expect(has(root, 'Invite User')).toBe(true);
+    expect(has(root, 'Invite Individual')).toBe(true);
     expect(has(root, 'Join')).toBe(false);
     expect(has(root, 'Leave')).toBe(false);
   });
@@ -137,9 +137,9 @@ describe('organiser (organizer_id === signed-in user id)', () => {
   it('sees organiser controls and no RSVP control even when they also have an RSVP row (going)', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', user_rsvp_status: 'going' }));
     expect(has(root, 'Cancel Event')).toBe(true);
-    expect(has(root, 'Edit Event')).toBe(true);
+    expect(has(root, 'Edit Game')).toBe(true);
     expect(has(root, 'Invite Group')).toBe(true);
-    expect(has(root, 'Invite User')).toBe(true);
+    expect(has(root, 'Invite Individual')).toBe(true);
     expect(has(root, 'Leave')).toBe(false);
     expect(has(root, 'Join')).toBe(false);
   });
@@ -147,9 +147,9 @@ describe('organiser (organizer_id === signed-in user id)', () => {
   it('sees organiser actions for an in-progress (active) event', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', status: 'active' }));
     expect(has(root, 'Cancel Event')).toBe(true);
-    expect(has(root, 'Edit Event')).toBe(true);
+    expect(has(root, 'Edit Game')).toBe(true);
     expect(has(root, 'Invite Group')).toBe(true);
-    expect(has(root, 'Invite User')).toBe(true);
+    expect(has(root, 'Invite Individual')).toBe(true);
   });
 
   it.each(['cancelled', 'completed'])(
@@ -157,8 +157,9 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     async status => {
       const root = await mount(rawEvent({ organizer_id: 'user-me', status }));
       expect(has(root, 'Cancel Event')).toBe(false);
-      expect(has(root, 'Edit Event')).toBe(false);
+      expect(has(root, 'Edit Game')).toBe(false);
       expect(has(root, 'Invite Group')).toBe(false);
+      expect(has(root, 'Invite Individual')).toBe(false);
       expect(has(root, 'Join')).toBe(false);
     },
   );
@@ -169,16 +170,18 @@ describe('non-organiser', () => {
     const root = await mount(rawEvent({ organizer_id: 'someone-else' }));
     expect(has(root, 'Join')).toBe(true);
     expect(has(root, 'Cancel Event')).toBe(false);
-    expect(has(root, 'Edit Event')).toBe(false);
+    expect(has(root, 'Edit Game')).toBe(false);
     expect(has(root, 'Invite Group')).toBe(false);
+    expect(has(root, 'Invite Individual')).toBe(false);
   });
 
   it('sees "Leave" (not Cancel) when already going', async () => {
     const root = await mount(rawEvent({ user_rsvp_status: 'going' }));
     expect(has(root, 'Leave')).toBe(true);
     expect(has(root, 'Cancel Event')).toBe(false);
-    expect(has(root, 'Edit Event')).toBe(false);
+    expect(has(root, 'Edit Game')).toBe(false);
     expect(has(root, 'Invite Group')).toBe(false);
+    expect(has(root, 'Invite Individual')).toBe(false);
     expect(has(root, 'Join')).toBe(false);
   });
 
@@ -341,7 +344,7 @@ describe('BUILD 2: Event Edit Flow', () => {
     );
 
     await act(async () => {
-      pressableLabelled(root, 'Edit Event').props.onPress();
+      pressableLabelled(root, 'Edit Game').props.onPress();
     });
 
     expect(has(root, 'Save Changes')).toBe(true);
@@ -358,7 +361,7 @@ describe('BUILD 2: Event Edit Flow', () => {
   it('validates client-side constraints on edit fields before submitting', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     await act(async () => {
-      pressableLabelled(root, 'Edit Event').props.onPress();
+      pressableLabelled(root, 'Edit Game').props.onPress();
     });
 
     const titleInput = root.findByProps({ accessibilityLabel: 'Event Title' });
@@ -405,7 +408,7 @@ describe('BUILD 2: Event Edit Flow', () => {
   it('does not render cost or currency in edit form (hidden per BUILD B)', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     await act(async () => {
-      pressableLabelled(root, 'Edit Event').props.onPress();
+      pressableLabelled(root, 'Edit Game').props.onPress();
     });
 
     expect(has(root, 'Estimated Cost')).toBe(false);
@@ -426,7 +429,7 @@ describe('BUILD 2: Event Edit Flow', () => {
 
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     await act(async () => {
-      pressableLabelled(root, 'Edit Event').props.onPress();
+      pressableLabelled(root, 'Edit Game').props.onPress();
     });
 
     const titleInput = root.findByProps({ accessibilityLabel: 'Event Title' });
@@ -479,7 +482,7 @@ describe('BUILD 2: Event Edit Flow', () => {
   it('does not render visibility in edit form (immutable post-creation)', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', visibility: 'public' }));
     await act(async () => {
-      pressableLabelled(root, 'Edit Event').props.onPress();
+      pressableLabelled(root, 'Edit Game').props.onPress();
     });
 
     expect(has(root, 'Visibility')).toBe(false);
@@ -499,7 +502,7 @@ describe('BUILD 2: Event Edit Flow', () => {
 
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     await act(async () => {
-      pressableLabelled(root, 'Edit Event').props.onPress();
+      pressableLabelled(root, 'Edit Game').props.onPress();
     });
 
     const sportInput = root.findByProps({ accessibilityLabel: 'Sport' });
@@ -529,7 +532,7 @@ describe('BUILD 2: Event Edit Flow', () => {
 
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     await act(async () => {
-      pressableLabelled(root, 'Edit Event').props.onPress();
+      pressableLabelled(root, 'Edit Game').props.onPress();
     });
 
     await act(async () => {
@@ -542,7 +545,7 @@ describe('BUILD 2: Event Edit Flow', () => {
   it('closes edit form on Cancel press without saving', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     await act(async () => {
-      pressableLabelled(root, 'Edit Event').props.onPress();
+      pressableLabelled(root, 'Edit Game').props.onPress();
     });
     expect(has(root, 'Save Changes')).toBe(true);
 
@@ -550,7 +553,7 @@ describe('BUILD 2: Event Edit Flow', () => {
       pressableLabelled(root, 'Cancel').props.onPress();
     });
     expect(has(root, 'Save Changes')).toBe(false);
-    expect(has(root, 'Edit Event')).toBe(true);
+    expect(has(root, 'Edit Game')).toBe(true);
   });
 
   it('populates sportOptions and allows selecting sport from OptionChips', async () => {
@@ -572,7 +575,7 @@ describe('BUILD 2: Event Edit Flow', () => {
     const root = await renderAsync(<EventDetailScreen {...props} />);
 
     await act(async () => {
-      pressableLabelled(root, 'Edit Event').props.onPress();
+      pressableLabelled(root, 'Edit Game').props.onPress();
     });
 
     expect(has(root, 'Squash')).toBe(true);
@@ -737,7 +740,7 @@ describe('BUILD C: Individual Invite Flow', () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
 
     await act(async () => {
-      pressableLabelled(root, 'Invite User').props.onPress();
+      pressableLabelled(root, 'Invite Individual').props.onPress();
     });
 
     expect(has(root, 'Pick Alex')).toBe(true);
@@ -774,7 +777,7 @@ describe('BUILD C: Individual Invite Flow', () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
 
     await act(async () => {
-      pressableLabelled(root, 'Invite User').props.onPress();
+      pressableLabelled(root, 'Invite Individual').props.onPress();
     });
 
     await act(async () => {
@@ -792,7 +795,7 @@ describe('BUILD C: Individual Invite Flow', () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
 
     await act(async () => {
-      pressableLabelled(root, 'Invite User').props.onPress();
+      pressableLabelled(root, 'Invite Individual').props.onPress();
     });
 
     await act(async () => {
@@ -812,5 +815,61 @@ describe('BUILD C: Individual Invite Flow', () => {
       pressableLabelled(root, 'Close').props.onPress();
     });
     expect(has(root, 'Pick Alex')).toBe(false);
+  });
+});
+
+describe('Mobile Artboard Stacked Cards Layout', () => {
+  it('renders back navigation button and calls goBack on tap', async () => {
+    const root = await mount(rawEvent());
+    expect(has(root, '‹ My Games')).toBe(true);
+    act(() => pressableLabelled(root, 'My Games').props.onPress());
+    expect(goBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders Capacity Card with ratio, players going label, and remaining spots', async () => {
+    const root = await mount(rawEvent({ capacity: 8, going_count: 7 }));
+    expect(has(root, '7 / 8')).toBe(true);
+    expect(has(root, 'players going')).toBe(true);
+    expect(has(root, '1 spot left')).toBe(true);
+  });
+
+  it('renders "About this game" Card with description', async () => {
+    const root = await mount(rawEvent({ description: 'Casual doubles, all skill levels welcome.' }));
+    expect(has(root, 'About this game')).toBe(true);
+    expect(has(root, 'Casual doubles, all skill levels welcome.')).toBe(true);
+  });
+
+  it('renders Skill level & Waitlist Card', async () => {
+    const root = await mount(rawEvent({ skill_level_requirement: 'beginner', allow_waitlist: true }));
+    expect(has(root, 'Skill level')).toBe(true);
+    expect(has(root, 'Beginner')).toBe(true);
+    expect(has(root, 'Waitlist')).toBe(true);
+    expect(has(root, 'Open')).toBe(true);
+  });
+
+  it('renders Participants Card with participant names and roles', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/events/evt-1/participants') {
+        return Promise.resolve({
+          data: [
+            { id: 'p-1', user_id: 'user-me', user_nickname: 'Pratheesh K', status: 'going' },
+            { id: 'p-2', user_id: 'user-2', user_nickname: 'Rahul S', status: 'going' },
+          ],
+        });
+      }
+      return Promise.resolve({ data: rawEvent({ organizer_id: 'user-me' }) });
+    });
+
+    const props = {
+      route: { key: 'k', name: 'EventDetail', params: { eventId: 'evt-1' } },
+      navigation: { goBack },
+    } as unknown as React.ComponentProps<typeof EventDetailScreen>;
+    const root = await renderAsync(<EventDetailScreen {...props} />);
+
+    expect(has(root, 'Participants')).toBe(true);
+    expect(has(root, 'Pratheesh K')).toBe(true);
+    expect(has(root, 'Organizer')).toBe(true);
+    expect(has(root, 'Rahul S')).toBe(true);
+    expect(has(root, 'Going')).toBe(true);
   });
 });

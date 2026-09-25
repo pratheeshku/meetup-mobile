@@ -32,4 +32,12 @@
 
 **Suggested addition** (target: "Design system & component reuse"): When introducing multi-selection to single-selection input components, extend prop types to union scalar and array values (`T | readonly T[] | null`) rather than creating separate multi-select components or breaking single-choice interfaces.
 
+## 5. Separation of icon glyphs and text labels in testable UI button primitives
+
+**What happened**: Action buttons on the redesigned mobile detail card incorporated icon glyphs directly concatenated into the label strings (e.g. `✎ Edit Game`, `👥 Invite Group`, `⊘ Cancel Event`). Testing utility functions (`texts(root)`) that inspect host `Text` node strings failed exact string equality checks (`expect(has(root, 'Edit Game')).toBe(true)`) because the text node contained the icon character. Separating the icon glyph into its own sibling `Text` node allowed both the visual icon presentation and clean semantic text matching in unit tests to work harmoniously without brittle regex matches or test helper modifications.
+
+**Why it matters generally**: In React Native test runners (`react-test-renderer`) and accessibility trees, concatenating decorative emoji/unicode glyphs into readable text labels creates coupled strings that break standard assistive technology lookups and test assertions.
+
+**Suggested addition** (target: "UI Component Architecture"): Always render decorative icons or glyphs in separate sibling Text or View nodes from readable text labels. This ensures clean accessibility label resolution, predictable text selector matching in test suites, and localization readiness.
+
 

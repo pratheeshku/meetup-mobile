@@ -11,6 +11,7 @@ import {
   cancelEvent,
   createEvent,
   getEvents,
+  getEventParticipants,
   inviteGroupToEvent,
   inviteUserToEvent,
   rsvpEvent,
@@ -349,4 +350,28 @@ describe('inviteUserToEvent (POST /events/{id}/invite-user)', () => {
     expect(result.invitee_user_id).toBe('user-3');
   });
 });
+
+describe('getEventParticipants (GET /events/{id}/participants)', () => {
+  afterEach(() => {
+    mockedGet.mockReset();
+  });
+
+  it('calls /events/{id}/participants and returns array of participants', async () => {
+    const participants = [
+      { id: 'part-1', user_id: 'user-1', status: 'going', user_nickname: 'PK' },
+      { id: 'part-2', user_id: 'user-2', status: 'going', user_nickname: 'RS' },
+    ];
+    mockedGet.mockResolvedValueOnce({ data: participants });
+
+    const result = await getEventParticipants('evt-1', { correlationId: 'cid-part' });
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/events/evt-1/participants',
+      { correlationId: 'cid-part' },
+    );
+    expect(result).toHaveLength(2);
+    expect(result[0].user_nickname).toBe('PK');
+  });
+});
+
 

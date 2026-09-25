@@ -304,6 +304,30 @@ describe('HomeScreen — My Games filtered view (BUG-M04)', () => {
     const root = await mount({ filter: 'mine' });
     expect(texts(root)).toContain("You don't have any games yet — join one or create your own.");
   });
+
+  it('offers filter pills: All (selected), Hosting, Joined, Waitlist', async () => {
+    const root = await mount({ filter: 'mine' });
+    expect(pressableLabelled(root, 'All').props.accessibilityState).toEqual({ selected: true });
+    expect(pressableLabelled(root, 'Hosting').props.accessibilityState).toEqual({ selected: false });
+    expect(pressableLabelled(root, 'Joined').props.accessibilityState).toEqual({ selected: false });
+    expect(pressableLabelled(root, 'Waitlist').props.accessibilityState).toEqual({ selected: false });
+  });
+
+  it('filters by Hosting, Joined, and Waitlist', async () => {
+    const root = await mount({ filter: 'mine' });
+
+    // Tap Hosting -> only 'My own event'
+    act(() => pressableLabelled(root, 'Hosting').props.onPress());
+    expect(cardTitles(root, /^(Up |My own)/)).toEqual(['My own event']);
+
+    // Tap Joined -> 'Up two', 'Up one', 'Up four'
+    act(() => pressableLabelled(root, 'Joined').props.onPress());
+    expect(cardTitles(root, /^(Up |My own)/)).toEqual(['Up two', 'Up one', 'Up four']);
+
+    // Tap Waitlist -> 'Up three' (FEED has up3 as waitlisted)
+    act(() => pressableLabelled(root, 'Waitlist').props.onPress());
+    expect(cardTitles(root, /^Up /)).toEqual(['Up three']);
+  });
 });
 
 describe('HomeScreen data loading', () => {

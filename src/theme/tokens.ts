@@ -32,12 +32,12 @@ export const colors = {
   primary: '#1565C0',
   primaryDark: '#0D47A1',
   primaryLight: '#E3F2FD',
-  background: '#F0F4FF',
+  background: '#FAF6F1',
   surface: '#FFFFFF',
-  textPrimary: '#0D1B3E',
-  textSecondary: '#5C6B8A',
-  textMuted: '#5E6D94',
-  border: '#E0E6F5',
+  textPrimary: '#1B1918',
+  textSecondary: '#52514F',
+  textMuted: '#6E6D6B',
+  border: '#E8E4DF',
   success: '#2E7D32',
   successLight: '#E8F5E9',
   warning: '#F57C00',
@@ -45,9 +45,27 @@ export const colors = {
   error: '#C62828',
   errorLight: '#FFEBEE',
   white: '#FFFFFF',
+  accent: '#C2481F',
+  accentLight: '#FBECE6',
+  track: '#EFECE6',
   /** Additive: modal backdrop — `textPrimary` at 50% opacity. */
-  scrim: 'rgba(13, 27, 62, 0.5)',
+  scrim: 'rgba(27, 25, 24, 0.5)',
 };
+
+export const sportColors: Record<string, string> = {
+  badminton: '#2A7B72',
+  football: '#835C2B',
+  '5-a-side football': '#835C2B',
+  futsal: '#835C2B',
+  basketball: '#67509B',
+  tennis: '#A54362',
+};
+
+export function getSportColor(sport?: string | null): string {
+  if (!sport) return '#2A7B72';
+  const key = sport.trim().toLowerCase();
+  return sportColors[key] ?? '#2A7B72';
+}
 
 export const spacing = {
   xs: 4,
