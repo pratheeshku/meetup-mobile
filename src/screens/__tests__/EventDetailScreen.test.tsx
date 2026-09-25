@@ -47,6 +47,8 @@ function rawEvent(overrides: Record<string, unknown> = {}): Record<string, unkno
     starts_at: '2026-09-25T18:00:00Z',
     ends_at: '2026-09-25T20:00:00Z',
     estimated_cost_cents: null,
+    estimated_cost_currency: null,
+    allow_waitlist: true,
     recurrence_rule_id: null,
     status: 'upcoming',
     venue_name: 'Riverside Courts',
@@ -95,6 +97,13 @@ it('resolves the sport slug to its display_name from GET /admin/sports/public (B
   } as unknown as React.ComponentProps<typeof EventDetailScreen>;
   const root = await renderAsync(<EventDetailScreen {...props} />);
   expect(texts(root)).toContain('Badminton · Riverside Courts');
+});
+
+it('renders formatted cost with currency when estimated_cost_cents is set', async () => {
+  const root = await mount(
+    rawEvent({ estimated_cost_cents: 1550, estimated_cost_currency: 'USD' }),
+  );
+  expect(has(root, 'Cost: $15.50 USD')).toBe(true);
 });
 
 describe('organiser (organizer_id === signed-in user id)', () => {
@@ -326,7 +335,7 @@ describe('BUILD 2: Event Edit Flow', () => {
     expect(venueAddressInput.props.value).toBe('100 Main St');
   });
 
-  it('validates empty title and invalid capacity client-side before sending', async () => {
+  it('validates client-side constraints on edit fields before submitting', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     await act(async () => {
       pressableLabelled(root, 'Edit Event').props.onPress();
@@ -346,6 +355,21 @@ describe('BUILD 2: Event Edit Flow', () => {
     await act(async () => {
       titleInput.props.onChangeText('Valid Title');
     });
+
+    const sportInput = root.findByProps({ accessibilityLabel: 'Sport' });
+    await act(async () => {
+      sportInput.props.onChangeText('   ');
+    });
+    await act(async () => {
+      pressableLabelled(root, 'Save Changes').props.onPress();
+    });
+    expect(has(root, 'Sport cannot be empty.')).toBe(true);
+    expect(mockPatch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      sportInput.props.onChangeText('badminton');
+    });
+
     const capInput = root.findByProps({ accessibilityLabel: 'Capacity' });
     await act(async () => {
       capInput.props.onChangeText('0');
@@ -356,15 +380,47 @@ describe('BUILD 2: Event Edit Flow', () => {
     });
     expect(has(root, 'Capacity must be a positive number.')).toBe(true);
     expect(mockPatch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      capInput.props.onChangeText('10');
+    });
+
+    const costInput = root.findByProps({ accessibilityLabel: 'Estimated Cost' });
+    await act(async () => {
+      costInput.props.onChangeText('-5');
+    });
+    await act(async () => {
+      pressableLabelled(root, 'Save Changes').props.onPress();
+    });
+    expect(has(root, 'Estimated cost must be a non-negative number.')).toBe(true);
+    expect(mockPatch).not.toHaveBeenCalled();
+
+    await act(async () => {
+      costInput.props.onChangeText('10');
+    });
+
+    const currencyInput = root.findByProps({ accessibilityLabel: 'Currency' });
+    await act(async () => {
+      currencyInput.props.onChangeText('US');
+    });
+    await act(async () => {
+      pressableLabelled(root, 'Save Changes').props.onPress();
+    });
+    expect(has(root, 'Currency code must be 3 letters (e.g. USD, SGD).')).toBe(true);
+    expect(mockPatch).not.toHaveBeenCalled();
   });
 
-  it('submits PATCH /events/{id} with full EventUpdate field set', async () => {
+  it('submits PATCH /events/{id} with full 12-field EventUpdate field set (omits immutable visibility)', async () => {
     const updatedRaw = rawEvent({
       organizer_id: 'user-me',
       title: 'Edited Title',
+      sport: 'tennis',
       venue_name: 'New Arena',
       venue_address: '200 Arena Rd',
       capacity: 20,
+      allow_waitlist: false,
+      estimated_cost_cents: 2550,
+      estimated_cost_currency: 'SGD',
     });
     mockPatch.mockResolvedValueOnce({ data: updatedRaw });
 
@@ -378,6 +434,11 @@ describe('BUILD 2: Event Edit Flow', () => {
       titleInput.props.onChangeText('Edited Title');
     });
 
+    const sportInput = root.findByProps({ accessibilityLabel: 'Sport' });
+    await act(async () => {
+      sportInput.props.onChangeText('tennis');
+    });
+
     const venueNameInput = root.findByProps({ accessibilityLabel: 'Venue Name' });
     await act(async () => {
       venueNameInput.props.onChangeText('New Arena');
@@ -388,6 +449,21 @@ describe('BUILD 2: Event Edit Flow', () => {
       capInput.props.onChangeText('20');
     });
 
+    const allowWaitlistSwitch = root.findByProps({ accessibilityLabel: 'Allow Waitlist' });
+    await act(async () => {
+      allowWaitlistSwitch.props.onValueChange(false);
+    });
+
+    const costInput = root.findByProps({ accessibilityLabel: 'Estimated Cost' });
+    await act(async () => {
+      costInput.props.onChangeText('25.50');
+    });
+
+    const currencyInput = root.findByProps({ accessibilityLabel: 'Currency' });
+    await act(async () => {
+      currencyInput.props.onChangeText('sgd');
+    });
+
     await act(async () => {
       pressableLabelled(root, 'Save Changes').props.onPress();
     });
@@ -396,38 +472,61 @@ describe('BUILD 2: Event Edit Flow', () => {
       '/events/evt-1',
       expect.objectContaining({
         title: 'Edited Title',
+        sport: 'tennis',
         venue_name: 'New Arena',
         capacity: 20,
+        allow_waitlist: false,
+        estimated_cost_cents: 2550,
+        estimated_cost_currency: 'SGD',
       }),
       expect.any(Object),
     );
+    expect(mockPatch.mock.calls[0][1]).not.toHaveProperty('visibility');
     expect(has(root, 'Save Changes')).toBe(false);
     expect(has(root, 'Edited Title')).toBe(true);
   });
 
-  it('surfaces 409 conflict when visibility transition is rejected by backend', async () => {
-    mockPatch.mockRejectedValueOnce({
-      response: {
-        status: 409,
-        data: { detail: 'Visibility is immutable after creation' },
-      },
-    });
-
+  it('does not render visibility in edit form (immutable post-creation)', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', visibility: 'public' }));
     await act(async () => {
       pressableLabelled(root, 'Edit Event').props.onPress();
     });
 
-    // Select Group visibility
+    expect(has(root, 'Visibility')).toBe(false);
+    expect(has(root, 'Invite Only')).toBe(false);
+  });
+
+  it('surfaces 409 conflict when sport change is locked after participant joined', async () => {
+    mockPatch.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          detail:
+            'Cannot change sport after a participant has joined (skill-level matching is sport-relative)',
+        },
+      },
+    });
+
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     await act(async () => {
-      pressableLabelled(root, 'Group').props.onPress();
+      pressableLabelled(root, 'Edit Event').props.onPress();
+    });
+
+    const sportInput = root.findByProps({ accessibilityLabel: 'Sport' });
+    await act(async () => {
+      sportInput.props.onChangeText('tennis');
     });
 
     await act(async () => {
       pressableLabelled(root, 'Save Changes').props.onPress();
     });
 
-    expect(has(root, 'Visibility is immutable after creation')).toBe(true);
+    expect(
+      has(
+        root,
+        'Cannot change sport after a participant has joined (skill-level matching is sport-relative)',
+      ),
+    ).toBe(true);
   });
 
   it('surfaces 409 conflict when edit is locked after event start', async () => {
@@ -462,6 +561,36 @@ describe('BUILD 2: Event Edit Flow', () => {
     });
     expect(has(root, 'Save Changes')).toBe(false);
     expect(has(root, 'Edit Event')).toBe(true);
+  });
+
+  it('populates sportOptions and allows selecting sport from OptionChips', async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/admin/sports/public') {
+        return Promise.resolve({
+          data: [
+            { id: '1', name: 'badminton', slug: 'badminton', display_name: 'Badminton', is_active: true },
+            { id: '2', name: 'squash', slug: 'squash', display_name: 'Squash', is_active: true },
+          ],
+        });
+      }
+      return Promise.resolve({ data: rawEvent({ organizer_id: 'user-me', sport: 'badminton' }) });
+    });
+    const props = {
+      route: { key: 'k', name: 'EventDetail', params: { eventId: 'evt-1' } },
+      navigation: { goBack },
+    } as unknown as React.ComponentProps<typeof EventDetailScreen>;
+    const root = await renderAsync(<EventDetailScreen {...props} />);
+
+    await act(async () => {
+      pressableLabelled(root, 'Edit Event').props.onPress();
+    });
+
+    expect(has(root, 'Squash')).toBe(true);
+    await act(async () => {
+      pressableLabelled(root, 'Squash').props.onPress();
+    });
+    const sportInput = root.findByProps({ accessibilityLabel: 'Sport' });
+    expect(sportInput.props.value).toBe('squash');
   });
 });
 

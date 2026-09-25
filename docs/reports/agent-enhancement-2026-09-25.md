@@ -15,3 +15,12 @@
 **Why it matters generally**: Component mount helpers frequently encapsulate standard initial data fetching for common render setups. However, when a screen performs secondary data fetches during user interactions (such as dropdown population or picker loading), tests must ensure that initial mount mocks do not overwrite the handlers needed for those subsequent calls.
 
 **Suggested addition** (target: "Testing discipline"): In screen test suites with custom mount helpers, configure secondary endpoint mocks after the component has mounted, or design mount helpers to preserve URL-specific route dispatches (`mockImplementation`) across both the initial mount and subsequent interaction phases.
+
+## 3. Strict alignment of client form schemas with backend mutation rules
+
+**What happened**: An event edit form initially displayed immutable metadata (`visibility`) alongside editable fields, relying on backend 409 rejections. Removing immutable fields from the UI completely and aligning with the backend's current 12-field schema (`title`, `description`, `venue_name`, `venue_address`, `skill_level_requirement`, `capacity`, `starts_at`, `ends_at`, `sport`, `allow_waitlist`, `estimated_cost_cents`, `estimated_cost_currency`) matched web parity. Furthermore, proper wire serialization (converting user-entered decimal dollars to integer cents `ge=0`, uppercase 3-letter currency codes, and null-coercing empty strings) prevented FastAPI 422 validation errors.
+
+**Why it matters generally**: Immutable fields presented as inputs create poor UX and confuse users even when disabled. Validating and transforming client input to match exact Pydantic schema constraints (e.g. cents vs. dollars, 3-char ISO currency codes) ensures that network payloads succeed on first submit and server errors are reserved for genuine business conflicts (such as 409 post-start or participant-joined locks).
+
+**Suggested addition** (target: "Contract verification"): Distinguish between editable and immutable entity properties when designing edit forms. Never expose immutable fields as active or disabled form controls unless explicit requirements mandate informational display. Ensure monetary and enumerated fields are transformed into the backend's exact storage types (e.g., integer cents, normalized uppercase codes) prior to wire transmission.
+

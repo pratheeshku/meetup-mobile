@@ -76,6 +76,8 @@ interface EventApiItem {
   starts_at: string;
   ends_at: string | null;
   estimated_cost_cents: number | null;
+  estimated_cost_currency?: string | null;
+  allow_waitlist?: boolean;
   recurrence_rule_id: string | null;
   status: string;
   venue_name: string | null;
@@ -138,6 +140,9 @@ function mapEventApiItem(raw: EventApiItem): Event {
     venue_name: raw.venue_name ?? null,
     venue_address: raw.venue_address ?? null,
     skill_level_requirement: (raw.skill_level_requirement as EventSkillLevel | null) ?? null,
+    allow_waitlist: raw.allow_waitlist ?? true,
+    estimated_cost_cents: raw.estimated_cost_cents ?? null,
+    estimated_cost_currency: raw.estimated_cost_currency ?? null,
   };
 }
 
@@ -227,9 +232,9 @@ export async function cancelEvent(
 /**
  * Partial update for an owned event: calls `PATCH /events/{id}` (§5.9 Event Edit Lifecycle).
  * Organiser-only action. Only fields present in `input` are sent.
- * Note: backend schema EventUpdate accepts title, description, venue_name, venue_address,
- * skill_level_requirement, capacity, starts_at, ends_at, visibility.
- * Other fields (sport, allow_waitlist, cost) are omitted per verified live contract.
+ * Accepts: title, description, venue_name, venue_address, skill_level_requirement,
+ * capacity, starts_at, ends_at, visibility, sport, allow_waitlist,
+ * estimated_cost_cents, estimated_cost_currency.
  */
 export async function updateEvent(
   id: string,
@@ -248,6 +253,14 @@ export async function updateEvent(
   if (input.starts_at !== undefined) payload.starts_at = input.starts_at;
   if (input.ends_at !== undefined) payload.ends_at = input.ends_at;
   if (input.visibility !== undefined) payload.visibility = input.visibility;
+  if (input.sport !== undefined) payload.sport = input.sport;
+  if (input.allow_waitlist !== undefined) payload.allow_waitlist = input.allow_waitlist;
+  if (input.estimated_cost_cents !== undefined) {
+    payload.estimated_cost_cents = input.estimated_cost_cents;
+  }
+  if (input.estimated_cost_currency !== undefined) {
+    payload.estimated_cost_currency = input.estimated_cost_currency;
+  }
 
   const { data } = await apiClient.patch<EventApiItem>(`/events/${id}`, payload, {
     correlationId: options?.correlationId,

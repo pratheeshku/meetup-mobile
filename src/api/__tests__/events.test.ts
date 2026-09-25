@@ -222,19 +222,21 @@ describe('updateEvent (PATCH /events/{id})', () => {
     mockedPatch.mockReset();
   });
 
-  it('patches only the supported EventUpdate fields and maps the response', async () => {
+  it('patches all supported EventUpdate fields and maps the response', async () => {
     mockedPatch.mockResolvedValueOnce({
       data: {
         id: 'evt-1',
         organizer_id: 'org-1',
-        sport: 'football',
+        sport: 'basketball',
         title: 'Updated Kickabout',
         description: 'New description',
         visibility: 'public',
         capacity: 14,
         starts_at: '2026-10-02T10:00:00Z',
         ends_at: '2026-10-02T12:00:00Z',
-        estimated_cost_cents: null,
+        estimated_cost_cents: 1000,
+        estimated_cost_currency: 'USD',
+        allow_waitlist: true,
         recurrence_rule_id: null,
         status: 'upcoming',
         venue_name: 'Main Stadium',
@@ -257,10 +259,10 @@ describe('updateEvent (PATCH /events/{id})', () => {
       starts_at: '2026-10-02T10:00:00Z',
       ends_at: '2026-10-02T12:00:00Z',
       visibility: 'public' as const,
-      // Unsupported backend fields should be omitted from PATCH body
       sport: 'basketball',
       allow_waitlist: true,
       estimated_cost_cents: 1000,
+      estimated_cost_currency: 'USD',
     };
 
     const result = await updateEvent('evt-1', updateInput, { correlationId: 'cid-patch' });
@@ -277,13 +279,21 @@ describe('updateEvent (PATCH /events/{id})', () => {
         starts_at: '2026-10-02T10:00:00Z',
         ends_at: '2026-10-02T12:00:00Z',
         visibility: 'public',
+        sport: 'basketball',
+        allow_waitlist: true,
+        estimated_cost_cents: 1000,
+        estimated_cost_currency: 'USD',
       },
       { correlationId: 'cid-patch' },
     );
     expect(result.title).toBe('Updated Kickabout');
+    expect(result.sport).toBe('basketball');
     expect(result.location).toBe('Main Stadium');
     expect(result.venue_address).toBe('456 Stadium Way');
     expect(result.skill_level_requirement).toBe('intermediate');
+    expect(result.allow_waitlist).toBe(true);
+    expect(result.estimated_cost_cents).toBe(1000);
+    expect(result.estimated_cost_currency).toBe('USD');
   });
 
   it('propagates PATCH failures (e.g. 409 conflict)', async () => {

@@ -16,8 +16,8 @@
  * Error handling: rejected-action errors (e.g. 409 from immutable visibility or
  * locked post-start edit) surface via `getApiErrorMessage(e, fallback)`.
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
@@ -29,6 +29,7 @@ import {
   withdrawEvent,
 } from '../api/events';
 import { getMyGroups } from '../api/groups';
+import { getSports } from '../api/sports';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
 import Badge from '../components/Badge';
@@ -40,8 +41,9 @@ import LoadingView from '../components/LoadingView';
 import OptionChips, { ChipOption } from '../components/OptionChips';
 import TextField from '../components/TextField';
 import { colors, radius, spacing, typography } from '../theme/tokens';
-import type { Event, EventSkillLevel, EventVisibility, UpdateEventInput } from '../types/event';
+import type { Event, EventSkillLevel, UpdateEventInput } from '../types/event';
 import type { Group } from '../types/group';
+import type { Sport } from '../types/sport';
 import type { HomeStackParamList } from '../navigation/types';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import { formatLocalDateTime, LOCAL_DATE_TIME_PLACEHOLDER, parseLocalDateTime } from '../utils/localDateTime';
@@ -56,12 +58,6 @@ const SKILL_LEVEL_OPTIONS: ChipOption<string>[] = [
   { value: 'beginner', label: 'Beginner' },
   { value: 'intermediate', label: 'Intermediate' },
   { value: 'expert', label: 'Expert' },
-];
-
-const VISIBILITY_OPTIONS: ChipOption<string>[] = [
-  { value: 'public', label: 'Public' },
-  { value: 'invite_only', label: 'Invite Only' },
-  { value: 'group', label: 'Group' },
 ];
 
 export default function EventDetailScreen({ route }: Props): React.JSX.Element {
@@ -97,9 +93,26 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
   const [editCapacity, setEditCapacity] = useState('10');
   const [editStartsAt, setEditStartsAt] = useState('');
   const [editEndsAt, setEditEndsAt] = useState('');
-  const [editVisibility, setEditVisibility] = useState<string>('public');
+  const [editSport, setEditSport] = useState('');
+  const [editAllowWaitlist, setEditAllowWaitlist] = useState(true);
+  const [editCost, setEditCost] = useState('');
+  const [editCurrency, setEditCurrency] = useState('');
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [sports, setSports] = useState<Sport[]>([]);
+
+  useEffect(() => {
+    getSports().then(setSports).catch(() => {});
+  }, []);
+
+  const sportOptions: ChipOption<string>[] = useMemo(() => {
+    const opts = sports.map(s => ({ value: s.name, label: s.display_name }));
+    if (editSport && !opts.some(o => o.value === editSport)) {
+      opts.unshift({ value: editSport, label: editSport });
+    }
+    return opts;
+  }, [sports, editSport]);
 
   const sportLabel = useSportDisplayName(event?.sport ?? '');
 
@@ -254,7 +267,14 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
     setEditCapacity(String(event.capacity));
     setEditStartsAt(event.starts_at ? formatLocalDateTime(new Date(event.starts_at)) : '');
     setEditEndsAt(event.ends_at ? formatLocalDateTime(new Date(event.ends_at)) : '');
-    setEditVisibility(event.visibility);
+    setEditSport(event.sport ?? '');
+    setEditAllowWaitlist(event.allow_waitlist !== false);
+    setEditCost(
+      event.estimated_cost_cents != null
+        ? (event.estimated_cost_cents / 100).toFixed(2)
+        : '',
+    );
+    setEditCurrency(event.estimated_cost_currency ?? '');
     setEditError(null);
     setIsCancelFormOpen(false);
     setIsInviteGroupOpen(false);
@@ -270,6 +290,11 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
     const trimmedTitle = editTitle.trim();
     if (!trimmedTitle) {
       setEditError('Title cannot be empty.');
+      return;
+    }
+    const trimmedSport = editSport.trim();
+    if (!trimmedSport) {
+      setEditError('Sport cannot be empty.');
       return;
     }
     const cap = parseInt(editCapacity, 10);
@@ -291,6 +316,26 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
       }
     }
 
+    let costCents: number | null = null;
+    if (editCost.trim()) {
+      const parsedCost = parseFloat(editCost.trim());
+      if (isNaN(parsedCost) || parsedCost < 0) {
+        setEditError('Estimated cost must be a non-negative number.');
+        return;
+      }
+      costCents = Math.round(parsedCost * 100);
+    }
+
+    let currencyCode: string | null = null;
+    if (editCurrency.trim()) {
+      const trimmedCurr = editCurrency.trim().toUpperCase();
+      if (trimmedCurr.length !== 3) {
+        setEditError('Currency code must be 3 letters (e.g. USD, SGD).');
+        return;
+      }
+      currencyCode = trimmedCurr;
+    }
+
     setEditError(null);
     setIsEditSubmitting(true);
     try {
@@ -303,7 +348,10 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
         capacity: cap,
         starts_at: startIso,
         ends_at: endIso,
-        visibility: editVisibility as EventVisibility,
+        sport: trimmedSport,
+        allow_waitlist: editAllowWaitlist,
+        estimated_cost_cents: costCents,
+        estimated_cost_currency: currencyCode,
       };
       await withCorrelationId(async correlationId => {
         const updated = await updateEvent(eventId, payload, { correlationId });
@@ -357,8 +405,14 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
           {event.participant_count}/{event.capacity} going
           {event.waitlist_count > 0 ? ` · ${event.waitlist_count} waitlisted` : ''}
         </Text>
-        <Text style={styles.meta}>Organised by {event.organiser_nickname}</Text>
-        {event.cost != null ? <Text style={styles.meta}>Cost: {event.cost}</Text> : null}
+        {event.estimated_cost_cents != null ? (
+          <Text style={styles.meta}>
+            Cost: ${(event.estimated_cost_cents / 100).toFixed(2)}
+            {event.estimated_cost_currency ? ` ${event.estimated_cost_currency}` : ''}
+          </Text>
+        ) : event.cost != null ? (
+          <Text style={styles.meta}>Cost: {event.cost}</Text>
+        ) : null}
 
         <Text style={styles.description}>{event.description}</Text>
       </Card>
@@ -483,7 +537,7 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
         </Card>
       ) : null}
 
-      {/* BUILD 2: Edit Event Form */}
+      {/* Edit Event Form */}
       {isEditing ? (
         <Card style={styles.formCard}>
           <Text style={styles.formTitle}>Edit Event</Text>
@@ -498,6 +552,27 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
             maxLength={150}
             style={styles.formInput}
           />
+
+          <Text style={styles.fieldLabel}>Sport</Text>
+          <TextField
+            placeholder="Sport (e.g. badminton)"
+            accessibilityLabel="Sport"
+            value={editSport}
+            onChangeText={setEditSport}
+            editable={!isEditSubmitting}
+            maxLength={30}
+            style={styles.formInput}
+          />
+          {sportOptions.length > 0 ? (
+            <View style={styles.chipRow}>
+              <OptionChips
+                options={sportOptions}
+                value={editSport}
+                onChange={setEditSport}
+                disabled={isEditSubmitting}
+              />
+            </View>
+          ) : null}
 
           <Text style={styles.fieldLabel}>Description</Text>
           <TextField
@@ -549,6 +624,18 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
             style={styles.formInput}
           />
 
+          <View style={styles.switchRow}>
+            <Text style={styles.fieldLabel}>Allow Waitlist</Text>
+            <Switch
+              accessibilityLabel="Allow Waitlist"
+              value={editAllowWaitlist}
+              onValueChange={setEditAllowWaitlist}
+              disabled={isEditSubmitting}
+              trackColor={{ false: colors.border, true: colors.primaryLight }}
+              thumbColor={editAllowWaitlist ? colors.primary : colors.textMuted}
+            />
+          </View>
+
           <Text style={styles.fieldLabel}>Start Date & Time</Text>
           <DateTimePickerField
             accessibilityLabel="Start Date & Time"
@@ -569,13 +656,33 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
             disabled={isEditSubmitting}
           />
 
-          <Text style={styles.fieldLabel}>Visibility</Text>
-          <OptionChips
-            options={VISIBILITY_OPTIONS}
-            value={editVisibility}
-            onChange={setEditVisibility}
-            disabled={isEditSubmitting}
-          />
+          <View style={styles.costCurrencyRow}>
+            <View style={styles.costFieldWrapper}>
+              <Text style={styles.fieldLabel}>Estimated Cost</Text>
+              <TextField
+                placeholder="e.g. 15.00"
+                accessibilityLabel="Estimated Cost"
+                value={editCost}
+                onChangeText={setEditCost}
+                editable={!isEditSubmitting}
+                keyboardType="decimal-pad"
+                style={styles.formInput}
+              />
+            </View>
+            <View style={styles.currencyFieldWrapper}>
+              <Text style={styles.fieldLabel}>Currency</Text>
+              <TextField
+                placeholder="USD"
+                accessibilityLabel="Currency"
+                value={editCurrency}
+                onChangeText={text => setEditCurrency(text.toUpperCase())}
+                editable={!isEditSubmitting}
+                maxLength={3}
+                autoCapitalize="characters"
+                style={styles.formInput}
+              />
+            </View>
+          </View>
 
           {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
 
@@ -645,6 +752,26 @@ const styles = StyleSheet.create({
   fieldLabel: { ...typography.bodyBold, color: colors.textPrimary, marginTop: spacing.sm, marginBottom: spacing.xs },
   formInput: { marginBottom: spacing.sm },
   multilineInput: { minHeight: 72 },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  costCurrencyRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  costFieldWrapper: {
+    flex: 2,
+  },
+  currencyFieldWrapper: {
+    flex: 1,
+  },
+  chipRow: {
+    marginBottom: spacing.sm,
+  },
   formButtonsRow: {
     flexDirection: 'row',
     marginTop: spacing.md,

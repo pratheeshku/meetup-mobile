@@ -61,6 +61,9 @@ export interface Event {
   venue_name?: string | null;
   venue_address?: string | null;
   skill_level_requirement?: EventSkillLevel | null;
+  allow_waitlist?: boolean;
+  estimated_cost_cents?: number | null;
+  estimated_cost_currency?: string | null;
 }
 
 export interface UpdateEventInput {
