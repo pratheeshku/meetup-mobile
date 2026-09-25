@@ -173,22 +173,28 @@ EventDetailScreen.tsx    |   90.44 |    74.86 |    87.5 |   91.66
 
 **Git evidence**:
 ```
+$ git log --oneline -3
+6c2566e fix(screens): correct CTA blue, fix Android keyboard-avoidance bug, rebuild Create Game controls
+cf9fda6 fix(build): add SKIP_VERSION_BUMP / --no-bump escape hatch to build-release-aab.sh
+706c245 chore(release): bump versionCode to 21
+
 $ git status --short
- M src/components/Button.tsx
- M src/components/OptionChips.tsx
- M src/components/__tests__/OptionChips.test.tsx
- M src/screens/CreateGameScreen.tsx
- M src/screens/EventDetailScreen.tsx
- M src/screens/__tests__/CreateGameScreen.test.tsx
- M src/screens/__tests__/EventDetailScreen.test.tsx
- M src/theme/tokens.ts
- M src/types/event.ts
-?? src/components/DropdownField.tsx
-?? src/components/__tests__/DropdownField.test.tsx
-?? docs/reports/IMPL-DES-MEETUP-MOBILE-create-game-rebuild-cta-fix.md
+(clean)
+
+$ git push
+To https://github.com/pratheeshku/meetup-mobile.git
+   cf9fda6..6c2566e  main -> main
 ```
-(commit/push evidence appended after this report is committed — see
-final message to user)
+
+Note: an intermediate commit accidentally included a wide, unrelated
+`prettier --write` reformatting pass on `CreateGameScreen.tsx` and
+`EventDetailScreen.tsx` (neither file was prettier-clean before this
+task under this repo's own config, so the formatter rewrote almost the
+whole file). Caught before push by the implausibly large diff stat;
+undone with `git reset --soft` (non-destructive) and every edit
+manually reapplied without the formatter pass. The pushed commit above
+is the corrected, minimal-diff version. See
+`docs/reports/agent-enhancement-2026-09-25.md` §9 for the write-up.
 
 **File evidence** (key changes on disk):
 ```
