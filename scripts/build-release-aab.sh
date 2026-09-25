@@ -2,11 +2,22 @@
 # Builds the signed Shuttlr release AAB.
 #
 #   npm run build:aab
+#   SKIP_VERSION_BUMP=1 npm run build:aab
+#   ./scripts/build-release-aab.sh --no-bump
 #
 # Steps: preflight (signing file, Firebase config matches applicationId) ->
-# bump versionCode in android/version.properties -> ./gradlew bundleRelease ->
-# verify the AAB is signed by the Shuttlr upload key. Never prints credentials.
+# bump versionCode in android/version.properties (unless SKIP_VERSION_BUMP=1 or --no-bump) ->
+# ./gradlew bundleRelease -> verify the AAB is signed by the Shuttlr upload key. Never prints credentials.
 set -euo pipefail
+
+SKIP_VERSION_BUMP="${SKIP_VERSION_BUMP:-0}"
+for arg in "$@"; do
+  case "$arg" in
+    --no-bump|--skip-version-bump)
+      SKIP_VERSION_BUMP=1
+      ;;
+  esac
+done
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -39,12 +50,19 @@ clients = json.load(open(path)).get("client", [])
 sys.exit(0 if any(c["client_info"]["android_client_info"]["package_name"] == app_id for c in clients) else 1)
 PY
 
-# Bump versionCode (strictly increasing; never reused, even if the build fails).
+# Bump versionCode (strictly increasing; never reused, even if the build fails),
+# unless SKIP_VERSION_BUMP=1 or --no-bump was specified to preserve a manual pre-set.
 CURRENT="$(sed -nE 's/^versionCode=([0-9]+)$/\1/p' "$VERSION_FILE")"
 [ -n "$CURRENT" ] || fail "versionCode not found in $VERSION_FILE"
-NEXT=$((CURRENT + 1))
-sed -E "s/^versionCode=[0-9]+$/versionCode=$NEXT/" "$VERSION_FILE" > "$VERSION_FILE.tmp" && mv "$VERSION_FILE.tmp" "$VERSION_FILE"
-echo "versionCode: $CURRENT -> $NEXT"
+
+if [ "$SKIP_VERSION_BUMP" = "1" ] || [ "$SKIP_VERSION_BUMP" = "true" ]; then
+  NEXT="$CURRENT"
+  echo "versionCode: preserved at $NEXT (SKIP_VERSION_BUMP enabled)"
+else
+  NEXT=$((CURRENT + 1))
+  sed -E "s/^versionCode=[0-9]+$/versionCode=$NEXT/" "$VERSION_FILE" > "$VERSION_FILE.tmp" && mv "$VERSION_FILE.tmp" "$VERSION_FILE"
+  echo "versionCode: $CURRENT -> $NEXT"
+fi
 
 (cd android && ./gradlew bundleRelease)
 
