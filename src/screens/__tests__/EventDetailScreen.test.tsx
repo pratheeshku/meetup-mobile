@@ -29,6 +29,23 @@ jest.mock('../../auth/AuthContext', () => ({
   useAuth: () => ({ user: mockUser }),
 }));
 
+jest.mock('../../components/UserSearchPicker', () => {
+  const { Pressable, Text } = require('react-native');
+  return function MockUserSearchPicker({ onSelect, disabled, excludeEventId }: any) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Pick Alex"
+        testID={`mock-picker-${excludeEventId}`}
+        disabled={disabled}
+        onPress={() => onSelect({ id: 'u-user-1', nickname: 'alex', display_name: 'Alex C' })}
+      >
+        <Text>Pick Alex</Text>
+      </Pressable>
+    );
+  };
+});
+
 const mockGet = apiClient.get as jest.Mock;
 const mockPost = apiClient.post as jest.Mock;
 const mockPatch = apiClient.patch as jest.Mock;
@@ -107,11 +124,12 @@ it('renders formatted cost with currency when estimated_cost_cents is set', asyn
 });
 
 describe('organiser (organizer_id === signed-in user id)', () => {
-  it('sees "Edit Event", "Invite Group", and "Cancel Event", but not "Join" or "Leave"', async () => {
+  it('sees "Edit Event", "Invite Group", "Invite User", and "Cancel Event", but not "Join" or "Leave"', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     expect(has(root, 'Cancel Event')).toBe(true);
     expect(has(root, 'Edit Event')).toBe(true);
     expect(has(root, 'Invite Group')).toBe(true);
+    expect(has(root, 'Invite User')).toBe(true);
     expect(has(root, 'Join')).toBe(false);
     expect(has(root, 'Leave')).toBe(false);
   });
@@ -121,6 +139,7 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     expect(has(root, 'Cancel Event')).toBe(true);
     expect(has(root, 'Edit Event')).toBe(true);
     expect(has(root, 'Invite Group')).toBe(true);
+    expect(has(root, 'Invite User')).toBe(true);
     expect(has(root, 'Leave')).toBe(false);
     expect(has(root, 'Join')).toBe(false);
   });
@@ -130,6 +149,7 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     expect(has(root, 'Cancel Event')).toBe(true);
     expect(has(root, 'Edit Event')).toBe(true);
     expect(has(root, 'Invite Group')).toBe(true);
+    expect(has(root, 'Invite User')).toBe(true);
   });
 
   it.each(['cancelled', 'completed'])(
@@ -380,37 +400,19 @@ describe('BUILD 2: Event Edit Flow', () => {
     });
     expect(has(root, 'Capacity must be a positive number.')).toBe(true);
     expect(mockPatch).not.toHaveBeenCalled();
-
-    await act(async () => {
-      capInput.props.onChangeText('10');
-    });
-
-    const costInput = root.findByProps({ accessibilityLabel: 'Estimated Cost' });
-    await act(async () => {
-      costInput.props.onChangeText('-5');
-    });
-    await act(async () => {
-      pressableLabelled(root, 'Save Changes').props.onPress();
-    });
-    expect(has(root, 'Estimated cost must be a non-negative number.')).toBe(true);
-    expect(mockPatch).not.toHaveBeenCalled();
-
-    await act(async () => {
-      costInput.props.onChangeText('10');
-    });
-
-    const currencyInput = root.findByProps({ accessibilityLabel: 'Currency' });
-    await act(async () => {
-      currencyInput.props.onChangeText('US');
-    });
-    await act(async () => {
-      pressableLabelled(root, 'Save Changes').props.onPress();
-    });
-    expect(has(root, 'Currency code must be 3 letters (e.g. USD, SGD).')).toBe(true);
-    expect(mockPatch).not.toHaveBeenCalled();
   });
 
-  it('submits PATCH /events/{id} with full 12-field EventUpdate field set (omits immutable visibility)', async () => {
+  it('does not render cost or currency in edit form (hidden per BUILD B)', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    await act(async () => {
+      pressableLabelled(root, 'Edit Event').props.onPress();
+    });
+
+    expect(has(root, 'Estimated Cost')).toBe(false);
+    expect(has(root, 'Currency')).toBe(false);
+  });
+
+  it('submits PATCH /events/{id} with EventUpdate field set (omits immutable visibility and cost/currency)', async () => {
     const updatedRaw = rawEvent({
       organizer_id: 'user-me',
       title: 'Edited Title',
@@ -419,8 +421,6 @@ describe('BUILD 2: Event Edit Flow', () => {
       venue_address: '200 Arena Rd',
       capacity: 20,
       allow_waitlist: false,
-      estimated_cost_cents: 2550,
-      estimated_cost_currency: 'SGD',
     });
     mockPatch.mockResolvedValueOnce({ data: updatedRaw });
 
@@ -454,16 +454,6 @@ describe('BUILD 2: Event Edit Flow', () => {
       allowWaitlistSwitch.props.onValueChange(false);
     });
 
-    const costInput = root.findByProps({ accessibilityLabel: 'Estimated Cost' });
-    await act(async () => {
-      costInput.props.onChangeText('25.50');
-    });
-
-    const currencyInput = root.findByProps({ accessibilityLabel: 'Currency' });
-    await act(async () => {
-      currencyInput.props.onChangeText('sgd');
-    });
-
     await act(async () => {
       pressableLabelled(root, 'Save Changes').props.onPress();
     });
@@ -476,12 +466,12 @@ describe('BUILD 2: Event Edit Flow', () => {
         venue_name: 'New Arena',
         capacity: 20,
         allow_waitlist: false,
-        estimated_cost_cents: 2550,
-        estimated_cost_currency: 'SGD',
       }),
       expect.any(Object),
     );
     expect(mockPatch.mock.calls[0][1]).not.toHaveProperty('visibility');
+    expect(mockPatch.mock.calls[0][1]).not.toHaveProperty('estimated_cost_cents');
+    expect(mockPatch.mock.calls[0][1]).not.toHaveProperty('estimated_cost_currency');
     expect(has(root, 'Save Changes')).toBe(false);
     expect(has(root, 'Edited Title')).toBe(true);
   });
@@ -681,5 +671,146 @@ describe('BUILD 3: Group Invite Flow', () => {
     });
 
     expect(has(root, 'Only group admins can invite members')).toBe(true);
+  });
+
+  it('supports selecting multiple groups and posts an invite for each group', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/settings/groups-owned') {
+        return Promise.resolve({
+          data: [
+            { id: 'grp-1', name: 'Badminton Club', description: '', owner_id: 'user-me', created_at: '2026-01-01' },
+          ],
+        });
+      }
+      if (url === '/settings/groups-member') {
+        return Promise.resolve({
+          data: [
+            { id: 'grp-2', name: 'Weekend Runners', description: '', owner_id: 'other', created_at: '2026-01-01' },
+          ],
+        });
+      }
+      return Promise.resolve({ data: rawEvent({ organizer_id: 'user-me' }) });
+    });
+
+    mockPost.mockResolvedValue({
+      data: [{ id: 'inv-1', event_id: 'evt-1', invitee_user_id: 'u-1', status: 'pending' }],
+    });
+
+    await act(async () => {
+      pressableLabelled(root, 'Invite Group').props.onPress();
+    });
+
+    // Select both groups
+    await act(async () => {
+      pressableLabelled(root, 'Badminton Club').props.onPress();
+    });
+    await act(async () => {
+      pressableLabelled(root, 'Weekend Runners').props.onPress();
+    });
+
+    await act(async () => {
+      pressableLabelled(root, 'Send Group Invite').props.onPress();
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/events/evt-1/invite-group',
+      { group_id: 'grp-1' },
+      expect.any(Object),
+    );
+    expect(mockPost).toHaveBeenCalledWith(
+      '/events/evt-1/invite-group',
+      { group_id: 'grp-2' },
+      expect.any(Object),
+    );
+    expect(has(root, 'Sent 2 group invitations!')).toBe(true);
+  });
+});
+
+describe('BUILD C: Individual Invite Flow', () => {
+  it('opens invite user form and sends POST /events/{id}/invite-user with user_id', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: { id: 'inv-u1', event_id: 'evt-1', invitee_user_id: 'u-user-1', status: 'pending' },
+    });
+
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+
+    await act(async () => {
+      pressableLabelled(root, 'Invite User').props.onPress();
+    });
+
+    expect(has(root, 'Pick Alex')).toBe(true);
+
+    // Pick Alex
+    await act(async () => {
+      pressableLabelled(root, 'Pick Alex').props.onPress();
+    });
+
+    expect(has(root, 'alex (Alex C)')).toBe(true);
+    expect(has(root, 'Change')).toBe(true);
+
+    // Send Invite
+    await act(async () => {
+      pressableLabelled(root, 'Send Invite').props.onPress();
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/events/evt-1/invite-user',
+      { user_id: 'u-user-1' },
+      expect.any(Object),
+    );
+    expect(has(root, 'Invitation sent to alex!')).toBe(true);
+  });
+
+  it('surfaces error when individual invite fails', async () => {
+    mockPost.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: { detail: 'User is already invited' },
+      },
+    });
+
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+
+    await act(async () => {
+      pressableLabelled(root, 'Invite User').props.onPress();
+    });
+
+    await act(async () => {
+      pressableLabelled(root, 'Pick Alex').props.onPress();
+    });
+
+    await act(async () => {
+      pressableLabelled(root, 'Send Invite').props.onPress();
+    });
+
+    expect(has(root, 'User is already invited')).toBe(true);
+  });
+
+  it('allows changing selection and closes form on Close press', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+
+    await act(async () => {
+      pressableLabelled(root, 'Invite User').props.onPress();
+    });
+
+    await act(async () => {
+      pressableLabelled(root, 'Pick Alex').props.onPress();
+    });
+    expect(has(root, 'alex (Alex C)')).toBe(true);
+
+    // Click Change
+    await act(async () => {
+      pressableLabelled(root, 'Change').props.onPress();
+    });
+    expect(has(root, 'alex (Alex C)')).toBe(false);
+    expect(has(root, 'Pick Alex')).toBe(true);
+
+    // Click Close
+    await act(async () => {
+      pressableLabelled(root, 'Close').props.onPress();
+    });
+    expect(has(root, 'Pick Alex')).toBe(false);
   });
 });

@@ -12,6 +12,7 @@ import {
   createEvent,
   getEvents,
   inviteGroupToEvent,
+  inviteUserToEvent,
   rsvpEvent,
   updateEvent,
   withdrawEvent,
@@ -327,3 +328,25 @@ describe('inviteGroupToEvent (POST /events/{id}/invite-group)', () => {
     expect(result[0].id).toBe('inv-1');
   });
 });
+
+describe('inviteUserToEvent (POST /events/{id}/invite-user)', () => {
+  afterEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('posts { user_id } to /events/{id}/invite-user and returns invitation', async () => {
+    const rawInvite = { id: 'inv-3', event_id: 'evt-1', invitee_user_id: 'user-3', status: 'pending' };
+    mockedPost.mockResolvedValueOnce({ data: rawInvite });
+
+    const result = await inviteUserToEvent('evt-1', 'user-3', { correlationId: 'cid-usr' });
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/events/evt-1/invite-user',
+      { user_id: 'user-3' },
+      { correlationId: 'cid-usr' },
+    );
+    expect(result.id).toBe('inv-3');
+    expect(result.invitee_user_id).toBe('user-3');
+  });
+});
+

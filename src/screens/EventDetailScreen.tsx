@@ -10,8 +10,7 @@
  * - Event Cancel (POST /events/{id}/cancel with required reason)
  * - Event Edit (PATCH /events/{id}, full field set matching EventUpdate schema)
  * - Event Group Invite (POST /events/{id}/invite-group with group_id)
- * Note: Individual invite (POST /events/{id}/invite-user) is on hold pending
- * backend deployment.
+ * - Event Individual Invite (POST /events/{id}/invite-user with user_id)
  *
  * Error handling: rejected-action errors (e.g. 409 from immutable visibility or
  * locked post-start edit) surface via `getApiErrorMessage(e, fallback)`.
@@ -24,6 +23,7 @@ import {
   cancelEvent,
   getEvent,
   inviteGroupToEvent,
+  inviteUserToEvent,
   rsvpEvent,
   updateEvent,
   withdrawEvent,
@@ -40,10 +40,13 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import OptionChips, { ChipOption } from '../components/OptionChips';
 import TextField from '../components/TextField';
-import { colors, radius, spacing, typography } from '../theme/tokens';
+import TextLink from '../components/TextLink';
+import UserSearchPicker from '../components/UserSearchPicker';
+import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { Event, EventSkillLevel, UpdateEventInput } from '../types/event';
 import type { Group } from '../types/group';
 import type { Sport } from '../types/sport';
+import type { UserSearchResult } from '../types/user';
 import type { HomeStackParamList } from '../navigation/types';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import { formatLocalDateTime, LOCAL_DATE_TIME_PLACEHOLDER, parseLocalDateTime } from '../utils/localDateTime';
@@ -79,10 +82,16 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
   const [isInviteGroupOpen, setIsInviteGroupOpen] = useState(false);
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [isGroupsLoading, setIsGroupsLoading] = useState(false);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [isInviteGroupSubmitting, setIsInviteGroupSubmitting] = useState(false);
   const [inviteGroupError, setInviteGroupError] = useState<string | null>(null);
   const [inviteGroupSuccess, setInviteGroupSuccess] = useState<string | null>(null);
+
+  const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
+  const [selectedInviteUser, setSelectedInviteUser] = useState<UserSearchResult | null>(null);
+  const [isInviteUserSubmitting, setIsInviteUserSubmitting] = useState(false);
+  const [inviteUserError, setInviteUserError] = useState<string | null>(null);
+  const [inviteUserSuccess, setInviteUserSuccess] = useState<string | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -95,8 +104,6 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
   const [editEndsAt, setEditEndsAt] = useState('');
   const [editSport, setEditSport] = useState('');
   const [editAllowWaitlist, setEditAllowWaitlist] = useState(true);
-  const [editCost, setEditCost] = useState('');
-  const [editCurrency, setEditCurrency] = useState('');
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -170,6 +177,7 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
     setCancelReason('');
     setIsEditing(false);
     setIsInviteGroupOpen(false);
+    setIsInviteUserOpen(false);
     setIsCancelFormOpen(true);
   };
 
@@ -206,9 +214,10 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
   const handleOpenInviteGroup = async (): Promise<void> => {
     setInviteGroupError(null);
     setInviteGroupSuccess(null);
-    setSelectedGroupId(null);
+    setSelectedGroupIds([]);
     setIsEditing(false);
     setIsCancelFormOpen(false);
+    setIsInviteUserOpen(false);
     setIsInviteGroupOpen(true);
     if (myGroups.length === 0) {
       setIsGroupsLoading(true);
@@ -227,11 +236,17 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
     setIsInviteGroupOpen(false);
     setInviteGroupError(null);
     setInviteGroupSuccess(null);
-    setSelectedGroupId(null);
+    setSelectedGroupIds([]);
+  };
+
+  const handleToggleGroup = (groupId: string): void => {
+    setSelectedGroupIds(prev =>
+      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId],
+    );
   };
 
   const handleSendGroupInvite = async (): Promise<void> => {
-    if (!selectedGroupId) {
+    if (selectedGroupIds.length === 0) {
       setInviteGroupError('Please select a group to invite.');
       return;
     }
@@ -240,19 +255,61 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
     setIsInviteGroupSubmitting(true);
     try {
       await withCorrelationId(async correlationId => {
-        const invites = await inviteGroupToEvent(eventId, selectedGroupId, { correlationId });
-        const count = invites.length;
+        let totalInvites = 0;
+        for (const groupId of selectedGroupIds) {
+          const invites = await inviteGroupToEvent(eventId, groupId, { correlationId });
+          totalInvites += invites.length;
+        }
         setInviteGroupSuccess(
-          count > 0
-            ? `Sent ${count} group invitation${count === 1 ? '' : 's'}!`
+          totalInvites > 0
+            ? `Sent ${totalInvites} group invitation${totalInvites === 1 ? '' : 's'}!`
             : 'Group members invited successfully!',
         );
       });
-      setSelectedGroupId(null);
+      setSelectedGroupIds([]);
     } catch (e) {
       setInviteGroupError(getApiErrorMessage(e, 'Could not invite group members. Please try again.'));
     } finally {
       setIsInviteGroupSubmitting(false);
+    }
+  };
+
+  // Organiser action: Invite User
+  const handleOpenInviteUser = (): void => {
+    setInviteUserError(null);
+    setInviteUserSuccess(null);
+    setSelectedInviteUser(null);
+    setIsEditing(false);
+    setIsCancelFormOpen(false);
+    setIsInviteGroupOpen(false);
+    setIsInviteUserOpen(true);
+  };
+
+  const handleCloseInviteUser = (): void => {
+    setIsInviteUserOpen(false);
+    setInviteUserError(null);
+    setInviteUserSuccess(null);
+    setSelectedInviteUser(null);
+  };
+
+  const handleSendUserInvite = async (): Promise<void> => {
+    if (!selectedInviteUser) {
+      setInviteUserError('Search for and choose a user to invite.');
+      return;
+    }
+    setInviteUserError(null);
+    setInviteUserSuccess(null);
+    setIsInviteUserSubmitting(true);
+    try {
+      await withCorrelationId(async correlationId => {
+        await inviteUserToEvent(eventId, selectedInviteUser.id, { correlationId });
+        setInviteUserSuccess(`Invitation sent to ${selectedInviteUser.nickname}!`);
+      });
+      setSelectedInviteUser(null);
+    } catch (e) {
+      setInviteUserError(getApiErrorMessage(e, 'Could not send the invite. Please try again.'));
+    } finally {
+      setIsInviteUserSubmitting(false);
     }
   };
 
@@ -269,15 +326,10 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
     setEditEndsAt(event.ends_at ? formatLocalDateTime(new Date(event.ends_at)) : '');
     setEditSport(event.sport ?? '');
     setEditAllowWaitlist(event.allow_waitlist !== false);
-    setEditCost(
-      event.estimated_cost_cents != null
-        ? (event.estimated_cost_cents / 100).toFixed(2)
-        : '',
-    );
-    setEditCurrency(event.estimated_cost_currency ?? '');
     setEditError(null);
     setIsCancelFormOpen(false);
     setIsInviteGroupOpen(false);
+    setIsInviteUserOpen(false);
     setIsEditing(true);
   };
 
@@ -316,26 +368,6 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
       }
     }
 
-    let costCents: number | null = null;
-    if (editCost.trim()) {
-      const parsedCost = parseFloat(editCost.trim());
-      if (isNaN(parsedCost) || parsedCost < 0) {
-        setEditError('Estimated cost must be a non-negative number.');
-        return;
-      }
-      costCents = Math.round(parsedCost * 100);
-    }
-
-    let currencyCode: string | null = null;
-    if (editCurrency.trim()) {
-      const trimmedCurr = editCurrency.trim().toUpperCase();
-      if (trimmedCurr.length !== 3) {
-        setEditError('Currency code must be 3 letters (e.g. USD, SGD).');
-        return;
-      }
-      currencyCode = trimmedCurr;
-    }
-
     setEditError(null);
     setIsEditSubmitting(true);
     try {
@@ -350,8 +382,6 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
         ends_at: endIso,
         sport: trimmedSport,
         allow_waitlist: editAllowWaitlist,
-        estimated_cost_cents: costCents,
-        estimated_cost_currency: currencyCode,
       };
       await withCorrelationId(async correlationId => {
         const updated = await updateEvent(eventId, payload, { correlationId });
@@ -437,7 +467,7 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
       ) : null}
 
       {/* Organiser Primary Action Triggers */}
-      {isOrganiserActionsVisible && !isEditing && !isCancelFormOpen && !isInviteGroupOpen ? (
+      {isOrganiserActionsVisible && !isEditing && !isCancelFormOpen && !isInviteGroupOpen && !isInviteUserOpen ? (
         <View style={styles.organiserActionsContainer}>
           <Button
             label="Edit Event"
@@ -449,6 +479,12 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
             label="Invite Group"
             variant="secondary"
             onPress={handleOpenInviteGroup}
+            style={styles.button}
+          />
+          <Button
+            label="Invite User"
+            variant="secondary"
+            onPress={handleOpenInviteUser}
             style={styles.button}
           />
           <Button
@@ -510,8 +546,8 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
           ) : (
             <OptionChips
               options={myGroups.map(g => ({ value: g.id, label: g.name }))}
-              value={selectedGroupId}
-              onChange={setSelectedGroupId}
+              value={selectedGroupIds}
+              onChange={handleToggleGroup}
               disabled={isInviteGroupSubmitting}
             />
           )}
@@ -523,7 +559,7 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
               variant="primary"
               onPress={handleSendGroupInvite}
               loading={isInviteGroupSubmitting}
-              disabled={!selectedGroupId || isInviteGroupSubmitting}
+              disabled={selectedGroupIds.length === 0 || isInviteGroupSubmitting}
               style={styles.rowButton}
             />
             <Button
@@ -531,6 +567,53 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
               variant="secondary"
               onPress={handleCloseInviteGroup}
               disabled={isInviteGroupSubmitting}
+              style={styles.rowButton}
+            />
+          </View>
+        </Card>
+      ) : null}
+
+      {/* Individual Invite User Form */}
+      {isInviteUserOpen ? (
+        <Card style={styles.formCard}>
+          <Text style={styles.formTitle}>Invite User</Text>
+          <Text style={styles.formHint}>
+            Search for and invite an individual user to this event.
+          </Text>
+          {selectedInviteUser ? (
+            <View style={styles.selectedInviteRow}>
+              <Text style={styles.selectedInviteText}>
+                {selectedInviteUser.nickname} ({selectedInviteUser.display_name})
+              </Text>
+              <TextLink
+                label="Change"
+                onPress={() => setSelectedInviteUser(null)}
+                disabled={isInviteUserSubmitting}
+              />
+            </View>
+          ) : (
+            <UserSearchPicker
+              onSelect={setSelectedInviteUser}
+              excludeEventId={eventId}
+              disabled={isInviteUserSubmitting}
+            />
+          )}
+          {inviteUserError ? <Text style={styles.errorText}>{inviteUserError}</Text> : null}
+          {inviteUserSuccess ? <Text style={styles.successText}>{inviteUserSuccess}</Text> : null}
+          <View style={styles.formButtonsRow}>
+            <Button
+              label="Send Invite"
+              variant="primary"
+              onPress={handleSendUserInvite}
+              loading={isInviteUserSubmitting}
+              disabled={!selectedInviteUser || isInviteUserSubmitting}
+              style={styles.rowButton}
+            />
+            <Button
+              label="Close"
+              variant="secondary"
+              onPress={handleCloseInviteUser}
+              disabled={isInviteUserSubmitting}
               style={styles.rowButton}
             />
           </View>
@@ -656,34 +739,6 @@ export default function EventDetailScreen({ route }: Props): React.JSX.Element {
             disabled={isEditSubmitting}
           />
 
-          <View style={styles.costCurrencyRow}>
-            <View style={styles.costFieldWrapper}>
-              <Text style={styles.fieldLabel}>Estimated Cost</Text>
-              <TextField
-                placeholder="e.g. 15.00"
-                accessibilityLabel="Estimated Cost"
-                value={editCost}
-                onChangeText={setEditCost}
-                editable={!isEditSubmitting}
-                keyboardType="decimal-pad"
-                style={styles.formInput}
-              />
-            </View>
-            <View style={styles.currencyFieldWrapper}>
-              <Text style={styles.fieldLabel}>Currency</Text>
-              <TextField
-                placeholder="USD"
-                accessibilityLabel="Currency"
-                value={editCurrency}
-                onChangeText={text => setEditCurrency(text.toUpperCase())}
-                editable={!isEditSubmitting}
-                maxLength={3}
-                autoCapitalize="characters"
-                style={styles.formInput}
-              />
-            </View>
-          </View>
-
           {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
 
           <View style={styles.formButtonsRow}>
@@ -759,15 +814,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
   },
-  costCurrencyRow: {
+  selectedInviteRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
   },
-  costFieldWrapper: {
-    flex: 2,
-  },
-  currencyFieldWrapper: {
-    flex: 1,
+  selectedInviteText: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
   },
   chipRow: {
     marginBottom: spacing.sm,

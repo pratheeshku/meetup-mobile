@@ -24,3 +24,12 @@
 
 **Suggested addition** (target: "Contract verification"): Distinguish between editable and immutable entity properties when designing edit forms. Never expose immutable fields as active or disabled form controls unless explicit requirements mandate informational display. Ensure monetary and enumerated fields are transformed into the backend's exact storage types (e.g., integer cents, normalized uppercase codes) prior to wire transmission.
 
+## 4. Multi-select transition with backwards-compatible UI primitives
+
+**What happened**: Transitioning single-select chip groups (`OptionChips`) and search pickers (`UserSearchPicker`) to multi-select required preserving existing single-choice consumer contracts across 6+ other screens. Extending `OptionChipsProps.value` to accept `T | readonly T[] | null` and checking `Array.isArray(value) ? value.includes(option.value) : option.value === value` allowed immediate multi-select highlighting without altering any other call sites.
+
+**Why it matters generally**: Shared UI form primitives are used across many features. When one feature requires multi-select, breaking component props or replacing the component with a divergent primitive introduces unnecessary churn and regression risk. Designing primitives to support scalar or collection values transparently keeps the component library unified.
+
+**Suggested addition** (target: "Design system & component reuse"): When introducing multi-selection to single-selection input components, extend prop types to union scalar and array values (`T | readonly T[] | null`) rather than creating separate multi-select components or breaking single-choice interfaces.
+
+

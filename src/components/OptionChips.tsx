@@ -16,7 +16,7 @@ export interface ChipOption<T extends string> {
 
 interface OptionChipsProps<T extends string> {
   options: ChipOption<T>[];
-  value: T | null;
+  value: T | readonly T[] | null;
   onChange: (value: T) => void;
   disabled?: boolean;
 }
@@ -30,7 +30,9 @@ export default function OptionChips<T extends string>({
   return (
     <View style={styles.row}>
       {options.map(option => {
-        const selected = option.value === value;
+        const selected = Array.isArray(value)
+          ? value.includes(option.value)
+          : option.value === value;
         return (
           <Pressable
             key={option.value}

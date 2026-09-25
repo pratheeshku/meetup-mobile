@@ -284,3 +284,21 @@ export async function inviteGroupToEvent(
   );
   return data;
 }
+
+/**
+ * Invite an individual user to an event: calls `POST /events/{id}/invite-user`.
+ * Organiser-only action. Takes `{ user_id }`.
+ */
+export async function inviteUserToEvent(
+  eventId: string,
+  userId: string,
+  options?: RequestOptions,
+): Promise<EventInvitation> {
+  const { data } = await apiClient.post<EventInvitation>(
+    `/events/${eventId}/invite-user`,
+    { user_id: userId },
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+

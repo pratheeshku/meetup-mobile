@@ -147,4 +147,36 @@ describe('invite flow', () => {
     await act(async () => pressableWithText(root, 'Send Invite').props.onPress());
     expect(texts(root)).toContain('Could not send the invite. Please try again.');
   });
+
+  it('supports selecting multiple users and invites each on submit', async () => {
+    const root = await mount();
+    act(() => pressableWithText(root, 'Invite').props.onPress());
+
+    mockSearchUsers.mockResolvedValueOnce([FOUND_USER]);
+    await search(root, 'alex');
+    act(() => pressableWithText(root, 'alexc').props.onPress());
+
+    const SECOND_USER: UserSearchResult = {
+      id: 'u-3',
+      display_name: 'Bob Builder',
+      nickname: 'bob',
+      pending: false,
+    };
+    mockSearchUsers.mockResolvedValueOnce([SECOND_USER]);
+    await search(root, 'bob');
+    act(() => pressableWithText(root, 'bob').props.onPress());
+
+    expect(texts(root)).toContain('alexc (Alex Chan)');
+    expect(texts(root)).toContain('bob (Bob Builder)');
+
+    // Remove first user
+    const removeAlex = root.findByProps({ accessibilityLabel: 'Remove alexc' });
+    act(() => removeAlex.props.onPress());
+    expect(texts(root)).not.toContain('alexc (Alex Chan)');
+    expect(texts(root)).toContain('bob (Bob Builder)');
+
+    await act(async () => pressableWithText(root, 'Send Invite').props.onPress());
+    expect(mockInviteMember).toHaveBeenCalledTimes(1);
+    expect(mockInviteMember).toHaveBeenCalledWith('group-1', 'u-3', expect.anything());
+  });
 });

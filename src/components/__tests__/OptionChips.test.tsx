@@ -25,6 +25,12 @@ describe('OptionChips', () => {
     expect(onChange).toHaveBeenCalledWith('a');
   });
 
+  it('supports multi-select array value', () => {
+    const multi = render(<OptionChips options={OPTIONS} value={['a', 'b']} onChange={jest.fn()} />);
+    expect(pressableLabelled(multi, 'Alpha').props.accessibilityState).toMatchObject({ selected: true });
+    expect(pressableLabelled(multi, 'Beta').props.accessibilityState).toMatchObject({ selected: true });
+  });
+
   it('is inert when disabled', () => {
     const root = render(<OptionChips options={OPTIONS} value={null} onChange={jest.fn()} disabled />);
     expect(pressableLabelled(root, 'Alpha').props.disabled).toBe(true);

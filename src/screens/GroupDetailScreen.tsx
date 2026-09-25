@@ -67,7 +67,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [isInviteFormOpen, setIsInviteFormOpen] = useState(false);
-  const [selectedInviteUser, setSelectedInviteUser] = useState<UserSearchResult | null>(null);
+  const [selectedInviteUsers, setSelectedInviteUsers] = useState<UserSearchResult[]>([]);
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
@@ -101,18 +101,31 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 
   const handleOpenInviteForm = (): void => {
     setInviteError(null);
-    setSelectedInviteUser(null);
+    setSelectedInviteUsers([]);
     setIsInviteFormOpen(true);
   };
 
   const handleCancelInvite = (): void => {
     setIsInviteFormOpen(false);
     setInviteError(null);
-    setSelectedInviteUser(null);
+    setSelectedInviteUsers([]);
+  };
+
+  const handleSelectUser = (selected: UserSearchResult): void => {
+    setSelectedInviteUsers(prev => {
+      if (prev.some(u => u.id === selected.id)) {
+        return prev;
+      }
+      return [...prev, selected];
+    });
+  };
+
+  const handleRemoveUser = (userId: string): void => {
+    setSelectedInviteUsers(prev => prev.filter(u => u.id !== userId));
   };
 
   const handleSendInvite = async (): Promise<void> => {
-    if (!selectedInviteUser) {
+    if (selectedInviteUsers.length === 0) {
       setInviteError('Search for and choose a user to invite.');
       return;
     }
@@ -120,11 +133,13 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
     setIsInviting(true);
     try {
       await withCorrelationId(async correlationId => {
-        await inviteMember(groupId, selectedInviteUser.id, { correlationId });
+        for (const invitee of selectedInviteUsers) {
+          await inviteMember(groupId, invitee.id, { correlationId });
+        }
         setGroup(await getGroup(groupId, { correlationId }));
       });
       setIsInviteFormOpen(false);
-      setSelectedInviteUser(null);
+      setSelectedInviteUsers([]);
     } catch {
       setInviteError('Could not send the invite. Please try again.');
     } finally {
@@ -256,24 +271,24 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 
         {isInviteFormOpen ? (
           <View style={styles.editRow}>
-            {selectedInviteUser ? (
-              <View style={styles.selectedInviteRow}>
+            {selectedInviteUsers.map(invitee => (
+              <View key={invitee.id} style={styles.selectedInviteRow}>
                 <Text style={styles.selectedInviteText}>
-                  {selectedInviteUser.nickname} ({selectedInviteUser.display_name})
+                  {invitee.nickname} ({invitee.display_name})
                 </Text>
                 <TextLink
-                  label="Change"
-                  onPress={() => setSelectedInviteUser(null)}
+                  label={selectedInviteUsers.length === 1 ? 'Change' : 'Remove'}
+                  accessibilityLabel={`Remove ${invitee.nickname}`}
+                  onPress={() => handleRemoveUser(invitee.id)}
                   disabled={isInviting}
                 />
               </View>
-            ) : (
-              <UserSearchPicker
-                onSelect={setSelectedInviteUser}
-                excludeGroupId={groupId}
-                disabled={isInviting}
-              />
-            )}
+            ))}
+            <UserSearchPicker
+              onSelect={handleSelectUser}
+              excludeGroupId={groupId}
+              disabled={isInviting}
+            />
             {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
             <View style={styles.editActionsRow}>
               <Button
@@ -281,7 +296,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
                 size="sm"
                 onPress={handleSendInvite}
                 loading={isInviting}
-                disabled={!selectedInviteUser}
+                disabled={selectedInviteUsers.length === 0}
                 style={styles.actionSpacing}
               />
               <Button
