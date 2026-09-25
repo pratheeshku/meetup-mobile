@@ -1,15 +1,5 @@
 /**
- * Shared display labels for the app's fixed backend enums (BUG-M02).
- *
- * `skill_level` and `visibility` have no backend display field at all, so
- * they need real label maps. Event and Tournament visibility are kept as
- * TWO separate maps, not one shared lookup keyed on a single enum: their
- * literal values genuinely differ (`invite_only` vs `invite` for the same
- * "private" concept) — collapsing them into one map is the exact bug this
- * ticket is fixing (a tournament's `invite` would silently miss a lookup
- * keyed only on the event enum and render blank again).
- *
- * `sport`, by contrast, DOES have a backend display field — but only on
+ * `sport` DOES have a backend display field — but only on
  * `GET /admin/sports/public` (`Sport.display_name`, distinct from the raw
  * `name`/slug), not on the `Event`/`Tournament` responses that embed a bare
  * `sport` string with no paired display value of their own. `CreateGameScreen`
@@ -21,33 +11,17 @@
  * fetched once and cached module-wide (not per-render, not per-screen) —
  * reusing `getSports()` (`api/sports.ts`) rather than duplicating its
  * fetch logic, per this task's explicit instruction.
+ *
+ * This file previously (BUG-M02) also carried hardcoded `skill_level` and
+ * `*_visibility` label maps. Those had no backend display field at the
+ * time; they've since been replaced by the shared `GET /api/labels`
+ * endpoint — see `src/labels/LabelsContext.tsx` (`useLabels()`/`getLabel()`)
+ * and `src/api/labels.ts`. `sport`'s own display field (`display_name`,
+ * above) is unaffected — a separate mechanism, out of scope for that fix.
  */
 import { useEffect, useState } from 'react';
 
 import { getSports } from '../api/sports';
-import type { EventSkillLevel, EventVisibility } from '../types/event';
-import type { TournamentVisibility } from '../types/tournament';
-
-export const SKILL_LEVEL_LABELS: Record<EventSkillLevel, string> = {
-  all_levels: 'All Levels',
-  beginner: 'Beginner',
-  intermediate: 'Intermediate',
-  expert: 'Expert',
-};
-
-/** `EventVisibility`'s third value is `invite_only` — see `types/event.ts`. */
-export const EVENT_VISIBILITY_LABELS: Record<EventVisibility, string> = {
-  public: 'Public',
-  invite_only: 'Private',
-  group: 'Group',
-};
-
-/** `TournamentVisibility`'s third value is `invite`, NOT `invite_only` — see `types/tournament.ts`. */
-export const TOURNAMENT_VISIBILITY_LABELS: Record<TournamentVisibility, string> = {
-  public: 'Public',
-  invite: 'Private',
-  group: 'Group Only',
-};
 
 // Module-wide cache: `getSports()` is fetched at most once across the whole
 // app's lifetime (per process), not once per screen/render. A slower earlier

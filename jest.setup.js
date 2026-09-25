@@ -71,8 +71,9 @@ jest.mock('@react-native-firebase/messaging', () => ({
 // @react-native-async-storage/async-storage v3 wraps a native module with no
 // Jest-environment equivalent. Its own in-memory mock (same package, `./jest`
 // export) is registered here, per this file's centralised-native-mock
-// convention. Used by src/notifications/pushRegistration.ts (rationale-shown
-// flag) — the only AsyncStorage consumer; never used for tokens (R-014).
+// convention. Consumers: src/notifications/pushRegistration.ts (rationale
+// -shown flag) and src/labels/LabelsContext.tsx (cached GET /api/labels
+// response) — never used for tokens (R-014).
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest'),
 );

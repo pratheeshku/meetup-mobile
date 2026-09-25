@@ -31,6 +31,7 @@ import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
 import type { ChipOption } from '../components/OptionChips';
 import TextField from '../components/TextField';
+import { getLabel, useLabels } from '../labels/LabelsContext';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Sport } from '../types/sport';
 import type { TeamVisibility } from '../types/team';
@@ -46,21 +47,10 @@ const MODE_OPTIONS: ChipOption<GroupKind>[] = [
   { value: 'team', label: '🛡️ Tournament Team' },
 ];
 
-/**
- * Team visibility — `public` or `private` only.
- *
- * ⚠️ Distinct enum from Event visibility (public/invite_only/group)
- * and Tournament visibility (public/invite/group). This is its own key —
- * not aliased to either existing visibility lookup.
- */
-const TEAM_VISIBILITY_OPTIONS: ChipOption<TeamVisibility>[] = [
-  { value: 'public', label: 'Public' },
-  { value: 'private', label: 'Private' },
-];
-
 const NAME_MAX_LENGTH = 100;
 
 export default function CreateGroupScreen({ navigation }: Props): React.JSX.Element {
+  const labels = useLabels();
   const [mode, setMode] = useState<GroupKind>('group');
 
   // Sports loading — only needed for Tournament Team mode, but loaded
@@ -167,6 +157,20 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
     value: item.name,
     label: item.display_name,
   }));
+
+  /**
+   * Team visibility — `public` or `private` only.
+   *
+   * ⚠️ Distinct enum from Event visibility (public/invite_only/group)
+   * and Tournament visibility (public/invite/group). Words sourced from
+   * `GET /api/labels` (`team_visibility.*`) — its own key prefix, not
+   * aliased to either existing visibility lookup, and never
+   * `group_visibility` (the real backend field is `teams.visibility`).
+   */
+  const TEAM_VISIBILITY_OPTIONS: ChipOption<TeamVisibility>[] = [
+    { value: 'public', label: getLabel(labels, 'team_visibility.public') },
+    { value: 'private', label: getLabel(labels, 'team_visibility.private') },
+  ];
 
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">

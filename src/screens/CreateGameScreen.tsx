@@ -53,12 +53,8 @@ import type {
   TournamentParticipationMode,
   TournamentVisibility,
 } from '../types/tournament';
+import { getLabel, useLabels } from '../labels/LabelsContext';
 import { getApiErrorMessage } from '../utils/apiError';
-import {
-  EVENT_VISIBILITY_LABELS,
-  SKILL_LEVEL_LABELS,
-  TOURNAMENT_VISIBILITY_LABELS,
-} from '../utils/labels';
 import {
   applyQuickDate,
   LOCAL_DATE_PLACEHOLDER,
@@ -81,39 +77,6 @@ const MODE_OPTIONS: ChipOption<GameKind>[] = [
   { value: 'tournament', label: '🏆 Tournament' },
 ];
 
-/**
- * `EventCreate.visibility` (`events/schemas.py`, `validate_visibility`):
- * enforced enum. Labels match web's `event-visibility` `<select>`; words
- * sourced from the shared `EVENT_VISIBILITY_LABELS` (BUG-M02) so this
- * picker and every read-only display (e.g. `EventCard`) stay in sync.
- */
-const CASUAL_VISIBILITY_OPTIONS: ChipOption<EventVisibility>[] = [
-  { value: 'public', label: `🌍 ${EVENT_VISIBILITY_LABELS.public}` },
-  { value: 'invite_only', label: `🔒 ${EVENT_VISIBILITY_LABELS.invite_only}` },
-  { value: 'group', label: `👥 ${EVENT_VISIBILITY_LABELS.group}` },
-];
-
-/** `EventCreate.skill_level_requirement` (`validate_skill`): enforced enum. */
-const SKILL_LEVEL_OPTIONS: ChipOption<EventSkillLevel>[] = [
-  { value: 'all_levels', label: SKILL_LEVEL_LABELS.all_levels },
-  { value: 'beginner', label: SKILL_LEVEL_LABELS.beginner },
-  { value: 'intermediate', label: SKILL_LEVEL_LABELS.intermediate },
-  { value: 'expert', label: SKILL_LEVEL_LABELS.expert },
-];
-
-/**
- * `TournamentCreate.visibility` — documented values, distinct literal
- * (`invite`, not Event's `invite_only`) — see `types/tournament.ts`. Words
- * sourced from the shared `TOURNAMENT_VISIBILITY_LABELS` (BUG-M02), kept
- * as its own map since the two enums' literals (and this one's "Group
- * Only" vs Event's "Group") genuinely differ.
- */
-const TOURNAMENT_VISIBILITY_OPTIONS: ChipOption<TournamentVisibility>[] = [
-  { value: 'public', label: TOURNAMENT_VISIBILITY_LABELS.public },
-  { value: 'invite', label: TOURNAMENT_VISIBILITY_LABELS.invite },
-  { value: 'group', label: TOURNAMENT_VISIBILITY_LABELS.group },
-];
-
 const PARTICIPATION_OPTIONS: ChipOption<TournamentParticipationMode>[] = [
   { value: 'individual', label: 'Individual' },
   { value: 'team', label: 'Team' },
@@ -129,6 +92,7 @@ const TITLE_MAX_LENGTH = 150;
 const DEFAULT_TOURNAMENT_CAPACITY = '8';
 
 export default function CreateGameScreen({ navigation }: Props): React.JSX.Element {
+  const labels = useLabels();
   const [mode, setMode] = useState<GameKind>('game');
 
   const [sports, setSports] = useState<Sport[]>([]);
@@ -357,6 +321,41 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     value: item.id,
     label: item.name,
   }));
+
+  /**
+   * `EventCreate.visibility` (`events/schemas.py`, `validate_visibility`):
+   * enforced enum. Labels match web's `event-visibility` `<select>`; words
+   * sourced from `GET /api/labels` (`event_visibility.*`, replacing
+   * BUG-M02's hardcoded map) so this picker and every read-only display
+   * (e.g. `EventCard`) stay in sync with the backend's own source of truth.
+   */
+  const CASUAL_VISIBILITY_OPTIONS: ChipOption<EventVisibility>[] = [
+    { value: 'public', label: `🌍 ${getLabel(labels, 'event_visibility.public')}` },
+    { value: 'invite_only', label: `🔒 ${getLabel(labels, 'event_visibility.invite_only')}` },
+    { value: 'group', label: `👥 ${getLabel(labels, 'event_visibility.group')}` },
+  ];
+
+  /** `EventCreate.skill_level_requirement` (`validate_skill`): enforced enum. */
+  const SKILL_LEVEL_OPTIONS: ChipOption<EventSkillLevel>[] = [
+    { value: 'all_levels', label: getLabel(labels, 'skill_level.all_levels') },
+    { value: 'beginner', label: getLabel(labels, 'skill_level.beginner') },
+    { value: 'intermediate', label: getLabel(labels, 'skill_level.intermediate') },
+    { value: 'expert', label: getLabel(labels, 'skill_level.expert') },
+  ];
+
+  /**
+   * `TournamentCreate.visibility` — documented values, distinct literal
+   * (`invite`, not Event's `invite_only`) — see `types/tournament.ts`. Words
+   * sourced from `GET /api/labels` (`tournament_visibility.*`), a distinct
+   * key prefix from Event's `event_visibility.*` since the two enums'
+   * literals (and this one's "Group Only" vs Event's "Group") genuinely
+   * differ — never cross-wired.
+   */
+  const TOURNAMENT_VISIBILITY_OPTIONS: ChipOption<TournamentVisibility>[] = [
+    { value: 'public', label: getLabel(labels, 'tournament_visibility.public') },
+    { value: 'invite', label: getLabel(labels, 'tournament_visibility.invite') },
+    { value: 'group', label: getLabel(labels, 'tournament_visibility.group') },
+  ];
 
   const renderGroupPicker = (
     value: string | null,
