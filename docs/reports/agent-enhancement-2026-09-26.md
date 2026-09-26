@@ -23,3 +23,11 @@
 **Why it matters generally**: Codebases adhering to strict contract discipline often have tests asserting that blocked, stubbed, or unsupported fields remain empty/null to prevent regression. When unblocking a field per an approved addendum, failing to inspect existing contract regression tests for that specific field leads to predictable test failures late in the cycle.
 
 **Suggested addition** (target: "Gate 3 — Task confirmation"): When unblocking a previously blocked field or contract finding, search the test suite for existing regression assertions enforcing the blocked state (e.g., `toBeNull()`, `toBeUndefined()`) and include their updates in the planned change set.
+
+## 4. Empirical verification of native SDK capabilities before assuming frontend workarounds
+
+**What happened**: When tasked with adding crop/zoom/flip via `react-native-image-crop-picker`, investigation of the underlying native controllers (`TOCropViewController` on iOS and `uCrop` on Android) confirmed that both expose crop (pinch-zoom, reposition) and rotate (90-degree buttons, angle dial), but neither natively exposes horizontal or vertical flip. Verifying this directly against the native library source prevented pulling in heavyweight dependencies (`react-native-gesture-handler`, `react-native-reanimated`, plus a transform library) and enabled clean documentation for the architect's design write-back under Propose & Proceed.
+
+**Why it matters generally**: Cross-platform wrapper libraries wrap disparate native UI controllers that frequently have feature parity gaps or omit specific transformations (like mirroring). Rather than guessing or silently pulling in heavyweight custom gesture/transform engines to emulate the missing feature in JS, inspecting the native controllers' exposed APIs and source allows the developer to cleanly isolate what is natively supported and record the limitation for architect ratification.
+
+**Suggested addition** (target: "Gate 2 — Dependency audit / Fidelity rules"): When integrating native third-party UI modules for editing or media manipulation, inspect the underlying native platform libraries (iOS Pod / Android AAR/Gradle dependencies) to confirm what actions (crop, rotate, flip, filter) are natively supported by the platform controllers before designing or pulling in custom JavaScript fallback pipelines.
