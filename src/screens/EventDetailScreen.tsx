@@ -10,7 +10,7 @@
  *   3. Card 2: Action Buttons Card (Edit Game, Invite Group, Invite Individual,
  *      Cancel Event for organiser; Join / Leave for non-organiser)
  *   4. Card 3: About this game Card (description)
- *   5. Card 4: Skill level & Waitlist Card (Skill level, Waitlist status)
+ *   5. Card 4: Event Details Card (Visibility, Skill level, Waitlist status, Cost)
  *   6. Card 5: Participants Card (list with avatar circles, names, roles, count)
  *
  * Organiser forms (Cancel, Invite Group, Invite Individual, Edit) render
@@ -34,6 +34,8 @@ import { getMyGroups } from '../api/groups';
 import { getSports } from '../api/sports';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
+import { useLabels } from '../labels/LabelsContext';
+import { getEventVisibilityLabel } from '../utils/labels';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import DateTimePickerField from '../components/DateTimePickerField';
@@ -87,6 +89,7 @@ function formatSkillLevel(level?: string | null): string {
 export default function EventDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const { eventId } = route.params;
   const { user } = useAuth();
+  const labels = useLabels();
 
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
@@ -926,26 +929,37 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         <Text style={styles.descriptionText}>
           {event.description || 'Casual doubles, all skill levels welcome.'}
         </Text>
-        {event.estimated_cost_cents != null ? (
-          <Text style={styles.costText}>
-            Cost: ${(event.estimated_cost_cents / 100).toFixed(2)}
-            {event.estimated_cost_currency ? ` ${event.estimated_cost_currency}` : ''}
-          </Text>
-        ) : event.cost != null ? (
-          <Text style={styles.costText}>Cost: {event.cost}</Text>
-        ) : null}
       </Card>
 
-      {/* CARD 4: Skill level & Waitlist Card */}
+      {/* CARD 4: Event Details Card */}
       <Card style={styles.card}>
+        <Text style={styles.cardHeading}>Event Details</Text>
+        <View style={styles.metaKeyValRow}>
+          <Text style={styles.metaKey}>Visibility</Text>
+          <Text style={styles.metaVal}>{getEventVisibilityLabel(event.visibility, labels)}</Text>
+        </View>
         <View style={styles.metaKeyValRow}>
           <Text style={styles.metaKey}>Skill level</Text>
           <Text style={styles.metaVal}>{formatSkillLevel(event.skill_level_requirement)}</Text>
         </View>
-        <View style={[styles.metaKeyValRow, styles.metaKeyValRowBottom]}>
+        <View style={styles.metaKeyValRow}>
           <Text style={styles.metaKey}>Waitlist</Text>
           <Text style={styles.metaVal}>{event.allow_waitlist !== false ? 'Open' : 'Closed'}</Text>
         </View>
+        {event.estimated_cost_cents != null ? (
+          <View style={styles.metaKeyValRow}>
+            <Text style={styles.metaKey}>Cost</Text>
+            <Text style={styles.metaVal}>
+              ${(event.estimated_cost_cents / 100).toFixed(2)}
+              {event.estimated_cost_currency ? ` ${event.estimated_cost_currency}` : ''}
+            </Text>
+          </View>
+        ) : event.cost != null ? (
+          <View style={styles.metaKeyValRow}>
+            <Text style={styles.metaKey}>Cost</Text>
+            <Text style={styles.metaVal}>{event.cost}</Text>
+          </View>
+        ) : null}
       </Card>
 
       {/* CARD 5: Participants Card */}
@@ -1167,19 +1181,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
   },
-  costText: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: spacing.sm,
-  },
   metaKeyValRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: spacing.xs,
-  },
-  metaKeyValRowBottom: {
-    marginTop: spacing.xs,
   },
   metaKey: {
     ...typography.body,

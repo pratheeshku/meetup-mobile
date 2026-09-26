@@ -55,6 +55,7 @@ import type {
 } from '../types/tournament';
 import { getLabel, useLabels } from '../labels/LabelsContext';
 import { getApiErrorMessage } from '../utils/apiError';
+import { getEventVisibilityLabel } from '../utils/labels';
 import {
   applyQuickDate,
   LOCAL_DATE_PLACEHOLDER,
@@ -330,9 +331,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
    * (e.g. `EventCard`) stay in sync with the backend's own source of truth.
    */
   const CASUAL_VISIBILITY_OPTIONS: ChipOption<EventVisibility>[] = [
-    { value: 'public', label: `🌍 ${getLabel(labels, 'event_visibility.public')}` },
-    { value: 'invite_only', label: `🔒 ${getLabel(labels, 'event_visibility.invite_only')}` },
-    { value: 'group', label: `👥 ${getLabel(labels, 'event_visibility.group')}` },
+    { value: 'public', label: getEventVisibilityLabel('public', labels) },
+    { value: 'invite_only', label: getEventVisibilityLabel('invite_only', labels) },
+    { value: 'group', label: getEventVisibilityLabel('group', labels) },
   ];
 
   /** `EventCreate.skill_level_requirement` (`validate_skill`): enforced enum. */
