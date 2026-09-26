@@ -15,7 +15,7 @@ This implementation delivers mobile UI enhancements and navigation fixes:
    - Built reusable `GroupCard` component as a sibling to `EventCard`, sharing the same Card and theme tokens (`colors`, `radius`, `spacing`, `typography`, `shadows.card`).
    - Row 1: Role pill (`Owner`, `Admin`, `Member`) using rounded/colored-bg/white-text pill styling matching EventCard's sport pill (`ROLE_BADGE_VARIANT` mapping with `colors.primary` for primary roles and `colors.textSecondary` for neutral roles).
    - Row 2: Group name formatted with `h3`/700 bold typography.
-   - Row 3: Description single line with `colors.textMuted`, falling back cleanly to blank if empty or missing.
+   - Row 3: Description single line with `colors.textMuted`, conditionally rendered matching EventCard's pattern (`{group.description ? <Text ...>{group.description}</Text> : null}`) so no empty gap is left when empty.
    - Row 4: Member count (`{member_count} members` / `1 member`) on the left, and `View →` action link on the right (`colors.accent`, 700 bold).
    - No progress bar rendered (groups have no capacity/fill metric).
    - Replaced inline Card + Badge block in `GroupsScreen.tsx` with `<GroupCard group={item} onPress={...} />`.

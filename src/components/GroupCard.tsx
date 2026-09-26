@@ -67,9 +67,11 @@ export default function GroupCard({ group, onPress }: GroupCardProps): React.JSX
       </Text>
 
       {/* Row 3: Description (1 line, textMuted; if empty, fall back to blank) */}
-      <Text style={styles.description} numberOfLines={1}>
-        {group.description || ''}
-      </Text>
+      {group.description ? (
+        <Text style={styles.description} numberOfLines={1}>
+          {group.description}
+        </Text>
+      ) : null}
 
       {/* Row 4: Member count & Action link */}
       <View style={styles.bottomRow}>

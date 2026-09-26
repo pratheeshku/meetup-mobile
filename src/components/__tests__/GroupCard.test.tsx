@@ -147,8 +147,12 @@ describe('GroupCard', () => {
 
     it('falls back to blank when description is empty or missing', () => {
       const renderer = renderCard({ description: '' });
-      const t = texts(renderer).map(textOf);
-      expect(t).toContain('');
+      const descNode = renderer.root.findAll(
+        node =>
+          (node.type as unknown) === 'Text' &&
+          StyleSheet.flatten(node.props.style)?.color === colors.textMuted,
+      );
+      expect(descNode.length).toBe(0);
     });
   });
 
