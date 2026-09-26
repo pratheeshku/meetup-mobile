@@ -1,12 +1,13 @@
 /**
- * Locally-displayed notifications for `group_event_created` and
- * `event_changed` (DES-MEETUP-MOBILE.md §4.8; mobile notify-kit task Part 3).
+ * Locally-displayed notifications for `group_event_created`, `event_changed`,
+ * and `event_reminder` (DES-MEETUP-MOBILE.md §4.8; mobile notify-kit task Part 3;
+ * DES-MEETUP-ADDENDUM-event-reminder.md v1.1).
  *
- * Both types are delivered data-only (no FCM `notification` block) and built
+ * All types are delivered data-only (no FCM `notification` block) and built
  * locally with `react-native-notify-kit`, for the same reason
  * `event_participant_added`/`event_participant_removed` are
  * (`participantHandler.ts`, built earlier): a native FCM `notification`
- * block cannot carry custom-labelled action buttons, and both these types
+ * block cannot carry custom-labelled action buttons, and these types
  * need one.
  *
  * Proposed Assumption: `event_changed` was previously one of the 12
@@ -24,7 +25,7 @@
  * corresponding backend change ships.
  *
  * Shapes (per task brief, updated same-day per the architect's confirmed
- * design: both types now use a primary action + OK, differing only in the
+ * design: types use a primary action + OK, differing only in the
  * primary action's label/id):
  * - `group_event_created`: Join + OK. Pressing Join, or tapping the
  *   notification body, both navigate to Event Detail — the same target
@@ -35,13 +36,10 @@
  *   background execution unconfirmed). The existing Event Detail RSVP
  *   button is untouched; joining still happens there. OK dismisses only,
  *   same as `event_changed`'s OK — it never opens the app.
- * - `event_changed`: View + OK, the identical shape `participantHandler.ts`
- *   already uses for the two participant types — View (or a body tap)
- *   navigates to Event Detail and clears the tray entry; OK dismisses only.
- *   Neither performs an API call. The body text (what changed — e.g. old →
- *   new venue/time) is pre-built by the backend, same as every other
- *   locally-displayed type; this file only ever displays `data.title`/
- *   `data.body` verbatim.
+ * - `event_changed` and `event_reminder`: View + OK, the identical shape
+ *   `participantHandler.ts` already uses for the two participant types — View
+ *   (or a body tap) navigates to Event Detail and clears the tray entry; OK
+ *   dismisses only. Neither performs an API call.
  *
  * `group_event_created`'s body: the backend is expected to enrich it into a
  * multi-line string (sport, organizer as "display_name (nickname)", date,
@@ -83,10 +81,11 @@ import {
 } from './notificationRouting';
 import type { NotificationType, PushNotificationPayload } from '../types/notification';
 
-/** The two notification types delivered data-only and rendered locally by this file. */
+/** The notification types delivered data-only and rendered locally by this file. */
 export const EVENT_NOTIFICATION_TYPES = [
   'group_event_created',
   'event_changed',
+  'event_reminder',
 ] as const satisfies readonly NotificationType[];
 
 export type EventHandlerNotificationType = (typeof EVENT_NOTIFICATION_TYPES)[number];
@@ -108,8 +107,8 @@ const DEFAULT_PRESS_ID = 'default';
  * `title`/`body` are pre-built by the server (`body` may contain `\n`).
  *
  * `group_event_created` gets Join + OK; every other type handled by this
- * file (`event_changed`) gets View + OK — identical shape, differing only
- * in the primary action's label/id, matching `participantHandler.ts`'s
+ * file (`event_changed`, `event_reminder`) gets View + OK — identical shape,
+ * differing only in the primary action's label/id, matching `participantHandler.ts`'s
  * `displayParticipantNotification` for the OK half.
  *
  * The whole `data` map is attached to the notification so the press

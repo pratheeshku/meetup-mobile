@@ -56,10 +56,10 @@ export type NotificationTarget =
 /**
  * Resolves a notification type + entity id to a concrete navigation
  * target. Exhaustive over `NotificationType` (the 12 from §4.8, the two
- * participant types, plus `group_event_created` — 15 total) — the `never`
- * fallthrough in `default` makes an unhandled type a compile error, not a
- * silent no-op, satisfying the task brief's "no unhandled types" rule at
- * the type-checker level.
+ * participant types, `group_event_created`, plus `event_reminder` — 16 total) —
+ * the `never` fallthrough in `default` makes an unhandled type a compile
+ * error, not a silent no-op, satisfying the task brief's "no unhandled types"
+ * rule at the type-checker level.
  */
 export function resolveNotificationTarget(
   notificationType: NotificationType,
@@ -69,15 +69,17 @@ export function resolveNotificationTarget(
     case 'global':
       return { tab: 'Home', screen: 'EventsList' };
 
-    // `group_event_created` (mobile notify-kit task, Part 3) routes exactly
-    // like `event_invite` — same target, same mechanism, no blank-id guard
-    // (unlike event_participant_added/removed below). entity_id is the
-    // event id per the task brief; unverified against a live payload.
+    // `group_event_created` (mobile notify-kit task, Part 3) and `event_reminder`
+    // (DES-MEETUP-ADDENDUM-event-reminder.md v1.1) route exactly like `event_invite` —
+    // same target, same mechanism, no blank-id guard (unlike
+    // event_participant_added/removed below). entity_id assumed = event id,
+    // not verified against a live backend payload.
     case 'event_invite':
     case 'event_changed':
     case 'event_cancelled':
     case 'waitlist_promoted':
     case 'group_event_created':
+    case 'event_reminder':
       return {
         tab: 'Home',
         screen: 'EventDetail',

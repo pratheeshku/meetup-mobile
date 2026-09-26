@@ -52,6 +52,7 @@ describe.each([
   ['event_participant_removed', 'You were removed', 'Sunday football'],
   ['group_event_created', 'New event in your group', 'Sunday football, 6pm, Central Park'],
   ['event_changed', 'Event updated', 'Venue changed: Central Park -> Riverside Courts'],
+  ['event_reminder', 'Event reminder', 'Match starts in 1 hour'],
 ])('%s', (type, title, body) => {
   it('displays a local notification with the payload title, body and data — not the banner', () => {
     deliver({

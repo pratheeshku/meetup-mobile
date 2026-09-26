@@ -44,6 +44,13 @@ const EVENT_CHANGED_DATA = {
   body: 'Venue changed: Central Park -> Riverside Courts',
 };
 
+const EVENT_REMINDER_DATA = {
+  notification_type: 'event_reminder',
+  entity_id: 'evt-42',
+  title: 'Event reminder',
+  body: 'Sunday football starts in 1 hour',
+};
+
 function makeEvent(
   type: EventType,
   pressActionId: string | undefined,
@@ -94,6 +101,23 @@ describe('displayEventNotification', () => {
 
   it('calls notifee.displayNotification with two actions (View, OK) for event_changed — same shape as participantHandler', async () => {
     await displayEventNotification(EVENT_CHANGED_DATA);
+
+    const notification = mockDisplayNotification.mock.calls[0][0];
+    expect(notification.android.actions).toHaveLength(2);
+    expect(notification.android.actions.map((a: { title: string }) => a.title)).toEqual([
+      'View',
+      'OK',
+    ]);
+    expect(
+      notification.android.actions.map((a: { pressAction: { id: string } }) => a.pressAction.id),
+    ).toEqual(['view', 'ok']);
+    const [view, ok] = notification.android.actions;
+    expect(view.pressAction.launchActivity).toBe('default');
+    expect(ok.pressAction).not.toHaveProperty('launchActivity');
+  });
+
+  it('calls notifee.displayNotification with two actions (View, OK) for event_reminder — same shape as event_changed', async () => {
+    await displayEventNotification(EVENT_REMINDER_DATA);
 
     const notification = mockDisplayNotification.mock.calls[0][0];
     expect(notification.android.actions).toHaveLength(2);
@@ -220,6 +244,27 @@ describe('registerEventBackgroundHandler', () => {
     expect(navigateSpy).not.toHaveBeenCalled();
   });
 
+  it('navigates to EventDetailScreen on a View press for event_reminder', async () => {
+    const handler = registerAndGetHandler();
+
+    await handler(makeEvent(EventType.ACTION_PRESS, 'view', EVENT_REMINDER_DATA));
+
+    expect(navigateSpy).toHaveBeenCalledWith('Home', {
+      screen: 'EventDetail',
+      params: { eventId: 'evt-42' },
+    });
+  });
+
+  it('cancels the notification on an OK press (event_reminder) and makes no navigation (negative)', async () => {
+    const handler = registerAndGetHandler();
+
+    await handler(makeEvent(EventType.ACTION_PRESS, 'ok', EVENT_REMINDER_DATA));
+
+    expect(mockCancelNotification).toHaveBeenCalledTimes(1);
+    expect(mockCancelNotification).toHaveBeenCalledWith('notif-1');
+    expect(navigateSpy).not.toHaveBeenCalled();
+  });
+
   it('cancels the notification on DISMISSED and makes no navigation (negative)', async () => {
     const handler = registerAndGetHandler();
 
@@ -312,6 +357,20 @@ describe('getInitialEventNotification (quit-state launch)', () => {
     });
   });
 
+  it('returns the payload when the app was launched by pressing View (event_reminder)', async () => {
+    mockGetInitialNotification.mockResolvedValueOnce({
+      notification: { id: 'n', title: 'Event reminder', body: 'b', data: EVENT_REMINDER_DATA },
+      pressAction: { id: 'view' },
+    });
+
+    await expect(getInitialEventNotification()).resolves.toEqual({
+      notification_type: 'event_reminder',
+      entity_id: 'evt-42',
+      title: 'Event reminder',
+      body: 'b',
+    });
+  });
+
   it('returns the payload when the app was launched by a body tap', async () => {
     mockGetInitialNotification.mockResolvedValueOnce({
       notification: { id: 'n', data: GROUP_EVENT_DATA },
@@ -348,6 +407,15 @@ describe('getInitialEventNotification (quit-state launch)', () => {
     await expect(getInitialEventNotification()).resolves.toBeNull();
   });
 
+  it('returns null when the initial press was the OK button on event_reminder (negative)', async () => {
+    mockGetInitialNotification.mockResolvedValueOnce({
+      notification: { id: 'n', data: EVENT_REMINDER_DATA },
+      pressAction: { id: 'ok' },
+    });
+
+    await expect(getInitialEventNotification()).resolves.toBeNull();
+  });
+
   it('returns null for a notification not handled by this file (negative)', async () => {
     mockGetInitialNotification.mockResolvedValueOnce({
       notification: { id: 'n', data: { notification_type: 'group_invite', entity_id: 'g' } },
@@ -359,7 +427,7 @@ describe('getInitialEventNotification (quit-state launch)', () => {
 });
 
 describe('isEventNotificationType', () => {
-  it.each(['group_event_created', 'event_changed'])('accepts %s', type => {
+  it.each(['group_event_created', 'event_changed', 'event_reminder'])('accepts %s', type => {
     expect(isEventNotificationType(type)).toBe(true);
   });
 

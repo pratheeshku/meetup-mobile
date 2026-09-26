@@ -17,12 +17,12 @@ import {
 const PARTICIPANT_TYPES = ['event_participant_added', 'event_participant_removed'] as const;
 
 describe('type list', () => {
-  it('contains both participant types and group_event_created, alongside the original 12 (15 total, no duplicates)', () => {
+  it('contains both participant types, group_event_created, and event_reminder, alongside the original 12 (16 total, no duplicates)', () => {
     expect(NOTIFICATION_TYPES).toEqual(
-      expect.arrayContaining([...PARTICIPANT_TYPES, 'group_event_created']),
+      expect.arrayContaining([...PARTICIPANT_TYPES, 'group_event_created', 'event_reminder']),
     );
-    expect(NOTIFICATION_TYPES).toHaveLength(15);
-    expect(new Set(NOTIFICATION_TYPES).size).toBe(15);
+    expect(NOTIFICATION_TYPES).toHaveLength(16);
+    expect(new Set(NOTIFICATION_TYPES).size).toBe(16);
   });
 
   it('resolves every listed type without throwing (list and switch cannot drift)', () => {
@@ -69,6 +69,33 @@ describe('resolveNotificationTarget(group_event_created)', () => {
 
   it('does NOT fall back to the events list for a blank entity id (unlike the participant types)', () => {
     expect(resolveNotificationTarget('group_event_created', '')).toEqual({
+      tab: 'Home',
+      screen: 'EventDetail',
+      params: { eventId: '' },
+    });
+  });
+});
+
+describe('resolveNotificationTarget(event_reminder)', () => {
+  it('opens Event Detail for the entity id', () => {
+    expect(resolveNotificationTarget('event_reminder', 'evt-42')).toEqual({
+      tab: 'Home',
+      screen: 'EventDetail',
+      params: { eventId: 'evt-42' },
+    });
+  });
+
+  it('routes exactly like event_changed and event_invite', () => {
+    expect(resolveNotificationTarget('event_reminder', 'evt-42')).toEqual(
+      resolveNotificationTarget('event_changed', 'evt-42'),
+    );
+    expect(resolveNotificationTarget('event_reminder', 'evt-42')).toEqual(
+      resolveNotificationTarget('event_invite', 'evt-42'),
+    );
+  });
+
+  it('does NOT fall back to the events list for a blank entity id (unlike the participant types)', () => {
+    expect(resolveNotificationTarget('event_reminder', '')).toEqual({
       tab: 'Home',
       screen: 'EventDetail',
       params: { eventId: '' },

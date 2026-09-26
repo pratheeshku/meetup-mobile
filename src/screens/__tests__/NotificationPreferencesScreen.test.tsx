@@ -33,9 +33,10 @@ it('shows a row for every known type, with the two participant labels', async ()
   const labels = texts(root);
   expect(labels).toContain('Added to an event');
   expect(labels).toContain('Removed from an event');
+  expect(labels).toContain('Event reminders');
   const switches = root.findAllByType(Switch);
   expect(switches).toHaveLength(NOTIFICATION_TYPES.length);
-  expect(NOTIFICATION_TYPES.length).toBe(15);
+  expect(NOTIFICATION_TYPES.length).toBe(16);
 
   // Unlisted types default to on; a listed one keeps the server value.
   const added = NOTIFICATION_TYPES.indexOf('event_participant_added');
@@ -44,7 +45,7 @@ it('shows a row for every known type, with the two participant labels', async ()
   expect(switches[changed].props.value).toBe(false);
 });
 
-it.each(['event_participant_added', 'event_participant_removed'] as const)(
+it.each(['event_participant_added', 'event_participant_removed', 'event_reminder'] as const)(
   'toggling %s saves it under its own type',
   async type => {
     mockGetPreferences.mockResolvedValue([]);

@@ -28,6 +28,7 @@ export type NotificationType =
   | 'event_invite'
   | 'event_changed'
   | 'event_cancelled'
+  | 'event_reminder'
   | 'event_participant_added'
   | 'event_participant_removed'
   | 'group_event_created'
@@ -40,12 +41,13 @@ export type NotificationType =
   | 'tournament_standings_published'
   | 'team_invite';
 
-/** All 15 known notification types (the 12 from the task brief, the two participant types, plus `group_event_created`). */
+/** All 16 known notification types (the 12 from the task brief, the two participant types, group_event_created, plus event_reminder). */
 export const NOTIFICATION_TYPES: NotificationType[] = [
   'global',
   'event_invite',
   'event_changed',
   'event_cancelled',
+  'event_reminder',
   'event_participant_added',
   'event_participant_removed',
   'group_event_created',

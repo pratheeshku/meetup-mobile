@@ -142,6 +142,29 @@ describe('tapping an unread item', () => {
     expect(titleWeight(root, 'Event updated')).toBe('700');
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
+
+  it('recognizes event_reminder as a known type, marks read, and routes to EventDetail', async () => {
+    mockHistory.mockResolvedValue({
+      items: [
+        makeItem({
+          id: 'rem-1',
+          notification_type: 'event_reminder',
+          title: 'Event starting soon',
+          entity_id: 'evt-99',
+        }),
+      ],
+    });
+    const root = await renderAsync(<NotificationHistoryScreen />);
+
+    await act(async () => pressableWithText(root, 'Event starting soon').props.onPress());
+
+    expect(mockMarkRead).toHaveBeenCalledWith('rem-1');
+    expect(mockNavigate).toHaveBeenCalledWith({
+      tab: 'Home',
+      screen: 'EventDetail',
+      params: { eventId: 'evt-99' },
+    });
+  });
 });
 
 it('does not call markNotificationRead for an already-read item, but still routes', async () => {
