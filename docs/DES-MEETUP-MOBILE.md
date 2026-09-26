@@ -694,6 +694,18 @@ sent) is removed — it always produced a guaranteed 422, so this is a bug
 fix, not a regression. Re-introduce only after a `structured_rules` UI is
 designed on web first — mobile does not lead web on this contract.
 
+**Navigation and Scroll Resets (UI polish / bug fix sync)**:
+- **Home Tab Reset**: `RootNavigator` attaches a `tabPress` listener on
+  the Home tab screen navigating to `{ screen: 'EventsList', params: { filter: undefined } }`,
+  ensuring a single tap on the Home tab reliably returns to the Dashboard.
+- **Scroll Position Resets**: `HomeScreen` binds `scrollRef` to its
+  `ScrollView` and resets scroll to `{ y: 0, animated: false }` whenever
+  `isMyGamesFilterActive` flips (entering or leaving the "My Games" filtered
+  view). `GroupsScreen` binds `scrollRef` to its `FlatList` and resets
+  scroll to `{ offset: 0, animated: false }` via `useFocusEffect` on every
+  screen focus. Both screens wire `useScrollToTop(scrollRef)` to observe
+  the standard platform convention of scrolling to top on active tab re-press.
+
 ### 4.4 Groups & Teams
 
 **Screens**: Group List, Group Detail, Create Group, Team List, Team

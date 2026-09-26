@@ -247,10 +247,25 @@ function ProfileStack(): React.JSX.Element {
   );
 }
 
+export const homeTabListeners = ({
+  navigation,
+}: {
+  navigation: { navigate: (route: string, params?: unknown) => void };
+}) => ({
+  tabPress: () => {
+    navigation.navigate('Home', { screen: 'EventsList', params: { filter: undefined } });
+  },
+});
+
 function AppStack(): React.JSX.Element {
   return (
     <AppTabsNav.Navigator screenOptions={tabScreenOptions}>
-      <AppTabsNav.Screen name="Home" component={HomeStack} options={{ headerShown: false }} />
+      <AppTabsNav.Screen
+        name="Home"
+        component={HomeStack}
+        options={{ headerShown: false }}
+        listeners={homeTabListeners}
+      />
       <AppTabsNav.Screen name="Groups" component={GroupsStack} options={{ headerShown: false }} />
       {/*
         Center action button, not a destination: it opens the Create menu
