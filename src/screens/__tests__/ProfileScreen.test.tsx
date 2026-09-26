@@ -5,9 +5,17 @@
 import React from 'react';
 import { Alert } from 'react-native';
 
-import { deleteSkillLevel, getProfile, updateProfile, updateSkillLevel } from '../../api/profile';
+import {
+  deleteAvatar,
+  deleteSkillLevel,
+  getProfile,
+  updateProfile,
+  updateSkillLevel,
+  uploadAvatar,
+} from '../../api/profile';
 import { getSports } from '../../api/sports';
-import { act, pressableWithText, renderAsync, texts } from '../../test-utils/render';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { act, pressableLabelled, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import type { UserProfile } from '../../types/user';
@@ -26,6 +34,8 @@ jest.mock('../../api/profile', () => ({
   deleteSkillLevel: jest.fn(),
   requestDeletion: jest.fn(),
   confirmDeletion: jest.fn(),
+  uploadAvatar: jest.fn(),
+  deleteAvatar: jest.fn(),
 }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 
@@ -34,6 +44,10 @@ const mockUpdateProfile = updateProfile as jest.MockedFunction<typeof updateProf
 const mockUpdateSkillLevel = updateSkillLevel as jest.MockedFunction<typeof updateSkillLevel>;
 const mockDeleteSkillLevel = deleteSkillLevel as jest.MockedFunction<typeof deleteSkillLevel>;
 const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
+const mockUploadAvatar = uploadAvatar as jest.MockedFunction<typeof uploadAvatar>;
+const mockDeleteAvatar = deleteAvatar as jest.MockedFunction<typeof deleteAvatar>;
+const mockLaunchCamera = launchCamera as jest.MockedFunction<typeof launchCamera>;
+const mockLaunchImageLibrary = launchImageLibrary as jest.MockedFunction<typeof launchImageLibrary>;
 
 /**
  * `Alert.alert` has no test-env implementation (bare RN, no mock configured
@@ -90,6 +104,10 @@ beforeEach(() => {
   mockUpdateSkillLevel.mockReset().mockResolvedValue(undefined);
   mockDeleteSkillLevel.mockReset().mockResolvedValue(undefined);
   mockGetSports.mockReset().mockResolvedValue(SPORTS);
+  mockUploadAvatar.mockReset().mockResolvedValue(undefined);
+  mockDeleteAvatar.mockReset().mockResolvedValue(undefined);
+  mockLaunchCamera.mockReset().mockResolvedValue({ didCancel: true, assets: [] });
+  mockLaunchImageLibrary.mockReset().mockResolvedValue({ didCancel: true, assets: [] });
   jest.spyOn(Alert, 'alert').mockReset();
   __resetSportDisplayNamesCacheForTests();
 });
@@ -314,5 +332,188 @@ describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', 
 
     expect(texts(root)).toContain('Could not remove this skill level. Please try again.');
     expect(texts(root)).toContain('Table Tennis');
+  });
+});
+
+describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => {
+  const PROFILE_WITH_AVATAR: UserProfile = {
+    ...PROFILE,
+    avatar_url: 'https://meetup.hel1.your-objectstorage.com/avatars/u-1.png',
+  };
+
+  it('renders placeholder when avatar_url is null', async () => {
+    const root = await mount();
+    // Placeholder should show the first letter of display name
+    expect(texts(root)).toContain('S');
+  });
+
+  it('renders the avatar photo when avatar_url is present', async () => {
+    mockGetProfile.mockResolvedValue(PROFILE_WITH_AVATAR);
+    const root = await mount();
+    // Should render a FastImage with the avatar URL (no placeholder letter visible as the primary display)
+    const fastImages = root.findAll(
+      node => node.props.testID === 'fastImage' && node.props.source?.uri === PROFILE_WITH_AVATAR.avatar_url,
+    );
+    expect(fastImages.length).toBeGreaterThan(0);
+  });
+
+  it('shows the "Change profile photo" pressable', async () => {
+    const root = await mount();
+    // The avatar area should be tappable
+    const avatarPressable = pressableLabelled(root, 'Change profile photo');
+    expect(avatarPressable).toBeDefined();
+  });
+
+  it('tapping the avatar when no photo shows camera/library options without Remove', async () => {
+    const root = await mount();
+    act(() => {
+      pressableLabelled(root, 'Change profile photo').props.onPress();
+    });
+    const alertSpy = Alert.alert as unknown as jest.Mock;
+    const [title, , buttons] = alertSpy.mock.calls[alertSpy.mock.calls.length - 1];
+    expect(title).toBe('Profile Photo');
+    const buttonTexts = (buttons as { text: string }[]).map(b => b.text);
+    expect(buttonTexts).toContain('Take Photo');
+    expect(buttonTexts).toContain('Choose from Library');
+    expect(buttonTexts).not.toContain('Remove Photo');
+  });
+
+  it('tapping the avatar when photo exists shows camera/library/remove options', async () => {
+    mockGetProfile.mockResolvedValue(PROFILE_WITH_AVATAR);
+    const root = await mount();
+    act(() => {
+      pressableLabelled(root, 'Change profile photo').props.onPress();
+    });
+    const alertSpy = Alert.alert as unknown as jest.Mock;
+    const [, , buttons] = alertSpy.mock.calls[alertSpy.mock.calls.length - 1];
+    const buttonTexts = (buttons as { text: string }[]).map(b => b.text);
+    expect(buttonTexts).toContain('Take Photo');
+    expect(buttonTexts).toContain('Choose from Library');
+    expect(buttonTexts).toContain('Remove Photo');
+  });
+
+  it('choosing from library → upload → re-fetch → avatar updates', async () => {
+    const UPDATED_PROFILE: UserProfile = {
+      ...PROFILE,
+      avatar_url: 'https://meetup.hel1.your-objectstorage.com/avatars/u-1-v2.png',
+    };
+    mockGetProfile.mockResolvedValueOnce(PROFILE).mockResolvedValueOnce(UPDATED_PROFILE);
+    mockLaunchImageLibrary.mockResolvedValue({
+      didCancel: false,
+      assets: [{
+        uri: 'file:///local/photo.jpg',
+        fileName: 'photo.jpg',
+        type: 'image/jpeg',
+        width: 800,
+        height: 800,
+      }],
+    });
+
+    const root = await mount();
+    act(() => {
+      pressableLabelled(root, 'Change profile photo').props.onPress();
+    });
+    // Confirm the "Choose from Library" action
+    await act(async () => {
+      await confirmAlert('Choose from Library');
+    });
+
+    expect(mockUploadAvatar).toHaveBeenCalledWith(
+      'file:///local/photo.jpg',
+      'photo.jpg',
+      'image/jpeg',
+      expect.objectContaining({ correlationId: expect.any(String) }),
+    );
+    expect(mockGetProfile).toHaveBeenCalledTimes(2);
+    // FastImage should now render the updated avatar URL
+    const fastImages = root.findAll(
+      node => node.props.testID === 'fastImage' && node.props.source?.uri === UPDATED_PROFILE.avatar_url,
+    );
+    expect(fastImages.length).toBeGreaterThan(0);
+  });
+
+  it('upload failure reverts preview and shows error message', async () => {
+    mockGetProfile.mockResolvedValue(PROFILE);
+    mockUploadAvatar.mockRejectedValue({
+      response: { status: 413, data: { detail: 'File too large.' } },
+    });
+    mockLaunchImageLibrary.mockResolvedValue({
+      didCancel: false,
+      assets: [{
+        uri: 'file:///local/big-photo.jpg',
+        fileName: 'big-photo.jpg',
+        type: 'image/jpeg',
+        width: 4000,
+        height: 4000,
+      }],
+    });
+
+    const root = await mount();
+    act(() => {
+      pressableLabelled(root, 'Change profile photo').props.onPress();
+    });
+    await act(async () => {
+      await confirmAlert('Choose from Library');
+    });
+
+    // Error message surfaced via getApiErrorMessage (same pattern as skill-level 409)
+    expect(texts(root)).toContain('File too large.');
+    // No re-fetch after failure
+    expect(mockGetProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('removing avatar → DELETE → re-fetch → placeholder renders', async () => {
+    mockGetProfile
+      .mockResolvedValueOnce(PROFILE_WITH_AVATAR)
+      .mockResolvedValueOnce(PROFILE);
+
+    const root = await mount();
+    act(() => {
+      pressableLabelled(root, 'Change profile photo').props.onPress();
+    });
+    await act(async () => {
+      await confirmAlert('Remove Photo');
+    });
+
+    expect(mockDeleteAvatar).toHaveBeenCalledWith(
+      expect.objectContaining({ correlationId: expect.any(String) }),
+    );
+    expect(mockGetProfile).toHaveBeenCalledTimes(2);
+    // After removal, placeholder should be visible
+    expect(texts(root)).toContain('S');
+  });
+
+  it('remove failure shows error and keeps the avatar', async () => {
+    mockGetProfile.mockResolvedValue(PROFILE_WITH_AVATAR);
+    mockDeleteAvatar.mockRejectedValue(new Error('network error'));
+
+    const root = await mount();
+    act(() => {
+      pressableLabelled(root, 'Change profile photo').props.onPress();
+    });
+    await act(async () => {
+      await confirmAlert('Remove Photo');
+    });
+
+    expect(texts(root)).toContain('Could not remove your photo. Please try again.');
+    // Avatar should still be rendered
+    const fastImages = root.findAll(
+      node => node.props.testID === 'fastImage' && node.props.source?.uri === PROFILE_WITH_AVATAR.avatar_url,
+    );
+    expect(fastImages.length).toBeGreaterThan(0);
+  });
+
+  it('cancelled image picker does not trigger upload', async () => {
+    const root = await mount();
+    act(() => {
+      pressableLabelled(root, 'Change profile photo').props.onPress();
+    });
+    await act(async () => {
+      await confirmAlert('Choose from Library');
+    });
+
+    // Default mock returns didCancel: true
+    expect(mockUploadAvatar).not.toHaveBeenCalled();
+    expect(mockGetProfile).toHaveBeenCalledTimes(1); // only initial load
   });
 });

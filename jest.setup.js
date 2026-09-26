@@ -144,3 +144,54 @@ jest.mock('@react-native-community/datetimepicker', () => {
   };
 });
 /* eslint-enable no-undef */
+
+// react-native-image-picker wraps native camera/gallery APIs with no
+// Jest-environment equivalent. Added for profile photo upload
+// (DES-MEETUP-ADDENDUM-profile-photo §10.4). Centralised here per this
+// file's established convention — add to this mock, not a new ad hoc one
+// per test file, if new APIs from this package are used.
+/* eslint-disable no-undef */
+jest.mock('react-native-image-picker', () => ({
+  launchCamera: jest.fn(async () => ({ didCancel: true, assets: [] })),
+  launchImageLibrary: jest.fn(async () => ({ didCancel: true, assets: [] })),
+}));
+
+// @d11/react-native-fast-image wraps native Glide/SDWebImage caching APIs
+// with no Jest-environment equivalent. Added for cached avatar rendering
+// (DES-MEETUP-ADDENDUM-profile-photo §10.2, R-NEW-8). The mock renders a
+// plain View (same pattern as DateTimePicker's mock above) and exposes the
+// static enums (resizeMode, priority, cacheControl) that feature code
+// references. Centralised here per this file's established convention.
+jest.mock('@d11/react-native-fast-image', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const MockFastImage = React.forwardRef((props, ref) => {
+    return React.createElement(View, {
+      ...props,
+      ref,
+      testID: props.testID || 'fastImage',
+    });
+  });
+  MockFastImage.displayName = 'MockFastImage';
+  MockFastImage.resizeMode = {
+    contain: 'contain',
+    cover: 'cover',
+    stretch: 'stretch',
+    center: 'center',
+  };
+  MockFastImage.priority = {
+    low: 'low',
+    normal: 'normal',
+    high: 'high',
+  };
+  MockFastImage.cacheControl = {
+    immutable: 'immutable',
+    web: 'web',
+    cacheOnly: 'cacheOnly',
+  };
+  return {
+    __esModule: true,
+    default: MockFastImage,
+  };
+});
+/* eslint-enable no-undef */

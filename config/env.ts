@@ -20,4 +20,11 @@ export const ENV = {
   // the OAuth-client sense (it's not a client *secret*), but still kept
   // config-driven rather than hardcoded per P1/§3.11.
   GOOGLE_WEB_CLIENT_ID: Config.GOOGLE_WEB_CLIENT_ID ?? '',
+  // Hetzner Object Storage bucket base URL for avatar images
+  // (DES-MEETUP-ADDENDUM-profile-photo §5, §10.1; P1 — config-driven,
+  // never hardcoded). `avatar_storage_key` from the backend is appended
+  // to this to form the full display URL. Config-overridable via .env,
+  // same as API_BASE_URL.
+  AVATAR_BUCKET_BASE_URL:
+    Config.AVATAR_BUCKET_BASE_URL ?? 'https://meetup.hel1.your-objectstorage.com',
 };

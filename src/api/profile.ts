@@ -23,6 +23,7 @@
  * gesture, which this is not).
  */
 import { apiClient } from './client';
+import { getAvatarUrl } from '../utils/avatar';
 import type { SkillLevel, SkillLevelValue, UpdateProfilePayload, UserProfile } from '../types/user';
 
 interface RequestOptions {
@@ -54,9 +55,11 @@ function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: Skil
     display_name: raw.display_name,
     is_admin: raw.is_admin,
     created_at: raw.created_at,
-    // BLOCKED, not guessed — see the type-level comment: no scheme exists
-    // to turn `avatar_storage_key` into a displayable URL.
-    avatar_url: null,
+    // UNBLOCKED (DES-MEETUP-ADDENDUM-profile-photo §5, §10.1) — the missing
+    // URL scheme is now specified: `{bucket_base_url}/{avatar_storage_key}`.
+    // `getAvatarUrl` returns `null` when the key is absent, preserving the
+    // existing placeholder behaviour on ProfileScreen.
+    avatar_url: getAvatarUrl(raw.avatar_storage_key),
     // BLOCKED, not guessed — see the type-level comment: no `role` field
     // exists on the real response at all.
     role: undefined,
@@ -143,6 +146,54 @@ export async function updateSkillLevel(
  */
 export async function deleteSkillLevel(sport: string, options?: RequestOptions): Promise<void> {
   await apiClient.delete(`/users/me/skill-level/${sport}`, {
+    correlationId: options?.correlationId,
+  });
+}
+
+/**
+ * `POST /users/me/avatar` — multipart file upload
+ * (DES-MEETUP-ADDENDUM-profile-photo §5, §10.4; R-NEW-1, R-NEW-2).
+ *
+ * Sends the selected photo as a multipart form-data request via the
+ * existing `apiClient`. The backend validates format (JPEG/PNG, magic-byte
+ * inspection) and size (max 5MB) server-side (§3.2) — the client does not
+ * perform client-side format validation (§10.3, R-NEW-2 simplified:
+ * Android-only, no HEIC).
+ *
+ * `fileUri` is the local file URI from react-native-image-picker.
+ * `fileName` and `fileType` are provided by the picker's response asset.
+ */
+export async function uploadAvatar(
+  fileUri: string,
+  fileName: string,
+  fileType: string,
+  options?: RequestOptions,
+): Promise<void> {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: fileUri,
+    name: fileName,
+    type: fileType,
+  } as unknown as Blob);
+
+  await apiClient.post('/users/me/avatar', formData, {
+    correlationId: options?.correlationId,
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+}
+
+/**
+ * `DELETE /users/me/avatar` — self-remove current profile photo
+ * (DES-MEETUP-ADDENDUM-profile-photo §5, §10.4; R-NEW-1).
+ *
+ * On success the backend nulls `avatar_storage_key` and deletes the
+ * storage object. The next `getProfile()` call returns a null key, and
+ * `getAvatarUrl(null)` → `null` → the existing placeholder renders.
+ */
+export async function deleteAvatar(options?: RequestOptions): Promise<void> {
+  await apiClient.delete('/users/me/avatar', {
     correlationId: options?.correlationId,
   });
 }

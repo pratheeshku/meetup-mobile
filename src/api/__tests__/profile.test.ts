@@ -51,9 +51,12 @@ describe('getProfile', () => {
       is_admin: false,
       skill_levels: [{ sport: 'football', skill_level: 'Intermediate' }],
     });
-    // BLOCKED fields (no source on the real response) must stay unset,
-    // never a guessed value.
-    expect(result.avatar_url).toBeNull();
+    // avatar_url is resolved from avatar_storage_key via getAvatarUrl()
+    // (DES-MEETUP-ADDENDUM-profile-photo §5, §10.1 — UNBLOCKED).
+    expect(result.avatar_url).toBe(
+      'https://meetup.hel1.your-objectstorage.com/avatars/u-1.png',
+    );
+    // role is still BLOCKED (no source on the real response).
     expect(result.role).toBeUndefined();
   });
 
@@ -82,6 +85,8 @@ describe('getProfile', () => {
 
     const result = await getProfile();
     expect(result.skill_levels).toEqual([]);
+    // null avatar_storage_key → getAvatarUrl() returns null → placeholder
+    expect(result.avatar_url).toBeNull();
   });
 });
 

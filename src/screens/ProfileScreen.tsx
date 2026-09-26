@@ -27,18 +27,30 @@
  * navigation context.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import FastImage from '@d11/react-native-fast-image';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
 import { withCorrelationId } from '../api/correlationId';
 import {
   confirmDeletion,
+  deleteAvatar,
   deleteSkillLevel,
   getProfile,
   requestDeletion,
   updateProfile,
   updateSkillLevel,
+  uploadAvatar,
 } from '../api/profile';
 import { getSports } from '../api/sports';
 import Button from '../components/Button';
@@ -152,6 +164,125 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const [confirmationCodeDraft, setConfirmationCodeDraft] = useState('');
   const [isConfirmingDeletion, setIsConfirmingDeletion] = useState(false);
   const [deletionError, setDeletionError] = useState<string | null>(null);
+
+  // Avatar upload/remove state (DES-MEETUP-ADDENDUM-profile-photo §10.4).
+  // `avatarPreviewUri` holds a local file URI for immediate visual feedback
+  // while the upload is in progress — reverted on failure (§10.4 step 5).
+  const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  /**
+   * §10.4 step 1: Tap avatar → react-native-image-picker action sheet.
+   * Presents a native action sheet with camera/gallery options. On selection,
+   * shows a local preview and fires the multipart upload.
+   */
+  const handleAvatarPress = (): void => {
+    if (isUploadingAvatar || isRemovingAvatar) {
+      return;
+    }
+
+    // If there's already an avatar, offer change or remove options
+    if (profile?.avatar_url) {
+      Alert.alert('Profile Photo', undefined, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Take Photo',
+          onPress: () => pickImage('camera'),
+        },
+        {
+          text: 'Choose from Library',
+          onPress: () => pickImage('library'),
+        },
+        {
+          text: 'Remove Photo',
+          style: 'destructive',
+          onPress: handleRemoveAvatar,
+        },
+      ]);
+    } else {
+      Alert.alert('Profile Photo', undefined, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Take Photo',
+          onPress: () => pickImage('camera'),
+        },
+        {
+          text: 'Choose from Library',
+          onPress: () => pickImage('library'),
+        },
+      ]);
+    }
+  };
+
+  const pickImage = async (source: 'camera' | 'library'): Promise<void> => {
+    setAvatarError(null);
+    try {
+      const result =
+        source === 'camera'
+          ? await launchCamera({ mediaType: 'photo', quality: 0.8 })
+          : await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
+
+      if (result.didCancel || !result.assets?.[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!asset.uri || !asset.fileName || !asset.type) {
+        setAvatarError('Could not read the selected photo. Please try again.');
+        return;
+      }
+
+      // §10.4 step 2: local preview (selected URI, pre-upload)
+      setAvatarPreviewUri(asset.uri);
+      setIsUploadingAvatar(true);
+
+      // §10.4 step 3: POST /users/me/avatar multipart, same correlation-ID
+      // threading already used throughout profile.ts
+      await withCorrelationId(async correlationId => {
+        await uploadAvatar(asset.uri!, asset.fileName!, asset.type!, { correlationId });
+        // §10.4 step 4: re-fetch profile → getAvatarUrl() picks up the new
+        // key → FastImage renders it (new key = cache miss = fresh fetch)
+        const refreshed = await getProfile({ correlationId });
+        setProfile(refreshed);
+      });
+      // Upload succeeded — clear the local preview; the profile's avatar_url
+      // (via getAvatarUrl) now points to the new storage object.
+      setAvatarPreviewUri(null);
+    } catch (e) {
+      // §10.4 step 5: on failure, revert preview, reuse the existing
+      // getApiErrorMessage pattern already established for the skill-level 409
+      setAvatarPreviewUri(null);
+      setAvatarError(
+        getApiErrorMessage(e, 'Could not upload your photo. Please try again.'),
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  /**
+   * DELETE /users/me/avatar → avatar_url → null → existing placeholder
+   * renders. Same shape as the upload flow (§10.4).
+   */
+  const handleRemoveAvatar = async (): Promise<void> => {
+    setAvatarError(null);
+    setIsRemovingAvatar(true);
+    try {
+      await withCorrelationId(async correlationId => {
+        await deleteAvatar({ correlationId });
+        const refreshed = await getProfile({ correlationId });
+        setProfile(refreshed);
+      });
+    } catch (e) {
+      setAvatarError(
+        getApiErrorMessage(e, 'Could not remove your photo. Please try again.'),
+      );
+    } finally {
+      setIsRemovingAvatar(false);
+    }
+  };
 
   const loadProfile = useCallback(async () => {
     setIsLoading(true);
@@ -357,15 +488,46 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Card style={styles.header}>
-        {profile.avatar_url ? (
-          <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Text style={styles.avatarPlaceholderText}>
-              {getDisplayName(profile).charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
+        <Pressable
+          onPress={handleAvatarPress}
+          accessibilityRole="button"
+          accessibilityLabel="Change profile photo"
+          disabled={isUploadingAvatar || isRemovingAvatar}
+        >
+          {avatarPreviewUri ? (
+            <View>
+              <FastImage
+                source={{ uri: avatarPreviewUri }}
+                style={styles.avatar}
+                resizeMode={FastImage.resizeMode.cover}
+              />
+              <View style={styles.avatarOverlay}>
+                <ActivityIndicator color={colors.white} />
+              </View>
+            </View>
+          ) : profile.avatar_url ? (
+            <View>
+              <FastImage
+                source={{ uri: profile.avatar_url, priority: FastImage.priority.normal }}
+                style={styles.avatar}
+                resizeMode={FastImage.resizeMode.cover}
+              />
+              {isRemovingAvatar ? (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator color={colors.white} />
+                </View>
+              ) : null}
+            </View>
+          ) : (
+            <View style={[styles.avatar, styles.avatarPlaceholder]}>
+              <Text style={styles.avatarPlaceholderText}>
+                {getDisplayName(profile).charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </Pressable>
+
+        {avatarError ? <Text style={styles.errorText}>{avatarError}</Text> : null}
 
         {isEditingDisplayName ? (
           <View style={styles.editRow}>
@@ -571,6 +733,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarPlaceholderText: { ...typography.h1, color: colors.white },
+  avatarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.scrim,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   displayNameRow: { flexDirection: 'row', alignItems: 'center' },
   displayName: { ...typography.h2, color: colors.textPrimary, marginRight: spacing.sm },
   nicknameLine: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
