@@ -14,7 +14,7 @@ import {
   uploadAvatar,
 } from '../../api/profile';
 import { getSports } from '../../api/sports';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import ImageCropPicker from 'react-native-image-crop-picker';
 import { act, pressableLabelled, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
@@ -46,8 +46,8 @@ const mockDeleteSkillLevel = deleteSkillLevel as jest.MockedFunction<typeof dele
 const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
 const mockUploadAvatar = uploadAvatar as jest.MockedFunction<typeof uploadAvatar>;
 const mockDeleteAvatar = deleteAvatar as jest.MockedFunction<typeof deleteAvatar>;
-const mockLaunchCamera = launchCamera as jest.MockedFunction<typeof launchCamera>;
-const mockLaunchImageLibrary = launchImageLibrary as jest.MockedFunction<typeof launchImageLibrary>;
+const mockOpenPicker = ImageCropPicker.openPicker as jest.MockedFunction<typeof ImageCropPicker.openPicker>;
+const mockOpenCamera = ImageCropPicker.openCamera as jest.MockedFunction<typeof ImageCropPicker.openCamera>;
 
 /**
  * `Alert.alert` has no test-env implementation (bare RN, no mock configured
@@ -106,8 +106,10 @@ beforeEach(() => {
   mockGetSports.mockReset().mockResolvedValue(SPORTS);
   mockUploadAvatar.mockReset().mockResolvedValue(undefined);
   mockDeleteAvatar.mockReset().mockResolvedValue(undefined);
-  mockLaunchCamera.mockReset().mockResolvedValue({ didCancel: true, assets: [] });
-  mockLaunchImageLibrary.mockReset().mockResolvedValue({ didCancel: true, assets: [] });
+  const cancelledError: any = new Error('User cancelled image selection');
+  cancelledError.code = 'E_PICKER_CANCELLED';
+  mockOpenCamera.mockReset().mockRejectedValue(cancelledError);
+  mockOpenPicker.mockReset().mockRejectedValue(cancelledError);
   jest.spyOn(Alert, 'alert').mockReset();
   __resetSportDisplayNamesCacheForTests();
 });
@@ -392,22 +394,20 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
     expect(buttonTexts).toContain('Remove Photo');
   });
 
-  it('choosing from library → upload → re-fetch → avatar updates', async () => {
+  it('choosing from library → crop/zoom/rotate options passed → upload → re-fetch → avatar updates', async () => {
     const UPDATED_PROFILE: UserProfile = {
       ...PROFILE,
       avatar_url: 'https://meetup.hel1.your-objectstorage.com/avatars/u-1-v2.png',
     };
     mockGetProfile.mockResolvedValueOnce(PROFILE).mockResolvedValueOnce(UPDATED_PROFILE);
-    mockLaunchImageLibrary.mockResolvedValue({
-      didCancel: false,
-      assets: [{
-        uri: 'file:///local/photo.jpg',
-        fileName: 'photo.jpg',
-        type: 'image/jpeg',
-        width: 800,
-        height: 800,
-      }],
-    });
+    mockOpenPicker.mockResolvedValue({
+      path: 'file:///local/photo-cropped.jpg',
+      filename: 'photo-cropped.jpg',
+      mime: 'image/jpeg',
+      width: 500,
+      height: 500,
+      size: 102400,
+    } as any);
 
     const root = await mount();
     act(() => {
@@ -418,9 +418,22 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
       await confirmAlert('Choose from Library');
     });
 
+    expect(mockOpenPicker).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mediaType: 'photo',
+        cropping: true,
+        width: 500,
+        height: 500,
+        compressImageQuality: 0.8,
+        cropperToolbarTitle: 'Edit Photo',
+        hideBottomControls: false,
+        enableRotationGesture: true,
+        cropperRotateButtonsHidden: false,
+      }),
+    );
     expect(mockUploadAvatar).toHaveBeenCalledWith(
-      'file:///local/photo.jpg',
-      'photo.jpg',
+      'file:///local/photo-cropped.jpg',
+      'photo-cropped.jpg',
       'image/jpeg',
       expect.objectContaining({ correlationId: expect.any(String) }),
     );
@@ -432,21 +445,65 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
     expect(fastImages.length).toBeGreaterThan(0);
   });
 
+  it('taking photo with camera → crop/zoom/rotate options passed → upload → re-fetch → avatar updates', async () => {
+    const UPDATED_PROFILE: UserProfile = {
+      ...PROFILE,
+      avatar_url: 'https://meetup.hel1.your-objectstorage.com/avatars/u-camera.png',
+    };
+    mockGetProfile.mockResolvedValueOnce(PROFILE).mockResolvedValueOnce(UPDATED_PROFILE);
+    mockOpenCamera.mockResolvedValue({
+      path: 'file:///local/camera-cropped.jpg',
+      filename: 'camera-cropped.jpg',
+      mime: 'image/jpeg',
+      width: 500,
+      height: 500,
+      size: 102400,
+    } as any);
+
+    const root = await mount();
+    act(() => {
+      pressableLabelled(root, 'Change profile photo').props.onPress();
+    });
+    // Confirm the "Take Photo" action
+    await act(async () => {
+      await confirmAlert('Take Photo');
+    });
+
+    expect(mockOpenCamera).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mediaType: 'photo',
+        cropping: true,
+        width: 500,
+        height: 500,
+        compressImageQuality: 0.8,
+        cropperToolbarTitle: 'Edit Photo',
+        hideBottomControls: false,
+        enableRotationGesture: true,
+        cropperRotateButtonsHidden: false,
+      }),
+    );
+    expect(mockUploadAvatar).toHaveBeenCalledWith(
+      'file:///local/camera-cropped.jpg',
+      'camera-cropped.jpg',
+      'image/jpeg',
+      expect.objectContaining({ correlationId: expect.any(String) }),
+    );
+    expect(mockGetProfile).toHaveBeenCalledTimes(2);
+  });
+
   it('upload failure reverts preview and shows error message', async () => {
     mockGetProfile.mockResolvedValue(PROFILE);
     mockUploadAvatar.mockRejectedValue({
       response: { status: 413, data: { detail: 'File too large.' } },
     });
-    mockLaunchImageLibrary.mockResolvedValue({
-      didCancel: false,
-      assets: [{
-        uri: 'file:///local/big-photo.jpg',
-        fileName: 'big-photo.jpg',
-        type: 'image/jpeg',
-        width: 4000,
-        height: 4000,
-      }],
-    });
+    mockOpenPicker.mockResolvedValue({
+      path: 'file:///local/big-photo.jpg',
+      filename: 'big-photo.jpg',
+      mime: 'image/jpeg',
+      width: 4000,
+      height: 4000,
+      size: 10485760,
+    } as any);
 
     const root = await mount();
     act(() => {
@@ -504,6 +561,10 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
   });
 
   it('cancelled image picker does not trigger upload', async () => {
+    const error: any = new Error('User cancelled image selection');
+    error.code = 'E_PICKER_CANCELLED';
+    mockOpenPicker.mockRejectedValue(error);
+
     const root = await mount();
     act(() => {
       pressableLabelled(root, 'Change profile photo').props.onPress();
@@ -512,7 +573,6 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
       await confirmAlert('Choose from Library');
     });
 
-    // Default mock returns didCancel: true
     expect(mockUploadAvatar).not.toHaveBeenCalled();
     expect(mockGetProfile).toHaveBeenCalledTimes(1); // only initial load
   });

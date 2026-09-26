@@ -37,7 +37,7 @@ import {
   View,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import ImageCropPicker from 'react-native-image-crop-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -174,8 +174,9 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
   /**
-   * §10.4 step 1: Tap avatar → react-native-image-picker action sheet.
-   * Presents a native action sheet with camera/gallery options. On selection,
+   * §10.4 step 1: Tap avatar → camera/gallery action sheet.
+   * Opens react-native-image-crop-picker with cropping enabled (pinch-zoom,
+   * reposition, square aspect ratio, rotation). On crop confirmation,
    * shows a local preview and fires the multipart upload.
    */
   const handleAvatarPress = (): void => {
@@ -219,29 +220,39 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const pickImage = async (source: 'camera' | 'library'): Promise<void> => {
     setAvatarError(null);
     try {
-      const result =
+      const cropOptions = {
+        mediaType: 'photo' as const,
+        cropping: true,
+        width: 500,
+        height: 500,
+        compressImageQuality: 0.8,
+        cropperToolbarTitle: 'Edit Photo',
+        hideBottomControls: false,
+        enableRotationGesture: true,
+        cropperRotateButtonsHidden: false,
+      };
+
+      const image =
         source === 'camera'
-          ? await launchCamera({ mediaType: 'photo', quality: 0.8 })
-          : await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
+          ? await ImageCropPicker.openCamera(cropOptions)
+          : await ImageCropPicker.openPicker(cropOptions);
 
-      if (result.didCancel || !result.assets?.[0]) {
+      if (!image || !image.path) {
         return;
       }
 
-      const asset = result.assets[0];
-      if (!asset.uri || !asset.fileName || !asset.type) {
-        setAvatarError('Could not read the selected photo. Please try again.');
-        return;
-      }
+      const fileName =
+        image.filename || image.path.split('/').pop() || 'avatar.jpg';
+      const fileType = image.mime || 'image/jpeg';
 
       // §10.4 step 2: local preview (selected URI, pre-upload)
-      setAvatarPreviewUri(asset.uri);
+      setAvatarPreviewUri(image.path);
       setIsUploadingAvatar(true);
 
       // §10.4 step 3: POST /users/me/avatar multipart, same correlation-ID
       // threading already used throughout profile.ts
       await withCorrelationId(async correlationId => {
-        await uploadAvatar(asset.uri!, asset.fileName!, asset.type!, { correlationId });
+        await uploadAvatar(image.path, fileName, fileType, { correlationId });
         // §10.4 step 4: re-fetch profile → getAvatarUrl() picks up the new
         // key → FastImage renders it (new key = cache miss = fresh fetch)
         const refreshed = await getProfile({ correlationId });
@@ -250,7 +261,15 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       // Upload succeeded — clear the local preview; the profile's avatar_url
       // (via getAvatarUrl) now points to the new storage object.
       setAvatarPreviewUri(null);
-    } catch (e) {
+    } catch (e: any) {
+      // User cancelled photo selection or cropping — do nothing
+      if (
+        e?.code === 'E_PICKER_CANCELLED' ||
+        e?.message?.toLowerCase().includes('cancel')
+      ) {
+        return;
+      }
+
       // §10.4 step 5: on failure, revert preview, reuse the existing
       // getApiErrorMessage pattern already established for the skill-level 409
       setAvatarPreviewUri(null);

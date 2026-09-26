@@ -145,15 +145,40 @@ jest.mock('@react-native-community/datetimepicker', () => {
 });
 /* eslint-enable no-undef */
 
-// react-native-image-picker wraps native camera/gallery APIs with no
-// Jest-environment equivalent. Added for profile photo upload
-// (DES-MEETUP-ADDENDUM-profile-photo §10.4). Centralised here per this
-// file's established convention — add to this mock, not a new ad hoc one
-// per test file, if new APIs from this package are used.
+// react-native-image-crop-picker wraps native camera/gallery and crop
+// controllers (uCrop on Android, TOCropViewController on iOS) with no
+// Jest-environment equivalent. Added for profile photo upload + crop
+// (replaces react-native-image-picker). Centralised here per this
+// file's established convention.
 /* eslint-disable no-undef */
-jest.mock('react-native-image-picker', () => ({
-  launchCamera: jest.fn(async () => ({ didCancel: true, assets: [] })),
-  launchImageLibrary: jest.fn(async () => ({ didCancel: true, assets: [] })),
+const mockCropPicker = {
+  openCamera: jest.fn(async () => {
+    const error = new Error('User cancelled image selection');
+    error.code = 'E_PICKER_CANCELLED';
+    throw error;
+  }),
+  openPicker: jest.fn(async () => {
+    const error = new Error('User cancelled image selection');
+    error.code = 'E_PICKER_CANCELLED';
+    throw error;
+  }),
+  openCropper: jest.fn(async () => {
+    const error = new Error('User cancelled image selection');
+    error.code = 'E_PICKER_CANCELLED';
+    throw error;
+  }),
+  clean: jest.fn(async () => {}),
+  cleanSingle: jest.fn(async () => {}),
+};
+
+jest.mock('react-native-image-crop-picker', () => ({
+  __esModule: true,
+  default: mockCropPicker,
+  openCamera: mockCropPicker.openCamera,
+  openPicker: mockCropPicker.openPicker,
+  openCropper: mockCropPicker.openCropper,
+  clean: mockCropPicker.clean,
+  cleanSingle: mockCropPicker.cleanSingle,
 }));
 
 // @d11/react-native-fast-image wraps native Glide/SDWebImage caching APIs

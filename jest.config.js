@@ -14,7 +14,7 @@ module.exports = {
         'react-native-svg',
         'react-native-qrcode-svg',
         'react-native-uuid',
-        'react-native-image-picker',
+        'react-native-image-crop-picker',
         '@d11/react-native-fast-image',
       ].join('|') +
       ')/)',

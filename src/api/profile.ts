@@ -160,7 +160,7 @@ export async function deleteSkillLevel(sport: string, options?: RequestOptions):
  * perform client-side format validation (§10.3, R-NEW-2 simplified:
  * Android-only, no HEIC).
  *
- * `fileUri` is the local file URI from react-native-image-picker.
+ * `fileUri` is the local file URI from react-native-image-crop-picker.
  * `fileName` and `fileType` are provided by the picker's response asset.
  */
 export async function uploadAvatar(
