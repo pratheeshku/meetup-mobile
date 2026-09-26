@@ -12,11 +12,21 @@
  * - My Games = going (3) + organised (1) = 4; the waitlisted one does not count
  */
 import React from 'react';
-import { RefreshControl } from 'react-native';
+import { RefreshControl, ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import ReactTestRenderer from 'react-test-renderer';
 
 import { getEvents } from '../../api/events';
 import { getMyGroups } from '../../api/groups';
+
+const mockUseScrollToTop = jest.fn();
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  return {
+    ...actual,
+    useScrollToTop: (...args: unknown[]) => mockUseScrollToTop(...args),
+  };
+});
 import { getSkillLevels } from '../../api/profile';
 import { getSports } from '../../api/sports';
 import { makeEvent } from '../../test-utils/makeEvent';
@@ -135,6 +145,7 @@ beforeEach(() => {
   // skill levels itself.
   mockGetSkillLevels.mockReset().mockResolvedValue([]);
   mockGetSports.mockReset().mockResolvedValue(ADMIN_SPORTS);
+  mockUseScrollToTop.mockReset();
   __resetSportDisplayNamesCacheForTests();
 });
 
@@ -493,3 +504,64 @@ function pressablesRetry(root: Instance): Instance {
   }
   return retry[0];
 }
+
+describe('HomeScreen scroll resets', () => {
+  it('wires useScrollToTop with the ScrollView ref', async () => {
+    await mount();
+    expect(mockUseScrollToTop).toHaveBeenCalledWith(
+      expect.objectContaining({ current: expect.anything() }),
+    );
+  });
+
+  it('scrolls to top without animation when isMyGamesFilterActive flips', async () => {
+    const scrollToSpy = jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation();
+    try {
+      let renderer!: ReactTestRenderer.ReactTestRenderer;
+      await ReactTestRenderer.act(async () => {
+        renderer = ReactTestRenderer.create(
+          <SafeAreaProvider initialMetrics={METRICS}>
+            <HomeScreen
+              navigation={{ navigate } as any}
+              route={{ key: 'k', name: 'EventsList', params: undefined } as any}
+            />
+          </SafeAreaProvider>,
+        );
+      });
+
+      scrollToSpy.mockClear();
+
+      // Flip filter to 'mine' (entering "My Games")
+      await ReactTestRenderer.act(async () => {
+        renderer.update(
+          <SafeAreaProvider initialMetrics={METRICS}>
+            <HomeScreen
+              navigation={{ navigate } as any}
+              route={{ key: 'k', name: 'EventsList', params: { filter: 'mine' } } as any}
+            />
+          </SafeAreaProvider>,
+        );
+      });
+
+      expect(scrollToSpy).toHaveBeenCalledWith({ y: 0, animated: false });
+
+      scrollToSpy.mockClear();
+
+      // Flip filter back to undefined (leaving "My Games")
+      await ReactTestRenderer.act(async () => {
+        renderer.update(
+          <SafeAreaProvider initialMetrics={METRICS}>
+            <HomeScreen
+              navigation={{ navigate } as any}
+              route={{ key: 'k', name: 'EventsList', params: undefined } as any}
+            />
+          </SafeAreaProvider>,
+        );
+      });
+
+      expect(scrollToSpy).toHaveBeenCalledWith({ y: 0, animated: false });
+    } finally {
+      scrollToSpy.mockRestore();
+    }
+  });
+});
+

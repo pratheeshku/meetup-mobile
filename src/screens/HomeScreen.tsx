@@ -40,6 +40,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import { useScrollToTop } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -98,6 +99,8 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   // (successfully or not), later loads (pull-to-refresh, the post-create
   // refetch) must never re-run it and stomp a selection the user made in
   // the meantime.
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
   const hasAppliedSportPreselectRef = useRef(false);
 
   const loadDashboard = useCallback(async (isRefresh: boolean) => {
@@ -188,6 +191,9 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   // that component caps a dashboard preview at `MAX_SECTION_ITEMS`, which
   // would defeat the point of a "see all my games" view.
   const isMyGamesFilterActive = route.params?.filter === 'mine';
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [isMyGamesFilterActive]);
   const myGames = useMemo(() => getMyGames(events, userId), [events, userId]);
 
   type MyGamesFilterType = 'All' | 'Hosting' | 'Joined' | 'Waitlist';
@@ -228,6 +234,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
   return (
     <ScrollView
+      ref={scrollRef}
       contentContainerStyle={{
         paddingTop: spacing.md,
         paddingBottom: spacing.lg,
