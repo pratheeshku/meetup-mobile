@@ -366,6 +366,35 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
     expect(avatarPressable).toBeDefined();
   });
 
+  it('renders edit-icon overlay badge on placeholder avatar as decorative affordance', async () => {
+    const root = await mount();
+    const avatarPressable = pressableLabelled(root, 'Change profile photo');
+    expect(avatarPressable).toBeDefined();
+
+    // Edit badge should be present inside the avatar pressable (not a separate touch target)
+    const editBadges = avatarPressable.findAll(
+      node => (node.type as unknown) === 'View' && node.props.testID === 'avatar-edit-badge',
+    );
+    expect(editBadges).toHaveLength(1);
+
+    const badge = editBadges[0];
+    expect(badge.props.accessibilityElementsHidden).toBe(true);
+    expect(badge.props.importantForAccessibility).toBe('no');
+  });
+
+  it('renders edit-icon overlay badge when photo is set', async () => {
+    mockGetProfile.mockResolvedValue(PROFILE_WITH_AVATAR);
+    const root = await mount();
+    const avatarPressable = pressableLabelled(root, 'Change profile photo');
+    expect(avatarPressable).toBeDefined();
+
+    // Edit badge should be present even when photo is set
+    const editBadges = avatarPressable.findAll(
+      node => (node.type as unknown) === 'View' && node.props.testID === 'avatar-edit-badge',
+    );
+    expect(editBadges).toHaveLength(1);
+  });
+
   it('tapping the avatar when no photo shows camera/library options without Remove', async () => {
     const root = await mount();
     act(() => {

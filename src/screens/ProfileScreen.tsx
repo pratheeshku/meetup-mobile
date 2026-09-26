@@ -38,6 +38,7 @@ import {
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import ImageCropPicker from 'react-native-image-crop-picker';
+import Svg, { Path } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -64,7 +65,7 @@ import TextLink from '../components/TextLink';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getDisplayName } from '../utils/displayName';
 import { useSportDisplayName } from '../utils/labels';
-import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
+import { borderWidth, colors, radius, shadows, sizes, spacing, typography } from '../theme/tokens';
 import type { SkillLevelValue, UserProfile } from '../types/user';
 import type { Sport } from '../types/sport';
 import type { ProfileStackParamList } from '../navigation/types';
@@ -512,9 +513,10 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           accessibilityRole="button"
           accessibilityLabel="Change profile photo"
           disabled={isUploadingAvatar || isRemovingAvatar}
+          style={styles.avatarContainer}
         >
           {avatarPreviewUri ? (
-            <View>
+            <View style={styles.avatar}>
               <FastImage
                 source={{ uri: avatarPreviewUri }}
                 style={styles.avatar}
@@ -525,7 +527,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
               </View>
             </View>
           ) : profile.avatar_url ? (
-            <View>
+            <View style={styles.avatar}>
               <FastImage
                 source={{ uri: profile.avatar_url, priority: FastImage.priority.normal }}
                 style={styles.avatar}
@@ -544,6 +546,17 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
               </Text>
             </View>
           )}
+
+          <View
+            style={styles.avatarEditBadge}
+            testID="avatar-edit-badge"
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          >
+            <Svg width={14} height={14} viewBox="0 0 24 24" fill={colors.white}>
+              <Path d="M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm8 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-2a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" />
+            </Svg>
+          </View>
         </Pressable>
 
         {avatarError ? <Text style={styles.errorText}>{avatarError}</Text> : null}
@@ -740,11 +753,16 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 const styles = StyleSheet.create({
   container: { padding: spacing.md },
   header: { alignItems: 'center', marginBottom: spacing.md },
+  avatarContainer: {
+    position: 'relative',
+    width: sizes.avatar,
+    height: sizes.avatar,
+    marginBottom: spacing.md,
+  },
   avatar: {
     width: sizes.avatar,
     height: sizes.avatar,
     borderRadius: radius.full,
-    marginBottom: spacing.md,
   },
   avatarPlaceholder: {
     backgroundColor: colors.primary,
@@ -762,6 +780,20 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+    borderWidth: borderWidth.thick,
+    borderColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.card,
   },
   displayNameRow: { flexDirection: 'row', alignItems: 'center' },
   displayName: { ...typography.h2, color: colors.textPrimary, marginRight: spacing.sm },
