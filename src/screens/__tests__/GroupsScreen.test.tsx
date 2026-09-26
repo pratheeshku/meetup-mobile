@@ -82,7 +82,7 @@ describe('GroupsScreen scroll resets and navigation', () => {
       focusCallback = cb;
     });
 
-    const root = await renderAsync(element());
+    await renderAsync(element());
     expect(focusCallback).toBeDefined();
 
     // Verify calling the focus callback does not throw (safely executes scrollToOffset)

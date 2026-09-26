@@ -14,10 +14,9 @@ import ReactTestRenderer from 'react-test-renderer';
 import GroupCard, {
   ROLE_BADGE_LABEL,
   ROLE_BADGE_VARIANT,
-  ROLE_PILL_BACKGROUND,
   getRolePillColor,
 } from '../GroupCard';
-import { colors, radius } from '../../theme/tokens';
+import { colors } from '../../theme/tokens';
 import type { Group } from '../../types/group';
 
 const BASE_GROUP: Group = {
