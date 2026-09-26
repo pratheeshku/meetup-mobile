@@ -47,5 +47,12 @@
 **Why it matters generally**: Hooks provided by routing/navigation libraries often depend on internal context providers. When adding such hooks to components that are tested in isolation, existing unit tests that mount the component directly will break unless the mock configuration is updated to stub the new hooks or the test harness wraps the component in the appropriate provider.
 
 **Suggested addition** (target: "Gate 3 — Task confirmation"): When adding navigation or routing hooks (such as `useScrollToTop` or `useFocusEffect`) to components, check all existing test files for that component to see whether they render the component outside a router/navigation provider or use file-level module mocks, and update those mocks or harnesses accordingly.
+## 6. Scoping negative test assertions to container nodes when introducing new read-only fields
+
+**What happened**: When adding a new "Visibility" row to the read-only "Event Details" card on `EventDetailScreen`, an existing regression test asserting that the edit form does not expose visibility (`it('does not render visibility in edit form (immutable post-creation)')`) failed. The test originally used a global screen-wide string assertion (`expect(has(root, 'Visibility')).toBe(false)`). Because `EventDetailScreen` renders inline organiser form cards while keeping underlying read-only details cards mounted below, introducing "Visibility" to the read view caused the screen-wide check to fail even though the edit form itself never exposed the field. Scoping the assertion to the specific edit form card node (`texts(editForm).includes('Visibility')`) preserved the test's contract invariant without false failures.
+
+**Why it matters generally**: Screen-wide text assertions (`texts(root).includes(...)`) are brittle in views that mount modal sheets, collapsible panels, or inline editing forms alongside read-only details. Negative assertions that check for absence across the entire component tree will inadvertently break whenever domain terms or labels are introduced into sibling read-only cards.
+
+**Suggested addition** (target: "Test Requirements / Testing discipline"): When writing negative assertions to verify that a form or dialog omits specific fields or actions, scope the assertion to the specific form container or panel under test rather than the entire component root, preventing false failures when sibling read-only components display those same domain terms elsewhere on the screen.
 
 

@@ -10,7 +10,11 @@ import { Text } from 'react-native';
 
 import { getSports } from '../../api/sports';
 import { act, render, texts } from '../../test-utils/render';
-import { __resetSportDisplayNamesCacheForTests, useSportDisplayName } from '../labels';
+import {
+  __resetSportDisplayNamesCacheForTests,
+  getEventVisibilityLabel,
+  useSportDisplayName,
+} from '../labels';
 
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 
@@ -77,5 +81,33 @@ describe('useSportDisplayName', () => {
     const root = render(<Probe sport="badminton" />);
     expect(texts(root)).toEqual(['Badminton']);
     expect(mockGetSports).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('getEventVisibilityLabel', () => {
+  const customLabels = {
+    'event_visibility.public': 'Everyone',
+    'event_visibility.invite_only': 'Only Invited',
+    'event_visibility.group': 'My Group',
+  };
+
+  it('formats public visibility with 🌍 emoji and label', () => {
+    expect(getEventVisibilityLabel('public', {})).toBe('🌍 Public');
+    expect(getEventVisibilityLabel('public', customLabels)).toBe('🌍 Everyone');
+  });
+
+  it('formats invite_only visibility with 🔒 emoji and label', () => {
+    expect(getEventVisibilityLabel('invite_only', {})).toBe('🔒 Private');
+    expect(getEventVisibilityLabel('invite_only', customLabels)).toBe('🔒 Only Invited');
+  });
+
+  it('formats group visibility with 👥 emoji and label', () => {
+    expect(getEventVisibilityLabel('group', {})).toBe('👥 Group');
+    expect(getEventVisibilityLabel('group', customLabels)).toBe('👥 My Group');
+  });
+
+  it('defaults to public with 🌍 emoji for undefined or unknown values', () => {
+    expect(getEventVisibilityLabel(undefined, {})).toBe('🌍 Public');
+    expect(getEventVisibilityLabel('unknown' as any, {})).toBe('🌍 Public');
   });
 });

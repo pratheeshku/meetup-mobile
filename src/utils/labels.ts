@@ -22,6 +22,9 @@
 import { useEffect, useState } from 'react';
 
 import { getSports } from '../api/sports';
+import type { LabelMap } from '../api/labels';
+import { getLabel } from '../labels/LabelsContext';
+import type { EventVisibility } from '../types/event';
 
 // Module-wide cache: `getSports()` is fetched at most once across the whole
 // app's lifetime (per process), not once per screen/render. A slower earlier
@@ -80,3 +83,25 @@ export function __resetSportDisplayNamesCacheForTests(): void {
   sportNamesPromise = null;
   cachedSportNames = null;
 }
+
+/**
+ * Returns formatted event visibility with emoji and localized label:
+ *   🌍 {getLabel(labels, 'event_visibility.public')}
+ *   🔒 {getLabel(labels, 'event_visibility.invite_only')}
+ *   👥 {getLabel(labels, 'event_visibility.group')}
+ */
+export function getEventVisibilityLabel(
+  visibility: EventVisibility | string | undefined,
+  labels: LabelMap,
+): string {
+  switch (visibility) {
+    case 'invite_only':
+      return `🔒 ${getLabel(labels, 'event_visibility.invite_only')}`;
+    case 'group':
+      return `👥 ${getLabel(labels, 'event_visibility.group')}`;
+    case 'public':
+    default:
+      return `🌍 ${getLabel(labels, 'event_visibility.public')}`;
+  }
+}
+

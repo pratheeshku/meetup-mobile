@@ -706,6 +706,13 @@ designed on web first — mobile does not lead web on this contract.
   screen focus. Both screens wire `useScrollToTop(scrollRef)` to observe
   the standard platform convention of scrolling to top on active tab re-press.
 
+**Event Details Card Consolidation (UI polish 2026-09-26)**
+
+`EventDetailScreen.tsx` read view consolidates secondary event metadata into a headed "Event Details" card (`h3`, matching "About this game" and "Participants" card headings), replacing the former heading-less "Skill level / Waitlist" block.
+- Row order: Visibility, Skill level, Waitlist, Cost (only rendered when cost/currency is present).
+- Visibility row (first row): shows emoji + localized label (`🌍 Public`, `🔒 Invite Only`, `👥 Group`) sourced via `LabelsContext` (`event_visibility.*`), shared with `CreateGameScreen` options via `getEventVisibilityLabel`. Group name is omitted on Event read view as group metadata is not present on the `Event` payload.
+- "About this game" card retains only the event description text; cost is moved exclusively to the "Event Details" card.
+
 ### 4.4 Groups & Teams
 
 **Screens**: Group List, Group Detail, Create Group, Team List, Team

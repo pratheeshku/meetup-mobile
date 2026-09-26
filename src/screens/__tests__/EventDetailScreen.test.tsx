@@ -122,7 +122,15 @@ it('renders formatted cost with currency when estimated_cost_cents is set', asyn
   const root = await mount(
     rawEvent({ estimated_cost_cents: 1550, estimated_cost_currency: 'USD' }),
   );
-  expect(has(root, 'Cost: $15.50 USD')).toBe(true);
+  expect(has(root, 'Cost')).toBe(true);
+  expect(has(root, '$15.50 USD')).toBe(true);
+});
+
+it('does not render Cost row when estimated_cost_cents and cost are null', async () => {
+  const root = await mount(
+    rawEvent({ estimated_cost_cents: null, cost: null }),
+  );
+  expect(has(root, 'Cost')).toBe(false);
 });
 
 describe('organiser (organizer_id === signed-in user id)', () => {
@@ -496,8 +504,13 @@ describe('BUILD 2: Event Edit Flow', () => {
       pressableLabelled(root, 'Edit Game').props.onPress();
     });
 
-    expect(has(root, 'Visibility')).toBe(false);
-    expect(has(root, 'Invite Only')).toBe(false);
+    const editFormCards = root.findAll(
+      node => texts(node).includes('Edit Event') && texts(node).includes('Save Changes'),
+    );
+    const editForm = editFormCards[editFormCards.length - 1];
+    expect(editForm).toBeDefined();
+    expect(texts(editForm).includes('Visibility')).toBe(false);
+    expect(texts(editForm).includes('Invite Only')).toBe(false);
   });
 
   it('surfaces 409 conflict when sport change is locked after participant joined', async () => {
@@ -844,18 +857,75 @@ describe('Mobile Artboard Stacked Cards Layout', () => {
     expect(has(root, '1 spot left')).toBe(true);
   });
 
-  it('renders "About this game" Card with description', async () => {
-    const root = await mount(rawEvent({ description: 'Casual doubles, all skill levels welcome.' }));
+  it('renders "About this game" Card with description only', async () => {
+    const root = await mount(
+      rawEvent({
+        description: 'Casual doubles, all skill levels welcome.',
+        estimated_cost_cents: 1550,
+        estimated_cost_currency: 'USD',
+      }),
+    );
     expect(has(root, 'About this game')).toBe(true);
     expect(has(root, 'Casual doubles, all skill levels welcome.')).toBe(true);
   });
 
-  it('renders Skill level & Waitlist Card', async () => {
-    const root = await mount(rawEvent({ skill_level_requirement: 'beginner', allow_waitlist: true }));
-    expect(has(root, 'Skill level')).toBe(true);
-    expect(has(root, 'Beginner')).toBe(true);
-    expect(has(root, 'Waitlist')).toBe(true);
-    expect(has(root, 'Open')).toBe(true);
+  describe('Event Details Card', () => {
+    it('renders heading "Event Details" and row order: Visibility, Skill level, Waitlist', async () => {
+      const root = await mount(
+        rawEvent({
+          visibility: 'public',
+          skill_level_requirement: 'beginner',
+          allow_waitlist: true,
+        }),
+      );
+      expect(has(root, 'Event Details')).toBe(true);
+      expect(has(root, 'Visibility')).toBe(true);
+      expect(has(root, '🌍 Public')).toBe(true);
+      expect(has(root, 'Skill level')).toBe(true);
+      expect(has(root, 'Beginner')).toBe(true);
+      expect(has(root, 'Waitlist')).toBe(true);
+      expect(has(root, 'Open')).toBe(true);
+      expect(has(root, 'Cost')).toBe(false);
+
+      const allTexts = texts(root);
+      const visIdx = allTexts.indexOf('Visibility');
+      const skillIdx = allTexts.indexOf('Skill level');
+      const waitlistIdx = allTexts.indexOf('Waitlist');
+      expect(visIdx).toBeGreaterThan(-1);
+      expect(skillIdx).toBeGreaterThan(visIdx);
+      expect(waitlistIdx).toBeGreaterThan(skillIdx);
+    });
+
+    it('renders 🔒 Private when visibility is invite_only', async () => {
+      const root = await mount(rawEvent({ visibility: 'invite_only' }));
+      expect(has(root, 'Visibility')).toBe(true);
+      expect(has(root, '🔒 Private')).toBe(true);
+    });
+
+    it('renders 👥 Group when visibility is group', async () => {
+      const root = await mount(rawEvent({ visibility: 'group' }));
+      expect(has(root, 'Visibility')).toBe(true);
+      expect(has(root, '👥 Group')).toBe(true);
+    });
+
+    it('renders Cost row as last row when cost is present', async () => {
+      const root = await mount(
+        rawEvent({
+          visibility: 'public',
+          skill_level_requirement: 'beginner',
+          allow_waitlist: true,
+          estimated_cost_cents: 1000,
+          estimated_cost_currency: 'USD',
+        }),
+      );
+      expect(has(root, 'Cost')).toBe(true);
+      expect(has(root, '$10.00 USD')).toBe(true);
+
+      const allTexts = texts(root);
+      const waitlistIdx = allTexts.indexOf('Waitlist');
+      const costIdx = allTexts.indexOf('Cost');
+      expect(costIdx).toBeGreaterThan(waitlistIdx);
+    });
   });
 
   it('renders Participants Card with participant names and roles', async () => {
