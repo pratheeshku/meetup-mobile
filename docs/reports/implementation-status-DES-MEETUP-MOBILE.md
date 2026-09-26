@@ -1,18 +1,25 @@
-## Status — 2026-09-22T00:00:00Z (archived — task complete)
+## Status — 2026-09-26T22:50:00+08:00 (archived — task complete)
 
 ### Completed
-- Design document amendment (Create Flow, §4.3/§4.5) confirmed as a real commit on `origin/main` (`fab9855`) and merged into this branch, after an initial Blocked Report on the unverifiable amendment claim in the task brief.
-- Field-source research directly against `pratheeshku/meetup` (backend `events/schemas.py`/`tournaments/schemas.py`, frontend `app.js`) via `gh api`, resolving every open field-set question without guessing.
-- FAB menu reduced to Game/Group; `CreateTournamentScreen` retired; merged `CreateGameScreen` built with a Casual Game/Tournament toggle, both submitting to the real `POST /events`/`POST /tournaments` endpoints.
-- `EventVisibility` enum bug fixed (forced by the amendment's own field needs); `EventCard` label corrected to match.
-- Full test suite (659/659, 3 consecutive runs), `tsc`, `eslint`, and a production Android bundle all clean.
-- Implementation Report committed: `docs/reports/IMPL-DES-MEETUP-MOBILE-create-flow-amendment.md`.
+- Verified git identity: Pratheesh <pratheeshknow@gmail.com>.
+- Created working branch `fix/mobile-event-detail-visibility-details-card`.
+- Pre-code gates 1, 2, 3 executed and verified. Baseline tests passing.
+- Extracted `getEventVisibilityLabel(visibility, labels)` helper in `src/utils/labels.ts`.
+- Integrated `getEventVisibilityLabel` in `src/screens/CreateGameScreen.tsx` (`CASUAL_VISIBILITY_OPTIONS`).
+- Renamed Card 4 in `src/screens/EventDetailScreen.tsx` to "Event Details" card with `cardHeading` (`h3`), adding Visibility as first row with emoji (`🌍 Public`, `🔒 Private`, `👥 Group`).
+- Relocated Cost line from Card 3 ("About this game") into Card 4 ("Event Details") as the last row using `metaKeyValRow`.
+- Maintained "About this game" with description text only.
+- Added and updated tests in `src/screens/__tests__/EventDetailScreen.test.tsx` and `src/utils/__tests__/labels.test.tsx`.
+- Updated `docs/DES-MEETUP-MOBILE.md` §4.3 to document consolidated "Event Details" card.
+- Full test suite passing (70/70 suites, 900/900 tests), `tsc --noEmit` clean, React Native Android bundle clean.
+- Session reflection: `docs/reports/agent-enhancement-2026-09-26.md`.
+- Implementation Report committed: `docs/reports/IMPL-DES-MEETUP-MOBILE-event-detail-visibility-details-card.md`.
 
 ### In Progress
 - None.
 
 ### Pending
-- None.
+- Push to origin branch `fix/mobile-event-detail-visibility-details-card`.
 
 ### Blocked
-- None currently. Known gap (not a blocker): device/emulator manual QA of both toggle states against the live API could not be performed in this sandbox (no attached device, no emulator) — flagged in the Implementation Report §0.2/§6 as a required human follow-up before ship.
+- None.
