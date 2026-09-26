@@ -1,20 +1,16 @@
-## Status — 2026-09-26T17:04:30+08:00
+## Status — 2026-09-26T21:03:30+08:00
 ### Completed
-- Design document acceptance (DES-MEETUP-ADDENDUM-profile-photo.md v1.0 APPROVED; reversal of non-goal / Assumption 2 per architect instruction acknowledged)
-- Git identity verified (Pratheesh / pratheeshknow@gmail.com)
-- Gate 1 — Environment verified (bare RN 0.86.3, React 19.2.3, New Architecture, no Expo)
-- Gate 2 — Dependency audit (react-native-image-crop-picker@0.51.1 installed >=0.50.0, react-native-image-picker removed)
-- Gate 3 — Task confirmation & empirical native capability analysis
-- Native crop controller analysis:
-  * iOS (TOCropViewController): exposes crop, pinch-zoom, reposition, 90-degree rotate button, angle adjustment. Does NOT expose flip (horizontal or vertical mirror).
-  * Android (uCrop): exposes crop, pinch-zoom, reposition, 90-degree rotate buttons, angle dial, rotation gestures. Does NOT expose flip (horizontal or vertical mirror).
-- ProfileScreen.tsx: wired up ImageCropPicker openPicker/openCamera with cropping: true, 500x500 square aspect ratio, rotation controls enabled, and graceful cancellation handling (E_PICKER_CANCELLED)
-- jest.config.js & jest.setup.js: updated mocks and transformIgnorePatterns for react-native-image-crop-picker
-- Tests: 29/29 passing in ProfileScreen.test.tsx; all 890 tests passing across 70 suites (3 consecutive green runs)
-- TypeScript tsc clean (exit 0)
-- ESLint clean on src/ (exit 0)
-- Agent enhancement document updated (docs/reports/agent-enhancement-2026-09-26.md)
-- Implementation Report generated (docs/reports/IMPL-DES-MEETUP-ADDENDUM-profile-photo-crop.md)
+- Verified git identity (Pratheesh / pratheeshknow@gmail.com)
+- Accepted design reference (DES-MEETUP-ADDENDUM-profile-photo.md v1.0, APPROVED)
+- Pre-code Gates 1, 2, 3 passed (React Native 0.86.3, no new dependencies, react-native-svg reused)
+- Added visual edit-icon overlay badge (`avatarEditBadge`) positioned at bottom-right of avatar circle in `src/screens/ProfileScreen.tsx`
+- Purely decorative affordance contained within the single existing `Pressable` (no separate touch target, no new interaction logic)
+- Marked overlay as decorative with `accessibilityElementsHidden` and `importantForAccessibility="no"`
+- Renders consistently whether avatar photo is loaded or placeholder initials are displayed
+- Added automated unit tests in `src/screens/__tests__/ProfileScreen.test.tsx` verifying badge presence, placement, and a11y properties
+- Verification: clean `tsc --noEmit`, clean `eslint src/`, all 70 test suites / 892 tests passing across 3 consecutive runs
+- Updated enhancement note in `docs/reports/agent-enhancement-2026-09-26.md`
+- Created Implementation Report in `docs/reports/IMPL-DES-MEETUP-ADDENDUM-profile-photo-affordance.md`
 
 ### In Progress
 (none)
