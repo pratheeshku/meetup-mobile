@@ -40,3 +40,12 @@
 
 **Suggested addition** (target: "Fidelity rules / Accessibility"): When adding visual affordance badges or icon overlays to existing interactive components, keep the badge strictly decorative (non-interactive) inside the existing interactive container unless the specification explicitly mandates independent interaction. Always mark purely decorative overlay icons with `accessibilityElementsHidden` and `importantForAccessibility="no"` so accessibility labels on the parent component remain the single source of truth.
 
+## 6. Accounting for navigation context dependencies in unit test harnesses
+
+**What happened**: Integrating `useScrollToTop` and `useFocusEffect` into `HomeScreen` and `GroupsScreen` caused failures in unit tests that rendered the screens directly using standalone render harnesses rather than inside a `NavigationContainer`. `useScrollToTop` internally calls `useRoute()`, throwing an error if no navigation context exists in the test tree. In addition, existing test-file-level mocks of `@react-navigation/native` lacked the newly added hooks, resulting in `is not a function` errors. Updating the mocks to stub `useScrollToTop` and `useFocusEffect` allowed direct screen tests to pass without needing full navigator wrappers.
+
+**Why it matters generally**: Hooks provided by routing/navigation libraries often depend on internal context providers. When adding such hooks to components that are tested in isolation, existing unit tests that mount the component directly will break unless the mock configuration is updated to stub the new hooks or the test harness wraps the component in the appropriate provider.
+
+**Suggested addition** (target: "Gate 3 — Task confirmation"): When adding navigation or routing hooks (such as `useScrollToTop` or `useFocusEffect`) to components, check all existing test files for that component to see whether they render the component outside a router/navigation provider or use file-level module mocks, and update those mocks or harnesses accordingly.
+
+
