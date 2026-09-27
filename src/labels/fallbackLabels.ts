@@ -34,9 +34,9 @@ export const FALLBACK_LABELS: LabelMap = {
   'event_visibility.group': 'Group',
 
   'tournament_visibility.public': 'Public',
-  'tournament_visibility.invite': 'Invite Only',
+  'tournament_visibility.invite': 'Private',
   'tournament_visibility.group': 'Group Only',
 
   'team_visibility.public': 'Public',
-  'team_visibility.private': 'Invite Only',
+  'team_visibility.private': 'Private',
 };

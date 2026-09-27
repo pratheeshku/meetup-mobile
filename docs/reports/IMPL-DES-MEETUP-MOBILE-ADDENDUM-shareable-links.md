@@ -16,7 +16,7 @@
 | R-277, Decision 3, Decision 15 | Group Invite Button (organizer/admin view): calls `POST /groups/invitations` with `{ group_id }`, receives `{ token, invitation_url }` | `src/types/group.ts` (`GroupInvitationResponse`), `src/api/groups.ts` (`createGroupInvitation`), `src/screens/GroupDetailScreen.tsx` | `f19c935` |
 | R-280, Decision 4 | Native share integration: generic `Share.share` sheet & WhatsApp direct link (`whatsapp://send?text=...`) with `https://wa.me/?text=...` fallback | `src/utils/shareLink.ts` (`shareGeneric`, `shareToWhatsApp`), `src/components/ShareActionSheet.tsx` | `f19c935` |
 | R-281, Decision 5 | Copy link via built-in React Native `Clipboard` with Toast confirmation | `src/utils/shareLink.ts` (`copyLinkToClipboard`), `src/components/Toast.tsx` | `f19c935` |
-| Decision 6 | "Invite Only" display relabel: "private" / "invite_only" displays as "Invite Only" | `src/labels/fallbackLabels.ts`, `src/utils/labels.ts` | `f19c935` |
+| Decision 6 | "Invite Only" display relabel: "private" / "invite_only" displays as "Invite Only" strictly for events (`event_visibility.invite_only`). Tournament and team visibility mappings remain untouched as "Private" per Decision 6 scope. | `src/labels/fallbackLabels.ts`, `src/utils/labels.ts` | `f19c935` |
 | Test Coverage | Comprehensive unit tests for share link utils, action sheet, toast, API, and screen integrations | `src/utils/__tests__/shareLink.test.ts`, `src/components/__tests__/ShareActionSheet.test.tsx`, `src/components/__tests__/Toast.test.tsx`, `src/api/__tests__/groups.test.ts`, `src/screens/__tests__/EventDetailScreen.test.tsx`, `src/screens/__tests__/GroupDetailScreen.test.tsx`, `src/screens/__tests__/CreateGroupScreen.test.tsx`, `src/utils/__tests__/labels.test.tsx` | `f19c935` |
 
 ## 3. Proposed Assumptions
@@ -36,10 +36,11 @@ None.
   - Baseline before: 70 suites, 900 tests.
   - After: 75 suites, 952 tests (+5 suites, +52 net new passing tests).
   - Test suite was executed once as mandated.
+- **Backend Testing Mode Confirmation (`POST /groups/invitations`)**: Tested against **mock only** (unit tests in `src/api/__tests__/groups.test.ts` and screen integration in `src/screens/__tests__/GroupDetailScreen.test.tsx`). The endpoint was NOT tested against the live kannapi endpoint (`https://meetups.duckdns.org`) because a live probe confirmed `POST /groups/invitations` was not yet deployed/merged on backend (returned 404; route absent from `/openapi.json`). Built to match the authoritative Decision 15 wire contract verbatim.
 
 ## 6. Known Gaps / Follow-ups
 
-- Backend route `POST /groups/invitations` is being developed concurrently in `pratheeshku/meetup` against the same Decision 15 wire schema (`{ group_id }` -> `{ token, invitation_url }`).
+- Backend route `POST /groups/invitations` is being developed concurrently in `pratheeshku/meetup` against the same Decision 15 wire schema (`{ group_id }` -> `{ token, invitation_url }`). E2E verification against live kannapi to occur once backend deployment completes.
 
 ---
 
@@ -97,5 +98,4 @@ src/utils/shareLink.ts:25:export function composeShareMessage(
 src/utils/shareLink.ts:31:  return `${inviterDisplayName} invited you to ${eventOrGroupName} on Shuttlr \u2014 ${link}`;
 src/api/groups.ts:220:export async function createGroupInvitation(
 src/labels/fallbackLabels.ts:33:  'event_visibility.invite_only': 'Invite Only',
-src/labels/fallbackLabels.ts:41:  'team_visibility.private': 'Invite Only',
 ```
