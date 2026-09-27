@@ -26,6 +26,7 @@ import {
   getEventParticipants,
   inviteGroupToEvent,
   inviteUserToEvent,
+  inviteEmailToEvent,
   rsvpEvent,
   updateEvent,
   withdrawEvent,
@@ -123,6 +124,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
   const [selectedInviteUser, setSelectedInviteUser] = useState<UserSearchResult | null>(null);
+  const [selectedInviteEmail, setSelectedInviteEmail] = useState<string | null>(null);
   const [isInviteUserSubmitting, setIsInviteUserSubmitting] = useState(false);
   const [inviteUserError, setInviteUserError] = useState<string | null>(null);
   const [inviteUserSuccess, setInviteUserSuccess] = useState<string | null>(null);
@@ -369,6 +371,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     setInviteUserError(null);
     setInviteUserSuccess(null);
     setSelectedInviteUser(null);
+    setSelectedInviteEmail(null);
     setIsEditing(false);
     setIsCancelFormOpen(false);
     setIsInviteGroupOpen(false);
@@ -380,11 +383,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     setInviteUserError(null);
     setInviteUserSuccess(null);
     setSelectedInviteUser(null);
+    setSelectedInviteEmail(null);
   };
 
   const handleSendUserInvite = async (): Promise<void> => {
-    if (!selectedInviteUser) {
-      setInviteUserError('Search for and choose a user to invite.');
+    if (!selectedInviteUser && !selectedInviteEmail) {
+      setInviteUserError('Search for and choose a user or email to invite.');
       return;
     }
     setInviteUserError(null);
@@ -392,10 +396,16 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     setIsInviteUserSubmitting(true);
     try {
       await withCorrelationId(async correlationId => {
-        await inviteUserToEvent(eventId, selectedInviteUser.id, { correlationId });
-        setInviteUserSuccess(`Invitation sent to ${selectedInviteUser.nickname}!`);
+        if (selectedInviteEmail) {
+          await inviteEmailToEvent(eventId, selectedInviteEmail, { correlationId });
+          setInviteUserSuccess(`Invitation sent to ${selectedInviteEmail}!`);
+          setSelectedInviteEmail(null);
+        } else if (selectedInviteUser) {
+          await inviteUserToEvent(eventId, selectedInviteUser.id, { correlationId });
+          setInviteUserSuccess(`Invitation sent to ${selectedInviteUser.nickname}!`);
+          setSelectedInviteUser(null);
+        }
       });
-      setSelectedInviteUser(null);
     } catch (e) {
       setInviteUserError(getApiErrorMessage(e, 'Could not send the invite. Please try again.'));
     } finally {
@@ -816,9 +826,22 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 disabled={isInviteUserSubmitting}
               />
             </View>
+          ) : selectedInviteEmail ? (
+            <View style={styles.selectedInviteRow}>
+              <Text style={styles.selectedInviteText}>
+                Invite by email: {selectedInviteEmail}
+              </Text>
+              <TextLink
+                label="Change"
+                onPress={() => setSelectedInviteEmail(null)}
+                disabled={isInviteUserSubmitting}
+              />
+            </View>
           ) : (
             <UserSearchPicker
               onSelect={setSelectedInviteUser}
+              onSelectEmail={setSelectedInviteEmail}
+              entityLabel="participant"
               excludeEventId={eventId}
               disabled={isInviteUserSubmitting}
             />
@@ -831,7 +854,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               variant="primary"
               onPress={handleSendUserInvite}
               loading={isInviteUserSubmitting}
-              disabled={!selectedInviteUser || isInviteUserSubmitting}
+              disabled={(!selectedInviteUser && !selectedInviteEmail) || isInviteUserSubmitting}
               style={styles.rowButton}
             />
             <Button

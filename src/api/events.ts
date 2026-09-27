@@ -303,6 +303,24 @@ export async function inviteUserToEvent(
 }
 
 /**
+ * Invite an email address to an event: calls `POST /events/{id}/invite-email`.
+ * Organiser-only action. Takes `{ email }`.
+ * DES-MEETUP-ADDENDUM-shareable-links Decision 25.
+ */
+export async function inviteEmailToEvent(
+  eventId: string,
+  email: string,
+  options?: RequestOptions,
+): Promise<EventInvitation> {
+  const { data } = await apiClient.post<EventInvitation>(
+    `/events/${eventId}/invite-email`,
+    { email },
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+/**
   * Fetch event participants: calls `GET /events/{id}/participants`.
   */
 export async function getEventParticipants(

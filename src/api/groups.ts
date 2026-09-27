@@ -215,16 +215,21 @@ export async function createGroup(
 }
 
 /**
- * `POST /groups/invitations` (DES-MEETUP-ADDENDUM-shareable-links Decision 15).
+ * `POST /groups/invitations` (DES-MEETUP-ADDENDUM-shareable-links Decision 15, Decision 24).
  * Authenticated; creates group invitation token and returns shareable URL.
+ * When `invitedEmail` is specified, attaches `invited_email` to the request body.
  */
 export async function createGroupInvitation(
   groupId: string,
-  options?: RequestOptions,
+  options?: RequestOptions & { invitedEmail?: string | null },
 ): Promise<GroupInvitationResponse> {
+  const body: { group_id: string; invited_email?: string } = { group_id: groupId };
+  if (options?.invitedEmail) {
+    body.invited_email = options.invitedEmail;
+  }
   const { data } = await apiClient.post<GroupInvitationResponse>(
     '/groups/invitations',
-    { group_id: groupId },
+    body,
     { correlationId: options?.correlationId },
   );
   return data;

@@ -191,6 +191,33 @@ describe('invite flow', () => {
     expect(mockInviteMember).toHaveBeenCalledTimes(1);
     expect(mockInviteMember).toHaveBeenCalledWith('group-1', 'u-3', expect.anything());
   });
+
+  it('supports inviting by email when zero search results for valid email (Decision 23 & 24)', async () => {
+    mockSearchUsers.mockResolvedValueOnce([]);
+    mockCreateGroupInvitation.mockResolvedValueOnce({
+      token: 'tok-email-abc',
+      invitation_url: 'https://meetups.duckdns.org/groups/invite/tok-email-abc',
+    });
+
+    const root = await mount();
+    act(() => pressableWithText(root, 'Invite').props.onPress());
+
+    await search(root, 'friend@example.com');
+    expect(texts(root)).toContain('✉️ Invite friend@example.com as new member');
+
+    act(() => pressableLabelled(root, 'Invite friend@example.com as new member').props.onPress());
+    expect(texts(root)).toContain('Invite by email: friend@example.com');
+    expect(texts(root)).toContain('Change');
+
+    await act(async () => pressableWithText(root, 'Send Invite').props.onPress());
+
+    expect(mockCreateGroupInvitation).toHaveBeenCalledWith(
+      'group-1',
+      expect.objectContaining({ invitedEmail: 'friend@example.com' }),
+    );
+    expect(mockInviteMember).not.toHaveBeenCalled();
+    expect(mockGetGroup).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('group invite link sharing', () => {

@@ -32,18 +32,30 @@ jest.mock('../../auth/AuthContext', () => ({
 }));
 
 jest.mock('../../components/UserSearchPicker', () => {
-  const { Pressable, Text } = require('react-native');
-  return function MockUserSearchPicker({ onSelect, disabled, excludeEventId }: any) {
+  const { Pressable, Text, View } = require('react-native');
+  return function MockUserSearchPicker({ onSelect, onSelectEmail, disabled, excludeEventId }: any) {
     return (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Pick Alex"
-        testID={`mock-picker-${excludeEventId}`}
-        disabled={disabled}
-        onPress={() => onSelect({ id: 'u-user-1', nickname: 'alex', display_name: 'Alex C' })}
-      >
-        <Text>Pick Alex</Text>
-      </Pressable>
+      <View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Pick Alex"
+          testID={`mock-picker-${excludeEventId}`}
+          disabled={disabled}
+          onPress={() => onSelect({ id: 'u-user-1', nickname: 'alex', display_name: 'Alex C' })}
+        >
+          <Text>Pick Alex</Text>
+        </Pressable>
+        {onSelectEmail ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Pick Email"
+            disabled={disabled}
+            onPress={() => onSelectEmail('newcomer@example.com')}
+          >
+            <Text>Pick Email</Text>
+          </Pressable>
+        ) : null}
+      </View>
     );
   };
 });
@@ -842,6 +854,45 @@ describe('BUILD C: Individual Invite Flow', () => {
       pressableLabelled(root, 'Close').props.onPress();
     });
     expect(has(root, 'Pick Alex')).toBe(false);
+  });
+
+  it('opens invite user form and sends POST /events/{id}/invite-email when email is selected (Decision 25)', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        id: 'inv-eml-1',
+        event_id: 'evt-1',
+        invited_email: 'newcomer@example.com',
+        status: 'pending',
+      },
+    });
+
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+
+    await act(async () => {
+      pressableLabelled(root, 'Invite Individual').props.onPress();
+    });
+
+    expect(has(root, 'Pick Email')).toBe(true);
+
+    // Pick Email
+    await act(async () => {
+      pressableLabelled(root, 'Pick Email').props.onPress();
+    });
+
+    expect(has(root, 'Invite by email: newcomer@example.com')).toBe(true);
+    expect(has(root, 'Change')).toBe(true);
+
+    // Send Invite
+    await act(async () => {
+      pressableLabelled(root, 'Send Invite').props.onPress();
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/events/evt-1/invite-email',
+      { email: 'newcomer@example.com' },
+      expect.any(Object),
+    );
+    expect(has(root, 'Invitation sent to newcomer@example.com!')).toBe(true);
   });
 });
 

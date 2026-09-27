@@ -25,9 +25,12 @@ import TextField from './TextField';
 
 const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_MS = 300;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface UserSearchPickerProps {
   onSelect: (user: UserSearchResult) => void;
+  onSelectEmail?: (email: string) => void;
+  entityLabel?: string;
   excludeGroupId?: string;
   excludeEventId?: string;
   excludeTeamId?: string;
@@ -37,6 +40,8 @@ interface UserSearchPickerProps {
 
 export default function UserSearchPicker({
   onSelect,
+  onSelectEmail,
+  entityLabel = 'member',
   excludeGroupId,
   excludeEventId,
   excludeTeamId,
@@ -110,7 +115,24 @@ export default function UserSearchPicker({
     setError(null);
   };
 
-  const showEmpty = !isSearching && !error && hasSearched && results.length === 0;
+  const handleSelectEmail = (email: string): void => {
+    if (!onSelectEmail) {
+      return;
+    }
+    onSelectEmail(email);
+    latestSearch.current += 1;
+    setQuery('');
+    setResults([]);
+    setHasSearched(false);
+    setError(null);
+  };
+
+  const trimmed = query.trim();
+  const isEmail = EMAIL_REGEX.test(trimmed);
+  const showEmailAffordance =
+    !isSearching && !error && hasSearched && results.length === 0 && isEmail && Boolean(onSelectEmail);
+  const showEmpty =
+    !isSearching && !error && hasSearched && results.length === 0 && !showEmailAffordance;
 
   return (
     <View>
@@ -131,6 +153,26 @@ export default function UserSearchPicker({
       ) : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {showEmpty ? <Text style={styles.emptyText}>No users found.</Text> : null}
+      {showEmailAffordance ? (
+        <View style={styles.resultsList}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.resultRow,
+              pressed ? styles.resultRowPressed : null,
+            ]}
+            onPress={() => handleSelectEmail(trimmed)}
+            accessibilityRole="button"
+            accessibilityLabel={`Invite ${trimmed} as new ${entityLabel}`}
+          >
+            <View style={styles.resultText}>
+              <Text style={styles.emailAffordanceTitle}>
+                ✉️ Invite {trimmed} as new {entityLabel}
+              </Text>
+              <Text style={styles.resultDisplayName}>Send an email invitation to join</Text>
+            </View>
+          </Pressable>
+        </View>
+      ) : null}
       {!isSearching && results.length > 0 ? (
         <View style={styles.resultsList}>
           {results.map(user => (
@@ -190,5 +232,6 @@ const styles = StyleSheet.create({
   resultText: { flexShrink: 1 },
   resultNickname: { ...typography.bodyBold, color: colors.textPrimary },
   resultDisplayName: { ...typography.caption, color: colors.textSecondary },
+  emailAffordanceTitle: { ...typography.bodyBold, color: colors.primary },
   pendingLabel: { ...typography.caption, color: colors.textMuted },
 });

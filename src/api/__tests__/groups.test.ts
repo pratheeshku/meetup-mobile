@@ -227,6 +227,27 @@ describe('createGroupInvitation', () => {
     });
   });
 
+  it('posts to /groups/invitations with { group_id, invited_email } when invitedEmail provided (Decision 24)', async () => {
+    mockedPost.mockResolvedValueOnce({
+      data: {
+        token: 'tok-email-123',
+        invitation_url: 'https://meetups.duckdns.org/groups/invite/tok-email-123',
+      },
+    });
+
+    const res = await createGroupInvitation('grp-999', {
+      invitedEmail: 'friend@example.com',
+      correlationId: 'cid-email-inv',
+    });
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/groups/invitations',
+      { group_id: 'grp-999', invited_email: 'friend@example.com' },
+      { correlationId: 'cid-email-inv' },
+    );
+    expect(res.token).toBe('tok-email-123');
+  });
+
   it('propagates a failed request to the caller', async () => {
     mockedPost.mockRejectedValueOnce(new Error('unauthorized'));
     await expect(createGroupInvitation('grp-999')).rejects.toThrow('unauthorized');

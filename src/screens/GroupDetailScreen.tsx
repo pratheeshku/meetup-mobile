@@ -82,6 +82,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 
   const [isInviteFormOpen, setIsInviteFormOpen] = useState(false);
   const [selectedInviteUsers, setSelectedInviteUsers] = useState<UserSearchResult[]>([]);
+  const [selectedInviteEmail, setSelectedInviteEmail] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
@@ -169,6 +170,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
   const handleOpenInviteForm = (): void => {
     setInviteError(null);
     setSelectedInviteUsers([]);
+    setSelectedInviteEmail(null);
     setIsInviteFormOpen(true);
   };
 
@@ -176,9 +178,11 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
     setIsInviteFormOpen(false);
     setInviteError(null);
     setSelectedInviteUsers([]);
+    setSelectedInviteEmail(null);
   };
 
   const handleSelectUser = (selected: UserSearchResult): void => {
+    setSelectedInviteEmail(null);
     setSelectedInviteUsers(prev => {
       if (prev.some(u => u.id === selected.id)) {
         return prev;
@@ -187,26 +191,40 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
     });
   };
 
+  const handleSelectEmail = (email: string): void => {
+    setSelectedInviteUsers([]);
+    setSelectedInviteEmail(email);
+  };
+
   const handleRemoveUser = (userId: string): void => {
     setSelectedInviteUsers(prev => prev.filter(u => u.id !== userId));
   };
 
+  const handleRemoveEmail = (): void => {
+    setSelectedInviteEmail(null);
+  };
+
   const handleSendInvite = async (): Promise<void> => {
-    if (selectedInviteUsers.length === 0) {
-      setInviteError('Search for and choose a user to invite.');
+    if (selectedInviteUsers.length === 0 && !selectedInviteEmail) {
+      setInviteError('Search for and choose a user or email to invite.');
       return;
     }
     setInviteError(null);
     setIsInviting(true);
     try {
       await withCorrelationId(async correlationId => {
-        for (const invitee of selectedInviteUsers) {
-          await inviteMember(groupId, invitee.id, { correlationId });
+        if (selectedInviteEmail) {
+          await createGroupInvitation(groupId, { invitedEmail: selectedInviteEmail, correlationId });
+        } else {
+          for (const invitee of selectedInviteUsers) {
+            await inviteMember(groupId, invitee.id, { correlationId });
+          }
         }
         setGroup(await getGroup(groupId, { correlationId }));
       });
       setIsInviteFormOpen(false);
       setSelectedInviteUsers([]);
+      setSelectedInviteEmail(null);
     } catch {
       setInviteError('Could not send the invite. Please try again.');
     } finally {
@@ -358,6 +376,19 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 
         {isInviteFormOpen ? (
           <View style={styles.editRow}>
+            {selectedInviteEmail ? (
+              <View style={styles.selectedInviteRow}>
+                <Text style={styles.selectedInviteText}>
+                  Invite by email: {selectedInviteEmail}
+                </Text>
+                <TextLink
+                  label="Change"
+                  accessibilityLabel={`Remove ${selectedInviteEmail}`}
+                  onPress={handleRemoveEmail}
+                  disabled={isInviting}
+                />
+              </View>
+            ) : null}
             {selectedInviteUsers.map(invitee => (
               <View key={invitee.id} style={styles.selectedInviteRow}>
                 <Text style={styles.selectedInviteText}>
@@ -371,11 +402,15 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
                 />
               </View>
             ))}
-            <UserSearchPicker
-              onSelect={handleSelectUser}
-              excludeGroupId={groupId}
-              disabled={isInviting}
-            />
+            {!selectedInviteEmail ? (
+              <UserSearchPicker
+                onSelect={handleSelectUser}
+                onSelectEmail={handleSelectEmail}
+                entityLabel="member"
+                excludeGroupId={groupId}
+                disabled={isInviting}
+              />
+            ) : null}
             {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
             <View style={styles.editActionsRow}>
               <Button
@@ -383,7 +418,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
                 size="sm"
                 onPress={handleSendInvite}
                 loading={isInviting}
-                disabled={selectedInviteUsers.length === 0}
+                disabled={selectedInviteUsers.length === 0 && !selectedInviteEmail}
                 style={styles.actionSpacing}
               />
               <Button
