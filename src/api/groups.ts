@@ -105,16 +105,53 @@ function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
   };
 }
 
-export async function getMyGroups(options?: RequestOptions): Promise<GroupsListResponse> {
+export interface GetMyGroupsOptions extends RequestOptions {
+  enrich?: boolean;
+}
+
+export async function getMyGroups(options?: GetMyGroupsOptions): Promise<GroupsListResponse> {
   const correlationId = options?.correlationId;
   const [{ data: owned }, { data: member }] = await Promise.all([
     apiClient.get<GroupApiItem[]>('/settings/groups-owned', { correlationId }),
     apiClient.get<GroupApiItem[]>('/settings/groups-member', { correlationId }),
   ]);
-  const items = [
-    ...owned.map(raw => mapGroupApiItem(raw, 'owner')),
-    ...member.map(raw => mapGroupApiItem(raw, 'member')),
+  const rawItems = [
+    ...owned.map(raw => ({ raw, role: 'owner' as GroupRole })),
+    ...member.map(raw => ({ raw, role: 'member' as GroupRole })),
   ];
+
+  const uniqueMap = new Map<string, { raw: GroupApiItem; role: GroupRole }>();
+  for (const item of rawItems) {
+    if (!uniqueMap.has(item.raw.id) || item.role === 'owner') {
+      uniqueMap.set(item.raw.id, item);
+    }
+  }
+  const uniqueItems = Array.from(uniqueMap.values());
+
+  if (options?.enrich) {
+    const enrichedItems = await Promise.all(
+      uniqueItems.map(async ({ raw, role }) => {
+        try {
+          const { data: rawMembers } = await apiClient.get<GroupMembershipApiItem[]>(
+            `/groups/${raw.id}/members`,
+            { correlationId },
+          );
+          const members = rawMembers.map(mapGroupMember);
+          const owner = members.find(m => m.user_id === raw.owner_id);
+          return {
+            ...mapGroupApiItem(raw, role),
+            owner_nickname: owner?.nickname ?? '',
+            member_count: members.length,
+          };
+        } catch {
+          return mapGroupApiItem(raw, role);
+        }
+      }),
+    );
+    return { items: enrichedItems, total: enrichedItems.length, page: 1, page_size: enrichedItems.length };
+  }
+
+  const items = uniqueItems.map(({ raw, role }) => mapGroupApiItem(raw, role));
   return { items, total: items.length, page: 1, page_size: items.length };
 }
 

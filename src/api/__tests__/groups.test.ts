@@ -67,6 +67,54 @@ describe('getMyGroups', () => {
     expect(result.items[0].member_count).toBeUndefined();
     expect(result.items[0].owner_nickname).toBeUndefined();
   });
+
+  it('enriches items with member_count and owner_nickname when enrich is true', async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url === '/settings/groups-owned') {
+        return Promise.resolve({
+          data: [
+            {
+              id: 'g-owned',
+              name: 'My Owned Group',
+              description: 'desc',
+              owner_id: 'u-1',
+              members_can_invite: true,
+              created_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+      }
+      if (url === '/settings/groups-member') {
+        return Promise.resolve({ data: [] });
+      }
+      if (url === '/groups/g-owned/members') {
+        return Promise.resolve({
+          data: [
+            {
+              user_id: 'u-1',
+              role: 'owner',
+              joined_at: '2026-01-01T00:00:00Z',
+              user_display_name: 'Sam Owner',
+              user_nickname: 'sam',
+            },
+            {
+              user_id: 'u-2',
+              role: 'member',
+              joined_at: '2026-01-02T00:00:00Z',
+              user_display_name: 'Alex Member',
+              user_nickname: 'alex',
+            },
+          ],
+        });
+      }
+      throw new Error(`unexpected url ${url}`);
+    });
+
+    const result = await getMyGroups({ enrich: true });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].member_count).toBe(2);
+    expect(result.items[0].owner_nickname).toBe('sam');
+  });
 });
 
 describe('getGroup', () => {

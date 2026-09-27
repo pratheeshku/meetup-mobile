@@ -206,6 +206,50 @@ describe('GroupCard', () => {
     });
   });
 
+  describe('Owner display and metadata', () => {
+    it('displays "Owner: Self" when user is owner by role', () => {
+      const renderer = renderCard({ current_user_role: 'owner' });
+      const t = texts(renderer).map(textOf);
+      expect(t).toContain('Owner: Self');
+    });
+
+    it('displays "Owner: Self" when currentUserId matches owner_id', () => {
+      let renderer!: ReactTestRenderer.ReactTestRenderer;
+      ReactTestRenderer.act(() => {
+        renderer = ReactTestRenderer.create(
+          <GroupCard
+            group={{ ...BASE_GROUP, owner_id: 'my-user-id', current_user_role: 'member' }}
+            currentUserId="my-user-id"
+            onPress={jest.fn()}
+          />,
+        );
+      });
+      const t = texts(renderer).map(textOf);
+      expect(t).toContain('Owner: Self');
+    });
+
+    it('displays "Owner: <nickname>" when owner is someone else and owner_nickname is set', () => {
+      const renderer = renderCard({
+        owner_id: 'other-user',
+        current_user_role: 'member',
+        owner_nickname: 'Alex',
+      });
+      const t = texts(renderer).map(textOf);
+      expect(t).toContain('Owner: Alex');
+    });
+
+    it('displays both member count and owner separated by middle dot', () => {
+      const renderer = renderCard({
+        member_count: 8,
+        current_user_role: 'owner',
+      });
+      const t = texts(renderer).map(textOf);
+      expect(t).toContain('8 members');
+      expect(t).toContain(' · ');
+      expect(t).toContain('Owner: Self');
+    });
+  });
+
   describe('Interactivity', () => {
     it('calls onPress when the card is pressed', () => {
       const onPress = jest.fn();
