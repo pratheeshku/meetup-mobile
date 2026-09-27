@@ -97,7 +97,7 @@ describe('getEventVisibilityLabel', () => {
   });
 
   it('formats invite_only visibility with 🔒 emoji and label', () => {
-    expect(getEventVisibilityLabel('invite_only', {})).toBe('🔒 Private');
+    expect(getEventVisibilityLabel('invite_only', {})).toBe('🔒 Invite Only');
     expect(getEventVisibilityLabel('invite_only', customLabels)).toBe('🔒 Only Invited');
   });
 

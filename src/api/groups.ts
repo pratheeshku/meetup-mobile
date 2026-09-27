@@ -30,6 +30,7 @@ import type {
   CreateGroupInput,
   Group,
   GroupDetail,
+  GroupInvitationResponse,
   GroupMember,
   GroupMemberRole,
   GroupRole,
@@ -211,4 +212,20 @@ export async function createGroup(
     correlationId: options?.correlationId,
   });
   return mapGroupApiItem(data, 'owner');
+}
+
+/**
+ * `POST /groups/invitations` (DES-MEETUP-ADDENDUM-shareable-links Decision 15).
+ * Authenticated; creates group invitation token and returns shareable URL.
+ */
+export async function createGroupInvitation(
+  groupId: string,
+  options?: RequestOptions,
+): Promise<GroupInvitationResponse> {
+  const { data } = await apiClient.post<GroupInvitationResponse>(
+    '/groups/invitations',
+    { group_id: groupId },
+    { correlationId: options?.correlationId },
+  );
+  return data;
 }

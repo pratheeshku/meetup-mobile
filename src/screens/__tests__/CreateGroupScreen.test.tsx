@@ -216,7 +216,7 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
     selectChip(root, '🛡️ Tournament Team');
     type(root, 'e.g. Real Madrid FC', 'Test FC');
     selectChip(root, 'Football');
-    selectChip(root, 'Private');
+    selectChip(root, 'Invite Only');
     await submitTeam(root);
 
     expect(mockCreateTeam).toHaveBeenCalledWith(

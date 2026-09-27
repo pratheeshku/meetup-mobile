@@ -30,13 +30,13 @@ export const FALLBACK_LABELS: LabelMap = {
   'skill_level.all_levels': 'All Levels',
 
   'event_visibility.public': 'Public',
-  'event_visibility.invite_only': 'Private',
+  'event_visibility.invite_only': 'Invite Only',
   'event_visibility.group': 'Group',
 
   'tournament_visibility.public': 'Public',
-  'tournament_visibility.invite': 'Private',
+  'tournament_visibility.invite': 'Invite Only',
   'tournament_visibility.group': 'Group Only',
 
   'team_visibility.public': 'Public',
-  'team_visibility.private': 'Private',
+  'team_visibility.private': 'Invite Only',
 };

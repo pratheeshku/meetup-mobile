@@ -42,9 +42,18 @@ import DateTimePickerField from '../components/DateTimePickerField';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import OptionChips, { ChipOption } from '../components/OptionChips';
+import ShareActionSheet from '../components/ShareActionSheet';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import Toast from '../components/Toast';
 import UserSearchPicker from '../components/UserSearchPicker';
+import {
+  composeShareMessage,
+  copyLinkToClipboard,
+  getEventShareUrl,
+  shareGeneric,
+  shareToWhatsApp,
+} from '../utils/shareLink';
 import {
   borderWidth,
   colors,
@@ -131,6 +140,47 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [editAllowWaitlist, setEditAllowWaitlist] = useState(true);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleOpenShare = (): void => {
+    setIsShareSheetOpen(true);
+  };
+
+  const handleCloseShare = (): void => {
+    setIsShareSheetOpen(false);
+  };
+
+  const handleShareGeneric = async (): Promise<void> => {
+    if (!event) {
+      return;
+    }
+    const inviterName = user?.display_name || user?.nickname || 'Someone';
+    const url = getEventShareUrl(event.id, user?.id);
+    const message = composeShareMessage(inviterName, event.title, url);
+    await shareGeneric({ message, url });
+  };
+
+  const handleShareWhatsApp = async (): Promise<void> => {
+    if (!event) {
+      return;
+    }
+    const inviterName = user?.display_name || user?.nickname || 'Someone';
+    const url = getEventShareUrl(event.id, user?.id);
+    const message = composeShareMessage(inviterName, event.title, url);
+    await shareToWhatsApp(message);
+  };
+
+  const handleCopyLink = (): void => {
+    if (!event) {
+      return;
+    }
+    const url = getEventShareUrl(event.id, user?.id);
+    copyLinkToClipboard(url);
+    setIsShareSheetOpen(false);
+    setToastMessage('Link copied to clipboard');
+  };
 
   const [sports, setSports] = useState<Sport[]>([]);
 
@@ -634,6 +684,18 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Share Event"
+            onPress={handleOpenShare}
+            style={[styles.actionBtn, styles.whiteActionBtn]}
+          >
+            <View style={styles.actionBtnContent}>
+              <Text style={styles.whiteActionBtnText}>🔗 </Text>
+              <Text style={styles.whiteActionBtnText}>Share Event</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel="Cancel Event"
             onPress={handleOpenCancel}
             style={[styles.actionBtn, styles.cancelBtn]}
@@ -995,6 +1057,17 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         </View>
       </Card>
     </ScrollView>
+
+      <ShareActionSheet
+        visible={isShareSheetOpen}
+        title="Share Event"
+        onShareGeneric={handleShareGeneric}
+        onShareWhatsApp={handleShareWhatsApp}
+        onCopyLink={handleCopyLink}
+        onClose={handleCloseShare}
+      />
+
+      <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
     </KeyboardAvoidingView>
   );
 }

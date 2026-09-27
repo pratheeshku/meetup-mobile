@@ -8,7 +8,7 @@
  * - Sport label display lookup (BUG-M02)
  */
 import React from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { Clipboard, Linking, Platform, Share, StyleSheet } from 'react-native';
 
 import { apiClient } from '../../api/client';
 import { colors } from '../../theme/tokens';
@@ -140,6 +140,7 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     expect(has(root, 'Edit Game')).toBe(true);
     expect(has(root, 'Invite Group')).toBe(true);
     expect(has(root, 'Invite Individual')).toBe(true);
+    expect(has(root, 'Share Event')).toBe(true);
     expect(has(root, 'Join')).toBe(false);
     expect(has(root, 'Leave')).toBe(false);
   });
@@ -192,6 +193,7 @@ describe('non-organiser', () => {
     expect(has(root, 'Edit Game')).toBe(false);
     expect(has(root, 'Invite Group')).toBe(false);
     expect(has(root, 'Invite Individual')).toBe(false);
+    expect(has(root, 'Share Event')).toBe(false);
   });
 
   it('sees "Leave" (not Cancel) when already going', async () => {
@@ -201,6 +203,7 @@ describe('non-organiser', () => {
     expect(has(root, 'Edit Game')).toBe(false);
     expect(has(root, 'Invite Group')).toBe(false);
     expect(has(root, 'Invite Individual')).toBe(false);
+    expect(has(root, 'Share Event')).toBe(false);
     expect(has(root, 'Join')).toBe(false);
   });
 
@@ -896,10 +899,10 @@ describe('Mobile Artboard Stacked Cards Layout', () => {
       expect(waitlistIdx).toBeGreaterThan(skillIdx);
     });
 
-    it('renders 🔒 Private when visibility is invite_only', async () => {
+    it('renders 🔒 Invite Only when visibility is invite_only', async () => {
       const root = await mount(rawEvent({ visibility: 'invite_only' }));
       expect(has(root, 'Visibility')).toBe(true);
-      expect(has(root, '🔒 Private')).toBe(true);
+      expect(has(root, '🔒 Invite Only')).toBe(true);
     });
 
     it('renders 👥 Group when visibility is group', async () => {
@@ -987,3 +990,60 @@ describe('keyboard avoidance (same class of bug as Create Game — the Edit Even
     expect(kav.findAll(n => (n.type as unknown) === 'TextInput').length).toBeGreaterThan(0);
   });
 });
+
+describe('share event flow', () => {
+  it('opens ShareActionSheet when tapping "Share Event"', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    expect(has(root, 'Share Event')).toBe(true);
+
+    act(() => pressableLabelled(root, 'Share Event').props.onPress());
+
+    expect(has(root, 'Share via WhatsApp')).toBe(true);
+    expect(has(root, 'Share via other apps')).toBe(true);
+    expect(has(root, 'Copy Link')).toBe(true);
+  });
+
+  it('triggers generic share with composed message and URL with ?ref=', async () => {
+    const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
+    const root = await mount(rawEvent({ organizer_id: 'user-me', title: 'Casual Badminton' }));
+
+    act(() => pressableLabelled(root, 'Share Event').props.onPress());
+    await act(async () => {
+      await pressableLabelled(root, 'Share via other apps').props.onPress();
+    });
+
+    expect(spy).toHaveBeenCalledWith({
+      message:
+        'Sam invited you to Casual Badminton on Shuttlr \u2014 https://meetups.duckdns.org/events/evt-1?ref=user-me',
+      url: 'https://meetups.duckdns.org/events/evt-1?ref=user-me',
+    });
+  });
+
+  it('triggers WhatsApp share with composed message', async () => {
+    const canOpenSpy = jest.spyOn(Linking, 'canOpenURL').mockResolvedValueOnce(true);
+    const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined as never);
+    const root = await mount(rawEvent({ organizer_id: 'user-me', title: 'Casual Badminton' }));
+
+    act(() => pressableLabelled(root, 'Share Event').props.onPress());
+    await act(async () => {
+      await pressableLabelled(root, 'Share via WhatsApp').props.onPress();
+    });
+
+    const expectedMsg =
+      'Sam invited you to Casual Badminton on Shuttlr \u2014 https://meetups.duckdns.org/events/evt-1?ref=user-me';
+    expect(canOpenSpy).toHaveBeenCalledWith('whatsapp://send');
+    expect(openSpy).toHaveBeenCalledWith(`whatsapp://send?text=${encodeURIComponent(expectedMsg)}`);
+  });
+
+  it('copies canonical event link with ?ref= to clipboard and displays toast', async () => {
+    const setStringSpy = jest.spyOn(Clipboard, 'setString');
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+
+    act(() => pressableLabelled(root, 'Share Event').props.onPress());
+    act(() => pressableLabelled(root, 'Copy Link').props.onPress());
+
+    expect(setStringSpy).toHaveBeenCalledWith('https://meetups.duckdns.org/events/evt-1?ref=user-me');
+    expect(has(root, 'Link copied to clipboard')).toBe(true);
+  });
+});
+
