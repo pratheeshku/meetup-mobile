@@ -88,3 +88,11 @@ export interface CreateGroupInput {
   name: string;
   description?: string;
 }
+
+/**
+ * Response from `POST /groups/invitations` (DES-MEETUP-ADDENDUM-shareable-links Decision 15).
+ */
+export interface GroupInvitationResponse {
+  token: string;
+  invitation_url: string;
+}

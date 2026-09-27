@@ -8,11 +8,11 @@
  * debounce/search behaviour is exercised for real — only the network call
  * underneath it is faked.
  */
-import React from 'react';
+import { Clipboard, Linking, Share } from 'react-native';
 
-import { getGroup, inviteMember } from '../../api/groups';
+import { createGroupInvitation, getGroup, inviteMember } from '../../api/groups';
 import { searchUsers } from '../../api/users';
-import { act, pressableWithText, renderAsync, texts } from '../../test-utils/render';
+import { act, pressableLabelled, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import type { GroupDetail } from '../../types/group';
 import type { UserSearchResult } from '../../types/user';
@@ -21,16 +21,24 @@ import GroupDetailScreen from '../GroupDetailScreen';
 type Props = React.ComponentProps<typeof GroupDetailScreen>;
 
 jest.mock('../../api/groups', () => ({
+  createGroupInvitation: jest.fn(),
   getGroup: jest.fn(),
   inviteMember: jest.fn(),
   removeMember: jest.fn(),
   updateMemberRole: jest.fn(),
 }));
 jest.mock('../../api/users', () => ({ searchUsers: jest.fn() }));
+
+let mockUser: { id: string; nickname?: string; display_name?: string } = {
+  id: 'user-me',
+  nickname: 'sam99',
+  display_name: 'Sam',
+};
 jest.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'user-me' } }),
+  useAuth: () => ({ user: mockUser }),
 }));
 
+const mockCreateGroupInvitation = createGroupInvitation as jest.MockedFunction<typeof createGroupInvitation>;
 const mockGetGroup = getGroup as jest.MockedFunction<typeof getGroup>;
 const mockInviteMember = inviteMember as jest.MockedFunction<typeof inviteMember>;
 const mockSearchUsers = searchUsers as jest.MockedFunction<typeof searchUsers>;
@@ -84,6 +92,10 @@ beforeEach(() => {
   mockGetGroup.mockReset().mockResolvedValue(GROUP);
   mockInviteMember.mockReset().mockResolvedValue(undefined);
   mockSearchUsers.mockReset().mockResolvedValue([FOUND_USER]);
+  mockCreateGroupInvitation.mockReset().mockResolvedValue({
+    token: 'tok-1',
+    invitation_url: 'https://meetups.duckdns.org/groups/invite/tok-1',
+  });
 });
 
 afterEach(() => {
@@ -180,3 +192,101 @@ describe('invite flow', () => {
     expect(mockInviteMember).toHaveBeenCalledWith('group-1', 'u-3', expect.anything());
   });
 });
+
+describe('group invite link sharing', () => {
+  it('renders "Share Group Invite" and "Share Link" for group owner/admin', async () => {
+    const root = await mount();
+    expect(texts(root)).toContain('Share Group Invite');
+    expect(texts(root)).toContain('Share Link');
+  });
+
+  it('does NOT render "Share Group Invite" for regular member', async () => {
+    mockGetGroup.mockResolvedValueOnce({
+      ...GROUP,
+      owner_id: 'other-owner',
+      members: [{ user_id: 'user-me', nickname: 'sam99', role: 'member', joined_at: '2026-01-01T00:00:00Z' }],
+    });
+    const root = await mount();
+    expect(texts(root)).not.toContain('Share Group Invite');
+    expect(texts(root)).not.toContain('Share Link');
+  });
+
+  it('calls createGroupInvitation and opens ShareActionSheet when Share Group Invite is tapped', async () => {
+    const root = await mount();
+    await act(async () => {
+      await pressableLabelled(root, 'Share Group Invite').props.onPress();
+    });
+
+    expect(mockCreateGroupInvitation).toHaveBeenCalledWith('group-1', expect.anything());
+    expect(texts(root)).toContain('Share Group Invite');
+    expect(texts(root)).toContain('Share via WhatsApp');
+    expect(texts(root)).toContain('Share via other apps');
+    expect(texts(root)).toContain('Copy Link');
+  });
+
+  it('shares via generic Share.share with composed message and invitation URL', async () => {
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
+    const root = await mount();
+
+    await act(async () => {
+      await pressableLabelled(root, 'Share Group Invite').props.onPress();
+    });
+
+    await act(async () => {
+      await pressableLabelled(root, 'Share via other apps').props.onPress();
+    });
+
+    expect(shareSpy).toHaveBeenCalledWith({
+      message:
+        'Sam invited you to Sunday League on Shuttlr \u2014 https://meetups.duckdns.org/groups/invite/tok-1',
+      url: 'https://meetups.duckdns.org/groups/invite/tok-1',
+    });
+  });
+
+  it('shares via WhatsApp with composed message', async () => {
+    const canOpenSpy = jest.spyOn(Linking, 'canOpenURL').mockResolvedValueOnce(true);
+    const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined as never);
+    const root = await mount();
+
+    await act(async () => {
+      await pressableLabelled(root, 'Share Group Invite').props.onPress();
+    });
+
+    await act(async () => {
+      await pressableLabelled(root, 'Share via WhatsApp').props.onPress();
+    });
+
+    const expectedMsg =
+      'Sam invited you to Sunday League on Shuttlr \u2014 https://meetups.duckdns.org/groups/invite/tok-1';
+    expect(canOpenSpy).toHaveBeenCalledWith('whatsapp://send');
+    expect(openSpy).toHaveBeenCalledWith(`whatsapp://send?text=${encodeURIComponent(expectedMsg)}`);
+  });
+
+  it('copies invitation link to clipboard and displays toast', async () => {
+    const setStringSpy = jest.spyOn(Clipboard, 'setString');
+    const root = await mount();
+
+    await act(async () => {
+      await pressableLabelled(root, 'Share Group Invite').props.onPress();
+    });
+
+    act(() => {
+      pressableLabelled(root, 'Copy Link').props.onPress();
+    });
+
+    expect(setStringSpy).toHaveBeenCalledWith('https://meetups.duckdns.org/groups/invite/tok-1');
+    expect(texts(root)).toContain('Link copied to clipboard');
+  });
+
+  it('displays error inline when createGroupInvitation fails', async () => {
+    mockCreateGroupInvitation.mockRejectedValueOnce(new Error('500 server error'));
+    const root = await mount();
+
+    await act(async () => {
+      await pressableLabelled(root, 'Share Group Invite').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Could not generate group invite link. Please try again.');
+  });
+});
+

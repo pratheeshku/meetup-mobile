@@ -5,7 +5,7 @@
  * (`GroupResponse`, `GroupMembershipResponse`).
  */
 import { apiClient } from '../client';
-import { createGroup, getGroup, getMyGroups, updateMemberRole } from '../groups';
+import { createGroup, createGroupInvitation, getGroup, getMyGroups, updateMemberRole } from '../groups';
 
 jest.mock('../client', () => ({
   apiClient: { get: jest.fn(), patch: jest.fn(), post: jest.fn() },
@@ -200,3 +200,36 @@ describe('createGroup', () => {
     await expect(createGroup({ name: 'G' })).rejects.toThrow('boom');
   });
 });
+
+describe('createGroupInvitation', () => {
+  afterEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('posts to /groups/invitations with { group_id } and passes correlationId', async () => {
+    mockedPost.mockResolvedValueOnce({
+      data: {
+        token: 'tok-abc',
+        invitation_url: 'https://meetups.duckdns.org/groups/invite/tok-abc',
+      },
+    });
+
+    const res = await createGroupInvitation('grp-999', { correlationId: 'cid-inv' });
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/groups/invitations',
+      { group_id: 'grp-999' },
+      { correlationId: 'cid-inv' },
+    );
+    expect(res).toEqual({
+      token: 'tok-abc',
+      invitation_url: 'https://meetups.duckdns.org/groups/invite/tok-abc',
+    });
+  });
+
+  it('propagates a failed request to the caller', async () => {
+    mockedPost.mockRejectedValueOnce(new Error('unauthorized'));
+    await expect(createGroupInvitation('grp-999')).rejects.toThrow('unauthorized');
+  });
+});
+

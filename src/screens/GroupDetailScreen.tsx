@@ -29,15 +29,29 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
 import { withCorrelationId } from '../api/correlationId';
-import { getGroup, inviteMember, removeMember, updateMemberRole } from '../api/groups';
+import {
+  createGroupInvitation,
+  getGroup,
+  inviteMember,
+  removeMember,
+  updateMemberRole,
+} from '../api/groups';
 import Badge from '../components/Badge';
 import type { BadgeVariant } from '../components/Badge';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
+import ShareActionSheet from '../components/ShareActionSheet';
 import TextLink from '../components/TextLink';
+import Toast from '../components/Toast';
 import UserSearchPicker from '../components/UserSearchPicker';
+import {
+  composeShareMessage,
+  copyLinkToClipboard,
+  shareGeneric,
+  shareToWhatsApp,
+} from '../utils/shareLink';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { GroupDetail, GroupMember, GroupMemberRole } from '../types/group';
 import type { UserSearchResult } from '../types/user';
@@ -81,6 +95,59 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 
   const [isLeaving, setIsLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+
+  const [isCreatingInvite, setIsCreatingInvite] = useState(false);
+  const [inviteLinkError, setInviteLinkError] = useState<string | null>(null);
+  const [shareSheetVisible, setShareSheetVisible] = useState(false);
+  const [groupInviteUrl, setGroupInviteUrl] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const handleShareGroupInvite = async (): Promise<void> => {
+    setInviteLinkError(null);
+    setIsCreatingInvite(true);
+    try {
+      const res = await withCorrelationId(async correlationId => {
+        return await createGroupInvitation(groupId, { correlationId });
+      });
+      setGroupInviteUrl(res.invitation_url);
+      setShareSheetVisible(true);
+    } catch {
+      setInviteLinkError('Could not generate group invite link. Please try again.');
+    } finally {
+      setIsCreatingInvite(false);
+    }
+  };
+
+  const handleCloseShareSheet = (): void => {
+    setShareSheetVisible(false);
+  };
+
+  const handleShareGeneric = async (): Promise<void> => {
+    if (!group || !groupInviteUrl) {
+      return;
+    }
+    const inviterName = user?.display_name || user?.nickname || 'Someone';
+    const message = composeShareMessage(inviterName, group.name, groupInviteUrl);
+    await shareGeneric({ message, url: groupInviteUrl });
+  };
+
+  const handleShareWhatsApp = async (): Promise<void> => {
+    if (!group || !groupInviteUrl) {
+      return;
+    }
+    const inviterName = user?.display_name || user?.nickname || 'Someone';
+    const message = composeShareMessage(inviterName, group.name, groupInviteUrl);
+    await shareToWhatsApp(message);
+  };
+
+  const handleCopyLink = (): void => {
+    if (!groupInviteUrl) {
+      return;
+    }
+    copyLinkToClipboard(groupInviteUrl);
+    setShareSheetVisible(false);
+    setToastMessage('Link copied to clipboard');
+  };
 
   const loadGroup = useCallback(async () => {
     setIsLoading(true);
@@ -259,13 +326,33 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
         <Text style={styles.meta}>
           {group.member_count} {group.member_count === 1 ? 'member' : 'members'}
         </Text>
+        {canInvite ? (
+          <Button
+            label="Share Group Invite"
+            variant="secondary"
+            size="sm"
+            onPress={handleShareGroupInvite}
+            loading={isCreatingInvite}
+            accessibilityLabel="Share Group Invite"
+            style={styles.shareGroupBtn}
+          />
+        ) : null}
+        {inviteLinkError ? <Text style={styles.errorText}>{inviteLinkError}</Text> : null}
       </Card>
 
       <Card>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Members</Text>
           {canInvite && !isInviteFormOpen ? (
-            <TextLink label="Invite" onPress={handleOpenInviteForm} />
+            <View style={styles.headerLinksRow}>
+              <TextLink
+                label="Share Link"
+                accessibilityLabel="Share Group Link"
+                onPress={handleShareGroupInvite}
+                disabled={isCreatingInvite}
+              />
+              <TextLink label="Invite" onPress={handleOpenInviteForm} />
+            </View>
           ) : null}
         </View>
 
@@ -406,6 +493,16 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
           />
         </View>
       ) : null}
+      <ShareActionSheet
+        visible={shareSheetVisible}
+        title="Share Group Invite"
+        onShareGeneric={handleShareGeneric}
+        onShareWhatsApp={handleShareWhatsApp}
+        onCopyLink={handleCopyLink}
+        onClose={handleCloseShareSheet}
+      />
+
+      <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
     </ScrollView>
   );
 }
@@ -413,6 +510,10 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 const styles = StyleSheet.create({
   container: { padding: spacing.md },
   infoCard: { marginBottom: spacing.md },
+  shareGroupBtn: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-start',
+  },
   title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.sm },
   description: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.md },
   meta: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xs },
@@ -421,6 +522,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
+  },
+  headerLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   sectionTitle: { ...typography.h3, color: colors.textPrimary },
   memberRow: {
