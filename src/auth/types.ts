@@ -34,4 +34,10 @@ export interface AuthResponse {
   access_token: string;
   refresh_token?: string;
   user: UserProfile;
+  /**
+   * Present when an invitation_token was supplied and resolved to a
+   * successful group join on registration (DES-MEETUP-ADDENDUM-shareable-links.md
+   * v1.3, Decision 17). None / undefined otherwise.
+   */
+  joined_group_id?: string | null;
 }
