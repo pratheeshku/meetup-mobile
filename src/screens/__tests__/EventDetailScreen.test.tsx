@@ -1014,8 +1014,8 @@ describe('share event flow', () => {
 
     expect(spy).toHaveBeenCalledWith({
       message:
-        'Sam invited you to Casual Badminton on Shuttlr \u2014 https://meetups.duckdns.org/events/evt-1?ref=user-me',
-      url: 'https://meetups.duckdns.org/events/evt-1?ref=user-me',
+        'Sam invited you to Casual Badminton on Shuttlr \u2014 https://meetups.duckdns.org/#event-detail/evt-1?ref=user-me',
+      url: 'https://meetups.duckdns.org/#event-detail/evt-1?ref=user-me',
     });
   });
 
@@ -1030,7 +1030,7 @@ describe('share event flow', () => {
     });
 
     const expectedMsg =
-      'Sam invited you to Casual Badminton on Shuttlr \u2014 https://meetups.duckdns.org/events/evt-1?ref=user-me';
+      'Sam invited you to Casual Badminton on Shuttlr \u2014 https://meetups.duckdns.org/#event-detail/evt-1?ref=user-me';
     expect(canOpenSpy).toHaveBeenCalledWith('whatsapp://send');
     expect(openSpy).toHaveBeenCalledWith(`whatsapp://send?text=${encodeURIComponent(expectedMsg)}`);
   });
@@ -1042,7 +1042,7 @@ describe('share event flow', () => {
     act(() => pressableLabelled(root, 'Share Event').props.onPress());
     act(() => pressableLabelled(root, 'Copy Link').props.onPress());
 
-    expect(setStringSpy).toHaveBeenCalledWith('https://meetups.duckdns.org/events/evt-1?ref=user-me');
+    expect(setStringSpy).toHaveBeenCalledWith('https://meetups.duckdns.org/#event-detail/evt-1?ref=user-me');
     expect(has(root, 'Link copied to clipboard')).toBe(true);
   });
 });

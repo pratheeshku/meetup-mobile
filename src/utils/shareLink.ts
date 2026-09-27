@@ -13,10 +13,11 @@ import { ENV } from '../../config/env';
 
 /**
  * Returns canonical web event URL with optional `?ref=<current_user_id>` query param (Decision 2).
+ * Matches the web app's client-side router (frontend/app.js line 2564).
  */
 export function getEventShareUrl(eventId: string, currentUserId?: string): string {
   const base = ENV.API_BASE_URL.replace(/\/+$/, '');
-  const url = `${base}/events/${eventId}`;
+  const url = `${base}/#event-detail/${eventId}`;
   return currentUserId ? `${url}?ref=${encodeURIComponent(currentUserId)}` : url;
 }
 
