@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Doc ID | DES-MEETUP-ADDENDUM-dashboard |
-| Version | v1.1 |
-| Status | APPROVED (architect approval 2026-09-29; v1.1 approved by architect instruction the same day) |
+| Version | v1.2 |
+| Status | APPROVED (architect approval 2026-09-29; v1.1 and v1.2 approved by architect instruction, 2026-09-29 and 2026-09-30) |
 | Current tier | T1 |
 | Principles | Enterprise Design Principles v1.0 (P1-P17); design-best-practices v1.0 (BP-01 to BP-13) |
 | Modifies | Nothing. Display-only addendum that supersedes the home screen layout in DES-MEETUP.md and DES-MEETUP-MOBILE.md (implementer verifies section numbers) |
@@ -15,13 +15,14 @@
 
 - v1.0: home screen redesign for web and app.
 - v1.1: desktop shell now uses the full window (Chrome review of the live web, 2026-09-29); sport chips become multi-select, default to the user's skill sports and filter the games lists; stray headings removed; profile photo display and greeting rules made explicit.
+- v1.2 (2026-09-30): maximum content width raised from 1440px to 1920px; the left menu restated as a hard requirement for signed-in users (the desktop version of the phone bottom bar, restored on page load); chip selection and default rules made testable.
 
 ## Decision summary (plain language)
 
 1. The home screen gets a blue and white banner with the app icon, notification bell with count, profile picture, and a greeting.
 2. Sports, games and groups are shown with large, colourful icons and small text.
 3. Order on phones: banner, next game, sport icons, My games (2), My groups (2), Recommended for you, then two shortcut tiles. Bottom bar stays as today, with "Tournaments" renamed "Games".
-4. Desktop web uses the full window: side navigation, a full-width banner with count chips, and three equal cards in one row.
+4. Desktop web uses the full window up to 1920px: the left menu (the desktop version of the phone bottom bar), a full-width banner with count chips, and three equal cards in one row.
 5. This is a display change only. No new backend endpoints or data are expected.
 6. Each section loads and fails on its own, so one failing call never blanks the screen.
 7. Sport chips are multi-select. They start on the sports the user has skill levels for, and they filter the games shown below (not groups).
@@ -49,9 +50,9 @@ Users said the home screen feels dull. The current screen (baseline screenshot, 
 
 **AD-8 Group icon.** A Players Group shows the groups icon (groups have no sport column, DES-MEETUP-ADDENDUM-shareable-links Decision 16). A Tournament Team shows its sport icon. Group meta shows member count, plus sport only for teams.
 
-**AD-9 Sport filter.** Chips come from the admin public sports list (`GET /admin/sports/public`), "All" first. Chips are multi-select: tapping a chip toggles it; "All" is exclusive (selecting it clears the others, and clearing every sport selects All). Default on load: the sports the user has a skill level for (source `user_skill_levels`) that also appear in the admin list; if none, All. The choice is not saved between visits. Selected chips have a 2px brand-colour ring. Overflow scrolls horizontally. Scope: the filter applies to the next-game card, My games and Recommended for you. When filtered, the next-game card is the soonest matching game and My games excludes it (AD-7). My groups and the counts are never filtered, because Players Groups have no sport and the counts must match their destination screens. When a filter leaves a section empty, show "No {sport names} games here — clear the filter to see all" instead of the generic empty text.
+**AD-9 Sport filter.** Chips come from the admin public sports list (`GET /admin/sports/public`), "All" first. Chips are multi-select: tapping a chip toggles it; "All" is exclusive (selecting it clears the others, and clearing every sport selects All). Default on load: the sports the user has a skill level for (source `user_skill_levels`) that also appear in the admin list; if none, All. The skill default applies only to the first render of a visit; after that the user's own selection is never overwritten by it. The choice is not saved between visits. Selected chips have a 2px brand-colour ring. Overflow scrolls horizontally. Scope: the filter applies to the next-game card, My games and Recommended for you. When filtered, the next-game card is the soonest matching game and My games excludes it (AD-7). My groups and the counts are never filtered, because Players Groups have no sport and the counts must match their destination screens. When a filter leaves a section empty, show "No {sport names} games here — clear the filter to see all" instead of the generic empty text.
 
-**AD-10 Desktop.** Below 1024px use the phone layout, centred at a maximum width of 640px, with the bottom bar. At 1024px and above the dashboard uses the full window. The dashboard page overrides the global 800px cap on the main content shell (this page only; other pages are unchanged), with 32px side padding and a 1440px maximum width, centred. Top to bottom: (1) left navigation rail, always visible: app icon at the top, then Home, Groups, Games, Profile and a labelled Create button; (2) banner as a full-width rounded card (radius 28): greeting and headline on the left; on the right the bell, profile picture and two count chips ("{n} active games", "{n} groups") that open My games and My groups; (3) next-game card, a full-width slim card directly under the banner; (4) sports row, aligned to the same left edge as the cards; (5) three equal-width cards in one row, 24px gutters, equal height, top-aligned: My games, My groups, Recommended for you, each with header, View all and up to two rows; (6) no shortcut tiles on desktop, because the count chips replace them. Column widths are equal at every width from 1024px up, and nothing scrolls horizontally.
+**AD-10 Desktop.** Below 1024px use the phone layout, centred at a maximum width of 640px, with the bottom bar. At 1024px and above the dashboard uses the full window. The dashboard page overrides the global 800px cap on the main content shell (this page only; other pages are unchanged), with 32px side padding and a 1920px maximum width, centred. Top to bottom: (1) left navigation rail (the desktop version of the phone bottom bar), visible on every signed-in page from 1024px up and restored on page load from the existing session, not only after a login click: app icon at the top, then Home, Groups, Games, Profile and a labelled Create button; (2) banner as a full-width rounded card (radius 28): greeting and headline on the left; on the right the bell, profile picture and two count chips ("{n} active games", "{n} groups") that open My games and My groups; (3) next-game card, a full-width slim card directly under the banner; (4) sports row, aligned to the same left edge as the cards; (5) three equal-width cards in one row, 24px gutters, equal height, top-aligned: My games, My groups, Recommended for you, each with header, View all and up to two rows; (6) no shortcut tiles on desktop, because the count chips replace them. Column widths are equal at every width from 1024px up, and nothing scrolls horizontally.
 
 **AD-11 Stray sections.** The headings "My Games & Groups" and "Recent Results" seen on the live web dashboard are removed unless the implementer shows they are real, data-backed sections; report where each comes from. No heading may appear without content, or above content that does not match it.
 
@@ -147,7 +148,8 @@ Risk class: low (display only), medium for navigation and counts.
 - Sport map: known slugs, unknown slug fallback.
 - Filter: multi-select toggling; All exclusivity; default from the user's skill sports, and All when the user has none or none match the admin list; selecting a sport changes the contents of the next-game card, My games and Recommended for you (assert the lists, not only the chip state); My groups and all counts never change; filtered-empty message.
 - Profile picture: shows the uploaded photo for an account that has one; falls back to the letter avatar when absent or on load error.
-- Desktop at 1024, 1280, 1440 and 1920px: content spans the window up to 1440 with 32px padding; the three cards have equal width and height; rail visible; no horizontal scroll.
+- Filter interaction (real clicks in a browser): from the default selection, clicking another sport selects it and the selection does not reset on re-render; clicking All and then a sport selects that sport; a user with no skill sports opens on All.
+- Desktop at 1024, 1280, 1440, 1920 and 2560px: content spans the window up to 1920 with 32px padding and is centred beyond that; the three cards have equal width and height; the rail is visible on a signed-in fresh page load (session restored, no login click) and hidden when signed out; no horizontal scroll.
 - No "My Games & Groups" or "Recent Results" headings unless backed by data (AD-11).
 - Next game and My games never show the same game (AD-7).
 - Group icon rule (AD-8).
@@ -197,6 +199,7 @@ Non-blocking:
 - N5 Explain why the top bar showed "Sign In" on a signed-in dashboard and why no desktop navigation was visible; fix if it is a defect.
 - N6 Report the origin of the "My Games & Groups" and "Recent Results" headings (AD-11).
 - N7 State whether the web ignored the photo field or the test account had no photo (AD-12).
+- N8 Signed-in fresh load: after a page reload with an existing session, the left rail, the user's display name and avatar must appear as they do after login (session-restore path).
 
 ## Appendix A: icon set (viewBox 0 0 48 48, use verbatim)
 
