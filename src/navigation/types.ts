@@ -1,9 +1,11 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
-/** Auth Stack route params (§4.2 — Sign In, Register). */
+/** Auth Stack route params (§4.2 — Sign In, Register, Verify, Forgot Password). */
 export type AuthStackParamList = {
-  Login: undefined;
+  Login: { successMessage?: string; email?: string } | undefined;
   Register: undefined;
+  Verify: { email: string; explanation?: string };
+  ForgotPassword: { email?: string } | undefined;
 };
 
 /**

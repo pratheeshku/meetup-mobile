@@ -104,6 +104,8 @@ import {
 
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import VerifyScreen from '../screens/VerifyScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CreateGameScreen from '../screens/CreateGameScreen';
 import EventDetailScreen from '../screens/EventDetailScreen';
@@ -163,6 +165,8 @@ function AuthStack(): React.JSX.Element {
     <AuthStackNav.Navigator screenOptions={stackScreenOptions}>
       <AuthStackNav.Screen name="Login" component={LoginScreen} />
       <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+      <AuthStackNav.Screen name="Verify" component={VerifyScreen} />
+      <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </AuthStackNav.Navigator>
   );
 }

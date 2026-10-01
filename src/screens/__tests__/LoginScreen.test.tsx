@@ -1,12 +1,15 @@
 /**
  * Sign In screen: shows the session-expired notice when `AuthContext` reports
  * one, and nothing when it does not. The Google failure message is unchanged.
+ * Tests 403 Verify routing, 401 message, forgot password link, success message,
+ * and touch targets.
  */
 import React from 'react';
+import { StyleSheet, TextInput } from 'react-native';
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
 
 import { GoogleSignInCancelledError } from '../../auth/googleAuth';
-import { act, renderAsync, texts } from '../../test-utils/render';
+import { act, pressables, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import LoginScreen from '../LoginScreen';
 
@@ -22,23 +25,54 @@ jest.mock('../../auth/googleAuth', () => ({
   GoogleSignInCancelledError: class CancelledStub extends Error {},
 }));
 
-const mount = (): Promise<Instance> =>
-  renderAsync(<LoginScreen {...({ navigation: { navigate: jest.fn() }, route: {} } as unknown as Props)} />);
+const mockNavigate = jest.fn();
+const mockNavigation = {
+  navigate: mockNavigate,
+  goBack: jest.fn(),
+  canGoBack: jest.fn(() => true),
+};
+
+const mount = (routeParams: { successMessage?: string; email?: string } = {}): Promise<Instance> =>
+  renderAsync(
+    <LoginScreen
+      {...({
+        navigation: mockNavigation,
+        route: { params: routeParams },
+      } as unknown as Props)}
+    />,
+  );
+
+const fillEmailPassword = (root: Instance, email = 'user@example.com', password = 'password123') => {
+  act(() => {
+    const inputs = root.findAllByType(TextInput);
+    const emailInput = inputs.find(i => i.props.placeholder === 'Email');
+    const passwordInput = inputs.find(i => i.props.placeholder === 'Password');
+    if (emailInput) emailInput.props.onChangeText(email);
+    if (passwordInput) passwordInput.props.onChangeText(password);
+  });
+};
+
+const resolveStyle = (node: Instance): Record<string, any> => {
+  const styleProp = node.props.style;
+  const evaluated = typeof styleProp === 'function' ? styleProp({ pressed: false }) : styleProp;
+  return StyleSheet.flatten(evaluated) || {};
+};
 
 beforeEach(() => {
+  jest.clearAllMocks();
   mockAuth.sessionExpired = false;
   mockAuth.signInWithGoogle.mockReset();
   mockAuth.signInWithEmail.mockReset();
 });
 
 describe('LoginScreen session-expired notice', () => {
-  it('shows "Session expired. Please sign in again." when the session expired', async () => {
+  it('[Execute] shows "Session expired. Please sign in again." when the session expired', async () => {
     mockAuth.sessionExpired = true;
 
     expect(texts(await mount())).toContain('Session expired. Please sign in again.');
   });
 
-  it('shows no notice on a normal visit', async () => {
+  it('[Execute] shows no notice on a normal visit', async () => {
     const t = texts(await mount());
 
     expect(t).not.toContain('Session expired. Please sign in again.');
@@ -53,7 +87,7 @@ describe('LoginScreen Google sign-in errors (unchanged)', () => {
     });
   };
 
-  it('shows the failure message for a real failure', async () => {
+  it('[Execute] shows the failure message for a real failure', async () => {
     mockAuth.signInWithGoogle.mockRejectedValue(new Error('boom'));
     const root = await mount();
 
@@ -62,7 +96,7 @@ describe('LoginScreen Google sign-in errors (unchanged)', () => {
     expect(texts(root)).toContain('Google sign-in failed. Please try again.');
   });
 
-  it('stays silent when the user cancels the account picker', async () => {
+  it('[Execute] stays silent when the user cancels the account picker', async () => {
     mockAuth.signInWithGoogle.mockRejectedValue(new GoogleSignInCancelledError());
     const root = await mount();
 
@@ -71,12 +105,124 @@ describe('LoginScreen Google sign-in errors (unchanged)', () => {
     expect(texts(root)).not.toContain('Google sign-in failed. Please try again.');
   });
 
-  it('shows no failure message when sign-in succeeds', async () => {
+  it('[Execute] shows no failure message when sign-in succeeds', async () => {
     mockAuth.signInWithGoogle.mockResolvedValue(undefined);
     const root = await mount();
 
     await pressGoogle(root);
 
     expect(texts(root)).not.toContain('Google sign-in failed. Please try again.');
+  });
+});
+
+describe('LoginScreen email auth and routing (AD-5)', () => {
+  it('[Execute] login 403 {"detail": "Email not verified"} routes to Verify with the email filled in and explanation', async () => {
+    const error: { isAxiosError: boolean; response: { status: number; data: { detail: string } } } = {
+      isAxiosError: true,
+      response: {
+        status: 403,
+        data: { detail: 'Email not verified' },
+      },
+    };
+    mockAuth.signInWithEmail.mockRejectedValueOnce(error);
+
+    const root = await mount();
+    fillEmailPassword(root, 'unverified@example.com', 'mypassword');
+
+    await act(async () => {
+      pressableWithText(root, 'Sign In').props.onPress();
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('Verify', {
+      email: 'unverified@example.com',
+      explanation: 'Please verify your email before signing in.',
+    });
+  });
+
+  it('[Execute] login 401 shows "Invalid email or password."', async () => {
+    const error: { isAxiosError: boolean; response: { status: number; data: { detail: string } } } = {
+      isAxiosError: true,
+      response: {
+        status: 401,
+        data: { detail: 'Incorrect credentials' },
+      },
+    };
+    mockAuth.signInWithEmail.mockRejectedValueOnce(error);
+
+    const root = await mount();
+    fillEmailPassword(root, 'user@example.com', 'wrongpassword');
+
+    await act(async () => {
+      pressableWithText(root, 'Sign In').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Invalid email or password.');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('[Execute] shows inline error with Retry when server is unreachable, and retrying succeeds', async () => {
+    const networkErr: { isAxiosError: boolean; code: string; message: string } = {
+      isAxiosError: true,
+      code: 'ERR_NETWORK',
+      message: 'Network Error',
+    };
+    mockAuth.signInWithEmail.mockRejectedValueOnce(networkErr);
+
+    const root = await mount();
+    fillEmailPassword(root, 'user@example.com', 'password123');
+
+    await act(async () => {
+      pressableWithText(root, 'Sign In').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Unable to connect to server.');
+    expect(texts(root)).toContain('Retry');
+
+    // Retrying with success
+    mockAuth.signInWithEmail.mockResolvedValueOnce(undefined);
+    await act(async () => {
+      pressableWithText(root, 'Retry').props.onPress();
+    });
+
+    expect(mockAuth.signInWithEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it('[Execute] "Forgot password?" link navigates to ForgotPassword with pre-filled email', async () => {
+    const root = await mount();
+    fillEmailPassword(root, 'forgot@example.com', 'pwd');
+
+    await act(async () => {
+      pressableWithText(root, 'Forgot password?').props.onPress();
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('ForgotPassword', {
+      email: 'forgot@example.com',
+    });
+  });
+
+  it('[Execute] shows successMessage when passed in route params (e.g. from Verify screen)', async () => {
+    const root = await mount({ successMessage: 'Email verified. Sign in.' });
+    expect(texts(root)).toContain('Email verified. Sign in.');
+  });
+
+  it('[Execute] pre-fills email when passed in route params', async () => {
+    const root = await mount({ email: 'prefilled@example.com' });
+    const inputs = root.findAllByType(TextInput);
+    const emailInput = inputs.find(i => i.props.placeholder === 'Email');
+    expect(emailInput?.props.value).toBe('prefilled@example.com');
+  });
+
+  it('[Execute] verifies all interactive pressables have a touch target height of at least 44px', async () => {
+    const root = await mount();
+    const buttons = pressables(root);
+    expect(buttons.length).toBeGreaterThanOrEqual(3);
+
+    for (const b of buttons) {
+      const flattened = resolveStyle(b);
+      const minHeight = flattened.minHeight;
+      const height = flattened.height;
+      const effectiveHeight = minHeight ?? height ?? 0;
+      expect(effectiveHeight).toBeGreaterThanOrEqual(44);
+    }
   });
 });

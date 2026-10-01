@@ -1,42 +1,58 @@
 /**
- * Sign In screen (DES-MEETUP-MOBILE.md §4.2; R-010, R-012).
+ * Sign In screen (DES-MEETUP-MOBILE.md §4.2; R-010, R-012;
+ * DES-MEETUP-ADDENDUM-email-auth AD-5).
  *
  * Password lives only in this component's local state for the duration
  * of the active input session — never lifted into context, storage, or
  * logs (R-111, P10).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { AxiosError } from 'axios';
 
 import { useAuth } from '../auth/AuthContext';
 import { GoogleSignInCancelledError } from '../auth/googleAuth';
 import { SESSION_EXPIRED_MESSAGE } from '../auth/messages';
 import Button from '../components/Button';
+import InlineError from '../components/InlineError';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { colors, spacing, typography } from '../theme/tokens';
+import { isNetworkError } from '../utils/networkError';
 import type { AuthStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
-export default function LoginScreen({ navigation }: Props): React.JSX.Element {
+export default function LoginScreen({ navigation, route }: Props): React.JSX.Element {
   const { signInWithGoogle, signInWithEmail, sessionExpired } = useAuth();
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(route?.params?.email ?? '');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (route?.params?.email) {
+      setEmail(route.params.email);
+    }
+  }, [route?.params?.email]);
 
   const handleGoogleSignIn = async (): Promise<void> => {
     setError(null);
+    setNetworkError(null);
     setIsSubmitting(true);
     try {
       await signInWithGoogle();
     } catch (err) {
       if (!(err instanceof GoogleSignInCancelledError)) {
-        setError('Google sign-in failed. Please try again.');
+        if (isNetworkError(err)) {
+          setNetworkError('Unable to connect to server.');
+        } else {
+          setError('Google sign-in failed. Please try again.');
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -45,16 +61,40 @@ export default function LoginScreen({ navigation }: Props): React.JSX.Element {
 
   const handleEmailSignIn = async (): Promise<void> => {
     setError(null);
+    setNetworkError(null);
 
-    if (!email || !password) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
       setError('Enter your email and password.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      await signInWithEmail(email, password);
-    } catch {
+      await signInWithEmail(trimmedEmail, password);
+    } catch (err) {
+      if (isNetworkError(err)) {
+        setNetworkError('Unable to connect to server.');
+        return;
+      }
+
+      const axiosErr = err as AxiosError<{ detail?: string }>;
+      const status = axiosErr.response?.status;
+      const detail = axiosErr.response?.data?.detail;
+
+      if (status === 403 && typeof detail === 'string' && detail.includes('Email not verified')) {
+        navigation.navigate('Verify', {
+          email: trimmedEmail,
+          explanation: 'Please verify your email before signing in.',
+        });
+        return;
+      }
+
+      if (status === 401) {
+        setError('Invalid email or password.');
+        return;
+      }
+
       // Enumeration-safe (§4.2): never reveal whether the email or the
       // password was the incorrect part.
       setError('Invalid email or password.');
@@ -63,10 +103,13 @@ export default function LoginScreen({ navigation }: Props): React.JSX.Element {
     }
   };
 
+  const successMessage = route?.params?.successMessage;
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Sign In</Text>
 
+      {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
       {sessionExpired ? <Text style={styles.notice}>{SESSION_EXPIRED_MESSAGE}</Text> : null}
 
       <GoogleSigninButton
@@ -97,7 +140,28 @@ export default function LoginScreen({ navigation }: Props): React.JSX.Element {
         editable={!isSubmitting}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.forgotPasswordRow}>
+        <TextLink
+          label="Forgot password?"
+          onPress={() =>
+            navigation.navigate('ForgotPassword', {
+              email: email.trim() || undefined,
+            })
+          }
+          disabled={isSubmitting}
+          style={styles.forgotPasswordLink}
+        />
+      </View>
+
+      {networkError ? (
+        <InlineError
+          message={networkError}
+          onRetry={handleEmailSignIn}
+          retryLabel="Retry"
+        />
+      ) : error ? (
+        <Text style={styles.error}>{error}</Text>
+      ) : null}
 
       <Button
         label="Sign In"
@@ -124,6 +188,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     textAlign: 'center',
   },
+  success: {
+    ...typography.body,
+    color: colors.success,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
   notice: {
     ...typography.body,
     color: colors.textPrimary,
@@ -132,6 +202,14 @@ const styles = StyleSheet.create({
   },
   googleButton: { alignSelf: 'center', marginBottom: spacing.lg },
   input: { marginBottom: spacing.md },
+  forgotPasswordRow: {
+    alignItems: 'flex-end',
+    marginBottom: spacing.md,
+  },
+  forgotPasswordLink: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
   error: {
     ...typography.body,
     color: colors.error,
@@ -139,5 +217,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   button: { marginBottom: spacing.md },
-  link: { alignSelf: 'center' },
+  link: { alignSelf: 'center', minHeight: 44, justifyContent: 'center' },
 });
