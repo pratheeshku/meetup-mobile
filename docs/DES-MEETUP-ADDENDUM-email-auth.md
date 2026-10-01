@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Doc ID | DES-MEETUP-ADDENDUM-email-auth |
-| Version | v1.1 |
-| Status | APPROVED (architect approval 2026-10-01; v1.1 approved 2026-10-01) |
+| Version | v1.2 |
+| Status | APPROVED (architect approval 2026-10-01; v1.1 and v1.2 approved 2026-10-01) |
 | Current tier | T1 |
 | Principles | Enterprise Design Principles v1.0 (P1-P17); design-best-practices v1.0 (BP-01 to BP-13) |
 | Modifies | Nothing. Additive addendum to DES-MEETUP.md and DES-MEETUP-MOBILE.md; design-only, no REQ addendum (architect instruction) |
@@ -15,13 +15,14 @@
 
 - v1.0: email sign-up fix, verification resend, link-based password reset.
 - v1.1: web router rulings (AD-6) after the implementer found the reset route unreachable when signed out; data lineage wording corrected; router and sanitizer tests added; deployment order fixed.
+- v1.2: a Google-only account that requests a password reset is told it signs in with Google (AD-7); web and app show the message and a Google sign-in button.
 
 ## Decision summary (plain language)
 
 1. Email sign-up works in the app: email, password, display name and nickname, then a 6-digit code from the verification email, then sign in.
 2. A user who misses or loses the code can request a new one (Resend), in the app and on the web. Today this is impossible.
 3. Forgot password: the reset email contains a one-time link. The link opens the web reset page in the phone's browser, the user sets a new password there, then returns to the app and signs in. The existing 6-digit code stays in the email as a backup.
-4. The app says the same thing whether or not an email is registered.
+4. The app says the same thing whether or not an email is registered, with one exception: an account that signs in with Google is told so, with a button to continue with Google (AD-7).
 5. A password reset signs the user out of every session.
 6. There is no deep linking. The browser handles the link.
 
@@ -38,6 +39,7 @@ Facts from the backend note (file and line cited there): sign-up returns no toke
 - D7 The web reset page reads the token from the link (AD-4).
 - D8 The app flows are in AD-5; the same generic messages apply on web.
 - D9 Existing endpoints and their contracts are unchanged (P14).
+- D10 A password-reset request for a Google-only account is answered with a clear message and no email (AD-7); architect decision 2026-10-01.
 
 ## 2. Architecture decisions
 
@@ -53,9 +55,11 @@ Facts from the backend note (file and line cited there): sign-up returns no toke
 - Sign-up screen: email, password (minimum 8, show/hide), display name, nickname. Request body is exactly those four fields. On 200 go to the Verify screen. Errors from the server (400 "Email already registered", "Nickname already taken", "Password must be at least 8 characters long") show inline. "Email already registered" also offers "Sign in" and "Verify your email".
 - Verify screen: shows the email, a 6-digit input, Verify, Resend (60-second cooldown, calls the resend endpoint) and Back. A failed code shows "That code didn't work. Check it or request a new one." (the server answers every failure with "Verification failed"). On success go to the login screen with "Email verified. Sign in." No auto-login.
 - Login: a 403 "Email not verified" routes to the Verify screen with the email filled in. 401 shows "Invalid email or password".
-- Forgot password: a "Forgot password?" link on the login screen opens an email field. Submit calls `POST /auth/reset-password-request` and always shows "If an account exists for that email, we've sent a reset link. Open it on this phone." with "Back to sign in". The link opens in the phone's browser; the app has no reset-password screen.
+- Forgot password: a "Forgot password?" link on the login screen opens an email field. Submit calls `POST /auth/reset-password-request` and shows "If an account exists for that email, we've sent a reset link. Open it on this phone." with "Back to sign in", except when the response carries `code: oauth_only` (AD-7), when it shows that message instead. The link opens in the phone's browser; the app has no reset-password screen.
 
 **AD-6 Web router (v1.1).** Fact: the web router sends every route except login, signup, event-detail and group-invite to the login page when there is no access token, so the existing `reset-password` route, and the "Forgot password?" link, have been unreachable for signed-out users. It also uses the whole hash as the route key, so `#reset-password?token=...` matches no handler. Rulings: (1) `reset-password` joins the signed-out allowlist. (2) The router ignores the `?query` part of the hash when choosing the route key. Prefer a narrow rule that applies to `reset-password` only; a general rule is acceptable only if tests prove every other route, including the shareable-link routes, resolves exactly as before. The reset page itself reads the token from `location.hash` and removes it with `history.replaceState`. (3) A signed-in user who opens the reset link also sees the reset page, with no redirect.
+
+**AD-7 Google-only accounts (v1.2).** `POST /auth/reset-password-request`: when the email belongs to an existing, non-deleted account with a Google sign-in (`oauth_provider` set) and no password (`password_hash` empty), the server answers 200 with `{"detail": "This account signs in with Google, so it has no password. Use Continue with Google to sign in.", "code": "oauth_only"}`, creates no challenge and sends no email. Every other case keeps today's generic 200 with no `code`, including an account that has both a Google link and a password, which gets the normal reset email. The field is additive; the response was never declared in the schema. Web: the request view shows the message and a "Continue with Google" button that starts the existing Google sign-in, and does not move on to the code view. App: the forgot-password screen shows the message, with the Google sign-in button where the app has one (Android) and "Back to sign in". The existing 5 per minute per IP limit bounds probing. Disclosure accepted: this reveals the sign-in method of a registered email (§6); sign-up already reveals that an email is registered. No database change is needed.
 
 ## 3. Tier and deferred decisions (BP-10)
 
@@ -66,6 +70,7 @@ Facts from the backend note (file and line cited there): sign-up returns no toke
 | Opening the app from the link (deep links) | Decided out of scope | Architect approves native deep linking |
 | Moving off Gmail SMTP | Free Gmail limits sending volume | Daily emails exceed 300 or any bounce or throttle is seen |
 | Reset for OAuth-only users | Not requested | Architect approves converting OAuth accounts to passwords |
+| Revert the Google-only message to the generic reply | Accepted disclosure of the sign-in method (AD-7) | More than 100 reset requests per hour from one IP, or more than 20 distinct emails probed per IP per day |
 
 ## 4. Components
 
@@ -93,7 +98,7 @@ Facts from the backend note (file and line cited there): sign-up returns no toke
 ## 6. Security
 
 - Tokens: 256 bits, hashed at rest, single use, short-lived, never logged (P10, P4).
-- Same response for registered and unknown emails on resend and reset request (P9). Timing gap deferred (§3).
+- Resend: the same response for every email. Reset request: the same generic response for every email except an existing, non-deleted account that signs in with Google and has no password, which is told so (AD-7, architect decision). Timing gap deferred (§3).
 - A successful reset revokes all sessions and consumes every other active reset challenge.
 - The link contains only the token, and the web page removes it from the address bar on load. The URL fragment is not sent to the server.
 - Rate limits at the gateway per IP plus the existing 3-active-challenge cap per email (P17).
@@ -116,10 +121,11 @@ Risk class: high (credential recovery).
 - Resend: identical 200 body for unverified, verified, unknown and OAuth-only emails; only an unverified local account gets a new code; the 4th active challenge is not created; the rate limit returns 429.
 - Reset token: single use; expired token rejected; wrong or altered token rejected with the identical generic message; a short password rejected; success updates the password, revokes refresh tokens and consumes the user's other active reset challenges; the old code no longer works after a token reset.
 - Email: with `WEB_BASE_URL` set the body contains the link with the token only (no email address) and the code fallback; with it unset the body is code-only.
+- Google-only reset (AD-7): the reply carries `code: oauth_only` and the message, and no challenge row and no outbox job are created; a password account, an unknown email, a deleted account and a Google-linked account that also has a password all get the generic reply (the last also gets the email); the rate limit is unchanged.
 - Contract: existing endpoints unchanged (compare the OpenAPI before and after); the new endpoints are present.
 - Logs: token, code and passwords never appear in logs.
-- Web (real browser): the reset page reads the token from the hash and removes it from the address bar; the new-password view; the success view; the invalid-link view with "Request a new link"; with no token the old flow works; Resend calls the new endpoint.
-- App: the sign-up request body is exactly the four fields; the Verify, Resend (cooldown) and login-403 routing; the forgot-password screen shows the generic message for any email; no number field on sign-up.
+- Web (real browser): the reset page reads the token from the hash and removes it from the address bar; the new-password view; the success view; the invalid-link view with "Request a new link"; with no token the old flow works; Resend calls the new endpoint; the request view shows the Google-only message and a Continue with Google button for an oauth_only reply.
+- App: the sign-up request body is exactly the four fields; the Verify, Resend (cooldown) and login-403 routing; the forgot-password screen shows the generic message for any email except an `oauth_only` reply, which shows the Google-only message; no number field on sign-up.
 
 - Web router: `#reset-password` and `#reset-password?token=...` reach the reset page when signed out (real browser); every other route, including login, signup, event-detail, group-invite and the authenticated routes, resolves exactly as before (a regression test over the route table).
 - Sanitizer: the new token and code entries only strip echoed input and do not rewrite the 422 messages of existing endpoints.
