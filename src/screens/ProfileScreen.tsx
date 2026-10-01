@@ -63,6 +63,7 @@ import type { ChipOption } from '../components/OptionChips';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { getApiErrorMessage } from '../utils/apiError';
+import MobileNumberCard from '../components/MobileNumberCard';
 import { getDisplayName } from '../utils/displayName';
 import { useSportDisplayName } from '../utils/labels';
 import { borderWidth, colors, radius, shadows, sizes, spacing, typography } from '../theme/tokens';
@@ -685,6 +686,13 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           </View>
         ) : null}
       </Card>
+
+      <MobileNumberCard
+        storedNumber={profile.mobile_number}
+        onSaved={mobileNumber =>
+          setProfile(current => (current ? { ...current, mobile_number: mobileNumber } : current))
+        }
+      />
 
       <Button
         label="Notification Preferences"

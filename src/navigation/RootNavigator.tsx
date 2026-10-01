@@ -116,6 +116,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
 import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
 import NotificationBanner from '../components/NotificationBanner';
+import OnboardingOverlay from './OnboardingOverlay';
 
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
@@ -385,6 +386,7 @@ export default function RootNavigator(): React.JSX.Element {
       >
         {user ? <AppStack /> : <AuthStack />}
       </NavigationContainer>
+      {user ? <OnboardingOverlay userId={user.id} /> : null}
       <NotificationBanner />
     </View>
   );
