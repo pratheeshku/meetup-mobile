@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Doc ID | DES-MEETUP-ADDENDUM-dashboard |
-| Version | v1.2 |
-| Status | APPROVED (architect approval 2026-09-29; v1.1 and v1.2 approved by architect instruction, 2026-09-29 and 2026-09-30) |
+| Version | v1.3 |
+| Status | APPROVED (architect approval 2026-09-29; v1.1 to v1.3 approved by architect instruction, 2026-09-29 to 2026-09-30) |
 | Current tier | T1 |
 | Principles | Enterprise Design Principles v1.0 (P1-P17); design-best-practices v1.0 (BP-01 to BP-13) |
 | Modifies | Nothing. Display-only addendum that supersedes the home screen layout in DES-MEETUP.md and DES-MEETUP-MOBILE.md (implementer verifies section numbers) |
@@ -16,6 +16,7 @@
 - v1.0: home screen redesign for web and app.
 - v1.1: desktop shell now uses the full window (Chrome review of the live web, 2026-09-29); sport chips become multi-select, default to the user's skill sports and filter the games lists; stray headings removed; profile photo display and greeting rules made explicit.
 - v1.2 (2026-09-30): maximum content width raised from 1440px to 1920px; the left menu restated as a hard requirement for signed-in users (the desktop version of the phone bottom bar, restored on page load); chip selection and default rules made testable.
+- v1.3 (2026-09-30): list definitions and order made explicit (AD-14); AD-7 reversed (My games may repeat the next-game card); sports row spreads across the full section width (AD-9); the web uses the same Shuttlr icon files as the mobile app (AD-3).
 
 ## Decision summary (plain language)
 
@@ -27,6 +28,9 @@
 6. Each section loads and fails on its own, so one failing call never blanks the screen.
 7. Sport chips are multi-select. They start on the sports the user has skill levels for, and they filter the games shown below (not groups).
 8. The user's uploaded profile photo shows in the banner.
+9. My games means games you host, are going to, or are waitlisted for; Recommended for you means upcoming public games you have not accepted. Both list the earliest first, two shown.
+10. The sport icons spread evenly across the full width of their section.
+11. The web uses the same Shuttlr icon as the mobile app.
 
 ## 1. Context
 
@@ -38,7 +42,7 @@ Users said the home screen feels dull. The current screen (baseline screenshot, 
 
 **AD-2 Icons.** One illustrated icon set as inline SVG (Appendix A). No emoji, no raster images, no icon-font dependency. Sport icons are chosen by sport slug. Unknown slugs use the generic ball icon.
 
-**AD-3 App icon.** The implementer locates the existing Shuttlr icon in the repo (app: launcher icon source or app assets; web: PWA manifest icons or public directory), reports the path found, and renders it at 34x34 logical px inside a 46x46 white tile with 14px corner radius. No app name text beside it. If no usable icon is found, file a blocked report. Do not substitute the mockup's shuttlecock, which is a placeholder.
+**AD-3 App icon.** The implementer locates the existing Shuttlr icon in the repo (app: launcher icon source or app assets; web: PWA manifest icons or public directory), reports the path found, and renders it at 34x34 logical px inside a 46x46 white tile with 14px corner radius. No app name text beside it. If no usable icon is found, file a blocked report. Do not substitute the mockup's shuttlecock, which is a placeholder. v1.3: the web uses the same Shuttlr icon files as the mobile app. The architect places `icon-512x512.png` and `icon-192x192.png` (copied from the mobile repo) in `frontend/icons/`, replacing the existing files under the same names. The web uses them for the banner, the left menu, the PWA manifest and the favicon; the implementer reports every other icon reference (favicon.svg, apple-touch-icon, manifest) and points all of them to the same icon, and bumps the app version so cached icons refresh.
 
 **AD-4 Display only.** Every element reads from existing sources (§5). If a section needs data the current endpoints cannot supply, file a blocked report. Do not add endpoints.
 
@@ -46,11 +50,11 @@ Users said the home screen feels dull. The current screen (baseline screenshot, 
 
 **AD-6 Typography.** Use each client's existing font. The mockup's typefaces are illustrative only, and no font dependency is added (avoids external font requests).
 
-**AD-7 No duplicate game.** The next-game card shows the soonest upcoming game the user is registered for. My games shows the next two after it. Fewer results show fewer rows.
+**AD-7 Next game and My games (v1.3).** The next-game card shows the soonest upcoming game the user is registered for. My games lists up to two games from the My games definition (AD-14), earliest first, and may repeat the game shown in the card. Reason: excluding it left My games empty for a user with a single game.
 
 **AD-8 Group icon.** A Players Group shows the groups icon (groups have no sport column, DES-MEETUP-ADDENDUM-shareable-links Decision 16). A Tournament Team shows its sport icon. Group meta shows member count, plus sport only for teams.
 
-**AD-9 Sport filter.** Chips come from the admin public sports list (`GET /admin/sports/public`), "All" first. Chips are multi-select: tapping a chip toggles it; "All" is exclusive (selecting it clears the others, and clearing every sport selects All). Default on load: the sports the user has a skill level for (source `user_skill_levels`) that also appear in the admin list; if none, All. The skill default applies only to the first render of a visit; after that the user's own selection is never overwritten by it. The choice is not saved between visits. Selected chips have a 2px brand-colour ring. Overflow scrolls horizontally. Scope: the filter applies to the next-game card, My games and Recommended for you. When filtered, the next-game card is the soonest matching game and My games excludes it (AD-7). My groups and the counts are never filtered, because Players Groups have no sport and the counts must match their destination screens. When a filter leaves a section empty, show "No {sport names} games here — clear the filter to see all" instead of the generic empty text.
+**AD-9 Sport filter.** Chips come from the admin public sports list (`GET /admin/sports/public`), "All" first. Chips are multi-select: tapping a chip toggles it; "All" is exclusive (selecting it clears the others, and clearing every sport selects All). Default on load: the sports the user has a skill level for (source `user_skill_levels`) that also appear in the admin list; if none, All. The skill default applies only to the first render of a visit; after that the user's own selection is never overwritten by it. The choice is not saved between visits. Selected chips have a 2px brand-colour ring. When all chips fit, they spread evenly across the full width of their section, the first at the left edge and the last at the right edge; when they do not fit, the row scrolls horizontally. Scope: the filter applies to the next-game card, My games and Recommended for you. When filtered, the next-game card is the soonest matching game. My groups and the counts are never filtered, because Players Groups have no sport and the counts must match their destination screens. When a filter leaves a section empty, show "No {sport names} games here — clear the filter to see all" instead of the generic empty text.
 
 **AD-10 Desktop.** Below 1024px use the phone layout, centred at a maximum width of 640px, with the bottom bar. At 1024px and above the dashboard uses the full window. The dashboard page overrides the global 800px cap on the main content shell (this page only; other pages are unchanged), with 32px side padding and a 1920px maximum width, centred. Top to bottom: (1) left navigation rail (the desktop version of the phone bottom bar), visible on every signed-in page from 1024px up and restored on page load from the existing session, not only after a login click: app icon at the top, then Home, Groups, Games, Profile and a labelled Create button; (2) banner as a full-width rounded card (radius 28): greeting and headline on the left; on the right the bell, profile picture and two count chips ("{n} active games", "{n} groups") that open My games and My groups; (3) next-game card, a full-width slim card directly under the banner; (4) sports row, aligned to the same left edge as the cards; (5) three equal-width cards in one row, 24px gutters, equal height, top-aligned: My games, My groups, Recommended for you, each with header, View all and up to two rows; (6) no shortcut tiles on desktop, because the count chips replace them. Column widths are equal at every width from 1024px up, and nothing scrolls horizontally.
 
@@ -59,6 +63,8 @@ Users said the home screen feels dull. The current screen (baseline screenshot, 
 **AD-12 Profile picture.** The banner shows the user's uploaded photo whenever a photo URL exists (web displays only; upload is mobile-only). It falls back to the default letter avatar only when there is no photo or the image fails to load. Verify with an account that has a photo.
 
 **AD-13 Greeting.** Plain text "Good to see you", without the waving-hand emoji (AD-2).
+
+**AD-14 List definitions and order (v1.3).** My games: games that start in the future, are not cancelled, and where the user is the organizer or has a going or waitlisted status. Recommended for you: public games that start in the future, are not cancelled, that the user does not organize and has not accepted (no going or waitlisted status); games the user declined are excluded. Both lists are ordered by start time, earliest first, ties broken by creation time. Two rows are shown, and View all opens the full list in the same order. The sport filter (AD-9) applies to both. The web uses the same data and rules as the mobile app's lists; the implementer checks the web result against the database for the same account and reports any difference.
 
 ## 3. Tier and deferred decisions (BP-10)
 
@@ -149,9 +155,11 @@ Risk class: low (display only), medium for navigation and counts.
 - Filter: multi-select toggling; All exclusivity; default from the user's skill sports, and All when the user has none or none match the admin list; selecting a sport changes the contents of the next-game card, My games and Recommended for you (assert the lists, not only the chip state); My groups and all counts never change; filtered-empty message.
 - Profile picture: shows the uploaded photo for an account that has one; falls back to the letter avatar when absent or on load error.
 - Filter interaction (real clicks in a browser): from the default selection, clicking another sport selects it and the selection does not reset on re-render; clicking All and then a sport selects that sport; a user with no skill sports opens on All.
+- List rules (AD-14): hosted, going and waitlisted games appear in My games; cancelled and past games never appear; Recommended excludes hosted, accepted and declined games; both lists are sorted earliest first; the web lists equal the database result for the same account.
+- Sports row spreads across the full section width when the chips fit and scrolls when they do not.
 - Desktop at 1024, 1280, 1440, 1920 and 2560px: content spans the window up to 1920 with 32px padding and is centred beyond that; the three cards have equal width and height; the rail is visible on a signed-in fresh page load (session restored, no login click) and hidden when signed out; no horizontal scroll.
 - No "My Games & Groups" or "Recent Results" headings unless backed by data (AD-11).
-- Next game and My games never show the same game (AD-7).
+- My games lists up to two games per AD-14 and may repeat the next-game card; with a single game, My games shows it.
 - Group icon rule (AD-8).
 - Counts on tiles equal the destination screen counts.
 - Bottom bar label reads "Games" and no Tournaments tile appears.
@@ -187,7 +195,7 @@ No deliberate deviations from either reference file.
 
 ## 13. Requirements coverage
 
-Design-only, no R-IDs. Basis: user feedback that the home screen feels dull, plus decisions made in the design review of 2026-09-29. v1.1 adds architect requests for photo display, filtering and skill-based defaults, and the 2026-09-29 Chrome review of the live desktop web.
+Design-only, no R-IDs. Basis: user feedback that the home screen feels dull, plus decisions made in the design review of 2026-09-29. v1.1 adds architect requests for photo display, filtering and skill-based defaults, and the 2026-09-29 Chrome review of the live desktop web. v1.3 adds the architect's 2026-09-30 findings on list definitions, icon reuse and sports row alignment.
 
 ## 14. Open items
 
@@ -200,6 +208,7 @@ Non-blocking:
 - N6 Report the origin of the "My Games & Groups" and "Recent Results" headings (AD-11).
 - N7 State whether the web ignored the photo field or the test account had no photo (AD-12).
 - N8 Signed-in fresh load: after a page reload with an existing session, the left rail, the user's display name and avatar must appear as they do after login (session-restore path).
+- N9 The new icon files must be present in `frontend/icons/` before the build (the architect places them). If absent, file a blocked report.
 
 ## Appendix A: icon set (viewBox 0 0 48 48, use verbatim)
 

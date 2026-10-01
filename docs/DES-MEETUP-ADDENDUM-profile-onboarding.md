@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Doc ID | DES-MEETUP-ADDENDUM-profile-onboarding |
-| Version | v1.1 |
-| Status | APPROVED-WITH-WAIVERS (approved by architect 2026-09-29; waivers W1-W2 in §14) |
+| Version | v1.2 |
+| Status | APPROVED-WITH-WAIVERS (approved by architect 2026-09-29; v1.2 approved 2026-09-30; waivers W1-W2 in §14) |
 | Current tier | T1 |
 | Principles | Enterprise Design Principles v1.0 (P1-P17); design-best-practices v1.0 (BP-01 to BP-13) |
 | Modifies | Nothing. Additive addendum to DES-MEETUP.md and DES-MEETUP-MOBILE.md; design-only, no REQ addendum (architect instruction) |
@@ -15,10 +15,11 @@
 
 - v1.0 (DRAFT): mobile number and a first-run prompt for skills and the number.
 - v1.1 (APPROVED-WITH-WAIVERS): prompt widened to skills, notification preferences, mobile number and, on mobile only, profile photo; reveal confirmed as a single audited click; blockers B1 and B2 converted to waived implementation gates G1-G2; gates G3-G4 added.
+- v1.2 (2026-09-30): country-code dropdown on every mobile number field, default +65, with the country list kept in a CSV file and served to web and mobile by one public endpoint.
 
 ## Decision summary (plain language)
 
-1. Users can optionally give a mobile number (any country) at registration, and change or clear it in Profile.
+1. Users can optionally give a mobile number (any country) at registration, and change or clear it in Profile. Every number field has a country-code dropdown that defaults to +65.
 2. Only platform admins can see it, one click at a time, and each view is logged. Organizers and other users never see it.
 3. The number is for one thing: an admin may phone a user, outside the app, for example when they accepted an invite but did not attend.
 4. Newly registered users see a one-time setup flow: sport skill levels, notification preferences, the optional mobile number (if not yet given) and, on mobile only, a profile photo. Every step has Save and Skip. Existing users never see it.
@@ -42,6 +43,7 @@ Locked decisions (all architect-approved in conversation, 2026-09-29):
 - D11 The notification step embeds the existing notification settings component; no new preference storage.
 - D12 The photo step reuses the existing photo upload; mobile only, since web has no upload.
 - D13 Reveal is a single click, audited; no confirmation dialog.
+- D14 Every mobile number field has a country-code dropdown defaulting to +65; the list lives in a CSV file for easy maintenance (AD-9).
 
 ## 2. Architecture decisions
 
@@ -60,6 +62,8 @@ Locked decisions (all architect-approved in conversation, 2026-09-29):
 **AD-7 Retention.** The number is nulled immediately on clear, on account deletion, and on consent withdrawal. A sweep (defined separately, D6) is a backstop only. Non-use is not a deletion trigger.
 
 **AD-8 No OTP.** Deferred (§3).
+
+**AD-9 Country codes.** The dropdown shows the ISO code and dial code (for example "SG +65"), with no emoji flags. The list comes from `data/country_codes.csv` in the backend repo (columns `iso2,name,dial_code,sort_order,enabled`). The architect maintains it by editing the file; the backend loads it at startup. One unauthenticated endpoint, `GET /public/country-codes`, returns the enabled rows in `sort_order`, so web and mobile share one list. The default country is config (`DEFAULT_COUNTRY_ISO`, default `SG`, +65). The client builds E.164 from the chosen code and the national number; server validation and storage are unchanged (one E.164 string, no schema change). When editing a stored number, the client preselects the country from its dial code, falling back to the default when several countries share a code. If the list cannot be loaded, the number field is hidden, as with the consent text. The initial CSV is generated from the pinned `phonenumbers` metadata and reviewed by the architect.
 
 Rejected: mandatory number (PDPA conditionality risk; breaks OAuth signup path); prompt for all existing users (owner decision); hard block on skills (personalization does not justify a lockout).
 
@@ -84,11 +88,12 @@ No-regret confirmation: all changes are additive (P14). Adding OTP later needs a
 - `GET /users/me` returns `mobile_number` (owner only) and `onboarding_required`.
 - `POST /users/me/onboarding/complete`: idempotent; sets `onboarding_completed_at = now()` only if NULL.
 - `GET /public/consent/mobile-number`: unauthenticated; returns current consent version and text from config. Falls under the existing `/public/*` rate limit.
+- `GET /public/country-codes`: unauthenticated; static non-PII list from the CSV (AD-9); same rate limit.
 - `POST /admin/users/{user_id}/mobile-number/reveal`: admin only; returns the number and writes the audit row in the same transaction.
 - Response-model allowlist: `mobile_number` may appear only in the owner's `/users/me` and the admin reveal response. It must not appear in user search, participant lists, invitations, organizer views, admin list or detail, any `/public/*` payload, notifications, or error bodies.
 
 ### 4.2 Web
-- Registration form: optional number field with country picker and the consent text.
+- Registration form: optional number field with the country-code dropdown (AD-9) and the consent text.
 - Profile settings: view, change, clear.
 - First-run modal: skills, notification preferences (existing settings component), then optional number (only if none stored). Each step has Save and Skip. No photo step on web.
 - Admin user detail: "Reveal mobile number" button, shown next to display name, nickname and email so the admin can confirm identity before calling.
@@ -123,11 +128,12 @@ No-regret confirmation: all changes are additive (P14). Adding OTP later needs a
 | `GET /users/me` | adds `mobile_number`, `onboarding_required` | none new |
 | `POST /users/me/onboarding/complete` | new, idempotent | none |
 | `GET /public/consent/mobile-number` | new, unauthenticated | none |
+| `GET /public/country-codes` | new, unauthenticated, static list (AD-9) | none |
 | `POST /admin/users/{user_id}/mobile-number/reveal` | new | 403 non-admin (security-stream event); 404 `no_mobile_number` |
 
 **Validation:** server parses with a phone-number library (`phonenumbers`, pinned exact version), requires leading `+`, strips spaces and dashes before parsing, requires a valid number, stores normalized E.164. Client uses `libphonenumber-js` (pinned) for the picker only. The 422 body must not echo the submitted value.
 
-**Config keys (P1):** `MOBILE_CONSENT_VERSION` (default `mobile-consent-v1`), `MOBILE_CONSENT_TEXT`, `ONBOARDING_PROMPT_ENABLED` (kill switch; false makes `onboarding_required` always false).
+**Config keys (P1):** `MOBILE_CONSENT_VERSION` (default `mobile-consent-v1`), `MOBILE_CONSENT_TEXT`, `ONBOARDING_PROMPT_ENABLED` (kill switch; false makes `onboarding_required` always false), `DEFAULT_COUNTRY_ISO` (default `SG`).
 
 Default consent text v1 (subject to legal review, D7): "Optional. Meetup administrators may call you on this number if, for example, you accept an event invitation but do not attend. It is not shown to other users. You can remove it at any time in Profile."
 
@@ -153,6 +159,7 @@ Default consent text v1 (subject to legal review, D7): "Optional. Meetup adminis
 ## 7. Failure modes
 
 - Consent endpoint fails: client hides the number field; registration proceeds without it.
+- Country list fails to load: the number field is hidden; registration and profile proceed without it.
 - `GET /users/me` fails or times out: client treats `onboarding_required` as false. Never block.
 - Save fails inside the prompt: inline error; Skip stays available.
 - Complete call fails: dismiss locally for the session; prompt reappears at next launch (flag still NULL).
@@ -187,6 +194,7 @@ Mandated negative tests:
 - Step order and per-step Skip on mobile and web; web never shows the photo step.
 - Notification step renders the same component as Settings; an opted-out type produces no delivery (gate G3).
 - Photo step uses the existing upload endpoint; an invalid or oversized file shows an inline error.
+- Country list: CSV rows parse; disabled rows are not served; order follows sort_order; the default is +65; a malformed CSV row fails startup with a clear error; editing a stored number preselects its country; the field is hidden if the list fails to load.
 
 Test suite is run once per implementation report.
 
@@ -209,7 +217,7 @@ Rollback is a config change: `ONBOARDING_PROMPT_ENABLED=false` hides the prompt;
 
 | Principle | Element |
 |---|---|
-| P1 | Consent version and text and kill switch in config |
+| P1 | Consent version and text, kill switch and default country in config; country list in a CSV file |
 | P4 | Denylist masking; security-event stream for denied reveals |
 | P5 | Completion endpoint idempotent by construction |
 | P6 | Append-only `pii_access_log`; no PII in the record |
