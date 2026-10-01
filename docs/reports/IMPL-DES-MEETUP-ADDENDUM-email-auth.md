@@ -5,8 +5,8 @@
 | Field | Value |
 |---|---|
 | Doc ID | DES-MEETUP-ADDENDUM-email-auth |
-| Version | v1.1 |
-| Status | APPROVED (architect approval 2026-10-01) |
+| Version | v1.2 |
+| Status | APPROVED (architect approval 2026-10-01; v1.1 and v1.2 approved 2026-10-01) |
 | Current tier | T1 |
 | Modifies | DES-MEETUP-MOBILE.md (§3.5, §4.2) |
 | Target Platform | Android app (`~/Developer/meetup-mobile`, React Native 0.86.3 bare workflow) |
@@ -20,7 +20,7 @@ Live OpenAPI specification fetched and inspected from `https://meetups.duckdns.o
 - `POST /auth/verify-email`: Verified present. `VerifyEmailRequest` required fields: `['email', 'code']`.
 - `POST /auth/login`: Verified present. `LoginRequest` required fields: `['email', 'password']`.
 - `POST /auth/resend-verification`: **Verified present and deployed** on the live backend (`operationId: resend_verification_auth_resend_verification_post`). Description: "DES-MEETUP-ADDENDUM-email-auth v1.0 AD-1. Same generic 200 for unknown, verified, OAuth-only, unverified and over-limit emails." Required field: `['email']`.
-- `POST /auth/reset-password-request`: Verified present. `ResetPasswordRequestModel` required field: `['email']`.
+- `POST /auth/reset-password-request`: Verified present. `ResetPasswordRequestModel` required field: `['email']`. (AD-7: 200 response with `code: 'oauth_only'` for Google-only accounts).
 - `POST /auth/reset-password-with-token`: Verified present. `ResetPasswordWithTokenModel`.
 
 All screens, components, and endpoints named in the addendum match existing repo structures and backend contracts.
@@ -46,28 +46,41 @@ All screens, components, and endpoints named in the addendum match existing repo
 | §2 AD-5, D3 | Verify screen: shows email, 6-digit input, Verify button, Resend button with 60s cooldown, Back link, generic failure message "That code didn't work. Check it or request a new one.", success routes to Login with "Email verified. Sign in.", no auto-login | `src/screens/VerifyScreen.tsx`<br>`src/auth/emailAuth.ts` | Completed |
 | §2 AD-1, §2 AD-5 | Resend verification: calls `POST /auth/resend-verification {email}` with 60s client cooldown; cooldown does not start on failure; disabled if endpoint absent | `src/screens/VerifyScreen.tsx`<br>`src/auth/emailAuth.ts` | Completed |
 | §2 AD-5, §1 D3 | Login: 403 `{"detail": "Email not verified"}` routes to Verify with pre-filled email and explanation; 401 shows "Invalid email or password."; "Forgot password?" link | `src/screens/LoginScreen.tsx` | Completed |
-| §2 AD-5, §1 D5 | Forgot password screen: email input + Submit, calls `POST /auth/reset-password-request {email}`, always shows generic message "If an account exists for that email, we've sent a reset link. Open it on this phone." with "Back to sign in" button for 200, 4xx, and 5xx; no client-side deep linking | `src/screens/ForgotPasswordScreen.tsx`<br>`src/auth/emailAuth.ts` | Completed |
+| §2 AD-5, §1 D5 | Forgot password screen: email input + Submit, calls `POST /auth/reset-password-request {email}`, always shows generic message "If an account exists for that email, we've sent a reset link. Open it on this phone." with "Back to sign in" button for normal replies and errors; no client-side deep linking | `src/screens/ForgotPasswordScreen.tsx`<br>`src/auth/emailAuth.ts` | Completed |
+| §2 AD-7 (v1.2) | Google-only accounts: `POST /auth/reset-password-request` returning `code: 'oauth_only'` shows backend `detail` message, "Continue with Google" button (reusing existing handler), and "Back to sign in" button | `src/screens/ForgotPasswordScreen.tsx`<br>`src/auth/emailAuth.ts` | Completed |
 | §7 Failure Modes | Server unreachable: inline error with Retry on all screens; Resend cooldown does not start on failure | `src/utils/networkError.ts`<br>`src/components/InlineError.tsx`<br>All 4 screens | Completed |
 | WCAG / Design | Touch targets at least 44px on all buttons, links, and toggles | `src/components/TextLink.tsx`<br>`src/components/Button.tsx`<br>`src/screens/*` | Completed |
 | §2 AD-5, R-111, P10 | Security: passwords, codes, and tokens never appear in logs, analytics, crash reports, or navigation params | All screens & `src/navigation/types.ts` | Completed |
 
 ---
 
-## 5. Proposed Assumptions
+## 5. Reused Google Sign-In Handler
 
-None. All endpoint contracts and screen behaviors mapped directly to AD-5 and the live OpenAPI specification.
+Per AD-7 and prompt instructions, the "Continue with Google" button on the Forgot Password screen reuses the app's existing Google sign-in handler:
+- **Handler Definition**: `signInWithGoogle` in `src/auth/AuthContext.tsx`, line 167 (declared in `AuthContextValue` interface at line 45), exposed via `useAuth().signInWithGoogle`.
+- **Login screen caller**: `src/screens/LoginScreen.tsx`, line 29 (`const { signInWithGoogle } = useAuth();`) and line 48 (`await signInWithGoogle();`).
+- **ForgotPassword screen caller**: `src/screens/ForgotPasswordScreen.tsx`, line 32 (`const { signInWithGoogle } = useAuth();`) and line 85 (`await signInWithGoogle();`).
+- No new auth logic, no duplicate sign-in handler, and no new native dependency added.
 
 ---
 
-## 6. Deviations
+## 6. Proposed Assumptions
+
+None. All endpoint contracts and screen behaviors mapped directly to AD-5, AD-7, and the live OpenAPI specification.
+
+---
+
+## 7. Deviations
 
 None.
 
 ---
 
-## 7. New Tests Breakdown (Execute vs Source Check)
+## 8. New Tests Breakdown (Execute vs Source Check)
 
-### `src/screens/__tests__/RegisterScreen.test.tsx`
+Total: 43 tests (40 Execute, 3 Source check).
+
+### `src/screens/__tests__/RegisterScreen.test.tsx` (9 tests)
 1. `[Execute] posts exactly the four fields to /auth/signup (email, password, display_name, nickname) and no other fields` — Renders screen, fills inputs, submits form, verifies `apiClient.post` called with `/auth/signup` and exact keys `['display_name', 'email', 'nickname', 'password']`.
 2. `[Source check] confirms a mobile number field does not exist in the screen source or rendered tree` — Checks all rendered `TextInput` placeholders and verifies file source code contains no `mobile_number` or `mobile_consent`.
 3. `[Execute] toggles password visibility with show/hide button` — Tests toggle between `secureTextEntry` true/false and label "Show"/"Hide".
@@ -78,7 +91,7 @@ None.
 8. `[Execute] shows inline error with Retry when server is unreachable, and retrying succeeds` — Simulates network error, verifies "Unable to connect to server." with "Retry", clicks Retry and verifies success.
 9. `[Execute] verifies all interactive pressables have a touch target height of at least 44px` — Evaluates dynamic functional styles of all buttons and links, verifying `effectiveHeight >= 44`.
 
-### `src/screens/__tests__/VerifyScreen.test.tsx`
+### `src/screens/__tests__/VerifyScreen.test.tsx` (11 tests)
 10. `[Execute] shows the email, a 6-digit input, Verify, Resend, and Back buttons` — Renders screen with email param, asserts elements exist.
 11. `[Execute] displays explanation text when routed with an explanation` — Verifies explanation from login 403 displays.
 12. `[Execute] the Verify flow ends on the login screen with success message and without auto-login` — Submits 6-digit code, verifies `/auth/verify-email` call, verifies navigation to `Login` with `successMessage: 'Email verified. Sign in.'`, verifies no auth tokens stored.
@@ -91,76 +104,77 @@ None.
 19. `[Execute] Back button navigates back` — Verifies back navigation.
 20. `[Execute] verifies all interactive pressables have a touch target height of at least 44px` — Evaluates all pressable heights `>= 44`.
 
-### `src/screens/__tests__/ForgotPasswordScreen.test.tsx`
-21. `[Execute] shows the generic message on success (200) with "Back to sign in" button` — Submits email, asserts `/auth/reset-password-request` called and generic message displayed.
+### `src/screens/__tests__/ForgotPasswordScreen.test.tsx` (11 tests)
+21. `[Execute] shows the generic message on success (200) with "Back to sign in" button when code is absent` — Submits email, asserts `/auth/reset-password-request` called and generic message displayed.
 22. `[Execute] shows the same generic message on failure (400 client error)` — Asserts identical generic message on 400.
 23. `[Execute] shows the same generic message on a server error that is not a network error (500)` — Asserts identical generic message on 500.
 24. `[Execute] shows inline error with Retry when server is unreachable, and retrying succeeds` — Simulates network error, verifies retry functionality.
-25. `[Execute] pre-fills email when passed in route params` — Checks input initialization.
-26. `[Execute] Back to sign in link navigates to Login` — Checks navigation.
-27. `[Execute] verifies all interactive pressables have a touch target height of at least 44px` — Evaluates all pressable heights `>= 44`.
+25. `[Execute] an oauth_only reply shows the Google-only message, the Continue with Google button and Back to sign in, and does not show the normal message` — Simulates 200 `{ code: 'oauth_only', detail: '...' }`, asserts Google-only message, Continue with Google button, Back to sign in, and absence of generic message.
+26. `[Execute] pressing Continue with Google calls the existing Google sign-in handler` — Pressing button invokes `useAuth().signInWithGoogle`.
+27. `[Execute] handles Google sign-in cancellation silently without error message` — Simulates picker cancellation, asserts no error banner.
+28. `[Execute] handles Google sign-in network error with inline Retry` — Simulates network error during Google sign-in, verifies inline Retry re-invokes handler.
+29. `[Execute] pre-fills email when passed in route params` — Checks input initialization.
+30. `[Execute] Back to sign in link navigates to Login` — Checks navigation.
+31. `[Execute] verifies all interactive pressables have a touch target height of at least 44px (including oauth_only buttons)` — Evaluates all pressable heights `>= 44`.
 
-### `src/screens/__tests__/LoginScreen.test.tsx` (new tests added)
-28. `[Execute] login 403 {"detail": "Email not verified"} routes to Verify with the email filled in and explanation` — Simulates 403, asserts navigation to `Verify`.
-29. `[Execute] login 401 shows "Invalid email or password."` — Simulates 401 error message.
-30. `[Execute] shows inline error with Retry when server is unreachable, and retrying succeeds` — Simulates network error and retries.
-31. `[Execute] "Forgot password?" link navigates to ForgotPassword with pre-filled email` — Clicks link, asserts navigation.
-32. `[Execute] shows successMessage when passed in route params (e.g. from Verify screen)` — Asserts success banner renders.
-33. `[Execute] pre-fills email when passed in route params` — Checks input initialization.
-34. `[Execute] verifies all interactive pressables have a touch target height of at least 44px` — Evaluates all pressables `>= 44`.
+### `src/screens/__tests__/LoginScreen.test.tsx` (7 new tests)
+32: `[Execute] login 403 {"detail": "Email not verified"} routes to Verify with the email filled in and explanation` — Simulates 403, asserts navigation to `Verify`.
+33. `[Execute] login 401 shows "Invalid email or password."` — Simulates 401 error message.
+34. `[Execute] shows inline error with Retry when server is unreachable, and retrying succeeds` — Simulates network error and retries.
+35. `[Execute] "Forgot password?" link navigates to ForgotPassword with pre-filled email` — Clicks link, asserts navigation.
+36. `[Execute] shows successMessage when passed in route params (e.g. from Verify screen)` — Asserts success banner renders.
+37. `[Execute] pre-fills email when passed in route params` — Checks input initialization.
+38. `[Execute] verifies all interactive pressables have a touch target height of at least 44px` — Evaluates all pressables `>= 44`.
 
-### `src/screens/__tests__/emailAuthSecurityAndAudit.test.tsx`
-35. `[Execute] passwords, codes, and tokens are never printed to console logs during auth operations` — Spies on `console.log`, `console.warn`, `console.error` during signup, login, verify, resend, and reset password request; confirms sensitive credentials are never logged.
-36. `[Execute] verifies exact endpoint and payload contracts for all auth helper functions` — Asserts wire contracts on `apiClient.post`.
-37. `[Execute] toggles isResendAvailable correctly via setResendAvailable` — Verifies resend endpoint availability toggle.
-38. `[Source check] confirms navigation route params never contain password, code, or token fields` — Inspects `src/navigation/types.ts` `AuthStackParamList`.
-39. `[Source check] confirms no console.log calls exist in auth screens or emailAuth` — Static regex scan across all auth files ensuring no credential logging.
+### `src/screens/__tests__/emailAuthSecurityAndAudit.test.tsx` (5 tests)
+39. `[Execute] passwords, codes, and tokens are never printed to console logs during auth operations` — Spies on `console.log`, `console.warn`, `console.error` during signup, login, verify, resend, and reset password request; confirms sensitive credentials are never logged.
+40. `[Execute] verifies exact endpoint and payload contracts for all auth helper functions` — Asserts wire contracts on `apiClient.post`.
+41. `[Execute] toggles isResendAvailable correctly via setResendAvailable` — Verifies resend endpoint availability toggle.
+42. `[Source check] confirms navigation route params never contain password, code, or token fields` — Inspects `src/navigation/types.ts` `AuthStackParamList`.
+43. `[Source check] confirms no console.log calls exist in auth screens or emailAuth` — Static regex scan across all auth files ensuring no credential logging.
 
 ---
 
-## 8. Real Coverage Percentages Before and After
+## 9. Real Coverage Percentages Before and After
 
 | Metric | Before Implementation | After Implementation | Delta |
 |---|---|---|---|
-| **Statements** | 89.32% (2863 / 3205) | **89.66%** (2557 / 2852) | **+0.34%** |
-| **Branches** | 83.54% (1589 / 1902) | **83.66%** (1418 / 1695) | **+0.12%** |
-| **Functions** | 86.20% (731 / 848) | **86.43%** (618 / 715) | **+0.23%** |
+| **Statements** | 89.32% (2863 / 3205) | **89.67%** (2580 / 2877) | **+0.35%** |
+| **Branches** | 83.54% (1589 / 1902) | **83.61%** (1429 / 1709) | **+0.07%** |
+| **Functions** | 86.20% (731 / 848) | **86.33%** (619 / 717) | **+0.13%** |
+| **Lines** | 89.57% (2842 / 3173) | **89.94%** (2504 / 2784) | **+0.37%** |
 
 ---
 
-## 9. Completion Proof
+## 10. Completion Proof
 
 ### Test Evidence (Single Run Verbatim Output)
 
 ```
 Test Suites: 79 passed, 79 total
-Tests:       991 passed, 991 total
+Tests:       995 passed, 995 total
 Snapshots:   0 total
-Time:        6.172 s, estimated 12 s
+Time:        4.305 s, estimated 5 s
 Ran all test suites.
 ```
 
 ### Git Evidence
 
 ```
-$ git log --oneline -3
-11c6a28 feat(auth): implement email sign-up, verification, and password reset flows (DES-MEETUP-ADDENDUM-email-auth AD-5)
-301916f docs(reports): ratify DES-MEETUP-ADDENDUM-email-auth implementation report
-6a92ddf feat(auth): email sign-up, verification resend and link-based password reset (DES-MEETUP-ADDENDUM-email-auth v1.1)
+$ git log --oneline -4
+86788a3 feat(auth): handle Google-only accounts on forgot password screen (DES-MEETUP-ADDENDUM-email-auth v1.2 AD-7)
+db2d4fc docs(reports): add implementation report for DES-MEETUP-ADDENDUM-email-auth
+4414c07 feat(auth): implement email sign-up, verification, and password reset flows (DES-MEETUP-ADDENDUM-email-auth AD-5)
+ca332f2 Update for google only accounts
+```
 
+```
 $ git status
 On branch feat/mobile-email-auth
-Your branch is up to date with 'origin/main'.
-
 Changes not staged for commit:
   (use "git add <file>..." to update what will be committed)
   (use "git restore <file>..." to discard changes in working directory)
 	modified:   android/version.properties
-	modified:   src/screens/__tests__/ForgotPasswordScreen.test.tsx
-	modified:   src/screens/__tests__/LoginScreen.test.tsx
-	modified:   src/screens/__tests__/RegisterScreen.test.tsx
-	modified:   src/screens/__tests__/VerifyScreen.test.tsx
-	modified:   src/screens/__tests__/emailAuthSecurityAndAudit.test.tsx
 ```
 
 ### File Evidence (Key Changes Exist On Disk)
@@ -171,64 +185,20 @@ src/auth/emailAuth.ts:28: * Signs up a new account (DES-MEETUP-ADDENDUM-email-au
 src/auth/emailAuth.ts:32:  await apiClient.post('/auth/signup', {
 
 $ grep -rn "POST /auth/verify-email" src/
-src/auth/emailAuth.ts:44:  await apiClient.post('/auth/verify-email', { email, code });
+src/auth/emailAuth.ts:42: * (DES-MEETUP-ADDENDUM-email-auth AD-5).
+src/auth/emailAuth.ts:45:  await apiClient.post('/auth/verify-email', { email, code });
 
 $ grep -rn "POST /auth/resend-verification" src/
-src/auth/emailAuth.ts:52:  await apiClient.post('/auth/resend-verification', { email });
+src/auth/emailAuth.ts:50: * (DES-MEETUP-ADDENDUM-email-auth AD-1, AD-5).
+src/auth/emailAuth.ts:53:  await apiClient.post('/auth/resend-verification', { email });
 
 $ grep -rn "POST /auth/reset-password-request" src/
-src/auth/emailAuth.ts:60:  await apiClient.post('/auth/reset-password-request', { email });
+src/auth/emailAuth.ts:63: * (DES-MEETUP-ADDENDUM-email-auth AD-2, AD-5, AD-7).
+src/auth/emailAuth.ts:70:    '/auth/reset-password-request',
+
+$ grep -rn "oauth_only" src/
+src/auth/emailAuth.ts:58:  code?: string;
+src/auth/emailAuth.ts:64: * For Google-only accounts, returns { detail, code: 'oauth_only' }.
+src/screens/ForgotPasswordScreen.tsx:7: * (code: 'oauth_only'), where it displays the backend detail message and offers
+src/screens/ForgotPasswordScreen.tsx:57:      if (response?.code === 'oauth_only') {
 ```
-
----
-
-## 10. Add-on: AD-7 Google-Only Accounts (v1.2)
-
-### Context & Implementation
-Per `DES-MEETUP-ADDENDUM-email-auth.md` v1.2 AD-7, for Google-only accounts (`oauth_provider` set, `password_hash` empty), `POST /auth/reset-password-request` answers 200 with:
-`{"detail": "This account signs in with Google, so it has no password. Use Continue with Google to sign in.", "code": "oauth_only"}`.
-- In `src/screens/ForgotPasswordScreen.tsx`:
-  - When `response.code === 'oauth_only'`, the screen suppresses the normal "we've sent a reset link" message.
-  - Renders the response's `detail` message: `"This account signs in with Google, so it has no password. Use Continue with Google to sign in."`.
-  - Renders a `"Continue with Google"` button.
-  - Renders a `"Back to sign in"` button.
-  - When `code` is absent (older backend) or any other 200/error, existing behavior is preserved exactly.
-
-### Reused Google Sign-In Handler
-- **Handler**: `signInWithGoogle` from `src/auth/AuthContext.tsx`, line 167 (declared in `AuthContextValue` interface at line 45), exposed via `useAuth().signInWithGoogle`.
-- **Login screen usage**: `src/screens/LoginScreen.tsx`, line 29 (`const { signInWithGoogle } = useAuth();`) and line 48 (`await signInWithGoogle();`).
-- **ForgotPassword screen usage**: `src/screens/ForgotPasswordScreen.tsx`, line 28 (`const { signInWithGoogle } = useAuth();`) and line 85 (`await signInWithGoogle();`).
-- No new auth code, no new native dependency, and no refactor needed.
-
-### Add-on New Tests Breakdown (Execute vs Source Check)
-`src/screens/__tests__/ForgotPasswordScreen.test.tsx`:
-1. `[Execute] an oauth_only reply shows the Google-only message, the Continue with Google button and Back to sign in, and does not show the normal message` — Mocks `code: 'oauth_only'`, asserts `EXPECTED_OAUTH_ONLY_MESSAGE` renders, asserts generic message does not render, asserts buttons exist.
-2. `[Execute] pressing Continue with Google calls the existing Google sign-in handler` — Simulates press of "Continue with Google", asserts `mockAuth.signInWithGoogle` is called.
-3. `[Execute] handles Google sign-in cancellation silently without error message` — Simulates user cancelling Google account picker, asserts no error displayed.
-4. `[Execute] handles Google sign-in network error with inline Retry` — Simulates network error during Google sign in, asserts inline Retry displayed and functional.
-5. `[Execute] verifies all interactive pressables have a touch target height of at least 44px (including oauth_only buttons)` — Evaluates functional styles of all buttons ensuring `minHeight >= 44`.
-
-### Add-on Single-Run Test Output (Run ONLY on changed test files as instructed)
-```
-$ npx jest src/screens/__tests__/ForgotPasswordScreen.test.tsx --verbose
-PASS src/screens/__tests__/ForgotPasswordScreen.test.tsx
-  ForgotPasswordScreen
-    ✓ [Execute] shows the generic message on success (200) with "Back to sign in" button when code is absent (64 ms)
-    ✓ [Execute] shows the same generic message on failure (400 client error) (3 ms)
-    ✓ [Execute] shows the same generic message on a server error that is not a network error (500) (3 ms)
-    ✓ [Execute] shows inline error with Retry when server is unreachable, and retrying succeeds (3 ms)
-    ✓ [Execute] an oauth_only reply shows the Google-only message, the Continue with Google button and Back to sign in, and does not show the normal message (2 ms)
-    ✓ [Execute] pressing Continue with Google calls the existing Google sign-in handler (3 ms)
-    ✓ [Execute] handles Google sign-in cancellation silently without error message (2 ms)
-    ✓ [Execute] handles Google sign-in network error with inline Retry (4 ms)
-    ✓ [Execute] pre-fills email when passed in route params (1 ms)
-    ✓ [Execute] Back to sign in link navigates to Login (1 ms)
-    ✓ [Execute] verifies all interactive pressables have a touch target height of at least 44px (including oauth_only buttons) (2 ms)
-
-Test Suites: 1 passed, 1 total
-Tests:       11 passed, 11 total
-Snapshots:   0 total
-Time:        0.253 s, estimated 1 s
-Ran all test suites matching /src\/screens\/__tests__\/ForgotPasswordScreen.test.tsx/i.
-```
-
