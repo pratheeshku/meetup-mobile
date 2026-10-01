@@ -232,7 +232,7 @@ describe('the stub it works around', () => {
   });
 
   it('still honours is_organiser if the mapper ever supplies it (forward compatible)', async () => {
-    const { isOrganiserOf } = jest.requireActual('../../utils/homeDashboard') as typeof import('../../utils/homeDashboard');
+    const { isOrganiserOf } = jest.requireActual('../../utils/gameLists') as typeof import('../../utils/gameLists');
     const { getEvent } = jest.requireActual('../../api/events') as typeof import('../../api/events');
     mockGet.mockResolvedValue({ data: rawEvent() });
     const event = { ...(await getEvent('evt-1')), is_organiser: true };

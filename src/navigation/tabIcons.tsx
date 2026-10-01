@@ -1,56 +1,63 @@
 /**
- * Emoji tab-bar icons (matching the web app's sidebar icons).
+ * Bottom-bar tab icons and labels (DES-MEETUP-ADDENDUM-dashboard.md AD-5,
+ * §4 "Bottom bar"): the colourful Appendix A SVG icons at 30px, labels 11px,
+ * the active label in the brand colour and bold.
  *
- * Rendered through `tabBarIcon` rather than by prefixing `tabBarLabel`:
- * the tab bar shows react-navigation's placeholder `MissingIcon` above every
- * label when no icon is supplied, so a label-only emoji would show a
- * placeholder glyph *and* an emoji. The label text stays plain ("Home"),
- * which is also what screen readers announce.
+ * The tab whose route is `Tournaments` is labelled "Games" and uses the
+ * gamepad icon (its screen is the Games | Tournaments switch, AD-15); the
+ * route name itself is unchanged because notification deep links and the
+ * create flow navigate to it.
  *
- * Tab structure note: there is no separate "Games" tab — events live under
- * Home — so 🎮 is not used here (it appears on the Home dashboard's "My
- * Games" tile instead), and the web's "Discover" has no mobile tab.
+ * Icons are decorative and hidden from screen readers; the label carries the
+ * meaning.
  */
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
 
-import { opacity } from '../theme/tokens';
+import { GamesIcon, GroupsIcon, HomeIcon, ProfileIcon } from '../components/icons/DashboardIcons';
+import type { IconProps } from '../components/icons/DashboardIcons';
+import { dash, dashSize } from '../theme/dashboardTheme';
 import type { AppTabParamList } from './types';
 
 /** `Create` is excluded: the center action button draws its own "+" glyph. */
-export type EmojiTabName = Exclude<keyof AppTabParamList, 'Create'>;
+export type IconTabName = Exclude<keyof AppTabParamList, 'Create'>;
 
-export const TAB_EMOJI: Record<EmojiTabName, string> = {
-  Home: '🏠',
-  Groups: '👥',
-  Tournaments: '🏆',
-  Profile: '👤',
+export const TAB_ICONS: Record<IconTabName, (props: IconProps) => React.JSX.Element> = {
+  Home: HomeIcon,
+  Groups: GroupsIcon,
+  Tournaments: GamesIcon,
+  Profile: ProfileIcon,
 };
 
-interface TabEmojiProps {
-  emoji: string;
-  focused: boolean;
-  /** Icon size supplied by the tab bar. */
-  size: number;
+/** Visible label per tab ("Tournaments" route is the "Games" tab). */
+export const TAB_LABELS: Record<IconTabName, string> = {
+  Home: 'Home',
+  Groups: 'Groups',
+  Tournaments: 'Games',
+  Profile: 'Profile',
+};
+
+export function TabIcon({ name }: { name: IconTabName }): React.JSX.Element {
+  const Icon = TAB_ICONS[name];
+  return <Icon size={dashSize.navIcon} />;
 }
 
-/**
- * Emoji glyphs ignore text colour, so the active/inactive distinction the
- * tab bar normally expresses via tint is expressed as opacity instead.
- */
-export function TabEmoji({ emoji, focused, size }: TabEmojiProps): React.JSX.Element {
+export function TabLabel({
+  name,
+  focused,
+}: {
+  name: IconTabName;
+  focused: boolean;
+}): React.JSX.Element {
   return (
-    <Text
-      accessibilityElementsHidden
-      importantForAccessibility="no"
-      style={[styles.emoji, { fontSize: size }, focused ? null : styles.inactive]}
-    >
-      {emoji}
+    <Text style={[styles.label, focused ? styles.labelActive : styles.labelIdle]}>
+      {TAB_LABELS[name]}
     </Text>
   );
 }
 
 const styles = StyleSheet.create({
-  emoji: { textAlign: 'center' },
-  inactive: { opacity: opacity.disabled },
+  label: { fontSize: dashSize.navLabel },
+  labelIdle: { color: dash.navInactive, fontWeight: '400' },
+  labelActive: { color: dash.brand, fontWeight: '700' },
 });
