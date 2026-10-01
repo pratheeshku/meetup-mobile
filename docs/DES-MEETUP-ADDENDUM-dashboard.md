@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Doc ID | DES-MEETUP-ADDENDUM-dashboard |
-| Version | v1.5 |
-| Status | APPROVED (architect approval 2026-09-29; v1.1 to v1.5 approved by architect instruction, 2026-09-29 to 2026-10-01) |
+| Version | v1.6 |
+| Status | APPROVED (architect approval 2026-09-29; v1.1 to v1.6 approved by architect instruction, 2026-09-29 to 2026-10-01) |
 | Current tier | T1 |
 | Principles | Enterprise Design Principles v1.0 (P1-P17); design-best-practices v1.0 (BP-01 to BP-13) |
 | Modifies | Nothing. Display-only addendum that supersedes the home screen layout in DES-MEETUP.md and DES-MEETUP-MOBILE.md (implementer verifies section numbers) |
@@ -19,6 +19,7 @@
 - v1.3 (2026-09-30): list definitions and order made explicit (AD-14); AD-7 reversed (My games may repeat the next-game card); sports row spreads across the full section width (AD-9); the web uses the same Shuttlr icon files as the mobile app (AD-3).
 - v1.4 (2026-10-01): in the app the Games tab opens one screen with a Games | Tournaments switch (AD-5, AD-15); the Games list combines My games and open public games with scope chips and row badges; mobile icon source recorded (AD-3); open items N2, N4, N5, N6, N8 and N9 closed.
 - v1.5 (2026-10-01): desktop web gets a blue brand header above the left menu with the current icon and a two-tone Shuttlr wordmark (AD-16); the icon leaves the desktop banner. The icon artwork is unchanged; any change to it is a later decision.
+- v1.6 (2026-10-01): phone web and the app get the same brand block in the banner's top row: the current icon straight on the blue, no white tile, with the two-tone Shuttlr name and tagline (AD-17). The white tile of AD-3 is superseded everywhere.
 
 ## Decision summary (plain language)
 
@@ -34,7 +35,8 @@
 10. The sport icons spread evenly across the full width of their section.
 11. The web uses the same Shuttlr icon as the mobile app.
 12. In the app, the Games tab opens one screen with a Games | Tournaments switch. Games shows your games and open public games together, earliest first, with badges and All, Mine and Open filters. The web is unchanged.
-13. On desktop web, the top of the left menu is a blue header with the app icon, the name Shuttlr (the r in yellow) and a small tagline. The banner no longer carries the icon. Phone web and the app are unchanged.
+13. On desktop web, the top of the left menu is a blue header with the app icon, the name Shuttlr (the r in yellow) and a small tagline. The banner no longer carries the icon. Phone web and the app get the same look in the banner (item 14).
+14. On phones (web and app), the banner's top-left shows the current icon straight on the blue, with the two-tone Shuttlr name and the tagline beside it.
 
 ## 1. Context
 
@@ -46,7 +48,7 @@ Users said the home screen feels dull. The current screen (baseline screenshot, 
 
 **AD-2 Icons.** One illustrated icon set as inline SVG (Appendix A). No emoji, no raster images, no icon-font dependency. Sport icons are chosen by sport slug. Unknown slugs use the generic ball icon.
 
-**AD-3 App icon.** The implementer locates the existing Shuttlr icon in the repo (app: launcher icon source or app assets; web: PWA manifest icons or public directory), reports the path found, and renders it at 34x34 logical px inside a 46x46 white tile with 14px corner radius. No app name text beside it. If no usable icon is found, file a blocked report. Do not substitute the mockup's shuttlecock, which is a placeholder. v1.3: the web uses the same Shuttlr icon files as the mobile app. The architect places `icon-512x512.png` and `icon-192x192.png` (copied from the mobile repo) in `frontend/icons/`, replacing the existing files under the same names. The web uses them for the banner, the left menu, the PWA manifest and the favicon; the implementer reports every other icon reference (favicon.svg, apple-touch-icon, manifest) and points all of them to the same icon, and bumps the app version so cached icons refresh. Mobile (v1.4): the app uses the same image. The architect's file `shuttlr-icon.png` (identical to the web's `icon-192x192.png`, SHA-256 `c6b45fa6e5b565cb2ad4cf8da2fc49e49db58784ad9a03b6329c29828d11c054`) is copied into the mobile repo's assets folder; the implementer verifies the hash and reports the path. The launcher foreground layer is not used because it is transparent. v1.5: on desktop web the icon appears only in the rail's brand header (AD-16), without the white tile; the white-tile treatment above applies to the phone banner.
+**AD-3 App icon.** The implementer locates the existing Shuttlr icon in the repo (app: launcher icon source or app assets; web: PWA manifest icons or public directory), reports the path found, and renders it at 34x34 logical px inside a 46x46 white tile with 14px corner radius. No app name text beside it. If no usable icon is found, file a blocked report. Do not substitute the mockup's shuttlecock, which is a placeholder. v1.3: the web uses the same Shuttlr icon files as the mobile app. The architect places `icon-512x512.png` and `icon-192x192.png` (copied from the mobile repo) in `frontend/icons/`, replacing the existing files under the same names. The web uses them for the banner, the left menu, the PWA manifest and the favicon; the implementer reports every other icon reference (favicon.svg, apple-touch-icon, manifest) and points all of them to the same icon, and bumps the app version so cached icons refresh. Mobile (v1.4): the app uses the same image. The architect's file `shuttlr-icon.png` (identical to the web's `icon-192x192.png`, SHA-256 `c6b45fa6e5b565cb2ad4cf8da2fc49e49db58784ad9a03b6329c29828d11c054`) is copied into the mobile repo's assets folder; the implementer verifies the hash and reports the path. The launcher foreground layer is not used because it is transparent. v1.5: on desktop web the icon appears only in the rail's brand header (AD-16), without the white tile; the white-tile treatment above applies to the phone banner. v1.6: the phone banner no longer uses the white tile either; the icon sits straight on the blue with the wordmark (AD-17), so the white tile is superseded everywhere.
 
 **AD-4 Display only.** Every element reads from existing sources (§5). If a section needs data the current endpoints cannot supply, file a blocked report. Do not add endpoints.
 
@@ -74,6 +76,8 @@ Users said the home screen feels dull. The current screen (baseline screenshot, 
 
 **AD-16 Brand header (v1.5, desktop web, 1024px and up).** The top of the left menu is a block as wide as the menu and 96px tall, filled with the banner's brand blue (the same theme token, `brand`), optionally with the same two soft circles as the banner. It holds the app icon (the current `icon-192x192.png` as it is, 48x48 with a 14px corner radius, no white tile) and, beside it, the wordmark: "Shuttl" in white with the final "r" in warm yellow (`#FDE68A`), bold, in the app's existing heading font (no new font, AD-6), about 28px; under it the tagline "PLAY TOGETHER" in capitals, 10px, bold, letter-spacing 2px, colour `#DBEAFE` (contrast at least 4.5:1 on the blue). The wordmark and tagline are live text, not an image, and their strings live in one constant. Tapping the header goes to Home. Phone web and the app are unchanged. The icon artwork itself is unchanged; any change to it (for example a round medallion-only crop on the brand blue) is a later decision.
 
+**AD-17 Phone brand block (v1.6, phone web and the app).** In the banner's top row, the left side shows the brand block: the current icon (the same image as AD-16) at 52x52 with a 12px corner radius, placed straight on the blue with no white tile; 12px to its right the wordmark "Shuttl" in white with the final "r" in `#FDE68A`, bold, about 26px, in the platform's existing font (no new font); and under it the tagline "PLAY TOGETHER", 9px, bold, letter-spacing 2.5px, colour `#DBEAFE`. The strings come from the same constant as AD-16 (one constant per client). The right side keeps the bell and the profile picture. The block is not interactive. The greeting and headline below are unchanged; if the top row grows, the banner grows with it and nothing overlaps, down to a 360px-wide screen. The app uses its existing `shuttlr-icon.png` and the web its existing `icon-192x192.png`; the artwork is unchanged and any change to it is a later decision.
+
 ## 3. Tier and deferred decisions (BP-10)
 
 | Deferred | Reason | Gate (upgrade when) |
@@ -88,7 +92,7 @@ No-regret confirmation: all changes are display-only and additive. The icon set 
 
 | Component | Behaviour |
 |---|---|
-| Banner | Height 208 on phone. Left: app icon tile. Right: bell (44px target, red count badge, hidden at zero) and profile picture (48px circle, 2px white ring). Below: greeting "Good to see you" and headline "Ready to play, {display name}?" Profile picture per AD-12 |
+| Banner | Height 208 on phone. Left: the brand block (AD-17). Right: bell (44px target, red count badge, hidden at zero) and profile picture (48px circle, 2px white ring). Below: greeting "Good to see you" and headline "Ready to play, {display name}?" Profile picture per AD-12 |
 | Next-game card | White card, radius 22, overlaps banner by 40px. Sport icon tile, "Next game" and day, title, time and venue, chevron. Tap opens game detail. Hidden when none, replaced by the existing empty message |
 | Sports row | See AD-9: multi-select, defaults from the user's skills. Tile 60x60 radius 20, icon 38px, label 11px. On desktop it aligns to the card grid's left edge |
 | Section header | Title, and "View all" in brand colour |
@@ -167,6 +171,7 @@ Risk class: low (display only), medium for navigation and counts.
 - List rules (AD-14): hosted, going and waitlisted games appear in My games; cancelled and past games never appear; Recommended excludes hosted, accepted and declined games; both lists are sorted earliest first; the web lists equal the database result for the same account.
 - Games screen (app, AD-15): the switch toggles Games and Tournaments and each segment keeps its own state; the Games list is the union of My games and Open games, earliest first, future and non-cancelled only; badges are correct for hosting, going, waitlisted and open games; scope chips All, Mine and Open filter correctly and combine with the sport chips; each Home entry point opens the right scope; Tournaments shows the existing list unchanged.
 - Sports row spreads across the full section width when the chips fit and scrolls when they do not.
+- Phone brand block (AD-17), phone web and the app: the icon renders at 52x52 with a 12px radius and no white tile behind it; the wordmark shows "Shuttl" in white and the "r" in `#FDE68A`; the tagline renders in `#DBEAFE`; nothing overlaps the greeting and nothing overflows horizontally at 360px and 390px widths.
 - Brand header (AD-16): at 1024px and up the rail's top block is 220px wide and 96px tall with the brand-blue background; it shows the icon, "Shuttl" in white, the "r" in `#FDE68A` and the tagline; the banner contains no app icon; below 1024px the layout is unchanged.
 - Desktop at 1024, 1280, 1440, 1920 and 2560px: content spans the window up to 1920 with 32px padding and is centred beyond that; the three cards have equal width and height; the rail is visible on a signed-in fresh page load (session restored, no login click) and hidden when signed out; no horizontal scroll.
 - No "My Games & Groups" or "Recent Results" headings unless backed by data (AD-11).
@@ -206,7 +211,7 @@ No deliberate deviations from either reference file.
 
 ## 13. Requirements coverage
 
-Design-only, no R-IDs. Basis: user feedback that the home screen feels dull, plus decisions made in the design review of 2026-09-29. v1.1 adds architect requests for photo display, filtering and skill-based defaults, and the 2026-09-29 Chrome review of the live desktop web. v1.3 adds the architect's 2026-09-30 findings on list definitions, icon reuse and sports row alignment. v1.4 adds the Games tab design (AD-15) from the architect's 2026-10-01 decisions. v1.5 adds the desktop brand header (AD-16) from the architect's review of the desktop mockup.
+Design-only, no R-IDs. Basis: user feedback that the home screen feels dull, plus decisions made in the design review of 2026-09-29. v1.1 adds architect requests for photo display, filtering and skill-based defaults, and the 2026-09-29 Chrome review of the live desktop web. v1.3 adds the architect's 2026-09-30 findings on list definitions, icon reuse and sports row alignment. v1.4 adds the Games tab design (AD-15) from the architect's 2026-10-01 decisions. v1.5 adds the desktop brand header (AD-16) from the architect's review of the desktop mockup. v1.6 adds the phone brand block (AD-17).
 
 ## 14. Open items
 
