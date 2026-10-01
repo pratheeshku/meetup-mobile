@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Doc ID | DES-MEETUP-ADDENDUM-profile-onboarding |
-| Version | v1.2 |
-| Status | APPROVED-WITH-WAIVERS (approved by architect 2026-09-29; v1.2 approved 2026-09-30; waivers W1-W2 in §14) |
+| Version | v1.3 |
+| Status | APPROVED-WITH-WAIVERS (approved by architect 2026-09-29; v1.2 and v1.3 approved 2026-09-30 and 2026-10-01; waivers W1-W2 in §14) |
 | Current tier | T1 |
 | Principles | Enterprise Design Principles v1.0 (P1-P17); design-best-practices v1.0 (BP-01 to BP-13) |
 | Modifies | Nothing. Additive addendum to DES-MEETUP.md and DES-MEETUP-MOBILE.md; design-only, no REQ addendum (architect instruction) |
@@ -16,6 +16,7 @@
 - v1.0 (DRAFT): mobile number and a first-run prompt for skills and the number.
 - v1.1 (APPROVED-WITH-WAIVERS): prompt widened to skills, notification preferences, mobile number and, on mobile only, profile photo; reveal confirmed as a single audited click; blockers B1 and B2 converted to waived implementation gates G1-G2; gates G3-G4 added.
 - v1.2 (2026-09-30): country-code dropdown on every mobile number field, default +65, with the country list kept in a CSV file and served to web and mobile by one public endpoint.
+- v1.3 (2026-10-01): database role name corrected to `meetup_app`; the default country is the first row of the list; gate results recorded (G1 clean, G3 passed, G4 conditional).
 
 ## Decision summary (plain language)
 
@@ -63,7 +64,7 @@ Locked decisions (all architect-approved in conversation, 2026-09-29):
 
 **AD-8 No OTP.** Deferred (§3).
 
-**AD-9 Country codes.** The dropdown shows the ISO code and dial code (for example "SG +65"), with no emoji flags. The list comes from `data/country_codes.csv` in the backend repo (columns `iso2,name,dial_code,sort_order,enabled`). The architect maintains it by editing the file; the backend loads it at startup. One unauthenticated endpoint, `GET /public/country-codes`, returns the enabled rows in `sort_order`, so web and mobile share one list. The default country is config (`DEFAULT_COUNTRY_ISO`, default `SG`, +65). The client builds E.164 from the chosen code and the national number; server validation and storage are unchanged (one E.164 string, no schema change). When editing a stored number, the client preselects the country from its dial code, falling back to the default when several countries share a code. If the list cannot be loaded, the number field is hidden, as with the consent text. The initial CSV is generated from the pinned `phonenumbers` metadata and reviewed by the architect.
+**AD-9 Country codes.** The dropdown shows the ISO code and dial code (for example "SG +65"), with no emoji flags. The list comes from `data/country_codes.csv` in the backend repo (columns `iso2,name,dial_code,sort_order,enabled`). The architect maintains it by editing the file; the backend loads it at startup. One unauthenticated endpoint, `GET /public/country-codes`, returns the enabled rows in `sort_order`, so web and mobile share one list. The default country is the first row of the list: the architect keeps SG (+65) first in the CSV and the CSV order is authoritative (`DEFAULT_COUNTRY_ISO` stays in config for documentation, must match, and is not read by clients). The client builds E.164 from the chosen code and the national number; server validation and storage are unchanged (one E.164 string, no schema change). When editing a stored number, the client preselects the country from its dial code, falling back to the default when several countries share a code. If the list cannot be loaded, the number field is hidden, as with the consent text. The initial CSV is generated from the pinned `phonenumbers` metadata and reviewed by the architect.
 
 Rejected: mandatory number (PDPA conditionality risk; breaks OAuth signup path); prompt for all existing users (owner decision); hard block on skills (personalization does not justify a lockout).
 
@@ -117,7 +118,7 @@ No-regret confirmation: all changes are additive (P14). Adding OTP later needs a
 `pii_access_log` (new, append-only):
 `id` UUID PK, `occurred_at` TIMESTAMPTZ NOT NULL, `actor_user_id` UUID NOT NULL, `actor_role` TEXT NOT NULL, `subject_user_id` UUID NOT NULL, `field` TEXT NOT NULL (`mobile_number`), `action` TEXT NOT NULL CHECK IN (`set`,`change`,`clear`,`admin_reveal`), `correlation_id` TEXT. Application role holds INSERT only; no UPDATE or DELETE grant. Follow the existing append-only audit pattern for RLS.
 
-**Function** `fn_admin_reveal_mobile_number(p_subject UUID) RETURNS TEXT`: SECURITY DEFINER; verifies admin from the same transaction-local context used by existing admin functions; selects the number; inserts the `pii_access_log` row; returns text only. Grantee: `meetupapp` only. Must be proven to work under FORCE RLS as the real application role (a prior guard failed exactly here, see v1.70/v1.71 history). If it cannot, file a blocked report; do not widen any RLS policy.
+**Function** `fn_admin_reveal_mobile_number(p_subject UUID) RETURNS TEXT`: SECURITY DEFINER; verifies admin from the same transaction-local context used by existing admin functions; selects the number; inserts the `pii_access_log` row; returns text only. Grantee: `meetup_app` only. Must be proven to work under FORCE RLS as the real application role (a prior guard failed exactly here, see v1.70/v1.71 history). If it cannot, file a blocked report; do not widen any RLS policy.
 
 **API summary**
 
@@ -252,3 +253,4 @@ Non-blocking:
 - N2 In-app account deletion must null the number. The deletion flow is not built and blocks public go-live.
 - N3 Privacy notice with a named data-protection contact, T&C and the Play Data Safety declaration (prepared separately).
 - N4 Whether the re-platform repo re-implements this under app-layer authorization (the same predicates apply).
+- Status (2026-10-01): G1 reported clean in rounds 1 and 3. G3 passed: the fan-out joins notification_preferences and skips opted-out users. G4 conditional: object keys are random (128 bits), but the bucket must also deny anonymous listing before the photo step is enabled. W2 (disk encryption on kannapi) remains with the architect.
