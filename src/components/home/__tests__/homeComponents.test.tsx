@@ -9,9 +9,9 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { makeEvent } from '../../../test-utils/makeEvent';
-import { act, pressableLabelled, render, texts } from '../../../test-utils/render';
+import { act, pressableLabelled, pressables, render, texts } from '../../../test-utils/render';
 import type { Instance } from '../../../test-utils/render';
-import { dash, dashRadius, dashSize } from '../../../theme/dashboardTheme';
+import { brandBlock, dash, dashRadius, dashSize } from '../../../theme/dashboardTheme';
 import type { Group } from '../../../types/group';
 import { FootballIcon, GroupsIcon, SportIcon } from '../../icons/DashboardIcons';
 import DashboardBanner from '../DashboardBanner';
@@ -78,25 +78,109 @@ describe('DashboardBanner', () => {
     expect(texts(banner({ name: '  ' }))).toContain('Ready to play?');
   });
 
-  it('shows the app icon at 34x34 in a 46x46 white tile with a 14px radius and no name text', () => {
+  // NOTE: react-test-renderer does not run layout, so overlap/clipping at 360dp
+  // cannot be measured here; these cases assert the style props that produce it.
+  it('brand block: icon is shuttlr-icon.png at 52x52, radius 12, overflow hidden', () => {
+    const icon = hostByTestId(banner(), 'banner-app-icon');
+    expect(icon.props.source).toBe(require('../../../assets/shuttlr-icon.png'));
+    expect(flat(icon)).toMatchObject({ width: 52, height: 52, borderRadius: 12, overflow: 'hidden' });
+  });
+
+  it('brand block: no ancestor of the icon has a white (or any) background', () => {
+    const icon = hostByTestId(banner(), 'banner-app-icon');
+    let node = icon.parent;
+    let checked = 0;
+    while (node && node.props.testID !== 'dashboard-banner') {
+      if (typeof node.type === 'string') {
+        const bg = flat(node)?.backgroundColor;
+        expect(bg).toBeUndefined();
+        checked += 1;
+      }
+      node = node.parent;
+    }
+    expect(checked).toBeGreaterThan(0);
+    expect(flat(icon)?.backgroundColor).toBeUndefined();
+  });
+
+  it('brand block: "Shuttl" is white, bold 26/28, letterSpacing -0.3, with the "r" in #FDE68A', () => {
     const root = banner();
-    const icon = hostByTestId(root, 'banner-app-icon');
-    expect(flat(icon)).toMatchObject({ width: 34, height: 34 });
-    const tile = hostParent(icon);
-    expect(flat(tile)).toMatchObject({
-      width: 46,
-      height: 46,
-      borderRadius: 14,
-      backgroundColor: '#FFFFFF',
+    const word = root.findAll(
+      n => (n.type as unknown) === 'Text' && n.props.children?.[0] === 'Shuttl',
+    )[0];
+    expect(flat(word)).toMatchObject({
+      color: '#FFFFFF',
+      fontSize: 26,
+      lineHeight: 28,
+      fontWeight: '700',
+      letterSpacing: -0.3,
     });
-    expect(texts(root).join(' ')).not.toMatch(/meetup|shuttlr/i);
+    expect(flat(word)?.fontFamily).toBeUndefined();
+    const r = root.findAll(n => (n.type as unknown) === 'Text' && n.props.children === 'r')[0];
+    expect(flat(r)?.color).toBe('#FDE68A');
+  });
+
+  it('brand block: tagline "PLAY TOGETHER" is 9px bold, spacing 2.5, #DBEAFE, marginTop 2', () => {
+    const root = banner();
+    const tag = root.findAll(
+      n => (n.type as unknown) === 'Text' && n.props.children === 'PLAY TOGETHER',
+    )[0];
+    expect(flat(tag)).toMatchObject({
+      color: '#DBEAFE',
+      fontSize: 9,
+      fontWeight: '700',
+      letterSpacing: 2.5,
+      marginTop: 2,
+    });
+  });
+
+  it('brand block: labelled "Shuttlr" and not a touch target (no onPress, pointerEvents none)', () => {
+    const root = banner();
+    const block = hostByTestId(root, 'banner-brand-block');
+    expect(block.props.accessibilityLabel).toBe('Shuttlr');
+    expect(block.props.accessible).toBe(true);
+    expect(block.props.pointerEvents).toBe('none');
+    const inside = block.findAll(
+      n => typeof n.props.onPress === 'function' || typeof n.props.onPressIn === 'function',
+    );
+    expect(inside).toHaveLength(0);
+    expect(typeof block.props.onPress).toBe('undefined');
+    expect(pressables(root).map(p => p.props.accessibilityLabel)).not.toContain('Shuttlr');
+  });
+
+  it('brand block: strings and colours come from the theme constant', () => {
+    expect(brandBlock).toMatchObject({
+      accessibilityLabel: 'Shuttlr',
+      wordmarkLead: 'Shuttl',
+      wordmarkAccent: 'r',
+      tagline: 'PLAY TOGETHER',
+      accent: '#FDE68A',
+      taglineColor: '#DBEAFE',
+    });
+    const root = banner();
+    const all = texts(root);
+    expect(all).toContain(brandBlock.wordmarkLead);
+    expect(all).toContain(brandBlock.wordmarkAccent);
+    expect(all).toContain(brandBlock.tagline);
+    expect(hostByTestId(root, 'banner-brand-block').props.accessibilityLabel).toBe(
+      brandBlock.accessibilityLabel,
+    );
+  });
+
+  it('keeps the bell and avatar on the right and the greeting below the top row (style props)', () => {
+    const root = banner({ unreadCount: 2 });
+    expect(pressableLabelled(root, 'Notifications, 2 unread')).toBeDefined();
+    expect(pressableLabelled(root, 'Profile')).toBeDefined();
+    const topRow = hostParent(hostByTestId(root, 'banner-brand-block'));
+    expect(flat(topRow)).toMatchObject({ flexDirection: 'row', justifyContent: 'space-between' });
+    // The textBlock sits after the top row in normal flow (no absolute positioning).
+    expect(flat(hostByTestId(root, 'dashboard-banner'))?.position).toBeUndefined();
   });
 
   it('uses the brand banner at height 208 plus the status-bar inset with 32px bottom corners', () => {
     const style = flat(hostByTestId(banner(), 'dashboard-banner'));
     expect(style).toMatchObject({
       backgroundColor: dash.brand,
-      height: dashSize.bannerHeight + 24,
+      minHeight: dashSize.bannerHeight + 24,
       borderBottomLeftRadius: dashRadius.bannerBottom,
       borderBottomRightRadius: dashRadius.bannerBottom,
     });
