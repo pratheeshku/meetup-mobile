@@ -74,7 +74,7 @@ import {
   LOCAL_DATE_TIME_PLACEHOLDER,
   parseLocalDateTime,
 } from '../utils/localDateTime';
-import { isOrganiserOf } from '../utils/homeDashboard';
+import { isOrganiserOf } from '../utils/gameLists';
 import { useSportDisplayName } from '../utils/labels';
 import { getApiErrorMessage } from '../utils/apiError';
 

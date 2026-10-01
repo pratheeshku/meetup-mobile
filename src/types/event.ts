@@ -64,6 +64,8 @@ export interface Event {
   allow_waitlist?: boolean;
   estimated_cost_cents?: number | null;
   estimated_cost_currency?: string | null;
+  /** Wire `created_at`; the tie-break for equal start times (AD-14). */
+  created_at?: string;
 }
 
 export interface UpdateEventInput {

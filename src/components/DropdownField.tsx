@@ -16,6 +16,7 @@ import React, { useState } from 'react';
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleProp,
   StyleSheet,
   Text,
@@ -112,6 +113,7 @@ export default function DropdownField({
                 <Text style={styles.modalActionCancel}>Cancel</Text>
               </Pressable>
             </View>
+            <ScrollView style={styles.optionsScroll} keyboardShouldPersistTaps="handled">
             {options.map(option => (
               <Pressable
                 key={option.value}
@@ -135,6 +137,7 @@ export default function DropdownField({
                 </Text>
               </Pressable>
             ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -143,6 +146,8 @@ export default function DropdownField({
 }
 
 const styles = StyleSheet.create({
+  // Long lists (e.g. ~240 country codes) must scroll inside the sheet.
+  optionsScroll: { maxHeight: 360 },
   trigger: {
     minHeight: sizes.touchTarget,
     paddingHorizontal: spacing.md,

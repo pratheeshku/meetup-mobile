@@ -1,5 +1,9 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
+import type { GamesScope } from '../utils/gameLists';
+
+export type { GamesScope };
+
 /** Auth Stack route params (§4.2 — Sign In, Register). */
 export type AuthStackParamList = {
   Login: undefined;
@@ -18,14 +22,11 @@ export type AuthStackParamList = {
  * set by a successful Casual Game create (via `popTo`) so the list
  * re-fetches.
  *
- * `EventsList.filter` (BUG-M04): `'mine'` switches the Home dashboard to a
- * filtered "My Games" view (events the user organises or is going to,
- * `getMyGames()`) — the Home tab's own equivalent of a "Games tab", since
- * no separate one exists. Set by the Home dashboard's "My Games" tile;
- * cleared by navigating back to `undefined`.
+ * (The former `EventsList.filter: 'mine'` view was replaced by the Games
+ * screen's "Mine" scope — DES-MEETUP-ADDENDUM-dashboard.md AD-15.)
  */
 export type HomeStackParamList = {
-  EventsList: { refreshKey?: number; filter?: 'mine' } | undefined;
+  EventsList: { refreshKey?: number } | undefined;
   EventDetail: { eventId: string };
   CreateGame: undefined;
   NotificationHistory: undefined;
@@ -43,8 +44,16 @@ export type GroupsStackParamList = {
 };
 
 /**
- * Tournaments tab's nested stack route params (§4.5 — Tournaments list,
- * Tournament Detail). `refreshKey` works as on Groups.
+ * Games tab's nested stack route params (§4.5 — Tournaments list,
+ * Tournament Detail; DES-MEETUP-ADDENDUM-dashboard.md AD-15). The tab's
+ * route name stays `Tournaments` (notification deep links and the create
+ * flow navigate to it) but it is labelled "Games" and its first screen,
+ * `TournamentsList`, is the Games screen: a "Games | Tournaments" switch.
+ *
+ * `scope` + `entryKey`: Home's View all / tile entry points open the Games
+ * segment with that scope; `entryKey` makes a repeat entry with the same
+ * scope still register as a new navigation. `refreshKey` works as on
+ * Groups: it selects the Tournaments segment and refetches it.
  *
  * `CreateTournament` removed (Create Flow Amendment, §4.3/§4.5,
  * architect-approved 2026-09-22): tournament creation moved into the
@@ -54,7 +63,7 @@ export type GroupsStackParamList = {
  * stack).
  */
 export type TournamentsStackParamList = {
-  TournamentsList: { refreshKey?: number } | undefined;
+  TournamentsList: { refreshKey?: number; scope?: GamesScope; entryKey?: number } | undefined;
   TournamentDetail: { tournamentId: string };
 };
 

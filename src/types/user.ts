@@ -89,6 +89,12 @@ export interface UserProfile {
   is_admin?: boolean;
   created_at?: string;
   skill_levels?: SkillLevel[];
+  /**
+   * Owner-only E.164 number from `GET /users/me`
+   * (DES-MEETUP-ADDENDUM-profile-onboarding.md AD-1). PII: never log it or
+   * pass it through navigation params or analytics.
+   */
+  mobile_number?: string | null;
 }
 
 /**

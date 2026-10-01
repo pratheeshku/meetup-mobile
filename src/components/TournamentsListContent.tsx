@@ -1,23 +1,28 @@
 /**
- * Tournaments list (DES-MEETUP-MOBILE.md §4.5, §7.7; R-041).
+ * Tournaments list (DES-MEETUP-MOBILE.md §4.5, §7.7; R-041) — content
+ * unchanged; as of DES-MEETUP-ADDENDUM-dashboard.md AD-15 it is the
+ * "Tournaments" segment of the Games screen instead of a screen of its own.
+ * It loads, empties and fails on its own (`getTournaments()`).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getTournaments } from '../api/tournaments';
-import Badge from '../components/Badge';
-import type { BadgeVariant } from '../components/Badge';
-import Card from '../components/Card';
-import EmptyState from '../components/EmptyState';
-import ErrorView from '../components/ErrorView';
-import LoadingView from '../components/LoadingView';
+import Badge from './Badge';
+import type { BadgeVariant } from './Badge';
+import Card from './Card';
+import EmptyState from './EmptyState';
+import ErrorView from './ErrorView';
+import LoadingView from './LoadingView';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentRegistrationStatus } from '../types/tournament';
 import { useSportDisplayName } from '../utils/labels';
-import type { TournamentsStackParamList } from '../navigation/types';
 
-type Props = NativeStackScreenProps<TournamentsStackParamList, 'TournamentsList'>;
+interface Props {
+  onOpenTournament: (tournamentId: string) => void;
+  /** Set by a successful tournament create; each new value refetches once. */
+  refreshKey?: number;
+}
 
 const REGISTRATION_BADGE_LABEL: Record<TournamentRegistrationStatus, string> = {
   none: 'Not Registered',
@@ -68,7 +73,10 @@ function TournamentRow({
   );
 }
 
-export default function TournamentsScreen({ navigation, route }: Props): React.JSX.Element {
+export default function TournamentsListContent({
+  onOpenTournament,
+  refreshKey,
+}: Props): React.JSX.Element {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -98,7 +106,6 @@ export default function TournamentsScreen({ navigation, route }: Props): React.J
 
   // Create Group/Tournament pops back here with a fresh `refreshKey` on
   // success; re-fetch once per new key (the initial mount load is above).
-  const refreshKey = route.params?.refreshKey;
   useEffect(() => {
     if (refreshKey !== undefined) {
       loadTournaments(true);
@@ -141,7 +148,7 @@ export default function TournamentsScreen({ navigation, route }: Props): React.J
       renderItem={({ item }) => (
         <TournamentRow
           tournament={item}
-          onPress={() => navigation.navigate('TournamentDetail', { tournamentId: item.id })}
+          onPress={() => onOpenTournament(item.id)}
         />
       )}
     />

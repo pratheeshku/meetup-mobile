@@ -7,4 +7,6 @@ export interface Sport {
   /** The value sent as `sport` on create requests (see `api/sports.ts`). */
   name: string;
   display_name: string;
+  /** Icon lookup key on the dashboard (AD-2); falls back to `name` when absent. */
+  slug?: string;
 }

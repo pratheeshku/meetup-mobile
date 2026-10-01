@@ -12,17 +12,14 @@ import { getSports } from '../../api/sports';
 import { renderAsync, texts } from '../../test-utils/render';
 import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import type { Tournament } from '../../types/tournament';
-import TournamentsScreen from '../TournamentsScreen';
-
-type Props = React.ComponentProps<typeof TournamentsScreen>;
+import TournamentsListContent from '../TournamentsListContent';
 
 jest.mock('../../api/tournaments', () => ({ getTournaments: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 
 const mockGetTournaments = getTournaments as jest.MockedFunction<typeof getTournaments>;
 const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
-const navigate = jest.fn();
-const setOptions = jest.fn();
+const onOpenTournament = jest.fn();
 const EMPTY = { items: [], total: 0, page: 1, page_size: 0 };
 
 const TOURNAMENT: Tournament = {
@@ -44,19 +41,19 @@ const TOURNAMENT: Tournament = {
 };
 
 function element(params?: { refreshKey?: number }): React.ReactElement {
-  const props = { navigation: { navigate, setOptions }, route: { params } };
-  return <TournamentsScreen {...(props as unknown as Props)} />;
+  return (
+    <TournamentsListContent onOpenTournament={onOpenTournament} refreshKey={params?.refreshKey} />
+  );
 }
 
 beforeEach(() => {
   mockGetTournaments.mockReset().mockResolvedValue(EMPTY);
   mockGetSports.mockReset().mockRejectedValue(new Error('down'));
-  navigate.mockReset();
-  setOptions.mockReset();
+  onOpenTournament.mockReset();
   __resetSportDisplayNamesCacheForTests();
 });
 
-describe('TournamentsScreen refresh after create', () => {
+describe('TournamentsListContent refresh after create', () => {
   it('loads once on a normal mount', async () => {
     await renderAsync(element());
     expect(mockGetTournaments).toHaveBeenCalledTimes(1);
@@ -67,10 +64,6 @@ describe('TournamentsScreen refresh after create', () => {
     expect(mockGetTournaments).toHaveBeenCalledTimes(2);
   });
 
-  it('no longer sets a header "+" button (creation moved to Create Game)', async () => {
-    await renderAsync(element());
-    expect(setOptions).not.toHaveBeenCalled();
-  });
 });
 
 describe('sport display name (BUG-M02)', () => {

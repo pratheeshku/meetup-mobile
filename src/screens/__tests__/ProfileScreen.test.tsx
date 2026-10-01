@@ -24,6 +24,14 @@ import ProfileScreen from '../ProfileScreen';
 type Props = React.ComponentProps<typeof ProfileScreen>;
 
 const mockUpdateUser = jest.fn();
+// Mobile number card (profile-onboarding addendum): its own endpoints are covered in
+// `MobileNumberCard.test.tsx`; here they fail so the card stays hidden.
+jest.mock('../../api/mobileNumber', () => ({
+  getMobileConsent: jest.fn(() => Promise.reject(new Error('unavailable'))),
+  getCountryCodes: jest.fn(() => Promise.reject(new Error('unavailable'))),
+  updateMobileNumber: jest.fn(),
+  classifyMobileNumberError: jest.fn(() => 'other'),
+}));
 jest.mock('../../auth/AuthContext', () => ({
   useAuth: () => ({ signOut: jest.fn(), updateUser: mockUpdateUser }),
 }));

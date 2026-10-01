@@ -1,289 +1,381 @@
 /**
- * Behavioural contract of the Home dashboard's presentational components.
- * Focus: the rules the brief states (max three cards, exact empty-state
- * copy, "All" selected by default) and
- * the accessibility semantics that keep an inert tile from looking tappable.
+ * Dashboard components. Every test EXECUTES a real render (react-test-renderer)
+ * and asserts on the rendered tree / props; none reads source text. Layout is
+ * not computed by the test renderer, so the "spread vs scroll" case asserts
+ * the style props that produce it (flagged in the case name).
  */
 import React from 'react';
 import { StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { getSports } from '../../../api/sports';
-import StatCard from '../../StatCard';
-import { colors } from '../../../theme/tokens';
 import { makeEvent } from '../../../test-utils/makeEvent';
-import {
-  act,
-  pressableLabelled,
-  pressables,
-  pressableWithText,
-  render,
-  renderAsync,
-  texts,
-} from '../../../test-utils/render';
-import { getSportOptions } from '../../../utils/homeDashboard';
-import GreetingHeader from '../GreetingHeader';
-import MyGamesGroupsSection from '../MyGamesGroupsSection';
-import RecommendedSection from '../RecommendedSection';
-import SportFilterPills from '../SportFilterPills';
-import UpcomingGamesSection from '../UpcomingGamesSection';
+import { act, pressableLabelled, render, texts } from '../../../test-utils/render';
+import type { Instance } from '../../../test-utils/render';
+import { dash, dashRadius, dashSize } from '../../../theme/dashboardTheme';
+import type { Group } from '../../../types/group';
+import { FootballIcon, GroupsIcon, SportIcon } from '../../icons/DashboardIcons';
+import DashboardBanner from '../DashboardBanner';
+import GameRow from '../GameRow';
+import GroupRow from '../GroupRow';
+import NextGameCard from '../NextGameCard';
+import ShortcutTiles from '../ShortcutTiles';
+import SportChipsRow from '../SportChipsRow';
+import { EmptyText, InlineError, SectionHeader, SkeletonRows } from '../SectionParts';
 
-// `UpcomingGamesSection`/`RecommendedSection` render `EventCard`, which
-// resolves its sport label via `useSportDisplayName` (BUG-M02) — mocked so
-// these tests never make a real `GET /admin/sports/public` call. Warmed
-// once, before any test, with a real render+await (`renderAsync`); every
-// later `render()` call in this file is synchronous and only works because
-// `useSportDisplayName`'s module-wide cache is already resolved by then, so
-// no further state update happens outside `act()`.
-jest.mock('../../../api/sports', () => ({ getSports: jest.fn() }));
-const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
-beforeAll(async () => {
-  mockGetSports.mockResolvedValue([]);
-  await renderAsync(<UpcomingGamesSection events={[makeEvent()]} onEventPress={jest.fn()} />);
+const METRICS = {
+  frame: { x: 0, y: 0, width: 360, height: 640 },
+  insets: { top: 24, left: 0, right: 0, bottom: 0 },
+};
+
+function banner(props: Partial<React.ComponentProps<typeof DashboardBanner>> = {}) {
+  return render(
+    <SafeAreaProvider initialMetrics={METRICS}>
+      <DashboardBanner
+        name="Sam Smith"
+        photoUrl={null}
+        unreadCount={0}
+        onBellPress={jest.fn()}
+        onAvatarPress={jest.fn()}
+        {...props}
+      />
+    </SafeAreaProvider>,
+  );
+}
+
+const flat = (node: Instance) => {
+  const style = node.props.style;
+  return StyleSheet.flatten(typeof style === 'function' ? style({ pressed: false }) : style);
+};
+
+/** Host (native) nodes with this testID — avoids matching composite wrappers too. */
+const hostsByTestId = (root: Instance, testID: string): Instance[] =>
+  root.findAll(node => typeof node.type === 'string' && node.props.testID === testID);
+/** Nearest ancestor that is a host (native) node. */
+const hostParent = (node: Instance): Instance => {
+  let current = node.parent as Instance;
+  while (typeof current.type !== 'string') {
+    current = current.parent as Instance;
+  }
+  return current;
+};
+const hostByTestId = (root: Instance, testID: string): Instance => {
+  const found = hostsByTestId(root, testID);
+  if (found.length !== 1) {
+    throw new Error(`Expected one host node with testID ${testID}, found ${found.length}`);
+  }
+  return found[0];
+};
+
+describe('DashboardBanner', () => {
+  it('greets with plain text "Good to see you" (no emoji) and "Ready to play, {name}?"', () => {
+    const all = texts(banner());
+    expect(all).toContain('Good to see you');
+    expect(all).toContain('Ready to play, Sam Smith?');
+    expect(all.join(' ')).not.toMatch(/👋|\p{Extended_Pictographic}/u);
+  });
+
+  it('drops the name from the headline when there is none', () => {
+    expect(texts(banner({ name: '  ' }))).toContain('Ready to play?');
+  });
+
+  it('shows the app icon at 34x34 in a 46x46 white tile with a 14px radius and no name text', () => {
+    const root = banner();
+    const icon = hostByTestId(root, 'banner-app-icon');
+    expect(flat(icon)).toMatchObject({ width: 34, height: 34 });
+    const tile = hostParent(icon);
+    expect(flat(tile)).toMatchObject({
+      width: 46,
+      height: 46,
+      borderRadius: 14,
+      backgroundColor: '#FFFFFF',
+    });
+    expect(texts(root).join(' ')).not.toMatch(/meetup|shuttlr/i);
+  });
+
+  it('uses the brand banner at height 208 plus the status-bar inset with 32px bottom corners', () => {
+    const style = flat(hostByTestId(banner(), 'dashboard-banner'));
+    expect(style).toMatchObject({
+      backgroundColor: dash.brand,
+      height: dashSize.bannerHeight + 24,
+      borderBottomLeftRadius: dashRadius.bannerBottom,
+      borderBottomRightRadius: dashRadius.bannerBottom,
+    });
+  });
+
+  it('hides the bell badge at zero and shows the count (capped at 99+) otherwise', () => {
+    expect(hostsByTestId(banner({ unreadCount: 0 }), 'notification-badge')).toHaveLength(0);
+    const root = banner({ unreadCount: 3 });
+    expect(texts(hostByTestId(root, 'notification-badge'))).toEqual(['3']);
+    expect(pressableLabelled(root, 'Notifications, 3 unread')).toBeDefined();
+    expect(texts(hostByTestId(banner({ unreadCount: 250 }), 'notification-badge'))).toEqual([
+      '99+',
+    ]);
+  });
+
+  it('shows the uploaded photo (48px, 2px white ring) when a URL exists', () => {
+    const root = banner({ photoUrl: 'https://cdn.example/a.jpg' });
+    const photo = hostByTestId(root, 'banner-avatar-photo');
+    expect(photo.props.source).toEqual({ uri: 'https://cdn.example/a.jpg' });
+    expect(hostsByTestId(root, 'banner-avatar-letter')).toHaveLength(0);
+    const ring = hostParent(photo);
+    expect(flat(ring)).toMatchObject({ width: 48, height: 48, borderWidth: 2, borderColor: '#FFFFFF' });
+  });
+
+  it('falls back to the letter avatar when there is no photo', () => {
+    const root = banner({ photoUrl: null });
+    expect(hostsByTestId(root, 'banner-avatar-photo')).toHaveLength(0);
+    expect(texts(hostByTestId(root, 'banner-avatar-letter'))).toEqual(['S']);
+  });
+
+  it('falls back to the letter avatar when the image fails to load', () => {
+    const root = banner({ photoUrl: 'https://cdn.example/broken.jpg' });
+    act(() => {
+      hostByTestId(root, 'banner-avatar-photo').props.onError();
+    });
+    expect(hostsByTestId(root, 'banner-avatar-photo')).toHaveLength(0);
+    expect(hostsByTestId(root, 'banner-avatar-letter')).toHaveLength(1);
+  });
+
+  it('routes the bell and the avatar presses', () => {
+    const onBellPress = jest.fn();
+    const onAvatarPress = jest.fn();
+    const root = banner({ onBellPress, onAvatarPress });
+    act(() => pressableLabelled(root, 'Notifications').props.onPress());
+    act(() => pressableLabelled(root, 'Profile').props.onPress());
+    expect(onBellPress).toHaveBeenCalledTimes(1);
+    expect(onAvatarPress).toHaveBeenCalledTimes(1);
+  });
 });
 
-const fiveEvents = Array.from({ length: 5 }, (_, i) =>
-  makeEvent({ id: `e${i}`, title: `Game ${i}` }),
-);
+describe('SportChipsRow', () => {
+  const options = [
+    { key: 'badminton', label: 'Badminton', slug: 'badminton' },
+    { key: 'curling', label: 'Curling', slug: 'curling' },
+  ];
 
-describe('GreetingHeader', () => {
-  it('shows the muted greeting and the personalised headline', () => {
-    const t = texts(render(<GreetingHeader name="Sam" />));
-    expect(t).toContain('Good to see you 👋');
-    expect(t).toContain('Ready to play, Sam?');
+  it('renders All first, then one chip per sport, as buttons', () => {
+    const root = render(<SportChipsRow options={options} selected={[]} onToggle={jest.fn()} />);
+    const labels = root
+      .findAll(node => node.props.accessibilityRole === 'button' && typeof node.props.onPress === 'function')
+      .map(node => node.props.accessibilityLabel);
+    expect(labels).toEqual(['All', 'Badminton', 'Curling']);
   });
 
-  it('drops the name (no "undefined" / stray comma) when the name is missing or blank', () => {
-    expect(texts(render(<GreetingHeader />))).toContain('Ready to play?');
-    expect(texts(render(<GreetingHeader name="   " />))).toContain('Ready to play?');
+  it('marks All selected when nothing is, and only the chosen sports otherwise', () => {
+    const none = render(<SportChipsRow options={options} selected={[]} onToggle={jest.fn()} />);
+    expect(pressableLabelled(none, 'All').props.accessibilityState).toEqual({ selected: true });
+    expect(pressableLabelled(none, 'Badminton').props.accessibilityState).toEqual({ selected: false });
+
+    const some = render(
+      <SportChipsRow options={options} selected={['badminton']} onToggle={jest.fn()} />,
+    );
+    expect(pressableLabelled(some, 'All').props.accessibilityState).toEqual({ selected: false });
+    expect(pressableLabelled(some, 'Badminton').props.accessibilityState).toEqual({ selected: true });
   });
 
-  it('renders no Create Game control (it lives in the tab bar now)', () => {
-    const root = render(<GreetingHeader name="Sam" />);
-    expect(texts(root).some(text => text.includes('Create Game'))).toBe(false);
-    expect(pressables(root)).toHaveLength(0);
-  });
-});
-
-describe('SportFilterPills', () => {
-  const sports = getSportOptions([
-    makeEvent({ sport: 'badminton' }),
-    makeEvent({ sport: 'curling' }),
-  ]);
-
-  it('renders "All" first, then one pill per sport with its emoji (🎯 for an unmapped sport)', () => {
-    const t = texts(render(<SportFilterPills sports={sports} selectedKey={null} onSelect={jest.fn()} />));
-    expect(t).toEqual(['All', '🏸 Badminton', '🎯 Curling']);
-  });
-
-  it('marks only "All" selected when selectedKey is null', () => {
-    const root = render(<SportFilterPills sports={sports} selectedKey={null} onSelect={jest.fn()} />);
-    expect(pressableLabelled(root, 'All sports').props.accessibilityState).toEqual({ selected: true });
-    expect(pressableLabelled(root, 'Badminton').props.accessibilityState).toEqual({ selected: false });
-  });
-
-  it('marks only the chosen sport selected, and gives it the primary fill', () => {
+  it('draws a 2px brand ring on a selected chip only', () => {
     const root = render(
-      <SportFilterPills sports={sports} selectedKey="badminton" onSelect={jest.fn()} />,
+      <SportChipsRow options={options} selected={['badminton']} onToggle={jest.fn()} />,
     );
-    expect(pressableLabelled(root, 'All sports').props.accessibilityState).toEqual({ selected: false });
-    const selected = pressableLabelled(root, 'Badminton');
-    expect(selected.props.accessibilityState).toEqual({ selected: true });
-    const style = StyleSheet.flatten(selected.props.style({ pressed: false }));
-    expect(style.backgroundColor).toBe(colors.primary);
+    const rings = hostsByTestId(root, 'sport-chip-ring');
+    expect(rings).toHaveLength(1);
+    expect(flat(rings[0])).toMatchObject({ borderWidth: 2, borderColor: dash.brand });
   });
 
-  it('reports the sport key on press, and null for "All"', () => {
-    const onSelect = jest.fn();
-    const root = render(<SportFilterPills sports={sports} selectedKey="badminton" onSelect={onSelect} />);
-    act(() => pressableLabelled(root, 'Curling').props.onPress());
-    expect(onSelect).toHaveBeenLastCalledWith('curling');
-    act(() => pressableLabelled(root, 'All sports').props.onPress());
-    expect(onSelect).toHaveBeenLastCalledWith(null);
+  it('reports taps: sport key for a chip, null for All', () => {
+    const onToggle = jest.fn();
+    const root = render(<SportChipsRow options={options} selected={[]} onToggle={onToggle} />);
+    act(() => pressableLabelled(root, 'Badminton').props.onPress());
+    act(() => pressableLabelled(root, 'All').props.onPress());
+    expect(onToggle.mock.calls).toEqual([['badminton'], [null]]);
   });
 
-  it('with no sports still shows just "All"', () => {
-    const t = texts(render(<SportFilterPills sports={[]} selectedKey={null} onSelect={jest.fn()} />));
-    expect(t).toEqual(['All']);
-  });
-});
-
-describe.each([
-  {
-    name: 'UpcomingGamesSection',
-    Section: UpcomingGamesSection,
-    title: 'Your Upcoming Games',
-    subtitle: "Games you've already registered for",
-    empty: 'No upcoming games yet — join one below or create your own.',
-  },
-  {
-    name: 'RecommendedSection',
-    Section: RecommendedSection,
-    title: 'Recommended for You',
-    subtitle: "Public games you haven't joined yet",
-    empty: 'No public games to recommend right now.',
-  },
-])('$name', ({ Section, title, subtitle, empty }) => {
-  it('shows the exact title and subtitle copy', () => {
-    const t = texts(render(<Section events={[fiveEvents[0]]} onEventPress={jest.fn()} />));
-    expect(t).toContain(title);
-    expect(t).toContain(subtitle);
+  it('shows an unknown sport with the fallback icon and a known one with its own', () => {
+    const root = render(<SportChipsRow options={options} selected={[]} onToggle={jest.fn()} />);
+    expect(root.findAllByType(SportIcon).map(node => node.props.slug)).toEqual(['badminton', 'curling']);
   });
 
-  it('shows the exact empty-state copy, and no "View all", when there are no events', () => {
-    const t = texts(render(<Section events={[]} onEventPress={jest.fn()} />));
-    expect(t).toContain(empty);
-    expect(t).not.toContain('View all →');
+  it('applies the spread-or-scroll layout: horizontal scroller whose content grows to fill and spaces between (props only; layout engine not run)', () => {
+    const root = render(<SportChipsRow options={options} selected={[]} onToggle={jest.fn()} />);
+    const scroll = hostByTestId(root, 'sport-chips-scroll');
+    expect(scroll.props.horizontal).toBe(true);
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle)).toMatchObject({
+      flexGrow: 1,
+      justifyContent: 'space-between',
+    });
   });
 
-  it('shows at most three cards, in the order supplied', () => {
-    const t = texts(render(<Section events={fiveEvents} onEventPress={jest.fn()} />));
-    expect(t.filter(text => /^Game \d$/.test(text))).toEqual(['Game 0', 'Game 1', 'Game 2']);
-    expect(t).not.toContain(empty);
-  });
-
-  it('offers no "View all" when three or fewer events exist (nothing more to reveal)', () => {
-    const t = texts(render(<Section events={fiveEvents.slice(0, 3)} onEventPress={jest.fn()} />));
-    expect(t).not.toContain('View all →');
-    expect(t).not.toContain('Show less');
-  });
-
-  it('"View all →" reveals every event and becomes "Show less", which collapses again', () => {
-    const root = render(<Section events={fiveEvents} onEventPress={jest.fn()} />);
-    const games = (): string[] => texts(root).filter(text => /^Game \d$/.test(text));
-
-    act(() => pressableWithText(root, 'View all →').props.onPress());
-    expect(games()).toEqual(['Game 0', 'Game 1', 'Game 2', 'Game 3', 'Game 4']);
-    expect(texts(root)).not.toContain('View all →');
-
-    act(() => pressableWithText(root, 'Show less').props.onPress());
-    expect(games()).toEqual(['Game 0', 'Game 1', 'Game 2']);
-    expect(texts(root)).toContain('View all →');
-  });
-
-  it('reports the pressed event', () => {
-    const onEventPress = jest.fn();
-    const root = render(<Section events={fiveEvents} onEventPress={onEventPress} />);
-    act(() => pressableWithText(root, 'Game 1').props.onPress());
-    expect(onEventPress).toHaveBeenCalledWith(fiveEvents[1]);
-  });
-});
-
-describe('MyGamesGroupsSection', () => {
-  it('shows both tiles with the specified copy', () => {
-    const t = texts(
-      render(
-        <MyGamesGroupsSection
-          myGamesCount={4}
-          groupsCount={2}
-          onPressMyGames={jest.fn()}
-          onPressMyGroups={jest.fn()}
-        />,
-      ),
-    );
-    expect(t).toEqual(
-      expect.arrayContaining([
-        'My Games & Groups',
-        '🎮',
-        'My Games',
-        '4 active · tap to manage',
-        '👥',
-        'My Groups',
-        '2 groups · tap to manage',
-      ]),
-    );
-  });
-
-  it('uses the singular for exactly one group', () => {
-    const t = texts(
-      render(
-        <MyGamesGroupsSection
-          myGamesCount={0}
-          groupsCount={1}
-          onPressMyGames={jest.fn()}
-          onPressMyGroups={jest.fn()}
-        />,
-      ),
-    );
-    expect(t).toContain('1 group · tap to manage');
-  });
-
-  it('shows zero counts honestly', () => {
-    const t = texts(
-      render(
-        <MyGamesGroupsSection
-          myGamesCount={0}
-          groupsCount={0}
-          onPressMyGames={jest.fn()}
-          onPressMyGroups={jest.fn()}
-        />,
-      ),
-    );
-    expect(t).toContain('0 active · tap to manage');
-    expect(t).toContain('0 groups · tap to manage');
-  });
-
-  it('omits the count (rather than showing a wrong 0) when the groups request failed', () => {
-    const t = texts(
-      render(
-        <MyGamesGroupsSection
-          myGamesCount={1}
-          groupsCount={null}
-          onPressMyGames={jest.fn()}
-          onPressMyGroups={jest.fn()}
-        />,
-      ),
-    );
-    expect(t).toContain('Tap to manage');
-    expect(t.join(' ')).not.toMatch(/\d+ groups?/);
-  });
-
-  it('makes both My Games and My Groups pressable (BUG-M04)', () => {
-    const onPressMyGames = jest.fn();
-    const onPressMyGroups = jest.fn();
+  it('shows skeleton tiles while the admin list loads', () => {
     const root = render(
-      <MyGamesGroupsSection
-        myGamesCount={4}
-        groupsCount={2}
-        onPressMyGames={onPressMyGames}
-        onPressMyGroups={onPressMyGroups}
+      <SportChipsRow options={[]} selected={[]} onToggle={jest.fn()} isLoading />,
+    );
+    expect(hostsByTestId(root, 'sport-chips-loading')).toHaveLength(1);
+  });
+});
+
+describe('GameRow', () => {
+  const event = makeEvent({
+    title: 'Friday doubles',
+    sport: 'Football',
+    venue_name: 'Riverside',
+    participant_count: 5,
+    capacity: 12,
+    starts_at: '2030-01-04T18:00:00Z',
+  });
+
+  it('shows the title, venue, going count, and the sport icon by slug', () => {
+    const root = render(<GameRow event={event} onPress={jest.fn()} />);
+    const all = texts(root);
+    expect(all).toContain('Friday doubles');
+    expect(all).toContain('5/12 going');
+    expect(all.some(text => text.includes('Riverside'))).toBe(true);
+    expect(root.findAllByType(SportIcon)[0].props.slug).toBe('Football');
+    expect(root.findAllByType(FootballIcon)).toHaveLength(1);
+  });
+
+  it('shows no status badge on Home, and the given badge on the Games screen', () => {
+    expect(texts(render(<GameRow event={event} onPress={jest.fn()} />))).not.toContain('Open');
+    expect(texts(render(<GameRow event={event} badge="Open" onPress={jest.fn()} />))).toContain('Open');
+    expect(texts(render(<GameRow event={event} badge="Waitlisted" onPress={jest.fn()} />))).toContain(
+      'Waitlisted',
+    );
+  });
+
+  it('uses the fallback icon for an unknown sport', () => {
+    const root = render(<GameRow event={makeEvent({ sport: 'curling' })} onPress={jest.fn()} />);
+    expect(root.findAllByType(FootballIcon)).toHaveLength(0);
+    expect(root.findAllByType(SportIcon)[0].props.slug).toBe('curling');
+  });
+
+  it('is a button with at least a 44px target that fires onPress', () => {
+    const onPress = jest.fn();
+    const root = render(<GameRow event={event} onPress={onPress} />);
+    const button = root.find(node => node.props.accessibilityRole === 'button');
+    expect(flat(button as Instance).minHeight).toBeGreaterThanOrEqual(44);
+    act(() => button.props.onPress());
+    expect(onPress).toHaveBeenCalled();
+  });
+});
+
+describe('NextGameCard', () => {
+  it('shows "Next game", the title and venue, and opens on press', () => {
+    const onPress = jest.fn();
+    const root = render(
+      <NextGameCard
+        event={makeEvent({ title: 'Sunday smash', venue_name: 'Court 3', starts_at: '2030-01-06T09:00:00Z' })}
+        onPress={onPress}
       />,
     );
-    const pressable = pressables(root);
-    expect(pressable).toHaveLength(2);
-
-    const myGamesTile = pressable.find(
-      node => node.props.accessibilityLabel === 'My Games, 4 active · tap to manage',
-    );
-    const myGroupsTile = pressable.find(
-      node => node.props.accessibilityLabel === 'My Groups, 2 groups · tap to manage',
-    );
-    expect(myGamesTile).toBeDefined();
-    expect(myGroupsTile).toBeDefined();
-
-    act(() => myGamesTile?.props.onPress());
-    expect(onPressMyGames).toHaveBeenCalledTimes(1);
-    act(() => myGroupsTile?.props.onPress());
-    expect(onPressMyGroups).toHaveBeenCalledTimes(1);
+    expect(texts(root).some(text => text.startsWith('Next game'))).toBe(true);
+    expect(texts(root)).toContain('Sunday smash');
+    expect(texts(root).some(text => text.includes('Court 3'))).toBe(true);
+    act(() => root.find(node => node.props.accessibilityRole === 'button').props.onPress());
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('StatCard', () => {
-  it('renders icon, title and subtitle', () => {
-    const t = texts(render(<StatCard icon="🎮" title="My Games" subtitle="3 active" />));
-    expect(t).toEqual(['🎮', 'My Games', '3 active']);
+describe('GroupRow (AD-8)', () => {
+  const group: Group = {
+    id: 'g1',
+    name: 'Tuesday crew',
+    description: '',
+    owner_id: 'o',
+    created_at: '2026-01-01T00:00:00Z',
+    current_user_role: 'member',
+    member_count: 8,
+  };
+
+  it('a Players Group shows the groups icon and its member count, no sport', () => {
+    const root = render(<GroupRow group={group} onPress={jest.fn()} />);
+    expect(root.findAllByType(GroupsIcon)).toHaveLength(1);
+    expect(root.findAllByType(SportIcon)).toHaveLength(0);
+    expect(texts(root)).toContain('8 members');
   });
 
-  it('is not a button when it has no action', () => {
-    expect(pressables(render(<StatCard icon="🎮" title="T" subtitle="S" />))).toHaveLength(0);
-  });
-
-  it('is a labelled button that fires onPress when it has an action', () => {
-    const onPress = jest.fn();
-    const [pressable] = pressables(
-      render(<StatCard icon="👥" title="My Groups" subtitle="2 groups" onPress={onPress} />),
+  it('a Team shows its sport icon, plus the sport in the meta', () => {
+    const root = render(
+      <GroupRow
+        group={group}
+        team={{ sportSlug: 'tennis', sportName: 'Tennis' }}
+        onPress={jest.fn()}
+      />,
     );
-    expect(pressable.props.accessibilityLabel).toBe('My Groups, 2 groups');
-    pressable.props.onPress();
-    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(root.findAllByType(GroupsIcon)).toHaveLength(0);
+    expect(root.findAllByType(SportIcon)[0].props.slug).toBe('tennis');
+    expect(texts(root)).toContain('8 members · Tennis');
+  });
+
+  it('omits the member count when the list item does not carry one', () => {
+    const root = render(<GroupRow group={{ ...group, member_count: undefined }} onPress={jest.fn()} />);
+    expect(texts(root)).toEqual(['Tuesday crew']);
+  });
+});
+
+describe('ShortcutTiles', () => {
+  it('shows "{n} active" and "{n} groups" and has exactly two tiles (no Tournaments tile)', () => {
+    const root = render(
+      <ShortcutTiles gamesCount={4} groupsCount={2} onPressGames={jest.fn()} onPressGroups={jest.fn()} />,
+    );
+    const all = texts(root);
+    expect(all).toEqual(['My games', '4 active', 'My groups', '2 groups']);
+    expect(all.join(' ')).not.toMatch(/tournament/i);
+  });
+
+  it('uses the singular for one group and drops a count whose source failed', () => {
+    const one = render(
+      <ShortcutTiles gamesCount={1} groupsCount={1} onPressGames={jest.fn()} onPressGroups={jest.fn()} />,
+    );
+    expect(texts(one)).toContain('1 group');
+    const failed = render(
+      <ShortcutTiles
+        gamesCount={null}
+        groupsCount={null}
+        onPressGames={jest.fn()}
+        onPressGroups={jest.fn()}
+      />,
+    );
+    expect(texts(failed)).toEqual(['My games', 'My groups']);
+  });
+
+  it('fires the matching handler', () => {
+    const onPressGames = jest.fn();
+    const onPressGroups = jest.fn();
+    const root = render(
+      <ShortcutTiles
+        gamesCount={4}
+        groupsCount={2}
+        onPressGames={onPressGames}
+        onPressGroups={onPressGroups}
+      />,
+    );
+    act(() => pressableLabelled(root, 'My games, 4 active').props.onPress());
+    act(() => pressableLabelled(root, 'My groups, 2 groups').props.onPress());
+    expect(onPressGames).toHaveBeenCalledTimes(1);
+    expect(onPressGroups).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('section parts', () => {
+  it('SectionHeader shows a header-role title and a View all button only when given a handler', () => {
+    const onViewAll = jest.fn();
+    const withLink = render(<SectionHeader title="My games" onViewAll={onViewAll} />);
+    expect(withLink.findAll(node => node.props.accessibilityRole === 'header')).not.toHaveLength(0);
+    act(() => pressableLabelled(withLink, 'View all My games').props.onPress());
+    expect(onViewAll).toHaveBeenCalledTimes(1);
+    expect(texts(render(<SectionHeader title="X" />))).toEqual(['X']);
+  });
+
+  it('InlineError shows its message and a working Retry', () => {
+    const onRetry = jest.fn();
+    const root = render(<InlineError message="Couldn't load your games" onRetry={onRetry} />);
+    expect(texts(root)).toContain("Couldn't load your games");
+    act(() => pressableLabelled(root, 'Retry').props.onPress());
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('SkeletonRows renders the requested number of rows; EmptyText renders its copy', () => {
+    const root = render(<SkeletonRows count={3} testID="sk" />);
+    expect(hostByTestId(root, 'sk').children).toHaveLength(3);
+    expect(texts(render(<EmptyText>Nothing here</EmptyText>))).toEqual(['Nothing here']);
   });
 });

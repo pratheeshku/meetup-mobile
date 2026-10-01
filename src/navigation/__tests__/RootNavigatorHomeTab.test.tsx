@@ -5,7 +5,7 @@
 import { homeTabListeners } from '../RootNavigator';
 
 describe('RootNavigator Home tab listener', () => {
-  it('navigates to Home -> EventsList with filter: undefined on tabPress', () => {
+  it('navigates to Home -> EventsList on tabPress', () => {
     const mockNavigation = { navigate: jest.fn() };
     const listeners = homeTabListeners({ navigation: mockNavigation });
 
@@ -14,7 +14,6 @@ describe('RootNavigator Home tab listener', () => {
 
     expect(mockNavigation.navigate).toHaveBeenCalledWith('Home', {
       screen: 'EventsList',
-      params: { filter: undefined },
     });
   });
 });

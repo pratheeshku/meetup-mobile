@@ -72,6 +72,7 @@ import { useAuth } from '../auth/AuthContext';
 import LoadingView from '../components/LoadingView';
 import { navigationTheme } from '../theme/navigationTheme';
 import { colors, typography } from '../theme/tokens';
+import { dash } from '../theme/dashboardTheme';
 import type {
   AuthStackParamList,
   AppTabParamList,
@@ -80,9 +81,8 @@ import type {
   ProfileStackParamList,
   TournamentsStackParamList,
 } from './types';
-import HomeHeader from './HomeHeader';
 import { CreateTabButton, CreateTabScreen } from './CreateTabButton';
-import { TAB_EMOJI, TabEmoji } from './tabIcons';
+import { TabIcon, TabLabel } from './tabIcons';
 import {
   navigationRef,
   navigateToNotificationTarget,
@@ -110,12 +110,13 @@ import EventDetailScreen from '../screens/EventDetailScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
-import TournamentsScreen from '../screens/TournamentsScreen';
+import GamesScreen from '../screens/GamesScreen';
 import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
 import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
 import NotificationBanner from '../components/NotificationBanner';
+import OnboardingOverlay from './OnboardingOverlay';
 
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
@@ -145,15 +146,14 @@ const tabScreenOptions = ({
   route: { name: keyof AppTabParamList };
 }): BottomTabNavigationOptions => {
   // `Create` is the raised action button, which draws its own glyph.
-  const emoji = route.name === 'Create' ? undefined : TAB_EMOJI[route.name];
+  const tabName = route.name === 'Create' ? undefined : route.name;
   return {
-    tabBarIcon: emoji
-      ? ({ focused, size }) => <TabEmoji emoji={emoji} focused={focused} size={size} />
-      : undefined,
+    tabBarIcon: tabName ? () => <TabIcon name={tabName} /> : undefined,
+    tabBarLabel: tabName ? ({ focused }) => <TabLabel name={tabName} focused={focused} /> : undefined,
     headerStyle: { backgroundColor: colors.surface },
     headerTitleStyle: { color: colors.textPrimary, ...typography.h3 },
-    tabBarActiveTintColor: colors.primary,
-    tabBarInactiveTintColor: colors.textMuted,
+    tabBarActiveTintColor: dash.brand,
+    tabBarInactiveTintColor: dash.navInactive,
     tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
   };
 };
@@ -171,14 +171,15 @@ function HomeStack(): React.JSX.Element {
   return (
     <HomeStackNav.Navigator screenOptions={stackScreenOptions}>
       {/*
-        The dashboard uses the branded AppHeader (logo + notification bell,
-        see HomeHeader) instead of the default title header. Only Home uses
-        it for now; the other tabs keep their titled headers.
+        The dashboard draws its own banner (app icon, bell, profile picture;
+        see DashboardBanner), which applies the top safe-area inset itself,
+        so the stack header is hidden and the status bar is light over the
+        brand-blue banner.
       */}
       <HomeStackNav.Screen
         name="EventsList"
         component={HomeScreen}
-        options={{ header: HomeHeader }}
+        options={{ headerShown: false, statusBarStyle: 'light' }}
       />
       <HomeStackNav.Screen
         name="EventDetail"
@@ -222,8 +223,8 @@ function TournamentsStack(): React.JSX.Element {
     <TournamentsStackNav.Navigator screenOptions={stackScreenOptions}>
       <TournamentsStackNav.Screen
         name="TournamentsList"
-        component={TournamentsScreen}
-        options={{ title: 'Tournaments' }}
+        component={GamesScreen}
+        options={{ title: 'Games' }}
       />
       <TournamentsStackNav.Screen
         name="TournamentDetail"
@@ -253,7 +254,7 @@ export const homeTabListeners = ({
   navigation: { navigate: (route: string, params?: unknown) => void };
 }) => ({
   tabPress: () => {
-    navigation.navigate('Home', { screen: 'EventsList', params: { filter: undefined } });
+    navigation.navigate('Home', { screen: 'EventsList' });
   },
 });
 
@@ -385,6 +386,7 @@ export default function RootNavigator(): React.JSX.Element {
       >
         {user ? <AppStack /> : <AuthStack />}
       </NavigationContainer>
+      {user ? <OnboardingOverlay userId={user.id} /> : null}
       <NotificationBanner />
     </View>
   );

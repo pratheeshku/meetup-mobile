@@ -87,6 +87,7 @@ interface EventApiItem {
   going_count: number;
   user_rsvp_status: string | null;
   skill_level_requirement?: string | null;
+  created_at?: string;
 }
 
 /**
@@ -105,7 +106,7 @@ interface EventApiItem {
  *    auth/session accessor into `src/api/events.ts` would also cross the
  *    documented zero-sibling-import boundary). The value is therefore
  *    NOT trustworthy: consumers must derive organiser status with
- *    `isOrganiserOf(event, currentUserId)` (`src/utils/homeDashboard.ts`),
+ *    `isOrganiserOf(event, currentUserId)` (`src/utils/gameLists.ts`),
  *    as `EventDetailScreen` and the Home dashboard do — never read
  *    `event.is_organiser` alone. Role/permission UI gating remains a UX
  *    convenience only, per R-017/R-082 — the backend enforces the real
@@ -143,6 +144,7 @@ function mapEventApiItem(raw: EventApiItem): Event {
     allow_waitlist: raw.allow_waitlist ?? true,
     estimated_cost_cents: raw.estimated_cost_cents ?? null,
     estimated_cost_currency: raw.estimated_cost_currency ?? null,
+    created_at: raw.created_at,
   };
 }
 

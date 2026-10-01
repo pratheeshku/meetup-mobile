@@ -24,8 +24,8 @@ describe('getSports', () => {
 
     expect(mockedGet).toHaveBeenCalledWith('/admin/sports/public', { correlationId: 'cid' });
     expect(sports).toEqual([
-      { name: 'badminton', display_name: 'Badminton' },
-      { name: 'tennis', display_name: 'Tennis' },
+      { name: 'badminton', display_name: 'Badminton', slug: 'badminton' },
+      { name: 'tennis', display_name: 'Tennis', slug: 'tennis' },
     ]);
   });
 });
