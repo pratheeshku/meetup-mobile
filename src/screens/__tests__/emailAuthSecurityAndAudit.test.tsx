@@ -6,11 +6,9 @@ const path = require('path');
 
 import { apiClient } from '../../api/client';
 import {
-  isResendAvailable,
   login,
   requestPasswordReset,
   resendVerification,
-  setResendAvailable,
   signup,
   verifyEmail,
 } from '../../auth/emailAuth';
@@ -124,12 +122,12 @@ describe('Email Auth Security & Audit (DES-MEETUP-ADDENDUM-email-auth AD-5, R-11
     });
   });
 
-  it('[Execute] toggles isResendAvailable correctly via setResendAvailable', () => {
-    expect(isResendAvailable()).toBe(true);
-    setResendAvailable(false);
-    expect(isResendAvailable()).toBe(false);
-    setResendAvailable(true);
-    expect(isResendAvailable()).toBe(true);
+  it('[Execute] resendVerification is available and calls the endpoint directly', async () => {
+    (apiClient.post as jest.Mock).mockResolvedValue({ data: {} });
+    await resendVerification('live@example.com');
+    expect(apiClient.post).toHaveBeenCalledWith('/auth/resend-verification', {
+      email: 'live@example.com',
+    });
   });
 
   it('[Source check] confirms navigation route params never contain password, code, or token fields', () => {

@@ -3,18 +3,32 @@
  *
  * Shows the email, a 6-digit input, Verify, Resend (with 60-second cooldown),
  * and Back. Never logs codes or tokens (R-111, P10).
+ *
+ * Error handling:
+ * - 429: "Too many attempts. Try again in a minute." (inline error, no cooldown on resend)
+ * - 5xx: "Something went wrong. Try again." with Retry button (no cooldown on resend)
+ * - Network error: "Unable to connect to server." with Retry button (no cooldown on resend)
+ * - Other failure: "That code didn't work. Check it or request a new one." on verify;
+ *   "Failed to resend verification code. Please try again." on resend.
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { isResendAvailable, resendVerification, verifyEmail } from '../auth/emailAuth';
+import { resendVerification, verifyEmail } from '../auth/emailAuth';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { colors, spacing, typography } from '../theme/tokens';
-import { isNetworkError } from '../utils/networkError';
+import {
+  isNetworkError,
+  isRateLimitError,
+  isServerError,
+  NETWORK_ERROR_MESSAGE,
+  RATE_LIMIT_MESSAGE,
+  SERVER_ERROR_MESSAGE,
+} from '../utils/networkError';
 import type { AuthStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Verify'>;
@@ -28,7 +42,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
   const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const [networkError, setNetworkError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
@@ -42,7 +56,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
   const handleVerify = async (): Promise<void> => {
     setError(null);
     setInfoMessage(null);
-    setNetworkError(null);
+    setRetryError(null);
     setRetryAction(null);
 
     const trimmedCode = code.trim();
@@ -57,10 +71,15 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
       navigation.navigate('Login', { successMessage: 'Email verified. Sign in.' });
     } catch (err) {
       if (isNetworkError(err)) {
-        setNetworkError('Unable to connect to server.');
+        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryAction(() => handleVerify);
+      } else if (isRateLimitError(err)) {
+        setError(RATE_LIMIT_MESSAGE);
+      } else if (isServerError(err)) {
+        setRetryError(SERVER_ERROR_MESSAGE);
         setRetryAction(() => handleVerify);
       } else {
-        // Every failure comes back as 400 "Verification failed"
+        // Every other failure comes back as 400 "Verification failed"
         setError("That code didn't work. Check it or request a new one.");
       }
     } finally {
@@ -69,11 +88,11 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
   };
 
   const handleResend = async (): Promise<void> => {
-    if (!isResendAvailable() || cooldown > 0 || isResending) return;
+    if (cooldown > 0 || isResending) return;
 
     setError(null);
     setInfoMessage(null);
-    setNetworkError(null);
+    setRetryError(null);
     setRetryAction(null);
 
     setIsResending(true);
@@ -83,7 +102,12 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
       setInfoMessage('Verification code resent.');
     } catch (err) {
       if (isNetworkError(err)) {
-        setNetworkError('Unable to connect to server.');
+        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryAction(() => handleResend);
+      } else if (isRateLimitError(err)) {
+        setError(RATE_LIMIT_MESSAGE);
+      } else if (isServerError(err)) {
+        setRetryError(SERVER_ERROR_MESSAGE);
         setRetryAction(() => handleResend);
       } else {
         setError('Failed to resend verification code. Please try again.');
@@ -94,7 +118,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     }
   };
 
-  const resendDisabled = !isResendAvailable() || cooldown > 0 || isResending || isVerifying;
+  const resendDisabled = cooldown > 0 || isResending || isVerifying;
   const resendLabel = cooldown > 0 ? `Resend (${cooldown}s)` : 'Resend';
 
   return (
@@ -119,9 +143,9 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
         editable={!isVerifying && !isResending}
       />
 
-      {networkError && retryAction ? (
+      {retryError && retryAction ? (
         <InlineError
-          message={networkError}
+          message={retryError}
           onRetry={retryAction}
           retryLabel="Retry"
         />

@@ -5,6 +5,13 @@
  * Password lives only in this component's local state for the duration
  * of the active input session — never lifted into context, storage, or
  * logs (R-111, P10).
+ *
+ * Error handling:
+ * - 429: "Too many attempts. Try again in a minute." (inline error)
+ * - 5xx: "Something went wrong. Try again." with Retry button
+ * - Network error: "Unable to connect to server." with Retry button
+ * - 403 {"detail": "Email not verified"}: routes to Verify screen with email and explanation
+ * - 401 or other 4xx: "Invalid email or password."
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -20,7 +27,14 @@ import InlineError from '../components/InlineError';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { colors, spacing, typography } from '../theme/tokens';
-import { isNetworkError } from '../utils/networkError';
+import {
+  isNetworkError,
+  isRateLimitError,
+  isServerError,
+  NETWORK_ERROR_MESSAGE,
+  RATE_LIMIT_MESSAGE,
+  SERVER_ERROR_MESSAGE,
+} from '../utils/networkError';
 import type { AuthStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
@@ -32,7 +46,8 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [networkError, setNetworkError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (route?.params?.email) {
@@ -42,14 +57,21 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
 
   const handleGoogleSignIn = async (): Promise<void> => {
     setError(null);
-    setNetworkError(null);
+    setRetryError(null);
+    setRetryAction(null);
     setIsSubmitting(true);
     try {
       await signInWithGoogle();
     } catch (err) {
       if (!(err instanceof GoogleSignInCancelledError)) {
         if (isNetworkError(err)) {
-          setNetworkError('Unable to connect to server.');
+          setRetryError(NETWORK_ERROR_MESSAGE);
+          setRetryAction(() => handleGoogleSignIn);
+        } else if (isRateLimitError(err)) {
+          setError(RATE_LIMIT_MESSAGE);
+        } else if (isServerError(err)) {
+          setRetryError(SERVER_ERROR_MESSAGE);
+          setRetryAction(() => handleGoogleSignIn);
         } else {
           setError('Google sign-in failed. Please try again.');
         }
@@ -61,7 +83,8 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
 
   const handleEmailSignIn = async (): Promise<void> => {
     setError(null);
-    setNetworkError(null);
+    setRetryError(null);
+    setRetryAction(null);
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
@@ -74,7 +97,19 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
       await signInWithEmail(trimmedEmail, password);
     } catch (err) {
       if (isNetworkError(err)) {
-        setNetworkError('Unable to connect to server.');
+        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryAction(() => handleEmailSignIn);
+        return;
+      }
+
+      if (isRateLimitError(err)) {
+        setError(RATE_LIMIT_MESSAGE);
+        return;
+      }
+
+      if (isServerError(err)) {
+        setRetryError(SERVER_ERROR_MESSAGE);
+        setRetryAction(() => handleEmailSignIn);
         return;
       }
 
@@ -153,10 +188,10 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
         />
       </View>
 
-      {networkError ? (
+      {retryError && retryAction ? (
         <InlineError
-          message={networkError}
-          onRetry={handleEmailSignIn}
+          message={retryError}
+          onRetry={retryAction}
           retryLabel="Retry"
         />
       ) : error ? (

@@ -2,11 +2,16 @@
  * Forgot password screen (DES-MEETUP-ADDENDUM-email-auth AD-5, AD-7).
  *
  * Requests a reset link via POST /auth/reset-password-request.
- * Generic outcome: always displays the identical message for any non-network
- * response to prevent user enumeration, except when the account is Google-only
- * (code: 'oauth_only'), where it displays the backend detail message and offers
- * Continue with Google (reusing the login screen's Google sign-in handler)
- * along with Back to sign in. The reset link opens in the phone's browser.
+ * - 200 without a "code" field, and any 4xx other than 429: keep the generic message
+ *   and Back to sign in to prevent email enumeration.
+ * - 200 with code "oauth_only": displays the backend detail message, Continue with Google
+ *   (reusing the login screen's handler), and Back to sign in.
+ * - 429 on this screen: show "Too many attempts. Try again in a minute." as an inline error;
+ *   do not show the "link sent" text.
+ * - 5xx on this screen: show "Something went wrong. Try again." with a Retry button;
+ *   do not show the "link sent" text.
+ * - Network error: show "Unable to connect to server." with a Retry button;
+ *   do not show the "link sent" text.
  */
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -20,7 +25,14 @@ import InlineError from '../components/InlineError';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { colors, spacing, typography } from '../theme/tokens';
-import { isNetworkError } from '../utils/networkError';
+import {
+  isNetworkError,
+  isRateLimitError,
+  isServerError,
+  NETWORK_ERROR_MESSAGE,
+  RATE_LIMIT_MESSAGE,
+  SERVER_ERROR_MESSAGE,
+} from '../utils/networkError';
 import type { AuthStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
@@ -37,17 +49,19 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
   const [submitted, setSubmitted] = useState(false);
   const [isOAuthOnly, setIsOAuthOnly] = useState(false);
   const [oauthOnlyMessage, setOAuthOnlyMessage] = useState(DEFAULT_OAUTH_ONLY_MESSAGE);
-  const [networkError, setNetworkError] = useState<string | null>(null);
-  const [clientError, setClientError] = useState<string | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
   const [googleError, setGoogleError] = useState<string | null>(null);
 
   const handleSubmit = async (): Promise<void> => {
-    setClientError(null);
-    setNetworkError(null);
+    setInlineError(null);
+    setRetryError(null);
+    setRetryAction(null);
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setClientError('Enter your email.');
+      setInlineError('Enter your email.');
       return;
     }
 
@@ -65,10 +79,15 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
       setSubmitted(true);
     } catch (err) {
       if (isNetworkError(err)) {
-        setNetworkError('Unable to connect to server.');
+        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryAction(() => handleSubmit);
+      } else if (isRateLimitError(err)) {
+        setInlineError(RATE_LIMIT_MESSAGE);
+      } else if (isServerError(err)) {
+        setRetryError(SERVER_ERROR_MESSAGE);
+        setRetryAction(() => handleSubmit);
       } else {
-        // Generic response: show the same message for success, failure,
-        // and server errors that are not network errors (AD-5, P9).
+        // Any 4xx other than 429: keep generic message and Back to sign in (email enumeration safe)
         setIsOAuthOnly(false);
         setSubmitted(true);
       }
@@ -79,14 +98,21 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
 
   const handleGoogleSignIn = async (): Promise<void> => {
     setGoogleError(null);
-    setNetworkError(null);
+    setRetryError(null);
+    setRetryAction(null);
     setIsGoogleSubmitting(true);
     try {
       await signInWithGoogle();
     } catch (err) {
       if (!(err instanceof GoogleSignInCancelledError)) {
         if (isNetworkError(err)) {
-          setNetworkError('Unable to connect to server.');
+          setRetryError(NETWORK_ERROR_MESSAGE);
+          setRetryAction(() => handleGoogleSignIn);
+        } else if (isRateLimitError(err)) {
+          setGoogleError(RATE_LIMIT_MESSAGE);
+        } else if (isServerError(err)) {
+          setRetryError(SERVER_ERROR_MESSAGE);
+          setRetryAction(() => handleGoogleSignIn);
         } else {
           setGoogleError('Google sign-in failed. Please try again.');
         }
@@ -108,10 +134,10 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
 
               {googleError ? <Text style={styles.error}>{googleError}</Text> : null}
 
-              {networkError ? (
+              {retryError && retryAction ? (
                 <InlineError
-                  message={networkError}
-                  onRetry={handleGoogleSignIn}
+                  message={retryError}
+                  onRetry={retryAction}
                   retryLabel="Retry"
                 />
               ) : null}
@@ -161,12 +187,12 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
             editable={!isSubmitting}
           />
 
-          {clientError ? <Text style={styles.error}>{clientError}</Text> : null}
+          {inlineError ? <Text style={styles.error}>{inlineError}</Text> : null}
 
-          {networkError ? (
+          {retryError && retryAction ? (
             <InlineError
-              message={networkError}
-              onRetry={handleSubmit}
+              message={retryError}
+              onRetry={retryAction}
               retryLabel="Retry"
             />
           ) : null}

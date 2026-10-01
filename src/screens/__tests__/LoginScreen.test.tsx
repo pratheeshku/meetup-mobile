@@ -1,8 +1,8 @@
 /**
  * Sign In screen: shows the session-expired notice when `AuthContext` reports
  * one, and nothing when it does not. The Google failure message is unchanged.
- * Tests 403 Verify routing, 401 message, forgot password link, success message,
- * and touch targets.
+ * Tests 403 Verify routing, 401 message, 429 rate limit, 5xx server error,
+ * forgot password link, success message, and touch targets.
  */
 import React from 'react';
 import { StyleSheet, TextInput } from 'react-native';
@@ -158,6 +158,56 @@ describe('LoginScreen email auth and routing (AD-5)', () => {
 
     expect(texts(root)).toContain('Invalid email or password.');
     expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('[Execute] login 429 shows "Too many attempts. Try again in a minute."', async () => {
+    const error: { isAxiosError: boolean; response: { status: number; data: { detail: string } } } = {
+      isAxiosError: true,
+      response: {
+        status: 429,
+        data: { detail: 'Too many requests' },
+      },
+    };
+    mockAuth.signInWithEmail.mockRejectedValueOnce(error);
+
+    const root = await mount();
+    fillEmailPassword(root, 'user@example.com', 'password123');
+
+    await act(async () => {
+      pressableWithText(root, 'Sign In').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Too many attempts. Try again in a minute.');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('[Execute] login 5xx shows "Something went wrong. Try again." with Retry button, and retrying succeeds', async () => {
+    const error: { isAxiosError: boolean; response: { status: number; data: { detail: string } } } = {
+      isAxiosError: true,
+      response: {
+        status: 500,
+        data: { detail: 'Internal Server Error' },
+      },
+    };
+    mockAuth.signInWithEmail.mockRejectedValueOnce(error);
+
+    const root = await mount();
+    fillEmailPassword(root, 'user@example.com', 'password123');
+
+    await act(async () => {
+      pressableWithText(root, 'Sign In').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Something went wrong. Try again.');
+    expect(texts(root)).toContain('Retry');
+
+    // Retrying with success
+    mockAuth.signInWithEmail.mockResolvedValueOnce(undefined);
+    await act(async () => {
+      pressableWithText(root, 'Retry').props.onPress();
+    });
+
+    expect(mockAuth.signInWithEmail).toHaveBeenCalledTimes(2);
   });
 
   it('[Execute] shows inline error with Retry when server is unreachable, and retrying succeeds', async () => {

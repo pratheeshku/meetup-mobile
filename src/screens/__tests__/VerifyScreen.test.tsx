@@ -2,7 +2,6 @@ import React from 'react';
 import { StyleSheet, TextInput } from 'react-native';
 
 import { apiClient } from '../../api/client';
-import { isResendAvailable, setResendAvailable } from '../../auth/emailAuth';
 import { act, pressables, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import VerifyScreen from '../VerifyScreen';
@@ -52,12 +51,10 @@ const resolveStyle = (node: Instance): Record<string, any> => {
 beforeEach(() => {
   jest.clearAllMocks();
   (apiClient.post as jest.Mock).mockReset();
-  setResendAvailable(true);
 });
 
 afterEach(() => {
   jest.useRealTimers();
-  setResendAvailable(true);
 });
 
 describe('VerifyScreen', () => {
@@ -125,6 +122,74 @@ describe('VerifyScreen', () => {
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
+  it('[Execute] 429 on verify shows "Too many attempts. Try again in a minute."', async () => {
+    (apiClient.post as jest.Mock).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 429,
+        data: { detail: 'Rate limit exceeded' },
+      },
+    });
+    const root = await mount({ email: 'target@example.com' });
+
+    setInputCode(root, '123456');
+
+    await act(async () => {
+      pressableWithText(root, 'Verify').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Too many attempts. Try again in a minute.');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('[Execute] 5xx on verify shows "Something went wrong. Try again." with Retry button, and retrying succeeds', async () => {
+    (apiClient.post as jest.Mock).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 500,
+        data: { detail: 'Internal Server Error' },
+      },
+    });
+    const root = await mount({ email: 'target@example.com' });
+
+    setInputCode(root, '123456');
+
+    await act(async () => {
+      pressableWithText(root, 'Verify').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Something went wrong. Try again.');
+    expect(texts(root)).toContain('Retry');
+
+    // Retry should succeed
+    (apiClient.post as jest.Mock).mockResolvedValueOnce({ data: {} });
+    await act(async () => {
+      pressableWithText(root, 'Retry').props.onPress();
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('Login', {
+      successMessage: 'Email verified. Sign in.',
+    });
+  });
+
+  it('[Execute] Resend is always enabled and calls the resend endpoint', async () => {
+    (apiClient.post as jest.Mock).mockResolvedValueOnce({
+      data: { detail: 'If the email needs verification, a new code has been sent.' },
+    });
+    const root = await mount({ email: 'target@example.com' });
+
+    const resendBtn = pressableWithText(root, 'Resend');
+    expect(resendBtn.props.accessibilityState.disabled).toBe(false);
+
+    await act(async () => {
+      resendBtn.props.onPress();
+    });
+
+    expect(apiClient.post).toHaveBeenCalledWith('/auth/resend-verification', {
+      email: 'target@example.com',
+    });
+  });
+
   it('[Execute] Resend calls POST /auth/resend-verification and starts 60-second cooldown on success', async () => {
     jest.useFakeTimers();
     (apiClient.post as jest.Mock).mockResolvedValueOnce({
@@ -178,20 +243,50 @@ describe('VerifyScreen', () => {
     expect(texts(root)).toContain('Failed to resend verification code. Please try again.');
   });
 
-  it('[Execute] Resend button is disabled when endpoint is absent', async () => {
-    setResendAvailable(false);
-    expect(isResendAvailable()).toBe(false);
-
+  it('[Execute] 429 on resend shows "Too many attempts. Try again in a minute." and cooldown does not start', async () => {
+    (apiClient.post as jest.Mock).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 429,
+        data: { detail: 'Too many attempts' },
+      },
+    });
     const root = await mount({ email: 'target@example.com' });
 
-    const resendBtn = pressableWithText(root, 'Resend');
-    expect(resendBtn.props.accessibilityState.disabled).toBe(true);
-
-    // Pressing it does not trigger any network request
     await act(async () => {
-      resendBtn.props.onPress();
+      pressableWithText(root, 'Resend').props.onPress();
     });
-    expect(apiClient.post).not.toHaveBeenCalled();
+
+    expect(texts(root)).toContain('Too many attempts. Try again in a minute.');
+    expect(texts(root)).not.toContain('Resend (60s)');
+  });
+
+  it('[Execute] 5xx on resend shows "Something went wrong. Try again." with Retry button, and cooldown does not start', async () => {
+    (apiClient.post as jest.Mock).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 502,
+        data: { detail: 'Bad Gateway' },
+      },
+    });
+    const root = await mount({ email: 'target@example.com' });
+
+    await act(async () => {
+      pressableWithText(root, 'Resend').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Something went wrong. Try again.');
+    expect(texts(root)).toContain('Retry');
+    expect(texts(root)).not.toContain('Resend (60s)');
+
+    // Retrying resend successfully starts cooldown
+    jest.useFakeTimers();
+    (apiClient.post as jest.Mock).mockResolvedValueOnce({ data: {} });
+    await act(async () => {
+      pressableWithText(root, 'Retry').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Resend (60s)');
   });
 
   it('[Execute] unreachable server during verification shows inline error with Retry, and retrying succeeds', async () => {

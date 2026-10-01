@@ -90,7 +90,7 @@ describe('ForgotPasswordScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('Login');
   });
 
-  it('[Execute] shows the same generic message on failure (400 client error)', async () => {
+  it('[Execute] shows the same generic message on failure (400 client error, protecting against email enumeration)', async () => {
     (apiClient.post as jest.Mock).mockRejectedValueOnce({
       isAxiosError: true,
       response: {
@@ -110,7 +110,7 @@ describe('ForgotPasswordScreen', () => {
     expect(pressableWithText(root, 'Back to sign in')).toBeDefined();
   });
 
-  it('[Execute] shows the same generic message on a server error that is not a network error (500)', async () => {
+  it('[Execute] shows "Something went wrong. Try again." with Retry button on server error (500) and does NOT show the link sent text', async () => {
     (apiClient.post as jest.Mock).mockRejectedValueOnce({
       isAxiosError: true,
       response: {
@@ -126,7 +126,44 @@ describe('ForgotPasswordScreen', () => {
       pressableWithText(root, 'Submit').props.onPress();
     });
 
+    expect(texts(root)).toContain('Something went wrong. Try again.');
+    expect(texts(root)).toContain('Retry');
+    expect(texts(root)).not.toContain(EXPECTED_GENERIC_MESSAGE);
+
+    // Retrying with success
+    (apiClient.post as jest.Mock).mockResolvedValueOnce({ data: {} });
+    await act(async () => {
+      pressableWithText(root, 'Retry').props.onPress();
+    });
+
     expect(texts(root)).toContain(EXPECTED_GENERIC_MESSAGE);
+  });
+
+  it('[Execute] shows "Too many attempts. Try again in a minute." on 429 rate limit and does NOT show the link sent text', async () => {
+    (apiClient.post as jest.Mock).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 429,
+        data: { detail: 'Too many requests' },
+      },
+    });
+    const root = await mount();
+
+    setInputEmail(root, 'ratelimit@example.com');
+
+    await act(async () => {
+      pressableWithText(root, 'Submit').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Too many attempts. Try again in a minute.');
+    expect(texts(root)).not.toContain(EXPECTED_GENERIC_MESSAGE);
+    expect(pressables(root).some(p => {
+      try {
+        return texts(p).includes('Retry');
+      } catch {
+        return false;
+      }
+    })).toBe(false);
   });
 
   it('[Execute] shows inline error with Retry when server is unreachable, and retrying succeeds', async () => {

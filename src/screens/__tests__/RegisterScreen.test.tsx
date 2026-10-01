@@ -234,6 +234,53 @@ describe('RegisterScreen', () => {
     expect(texts(root)).toContain('Password must be at least 8 characters long');
   });
 
+  it('[Execute] shows "Too many attempts. Try again in a minute." on 429 rate limit', async () => {
+    (apiClient.post as jest.Mock).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 429,
+        data: { detail: 'Rate limit exceeded' },
+      },
+    });
+    const root = await mount();
+
+    fillForm(root, { email: 'ratelimit@example.com' });
+
+    await act(async () => {
+      pressableWithText(root, 'Register').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Too many attempts. Try again in a minute.');
+  });
+
+  it('[Execute] shows "Something went wrong. Try again." with Retry button on server error (500), and retrying succeeds', async () => {
+    (apiClient.post as jest.Mock).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 500,
+        data: { detail: 'Internal Server Error' },
+      },
+    });
+    const root = await mount();
+
+    fillForm(root, { email: 'servererr@example.com' });
+
+    await act(async () => {
+      pressableWithText(root, 'Register').props.onPress();
+    });
+
+    expect(texts(root)).toContain('Something went wrong. Try again.');
+    expect(texts(root)).toContain('Retry');
+
+    // Retrying succeeds
+    (apiClient.post as jest.Mock).mockResolvedValueOnce({ data: {} });
+    await act(async () => {
+      pressableWithText(root, 'Retry').props.onPress();
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('Verify', { email: 'servererr@example.com' });
+  });
+
   it('[Execute] shows inline error with Retry when server is unreachable, and retrying succeeds', async () => {
     (apiClient.post as jest.Mock).mockRejectedValueOnce({
       isAxiosError: true,

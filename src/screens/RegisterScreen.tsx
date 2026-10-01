@@ -5,6 +5,12 @@
  * Password lives only in this component's local state for the duration
  * of the active input session (R-111, P10). Exactly four fields are
  * sent: email, password, display_name, nickname. No mobile number field.
+ *
+ * Error handling:
+ * - 429: "Too many attempts. Try again in a minute." (inline error)
+ * - 5xx: "Something went wrong. Try again." with Retry button
+ * - Network error: "Unable to connect to server." with Retry button
+ * - 400 errors: inline mappings for duplicate email/nickname and password length.
  */
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -17,7 +23,14 @@ import InlineError from '../components/InlineError';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { colors, spacing, typography } from '../theme/tokens';
-import { isNetworkError } from '../utils/networkError';
+import {
+  isNetworkError,
+  isRateLimitError,
+  isServerError,
+  NETWORK_ERROR_MESSAGE,
+  RATE_LIMIT_MESSAGE,
+  SERVER_ERROR_MESSAGE,
+} from '../utils/networkError';
 import type { AuthStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
@@ -31,12 +44,14 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isEmailRegistered, setIsEmailRegistered] = useState(false);
-  const [networkError, setNetworkError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
 
   const handleRegister = async (): Promise<void> => {
     setError(null);
     setIsEmailRegistered(false);
-    setNetworkError(null);
+    setRetryError(null);
+    setRetryAction(null);
 
     const trimmedNickname = nickname.trim();
     const trimmedDisplayName = displayName.trim();
@@ -63,7 +78,19 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       navigation.navigate('Verify', { email: trimmedEmail });
     } catch (err) {
       if (isNetworkError(err)) {
-        setNetworkError('Unable to connect to server.');
+        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryAction(() => handleRegister);
+        return;
+      }
+
+      if (isRateLimitError(err)) {
+        setError(RATE_LIMIT_MESSAGE);
+        return;
+      }
+
+      if (isServerError(err)) {
+        setRetryError(SERVER_ERROR_MESSAGE);
+        setRetryAction(() => handleRegister);
         return;
       }
 
@@ -144,10 +171,10 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         </Pressable>
       </View>
 
-      {networkError ? (
+      {retryError && retryAction ? (
         <InlineError
-          message={networkError}
-          onRetry={handleRegister}
+          message={retryError}
+          onRetry={retryAction}
           retryLabel="Retry"
         />
       ) : error ? (

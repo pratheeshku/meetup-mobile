@@ -73,18 +73,6 @@ export async function requestPasswordReset(
   return data;
 }
 
-let resendEndpointAvailable = true;
-
-/** Returns whether the resend verification endpoint is available. */
-export function isResendAvailable(): boolean {
-  return resendEndpointAvailable;
-}
-
-/** Toggles the resend verification availability flag (for tests/environment checks). */
-export function setResendAvailable(available: boolean): void {
-  resendEndpointAvailable = available;
-}
-
 /**
  * Legacy wrapper: signs up and returns void (does not auto-login).
  * @deprecated Use `signup` directly.
