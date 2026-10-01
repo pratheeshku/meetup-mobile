@@ -180,9 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   const registerWithEmail = useCallback(
     async (email: string, password: string, nickname: string) => {
       setSessionExpired(false);
-      establishSession(await emailRegister(email, password, nickname));
+      await emailRegister(email, password, nickname);
     },
-    [establishSession],
+    [],
   );
 
   const signOut = useCallback(async () => {

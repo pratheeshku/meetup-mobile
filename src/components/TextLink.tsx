@@ -68,7 +68,7 @@ export default function TextLink({
 }
 
 const styles = StyleSheet.create({
-  base: { paddingVertical: spacing.xs, justifyContent: 'center' },
+  base: { minHeight: 44, paddingVertical: spacing.xs, justifyContent: 'center' },
   pressed: { opacity: opacity.pressed },
   disabled: { opacity: opacity.disabled },
 });
