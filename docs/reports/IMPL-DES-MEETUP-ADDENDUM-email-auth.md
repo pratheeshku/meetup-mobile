@@ -179,3 +179,56 @@ src/auth/emailAuth.ts:52:  await apiClient.post('/auth/resend-verification', { e
 $ grep -rn "POST /auth/reset-password-request" src/
 src/auth/emailAuth.ts:60:  await apiClient.post('/auth/reset-password-request', { email });
 ```
+
+---
+
+## 10. Add-on: AD-7 Google-Only Accounts (v1.2)
+
+### Context & Implementation
+Per `DES-MEETUP-ADDENDUM-email-auth.md` v1.2 AD-7, for Google-only accounts (`oauth_provider` set, `password_hash` empty), `POST /auth/reset-password-request` answers 200 with:
+`{"detail": "This account signs in with Google, so it has no password. Use Continue with Google to sign in.", "code": "oauth_only"}`.
+- In `src/screens/ForgotPasswordScreen.tsx`:
+  - When `response.code === 'oauth_only'`, the screen suppresses the normal "we've sent a reset link" message.
+  - Renders the response's `detail` message: `"This account signs in with Google, so it has no password. Use Continue with Google to sign in."`.
+  - Renders a `"Continue with Google"` button.
+  - Renders a `"Back to sign in"` button.
+  - When `code` is absent (older backend) or any other 200/error, existing behavior is preserved exactly.
+
+### Reused Google Sign-In Handler
+- **Handler**: `signInWithGoogle` from `src/auth/AuthContext.tsx`, line 167 (declared in `AuthContextValue` interface at line 45), exposed via `useAuth().signInWithGoogle`.
+- **Login screen usage**: `src/screens/LoginScreen.tsx`, line 29 (`const { signInWithGoogle } = useAuth();`) and line 48 (`await signInWithGoogle();`).
+- **ForgotPassword screen usage**: `src/screens/ForgotPasswordScreen.tsx`, line 28 (`const { signInWithGoogle } = useAuth();`) and line 85 (`await signInWithGoogle();`).
+- No new auth code, no new native dependency, and no refactor needed.
+
+### Add-on New Tests Breakdown (Execute vs Source Check)
+`src/screens/__tests__/ForgotPasswordScreen.test.tsx`:
+1. `[Execute] an oauth_only reply shows the Google-only message, the Continue with Google button and Back to sign in, and does not show the normal message` — Mocks `code: 'oauth_only'`, asserts `EXPECTED_OAUTH_ONLY_MESSAGE` renders, asserts generic message does not render, asserts buttons exist.
+2. `[Execute] pressing Continue with Google calls the existing Google sign-in handler` — Simulates press of "Continue with Google", asserts `mockAuth.signInWithGoogle` is called.
+3. `[Execute] handles Google sign-in cancellation silently without error message` — Simulates user cancelling Google account picker, asserts no error displayed.
+4. `[Execute] handles Google sign-in network error with inline Retry` — Simulates network error during Google sign in, asserts inline Retry displayed and functional.
+5. `[Execute] verifies all interactive pressables have a touch target height of at least 44px (including oauth_only buttons)` — Evaluates functional styles of all buttons ensuring `minHeight >= 44`.
+
+### Add-on Single-Run Test Output (Run ONLY on changed test files as instructed)
+```
+$ npx jest src/screens/__tests__/ForgotPasswordScreen.test.tsx --verbose
+PASS src/screens/__tests__/ForgotPasswordScreen.test.tsx
+  ForgotPasswordScreen
+    ✓ [Execute] shows the generic message on success (200) with "Back to sign in" button when code is absent (64 ms)
+    ✓ [Execute] shows the same generic message on failure (400 client error) (3 ms)
+    ✓ [Execute] shows the same generic message on a server error that is not a network error (500) (3 ms)
+    ✓ [Execute] shows inline error with Retry when server is unreachable, and retrying succeeds (3 ms)
+    ✓ [Execute] an oauth_only reply shows the Google-only message, the Continue with Google button and Back to sign in, and does not show the normal message (2 ms)
+    ✓ [Execute] pressing Continue with Google calls the existing Google sign-in handler (3 ms)
+    ✓ [Execute] handles Google sign-in cancellation silently without error message (2 ms)
+    ✓ [Execute] handles Google sign-in network error with inline Retry (4 ms)
+    ✓ [Execute] pre-fills email when passed in route params (1 ms)
+    ✓ [Execute] Back to sign in link navigates to Login (1 ms)
+    ✓ [Execute] verifies all interactive pressables have a touch target height of at least 44px (including oauth_only buttons) (2 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        0.253 s, estimated 1 s
+Ran all test suites matching /src\/screens\/__tests__\/ForgotPasswordScreen.test.tsx/i.
+```
+

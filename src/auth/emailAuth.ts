@@ -53,12 +53,24 @@ export async function resendVerification(email: string): Promise<void> {
   await apiClient.post('/auth/resend-verification', { email });
 }
 
+export interface PasswordResetRequestResponse {
+  detail?: string;
+  code?: string;
+}
+
 /**
  * Requests a password reset link sent to the user's email.
- * (DES-MEETUP-ADDENDUM-email-auth AD-2, AD-5).
+ * (DES-MEETUP-ADDENDUM-email-auth AD-2, AD-5, AD-7).
+ * For Google-only accounts, returns { detail, code: 'oauth_only' }.
  */
-export async function requestPasswordReset(email: string): Promise<void> {
-  await apiClient.post('/auth/reset-password-request', { email });
+export async function requestPasswordReset(
+  email: string,
+): Promise<PasswordResetRequestResponse | undefined> {
+  const { data } = await apiClient.post<PasswordResetRequestResponse>(
+    '/auth/reset-password-request',
+    { email },
+  );
+  return data;
 }
 
 let resendEndpointAvailable = true;
