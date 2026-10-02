@@ -44,8 +44,6 @@
 	<string>Shuttlr uses the camera to take your profile photo and to scan event QR codes.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Shuttlr needs access to your photos so you can choose a profile picture.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
