@@ -4,14 +4,22 @@
  * "byte-identical when run twice" check needs Python/Pillow, so it is a
  * script step reported in the implementation report, not a Jest test.
  */
-import fs from 'fs';
-import path from 'path';
-import { PNG } from 'pngjs';
-
 import { dash } from '../../theme/dashboardTheme';
 
-const read = (name: string) =>
-  PNG.sync.read(fs.readFileSync(path.join(__dirname, '..', name)));
+// Node built-ins / pngjs are untyped in this RN project (no @types/node, no new deps).
+const fs = require('fs');
+const { PNG } = require('pngjs');
+
+const jestCwd = (): string => (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+
+interface Png {
+  width: number;
+  height: number;
+  data: Uint8Array;
+}
+
+const read = (name: string): Png =>
+  PNG.sync.read(fs.readFileSync(`${jestCwd()}/src/assets/${name}`));
 
 // Same classification as scripts/make-header-icon.py.
 const HUE_MIN = 205;
@@ -59,7 +67,7 @@ describe('header icon variant (AD-18)', () => {
       (isPlate ? plate : other).push(i);
     }
   }
-  const mean = (png: PNG, idx: number[]) =>
+  const mean = (png: Png, idx: number[]) =>
     [0, 1, 2].map(c => idx.reduce((a, i) => a + png.data[i + c], 0) / idx.length);
 
   it('has the same dimensions as the source', () => {
@@ -85,7 +93,7 @@ describe('header icon variant (AD-18)', () => {
   });
 
   it('keeps the embossed pattern as tonal variation on the plate', () => {
-    const lum = (png: PNG) => {
+    const lum = (png: Png) => {
       const v = plate.map(i => png.data[i + 2]);
       const m = v.reduce((a, b) => a + b, 0) / v.length;
       return Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length);
