@@ -1,46 +1,53 @@
 /**
- * Emoji tab icons: every tab route must have one (the record is typed on
- * `AppTabParamList`, so a new tab without an emoji is also a type error),
- * and inactive tabs must read as inactive despite emoji ignoring tint.
+ * Bottom-bar icons and labels (AD-5): every tab has an Appendix A SVG icon
+ * (the records are typed on `AppTabParamList`, so a new tab without one is
+ * also a type error); the Tournaments route is labelled "Games" with the
+ * gamepad; the active label is brand-coloured and bold. EXECUTES renders.
  */
-import React from 'react';
 import { StyleSheet } from 'react-native';
 
-import { opacity } from '../../theme/tokens';
-import { render } from '../../test-utils/render';
-import { TAB_EMOJI, TabEmoji } from '../tabIcons';
+import { GamesIcon, GroupsIcon, HomeIcon, ProfileIcon } from '../../components/icons/DashboardIcons';
+import { render, texts } from '../../test-utils/render';
+import { dash, dashSize } from '../../theme/dashboardTheme';
+import { TAB_ICONS, TAB_LABELS, TabIcon, TabLabel } from '../tabIcons';
 
-describe('TAB_EMOJI', () => {
-  it('maps each tab to the emoji specified for it', () => {
-    expect(TAB_EMOJI).toEqual({
-      Home: '🏠',
-      Groups: '👥',
-      Tournaments: '🏆',
-      Profile: '👤',
+describe('tab icon and label tables', () => {
+  it('maps each tab to its Appendix A icon, with the gamepad for the Games tab', () => {
+    expect(TAB_ICONS).toEqual({
+      Home: HomeIcon,
+      Groups: GroupsIcon,
+      Tournaments: GamesIcon,
+      Profile: ProfileIcon,
     });
+  });
+
+  it('renames the Tournaments tab to "Games" and keeps the other labels', () => {
+    expect(TAB_LABELS).toEqual({
+      Home: 'Home',
+      Groups: 'Groups',
+      Tournaments: 'Games',
+      Profile: 'Profile',
+    });
+    expect(Object.values(TAB_LABELS)).not.toContain('Tournaments');
   });
 });
 
-describe('TabEmoji', () => {
-  const hostText = (element: React.ReactElement) =>
-    render(element).find(node => (node.type as unknown) === 'Text');
-
-  it('renders the emoji at the size the tab bar supplies', () => {
-    const text = hostText(<TabEmoji emoji="🏠" focused size={24} />);
-    expect(text.props.children).toBe('🏠');
-    expect(StyleSheet.flatten(text.props.style).fontSize).toBe(24);
+describe('TabIcon / TabLabel', () => {
+  it('renders the icon at 30px', () => {
+    const icon = render(<TabIcon name="Tournaments" />).findByType(GamesIcon);
+    expect(icon.props.size).toBe(dashSize.navIcon);
+    expect(dashSize.navIcon).toBe(30);
   });
 
-  it('is fully opaque when focused and dimmed when not', () => {
-    const focused = StyleSheet.flatten(hostText(<TabEmoji emoji="🏠" focused size={24} />).props.style);
-    const idle = StyleSheet.flatten(hostText(<TabEmoji emoji="🏠" focused={false} size={24} />).props.style);
-    expect(focused.opacity).toBeUndefined();
-    expect(idle.opacity).toBe(opacity.disabled);
-  });
-
-  it('is hidden from screen readers (the tab label carries the meaning)', () => {
-    const text = hostText(<TabEmoji emoji="🏠" focused size={24} />);
-    expect(text.props.accessibilityElementsHidden).toBe(true);
-    expect(text.props.importantForAccessibility).toBe('no');
+  it('renders the label at 11px, bold brand when active and muted when idle', () => {
+    const active = StyleSheet.flatten(
+      render(<TabLabel name="Tournaments" focused />).findByType('Text' as never).props.style,
+    );
+    const idle = StyleSheet.flatten(
+      render(<TabLabel name="Home" focused={false} />).findByType('Text' as never).props.style,
+    );
+    expect(active).toMatchObject({ fontSize: 11, color: dash.brand, fontWeight: '700' });
+    expect(idle).toMatchObject({ fontSize: 11, color: dash.navInactive });
+    expect(texts(render(<TabLabel name="Tournaments" focused />))).toEqual(['Games']);
   });
 });

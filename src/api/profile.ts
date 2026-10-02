@@ -45,6 +45,7 @@ interface PrivateUserProfileApiItem {
   created_at: string;
   email: string;
   is_admin: boolean;
+  mobile_number?: string | null;
 }
 
 function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: SkillLevel[]): UserProfile {
@@ -64,6 +65,7 @@ function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: Skil
     // exists on the real response at all.
     role: undefined,
     skill_levels: skillLevels,
+    mobile_number: raw.mobile_number ?? null,
   };
 }
 

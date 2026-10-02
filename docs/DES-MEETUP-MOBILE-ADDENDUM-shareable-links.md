@@ -1,7 +1,7 @@
 # DES-MEETUP-MOBILE-ADDENDUM-shareable-links
 
 **Doc ID:** DES-MEETUP-MOBILE-ADDENDUM-shareable-links
-**Version:** v1.0
+**Version:** v1.1 — v1.0 (2026-09-27) APPROVED; v1.1 corrects Decision 2 with the exact canonical URL format after the original wording shipped a non-functional link (wrong path, missing hash-routing) — caught via live post-deploy testing, see `DES-MEETUP-ADDENDUM-shareable-links.md` Decision 21
 **Status:** APPROVED (2026-09-27)
 **Component:** Mobile (repo: `pratheeshku/meetup-mobile`)
 **Scale Tier:** T1
@@ -39,8 +39,12 @@ This feature's mobile footprint is **composition only** — an authenticated org
 **Decision 1 — No native deep-link interception (reaffirmed).**
 Documented here per BP-13 to prevent this being re-litigated as an oversight: the app does not register as a handler for event or group-invite URLs. A user with the app installed who taps a shared link is bounced to the system browser (PWA), same as a user without the app. Rationale: avoids App Links/Universal Links domain verification, a new unauthenticated nav stack (the existing Login/Signup stack does not cover this — it has no auth-aware branching for "same URL, different destination by session state"), and a post-signup return-to-app redirect mechanism — for a cost that is UX-only (one extra browser hop), not functional.
 
-**Decision 2 — Event link composition is client-side only.**
-No backend call to "generate" an event link — the Share button reads the event's existing canonical URL and appends `?ref=<current_user_id>` before handing off. Mirrors backend addendum Decision 7 (no creation step exists for event links).
+**Decision 2 — Event link composition is client-side only, exact format fixed (v1.1 correction).**
+No backend call to "generate" an event link — the Share button reads the event's canonical URL and appends `?ref=<current_user_id>` before handing off. "Canonical URL" is not this doc's to define — the web SPA's router (`pratheeshku/meetup`, `frontend/app.js`) is the single source of truth, and `DES-MEETUP-ADDENDUM-shareable-links.md` Decision 21 pins the exact format:
+```
+{origin}/#event-detail/{event_id}?ref={current_user_id}
+```
+The original wording here ("existing canonical URL") was ambiguous enough that the shipped build used `{base}/events/{event_id}` instead — wrong path segment, no hash — which the router doesn't recognize, producing a spurious auth error for logged-out visitors. If this format ever changes on the web side, that change is authoritative in the backend+web doc first; this doc's job is to match it, not restate it independently.
 
 **Decision 3 — Group link composition calls the backend.**
 `POST /groups/invitations` (authenticated) returns the shareable URL; the mobile UI then hands that URL to the same native-share code path as event links. No mobile-side token generation or storage.
