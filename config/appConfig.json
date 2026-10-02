@@ -2,6 +2,7 @@
   "displayName": "Shuttlr",
   "privacyPolicyUrl": "",
   "supportContact": "",
+  "reportFormUrl": "",
   "ios": {
     "marketingVersion": "0.1.0",
     "buildNumber": "1"

@@ -30,6 +30,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -62,7 +63,9 @@ import OptionChips from '../components/OptionChips';
 import type { ChipOption } from '../components/OptionChips';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import appConfig from '../../config/appConfig.json';
 import { getApiErrorMessage } from '../utils/apiError';
+import { toHttpsUrl } from '../utils/httpsUrl';
 import MobileNumberCard from '../components/MobileNumberCard';
 import { getDisplayName } from '../utils/displayName';
 import { useSportDisplayName } from '../utils/labels';
@@ -453,6 +456,19 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
     }
   };
 
+  // Report form (DES-MEETUP-ADDENDUM-IOS-App.md §7): hidden unless the
+  // configured URL is a valid https URL. Opened without a capability check;
+  // the URL is never logged.
+  const reportFormUrl = toHttpsUrl(appConfig.reportFormUrl);
+
+  const handleOpenReportForm = async (url: string): Promise<void> => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Could not open the form', 'Please try again later.');
+    }
+  };
+
   const handleDeleteAccountPress = (): void => {
     Alert.alert(
       'Delete Account',
@@ -712,6 +728,15 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         loading={isSigningOut}
         style={styles.signOutButton}
       />
+
+      {reportFormUrl ? (
+        <Button
+          label="Report a problem or content"
+          variant="secondary"
+          onPress={() => handleOpenReportForm(reportFormUrl)}
+          style={styles.stackedButton}
+        />
+      ) : null}
 
       <View style={styles.dangerZone}>
         {deletionError ? <Text style={styles.errorText}>{deletionError}</Text> : null}
