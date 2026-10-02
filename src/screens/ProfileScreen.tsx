@@ -30,7 +30,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -66,6 +65,8 @@ import TextLink from '../components/TextLink';
 import appConfig from '../../config/appConfig.json';
 import { getApiErrorMessage } from '../utils/apiError';
 import { toHttpsUrl } from '../utils/httpsUrl';
+import { openLink } from '../utils/openLink';
+import { toSupportLink } from '../utils/supportLink';
 import MobileNumberCard from '../components/MobileNumberCard';
 import { getDisplayName } from '../utils/displayName';
 import { useSportDisplayName } from '../utils/labels';
@@ -456,18 +457,12 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
     }
   };
 
-  // Report form (DES-MEETUP-ADDENDUM-IOS-App.md §7): hidden unless the
-  // configured URL is a valid https URL. Opened without a capability check;
-  // the URL is never logged.
+  // Report form, privacy policy, support contact (DES-MEETUP-ADDENDUM-IOS-App.md
+  // §7, §11): each row is hidden unless its configured value is valid.
   const reportFormUrl = toHttpsUrl(appConfig.reportFormUrl);
 
-  const handleOpenReportForm = async (url: string): Promise<void> => {
-    try {
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert('Could not open the form', 'Please try again later.');
-    }
-  };
+  const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
+  const supportLink = toSupportLink(appConfig.supportContact);
 
   const handleDeleteAccountPress = (): void => {
     Alert.alert(
@@ -729,11 +724,29 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         style={styles.signOutButton}
       />
 
+      {privacyPolicyUrl ? (
+        <Button
+          label="Privacy Policy"
+          variant="secondary"
+          onPress={() => openLink(privacyPolicyUrl, 'Could not open the page')}
+          style={styles.stackedButton}
+        />
+      ) : null}
+
+      {supportLink ? (
+        <Button
+          label="Contact support"
+          variant="secondary"
+          onPress={() => openLink(supportLink, 'Could not open the link')}
+          style={styles.stackedButton}
+        />
+      ) : null}
+
       {reportFormUrl ? (
         <Button
           label="Report a problem or content"
           variant="secondary"
-          onPress={() => handleOpenReportForm(reportFormUrl)}
+          onPress={() => openLink(reportFormUrl, 'Could not open the form')}
           style={styles.stackedButton}
         />
       ) : null}

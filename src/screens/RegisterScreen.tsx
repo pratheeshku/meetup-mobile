@@ -17,6 +17,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AxiosError } from 'axios';
 
+import appConfig from '../../config/appConfig.json';
 import { signup } from '../auth/emailAuth';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
@@ -31,6 +32,8 @@ import {
   RATE_LIMIT_MESSAGE,
   SERVER_ERROR_MESSAGE,
 } from '../utils/networkError';
+import { toHttpsUrl } from '../utils/httpsUrl';
+import { openLink } from '../utils/openLink';
 import type { AuthStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
@@ -46,6 +49,8 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   const [isEmailRegistered, setIsEmailRegistered] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
+
+  const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
 
   const handleRegister = async (): Promise<void> => {
     setError(null);
@@ -209,6 +214,15 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         disabled={isSubmitting}
         style={styles.link}
       />
+
+      {privacyPolicyUrl ? (
+        <TextLink
+          label="Privacy Policy"
+          onPress={() => openLink(privacyPolicyUrl, 'Could not open the page')}
+          disabled={isSubmitting}
+          style={styles.link}
+        />
+      ) : null}
     </View>
   );
 }
