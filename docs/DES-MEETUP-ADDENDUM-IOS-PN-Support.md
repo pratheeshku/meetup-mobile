@@ -1,11 +1,11 @@
 # DESIGN ADDENDUM — Mobile Push Platform Support (iOS)
 
 **Document:** DES-MEETUP-ADDENDUM-IOS-PN-Support.md
-**Version:** 1.1
+**Version:** 1.2
 **Status:** APPROVED
 **Approved by:** Pratheesh
 **Date:** 2026-10-02
-**Supersedes:** v1.0 (2026-10-02, original approved design)
+**Supersedes:** v1.1 (2026-10-02)
 **Amends:** REQ-MEETUP.md R-004 (superseded by R-004.1); DES-MEETUP.md §5.16, §4.11, §14
 **Authority:** this addendum is authoritative until folded into REQ-MEETUP.md / DES-MEETUP.md. It does not itself bump those documents' version numbers.
 **Companion:** DES-MEETUP-ADDENDUM-IOS-App.md (mobile client)
@@ -16,6 +16,7 @@
 |---|---|---|
 | 1.0 | 2026-10-02 | Original approved design: config-driven platform allowlist, CHECK dropped, platform filter removed from fan-out, iOS alert payloads, per-platform latch requirement (B7 unresolved). |
 | 1.1 | 2026-10-02 | Records the implemented and merged design. Adds: per-platform credential latch (B7 resolved), worker-startup builder check (B2 clarified), compose pass-through (B2a), `apns-collapse-id` (B6), narrowed FCM-AMD test rule (B9), implementation record, live-drift record, deployment sequence, documentation reconciliation list. Adds D-3. |
+| 1.2 | 2026-10-02 | Records the live deployment: the first migration attempt failed on table ownership; root cause (`MIGRATION_DATABASE_URL` unset, `meetup_app` owns no tables); successful application as `postgres` from the host virtualenv; corrected migration procedure; live-drift item closed; new open items (incomplete migration-role design, plaintext database passwords in git, mixed table ownership). |
 
 ---
 
@@ -133,23 +134,29 @@ No in-code defaults. Missing, empty or invalid values fail startup.
 - **Branch:** `feat/ios-push-platform-support`, merged to `main` and pushed 2026-10-02 (`main` tip `c3fbb13`).
 - **Commits:** `87fae1b` (platform support), `a710cee` (alembic head pin), `6ac8690` (reports), `2702886` (status reports and negative display tests), `f8b1664` (per-platform latch, collapse-id, compose pass-through).
 - **Migrations:** `e5f607182301` (drop platform CHECK), `f6a7b8c9d012` (fan-out without platform filter). Single alembic head `f6a7b8c9d012` confirmed after merge.
-- **Not yet applied to live at the time of writing:** both migrations and the three `.env` settings (see Part F).
+- **Applied to live on 2026-10-02:** both migrations and the three `.env` settings (see Part F).
 
 ## Part E — LIVE DATABASE DRIFT RECORD (2026-10-02)
 
 - `notifications.fn_materialize_deliveries` on live was changed outside alembic, between 11:40 and about 13:40 +08, to the `f6a7b8c9d012` body. It is the only catalog object newer than the last alembic run. Actor unattributed: `log_statement` is `none` and no audit extension is installed. Concurrent code changes on the host are the probable cause.
 - Read-only comparison against `meetup_test` found no other new drift. Four older unexplained items exist and do not affect the pending migrations: `check_event_organizer` and `check_group_membership` lack `COALESCE` (no runtime effect on PostgreSQL 17); `fn_expire_request` lacks EXECUTE for `meetup_worker_login` on live; the three notification-history functions are owned by `meetup_worker_login` (matches the 2026-09-23 repair and is intended).
 - Applying `e5f607182301` and `f6a7b8c9d012` was assessed safe.
+- **Resolved 2026-10-02:** applying `f6a7b8c9d012` re-applied the identical function body; the live function and `alembic_version` now agree.
 
-## Part F — DEPLOYMENT SEQUENCE
+## Part F — DEPLOYMENT RECORD AND PROCEDURE
 
-1. Add `MOBILE_PUSH_PLATFORMS`, `FCM_APNS_PRIORITY_ALERT`, `FCM_APNS_SOUND` to the live `.env`.
-2. Back up the database; run the blocking-session check.
-3. Build the `api` and `worker` images; apply `alembic upgrade head` with the new code present.
-4. Restart `worker`, then `api`.
-5. Verify alembic is at head, the CHECK is gone, and a real Android push arrives.
-6. Upload the APNs authentication key in Firebase before the first iOS device test.
-- **Rollback:** restore the previous images. Do not run `alembic downgrade`. The dropped CHECK is harmless to older code.
+**Record (2026-10-02):**
+1. A pre-change database backup was taken. The merged code (`main` tip `c3fbb13`) was built, and the three settings (`MOBILE_PUSH_PLATFORMS=android,ios`, `FCM_APNS_PRIORITY_ALERT=10`, `FCM_APNS_SOUND=default`) were added to the live `.env`.
+2. The first migration attempt, run in the `api` container, failed on `e5f607182301` with `must be owner of table mobile_push_tokens`. The transaction rolled back and `alembic_version` stayed `d4e5f6071823`. The deploy sequence had no stop-on-error, so the api and worker restarted on the new code against the old schema for a short period. Android was unaffected: the api was healthy, and the worker and api logs showed no FCM fault, error or traceback lines.
+3. **Root cause:** `MIGRATION_DATABASE_URL` is unset in the live `.env`, so migrations fell back to `DATABASE_URL`, which logs in as `meetup_app`. `meetup_app` owns no tables. `mobile_push_tokens` is owned by `meetup_migrator` (41 tables were transferred by `fef19e6bdd27`), and `fn_materialize_deliveries` is owned by `postgres`.
+4. Both migrations were then applied from the host virtualenv as `postgres`: `e5f607182301`, then `f6a7b8c9d012`. Verified: `alembic current` is `f6a7b8c9d012`; the platform CHECK no longer exists; `fn_materialize_deliveries` is owned by `postgres` with its body hash unchanged.
+5. No container restart was needed after the migration.
+
+**Procedure (corrected):** migrations run from the host as `postgres`, using the host virtualenv, with `MIGRATION_DATABASE_URL` unset. Print the connection role, host, port and database (never the password) before applying, and run each step individually or with stop-on-error. Do not run migrations in the `api` container as `meetup_app`, and do not hand-apply SQL.
+
+**Still to do:** upload the APNs authentication key in Firebase before the first iOS device test; confirm that a real Android push arrives after the deployment (unconfirmed at the time of writing).
+
+**Rollback:** restore the previous images. Do not run `alembic downgrade`. The dropped CHECK is harmless to older code.
 
 ---
 
@@ -166,3 +173,7 @@ No in-code defaults. Missing, empty or invalid values fail startup.
 3. `fn_expire_request` lacks EXECUTE for `meetup_worker_login` on live; confirm whether admin approval requests are expiring.
 4. `meetup_test` carries pre-amendment definitions of `fn_register_mobile_push_token` and `fn_register_push_subscription` and lacks two partial indexes; rebuild it from the migrations.
 5. Optional: enable `log_statement = 'ddl'` with a user/database prefix so out-of-band DDL can be attributed in future.
+6. The migration-role design is incomplete. `meetup_migrator` owns 41 tables, but it cannot run migrations that replace `postgres`-owned functions, and giving it that ownership would reintroduce the RLS regression reverted by `1cbad165523f` (it has no BYPASSRLS). Every migration in the project's history has run as `postgres`. Decide whether to finish or retire the role, and document the real procedure in `CLAUDE.md`.
+7. Plaintext database passwords remain in git: `docker-compose.yml` (the `postgres` password and the `meetup_app` password, twice), `tests/conftest.py` and `scripts/run_migrations.py`; older `alembic.ini` credentials remain in history (`ff39484`, `c1b1692`, `8d9927a`). Move them to `.env` and rotate (P10), as a planned task and not during a deployment.
+8. Five tables created after `fef19e6bdd27` are owned by `postgres`, not `meetup_migrator`: `apscheduler_jobs`, `event_reminder_dispatch_log`, `group_invitations`, `pii_access_log`, `user_photo_reports`. Resolve together with item 6.
+9. The deployment sequence must stop on the first error. Run steps individually or with stop-on-error.
