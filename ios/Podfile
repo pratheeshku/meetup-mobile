@@ -17,6 +17,11 @@ end
 target 'MeetupMobile' do
   config = use_native_modules!
 
+  # AppCheckCore (a Swift pod pulled in by Firebase) needs module maps from
+  # these two pods. Add further pods here only when `pod install` names them.
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'RecaptchaInterop', :modular_headers => true
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
