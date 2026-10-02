@@ -15,6 +15,7 @@ describe('appConfig.json', () => {
   it('has every required key, with string values (empty = explicit placeholder)', () => {
     expect(typeof appConfig.displayName).toBe('string');
     expect(typeof appConfig.privacyPolicyUrl).toBe('string');
+    expect(typeof appConfig.termsOfUseUrl).toBe('string');
     expect(typeof appConfig.supportContact).toBe('string');
     expect(typeof appConfig.reportFormUrl).toBe('string');
     expect(typeof appConfig.ios.marketingVersion).toBe('string');

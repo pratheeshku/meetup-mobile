@@ -467,6 +467,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const reportFormUrl = toHttpsUrl(appConfig.reportFormUrl);
 
   const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
+  const termsOfUseUrl = toHttpsUrl(appConfig.termsOfUseUrl);
   const supportLink = toSupportLink(appConfig.supportContact);
 
   const handleDeleteAccountPress = (): void => {
@@ -736,6 +737,15 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           label="Privacy Policy"
           variant="secondary"
           onPress={() => openLink(privacyPolicyUrl, 'Could not open the page')}
+          style={styles.stackedButton}
+        />
+      ) : null}
+
+      {termsOfUseUrl ? (
+        <Button
+          label="Terms of Use"
+          variant="secondary"
+          onPress={() => openLink(termsOfUseUrl, 'Could not open the page')}
           style={styles.stackedButton}
         />
       ) : null}

@@ -53,10 +53,23 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
 
   const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
+  // Terms agreement (email registration only): required only when a valid
+  // terms URL is configured; with none, registration is unchanged. The
+  // acceptance is not recorded server-side.
+  const termsOfUseUrl = toHttpsUrl(appConfig.termsOfUseUrl);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const termsBlocking = termsOfUseUrl !== null && !agreedToTerms;
 
   const chain = useFieldChain(['nickname', 'displayName', 'email', 'password']);
 
+  const agreeLabel = privacyPolicyUrl
+    ? 'I agree to the Terms of Use and Privacy Policy'
+    : 'I agree to the Terms of Use';
+
   const handleRegister = async (): Promise<void> => {
+    if (termsBlocking) {
+      return;
+    }
     setError(null);
     setIsEmailRegistered(false);
     setRetryError(null);
@@ -188,6 +201,45 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         </Pressable>
       </View>
 
+      {termsOfUseUrl ? (
+        <View style={styles.agreeRow}>
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: agreedToTerms, disabled: isSubmitting }}
+            accessibilityLabel={agreeLabel}
+            onPress={() => setAgreedToTerms(previous => !previous)}
+            disabled={isSubmitting}
+            style={styles.checkboxTarget}
+          >
+            <View style={[styles.checkbox, agreedToTerms ? styles.checkboxChecked : null]}>
+              {agreedToTerms ? <Text style={styles.checkMark}>{'\u2713'}</Text> : null}
+            </View>
+          </Pressable>
+          <Text style={styles.agreeText}>
+            I agree to the{' '}
+            <Text
+              style={styles.agreeLink}
+              accessibilityRole="link"
+              onPress={() => openLink(termsOfUseUrl, 'Could not open the page')}
+            >
+              Terms of Use
+            </Text>
+            {privacyPolicyUrl ? (
+              <>
+                {' '}and{' '}
+                <Text
+                  style={styles.agreeLink}
+                  accessibilityRole="link"
+                  onPress={() => openLink(privacyPolicyUrl, 'Could not open the page')}
+                >
+                  Privacy Policy
+                </Text>
+              </>
+            ) : null}
+          </Text>
+        </View>
+      ) : null}
+
       {retryError && retryAction ? (
         <InlineError
           message={retryError}
@@ -217,6 +269,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         label="Register"
         onPress={handleRegister}
         loading={isSubmitting}
+        disabled={termsBlocking}
         style={styles.button}
       />
 
@@ -284,6 +337,31 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: 'center',
   },
+  agreeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  checkboxTarget: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: colors.textSecondary,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+  checkMark: { color: colors.surface, fontWeight: '700', fontSize: 16, lineHeight: 18 },
+  agreeText: { ...typography.body, color: colors.textPrimary, flex: 1, marginLeft: spacing.xs },
+  agreeLink: { color: colors.primary, textDecorationLine: 'underline' },
   button: { marginBottom: spacing.md },
   link: { alignSelf: 'center', minHeight: 44, justifyContent: 'center' },
 });
