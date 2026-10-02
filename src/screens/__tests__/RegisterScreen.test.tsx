@@ -11,6 +11,14 @@ import { act, pressables, pressableWithText, renderAsync, texts } from '../../te
 import type { Instance } from '../../test-utils/render';
 import RegisterScreen from '../RegisterScreen';
 
+// The shipped config now sets termsOfUseUrl, which gates "Register" behind the
+// Terms checkbox (covered in RegisterScreenTerms.test.tsx). This suite exercises
+// the ungated submit flow, so run it with the terms URL empty.
+jest.mock('../../../config/appConfig.json', () => ({
+  __esModule: true,
+  default: { ...jest.requireActual('../../../config/appConfig.json'), termsOfUseUrl: '' },
+}));
+
 jest.mock('../../api/client', () => ({
   apiClient: {
     post: jest.fn(),
