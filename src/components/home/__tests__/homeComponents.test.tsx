@@ -80,9 +80,10 @@ describe('DashboardBanner', () => {
 
   // NOTE: react-test-renderer does not run layout, so overlap/clipping at 360dp
   // cannot be measured here; these cases assert the style props that produce it.
-  it('brand block: icon is shuttlr-icon.png at 52x52, radius 12, overflow hidden', () => {
+  it('brand block: icon is the AD-18 header variant (not the original) at 52x52, radius 12, overflow hidden', () => {
     const icon = hostByTestId(banner(), 'banner-app-icon');
-    expect(icon.props.source).toBe(require('../../../assets/shuttlr-icon.png'));
+    expect(icon.props.source).toBe(require('../../../assets/shuttlr-icon-header.png'));
+    expect(icon.props.source).not.toBe(require('../../../assets/shuttlr-icon.png'));
     expect(flat(icon)).toMatchObject({ width: 52, height: 52, borderRadius: 12, overflow: 'hidden' });
   });
 
@@ -131,6 +132,21 @@ describe('DashboardBanner', () => {
       letterSpacing: 2.5,
       marginTop: 2,
     });
+  });
+
+  it('brand block: wordmark and tagline ignore system font scaling and stay on one line', () => {
+    const root = banner();
+    const word = root.findAll(
+      n => (n.type as unknown) === 'Text' && n.props.children?.[0] === 'Shuttl',
+    )[0];
+    const tag = root.findAll(
+      n => (n.type as unknown) === 'Text' && n.props.children === 'PLAY TOGETHER',
+    )[0];
+    for (const t of [word, tag]) {
+      expect(t.props.allowFontScaling).toBe(false);
+      expect(t.props.numberOfLines).toBe(1);
+      expect(t.props.maxFontSizeMultiplier).toBe(1);
+    }
   });
 
   it('brand block: labelled "Shuttlr" and not a touch target (no onPress, pointerEvents none)', () => {

@@ -3,7 +3,7 @@
  * brand-blue, height 208 (plus the status-bar inset), bottom corners radius
  * 32, decorative SVG background (Appendix B).
  *
- * - Left (AD-17 brand block): the Shuttlr app icon (`src/assets/shuttlr-icon.png`)
+ * - Left (AD-17 brand block): the Shuttlr app icon (`src/assets/shuttlr-icon-header.png`, AD-18 variant)
  *   at 52x52 with a 12px radius straight on the blue (no tile), then the
  *   two-tone "Shuttlr" wordmark and the "PLAY TOGETHER" tagline. Not interactive.
  * - Right: bell (44px target, red count badge hidden at zero) and the
@@ -22,7 +22,7 @@ import { BannerBackground } from '../icons/DashboardIcons';
 import { brandBlock, dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
 
-const APP_ICON = require('../../assets/shuttlr-icon.png');
+const APP_ICON = require('../../assets/shuttlr-icon-header.png');
 
 const MAX_BADGE_COUNT = 99;
 
@@ -74,11 +74,21 @@ export default function DashboardBanner({
         >
           <Image testID="banner-app-icon" source={APP_ICON} style={styles.brandIcon} />
           <View style={styles.brandText}>
-            <Text style={styles.wordmark} numberOfLines={1}>
+            <Text
+              style={styles.wordmark}
+              numberOfLines={1}
+              allowFontScaling={false}
+              maxFontSizeMultiplier={1}
+            >
               {brandBlock.wordmarkLead}
               <Text style={styles.wordmarkAccent}>{brandBlock.wordmarkAccent}</Text>
             </Text>
-            <Text style={styles.tagline} numberOfLines={1}>
+            <Text
+              style={styles.tagline}
+              numberOfLines={1}
+              allowFontScaling={false}
+              maxFontSizeMultiplier={1}
+            >
               {brandBlock.tagline}
             </Text>
           </View>
