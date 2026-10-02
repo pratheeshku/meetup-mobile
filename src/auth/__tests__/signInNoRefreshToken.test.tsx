@@ -10,6 +10,7 @@
  * tests fail against the pre-fix code.
  */
 import React from 'react';
+import { Platform } from 'react-native';
 import * as Keychain from 'react-native-keychain';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
@@ -62,6 +63,12 @@ const mount = () =>
   );
 
 const writtenServices = (): string[] => mockSetPassword.mock.calls.map(call => call[2].service);
+
+// Jest's default platform is iOS; these suites exercise the Android-only
+// Google sign-in path (not offered on iOS, DES-MEETUP-ADDENDUM-IOS-App.md §3).
+beforeEach(() => {
+  jest.replaceProperty(Platform, 'OS', 'android');
+});
 
 beforeEach(() => {
   jest.clearAllMocks();

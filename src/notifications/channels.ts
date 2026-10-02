@@ -8,11 +8,16 @@
  * call on every app start (`index.js`). Channels must exist before a
  * notification that references them is displayed (Android 8+).
  */
+import { Platform } from 'react-native';
 import notifee, { AndroidImportance } from 'react-native-notify-kit';
 
 export const PLAN_CHANNEL_ID = 'plan';
 
+/** Channels are an Android concept; a no-op elsewhere. */
 export async function createNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') {
+    return;
+  }
   await notifee.createChannel({
     id: PLAN_CHANNEL_ID,
     name: 'Plans & Updates',

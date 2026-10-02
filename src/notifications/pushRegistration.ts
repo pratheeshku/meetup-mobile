@@ -7,9 +7,9 @@
  * returned function on sign-out / unmount, so nothing here ever runs while
  * signed out. One call = one "session":
  *
- * - Permission (API 33+): a short rationale `Alert` is shown ONCE per install
+ * - Permission (Android API 33+, and iOS): a short rationale `Alert` is shown ONCE per install
  *   — remembered in AsyncStorage before it is shown — followed by the system
- *   `POST_NOTIFICATIONS` prompt. After that, a denial is never re-prompted
+ *   permission prompt (`POST_NOTIFICATIONS` on Android). After that, a denial is never re-prompted
  *   (no nagging). Below API 33 there is no runtime permission and no
  *   rationale. If the "shown" flag cannot be read or written we fail closed
  *   and do not prompt.
@@ -44,7 +44,7 @@ function showRationale(): Promise<void> {
     Alert.alert(
       'Stay up to date',
       'Meetup sends notifications about event invites, changes, cancellations and waitlist ' +
-        'updates. Next, Android will ask whether to allow them. You can change this any time ' +
+        'updates. Next, your phone will ask whether to allow them. You can change this any time ' +
         'in your phone settings.',
       [{ text: 'Continue', onPress: () => resolve() }],
       // No outside-tap / back dismissal: the promise must resolve via the button.

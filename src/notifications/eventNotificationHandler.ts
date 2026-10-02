@@ -75,6 +75,7 @@ import notifee, { AndroidStyle, EventType } from 'react-native-notify-kit';
 import type { Event, Notification } from 'react-native-notify-kit';
 
 import { PLAN_CHANNEL_ID } from './channels';
+import { platformNotificationOptions } from './platformOptions';
 import {
   navigateToNotificationTarget,
   resolveNotificationTarget,
@@ -122,6 +123,7 @@ export async function displayEventNotification(data: Record<string, string>): Pr
     title: data.title,
     body: data.body,
     data,
+    ...platformNotificationOptions(),
     android: {
       channelId: PLAN_CHANNEL_ID,
       // BigText so a multi-line body (`\n`) is shown in full when expanded.

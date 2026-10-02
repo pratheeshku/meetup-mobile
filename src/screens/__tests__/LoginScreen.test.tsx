@@ -5,7 +5,7 @@
  * forgot password link, success message, and touch targets.
  */
 import React from 'react';
-import { StyleSheet, TextInput } from 'react-native';
+import { Platform, StyleSheet, TextInput } from 'react-native';
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
 
 import { GoogleSignInCancelledError } from '../../auth/googleAuth';
@@ -57,6 +57,12 @@ const resolveStyle = (node: Instance): Record<string, any> => {
   const evaluated = typeof styleProp === 'function' ? styleProp({ pressed: false }) : styleProp;
   return StyleSheet.flatten(evaluated) || {};
 };
+
+// Jest's default platform is iOS; these suites exercise the Android-only
+// Google sign-in path (not offered on iOS, DES-MEETUP-ADDENDUM-IOS-App.md §3).
+beforeEach(() => {
+  jest.replaceProperty(Platform, 'OS', 'android');
+});
 
 beforeEach(() => {
   jest.clearAllMocks();

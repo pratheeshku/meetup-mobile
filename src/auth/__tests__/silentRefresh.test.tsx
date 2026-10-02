@@ -9,6 +9,7 @@
  *   401                      -> a cookie existed but was rejected: notice
  */
 import React from 'react';
+import { Platform } from 'react-native';
 import * as Keychain from 'react-native-keychain';
 import ReactTestRenderer from 'react-test-renderer';
 
@@ -55,6 +56,12 @@ function serve(refreshReply: FakeReply, valid = 'fresh'): void {
     return backend.authorizationOf(config) === `Bearer ${valid}` ? { data: USER } : { status: 401 };
   };
 }
+
+// Jest's default platform is iOS; these suites exercise the Android-only
+// Google sign-in path (not offered on iOS, DES-MEETUP-ADDENDUM-IOS-App.md §3).
+beforeEach(() => {
+  jest.replaceProperty(Platform, 'OS', 'android');
+});
 
 beforeEach(() => {
   jest.clearAllMocks();

@@ -44,6 +44,7 @@ import { saveTokens, clearTokens } from '../storage/tokens';
 import { withCorrelationId } from '../api/correlationId';
 import { deregisterDeviceToken } from '../notifications/fcm';
 import { describeError } from '../utils/logSafeError';
+import { isGoogleSignInAvailable } from './googleSupport';
 import type { AuthResponse } from './types';
 import type { UserProfile } from '../types/user';
 
@@ -82,6 +83,9 @@ export class GoogleSignInCancelledError extends Error {
  * Google ID token for platform tokens, store them, return the profile.
  */
 export async function signIn(): Promise<UserProfile> {
+  if (!isGoogleSignInAvailable()) {
+    throw new Error('Google sign-in is not available on this platform');
+  }
   configureGoogleSignIn();
 
   // Recommended precondition for the classic GoogleSignInClient flow on

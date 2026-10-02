@@ -3,7 +3,10 @@
 // don't need a native module bridge; behavioural tests for
 // src/storage/tokens.ts should mock this module per-suite instead.
 jest.mock('react-native-keychain', () => ({
-  ACCESSIBLE: { WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'AccessibleWhenUnlockedThisDeviceOnly' },
+  ACCESSIBLE: {
+    WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'AccessibleWhenUnlockedThisDeviceOnly',
+    AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 'AccessibleAfterFirstUnlockThisDeviceOnly',
+  },
   STORAGE_TYPE: { AES_CBC: 'KeystoreAESCBC', AES_GCM_NO_AUTH: 'KeystoreAESGCM_NoAuth' },
   setGenericPassword: jest.fn(async () => ({ service: 'mock', storage: 'KeystoreAESGCM_NoAuth' })),
   getGenericPassword: jest.fn(async () => false),
@@ -59,6 +62,7 @@ jest.mock('@react-native-firebase/app', () => ({
 jest.mock('@react-native-firebase/messaging', () => ({
   getMessaging: jest.fn(() => ({})),
   requestPermission: jest.fn(async () => 1),
+  hasPermission: jest.fn(async () => 1),
   AuthorizationStatus: { NOT_DETERMINED: -1, DENIED: 0, AUTHORIZED: 1, PROVISIONAL: 2 },
   getToken: jest.fn(async () => 'mock-fcm-token'),
   onTokenRefresh: jest.fn(() => () => {}),

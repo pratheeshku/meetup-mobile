@@ -4,6 +4,7 @@
  * method) and stops when it ends — so it can never run while signed out.
  */
 import React from 'react';
+import { Platform } from 'react-native';
 
 import { apiClient, refreshAccessToken, SessionEndedError } from '../../api/client';
 import { authEvents } from '../../api/authEvents';
@@ -61,6 +62,12 @@ const mount = () =>
   );
 
 let stop: jest.Mock;
+
+// Jest's default platform is iOS; these suites exercise the Android-only
+// Google sign-in path (not offered on iOS, DES-MEETUP-ADDENDUM-IOS-App.md §3).
+beforeEach(() => {
+  jest.replaceProperty(Platform, 'OS', 'android');
+});
 
 beforeEach(() => {
   jest.clearAllMocks();

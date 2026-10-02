@@ -44,6 +44,7 @@ android/key.properties
 *.pfx
 /keys/
 android/app/google-services.json
+**/GoogleService-Info.plist
 *.env
 .env
 .env.*

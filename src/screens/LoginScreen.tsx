@@ -21,6 +21,7 @@ import type { AxiosError } from 'axios';
 
 import { useAuth } from '../auth/AuthContext';
 import { GoogleSignInCancelledError } from '../auth/googleAuth';
+import { isGoogleSignInAvailable } from '../auth/googleSupport';
 import { SESSION_EXPIRED_MESSAGE } from '../auth/messages';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
@@ -147,13 +148,15 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
       {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
       {sessionExpired ? <Text style={styles.notice}>{SESSION_EXPIRED_MESSAGE}</Text> : null}
 
-      <GoogleSigninButton
-        size={GoogleSigninButton.Size.Wide}
-        color={GoogleSigninButton.Color.Dark}
-        style={styles.googleButton}
-        disabled={isSubmitting}
-        onPress={handleGoogleSignIn}
-      />
+      {isGoogleSignInAvailable() ? (
+        <GoogleSigninButton
+          size={GoogleSigninButton.Size.Wide}
+          color={GoogleSigninButton.Color.Dark}
+          style={styles.googleButton}
+          disabled={isSubmitting}
+          onPress={handleGoogleSignIn}
+        />
+      ) : null}
 
       <TextField
         style={styles.input}

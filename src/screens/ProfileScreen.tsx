@@ -228,6 +228,8 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         width: 500,
         height: 500,
         compressImageQuality: 0.8,
+        // iOS only (ignored on Android): HEIC must never reach the backend.
+        forceJpg: true,
         cropperToolbarTitle: 'Edit Photo',
         hideBottomControls: false,
         enableRotationGesture: true,
