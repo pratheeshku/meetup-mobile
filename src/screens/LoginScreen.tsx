@@ -25,8 +25,10 @@ import { isGoogleSignInAvailable } from '../auth/googleSupport';
 import { SESSION_EXPIRED_MESSAGE } from '../auth/messages';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import { useFieldChain } from '../hooks/useFieldChain';
 import { colors, spacing, typography } from '../theme/tokens';
 import {
   isNetworkError,
@@ -55,6 +57,8 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
       setEmail(route.params.email);
     }
   }, [route?.params?.email]);
+
+  const chain = useFieldChain(['email', 'password']);
 
   const handleGoogleSignIn = async (): Promise<void> => {
     setError(null);
@@ -90,6 +94,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
       setError('Enter your email and password.');
+      chain.focus(trimmedEmail ? 'password' : 'email');
       return;
     }
 
@@ -142,7 +147,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
   const successMessage = route?.params?.successMessage;
 
   return (
-    <View style={styles.container}>
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Text style={styles.title}>Sign In</Text>
 
       {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
@@ -160,6 +165,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
 
       <TextField
         style={styles.input}
+        {...chain.props('email')}
         placeholder="Email"
         autoCapitalize="none"
         autoComplete="email"
@@ -170,6 +176,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
       />
       <TextField
         style={styles.input}
+        {...chain.props('password')}
         placeholder="Password"
         secureTextEntry
         autoComplete="password"
@@ -214,12 +221,12 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
         disabled={isSubmitting}
         style={styles.link}
       />
-    </View>
+    </KeyboardAwareScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  container: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   title: {
     ...typography.h1,
     color: colors.textPrimary,

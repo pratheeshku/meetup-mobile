@@ -22,8 +22,10 @@ import { GoogleSignInCancelledError } from '../auth/googleAuth';
 import { requestPasswordReset } from '../auth/emailAuth';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import { useFieldChain } from '../hooks/useFieldChain';
 import { colors, spacing, typography } from '../theme/tokens';
 import {
   isNetworkError,
@@ -54,6 +56,8 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
   const [googleError, setGoogleError] = useState<string | null>(null);
 
+  const chain = useFieldChain(['email']);
+
   const handleSubmit = async (): Promise<void> => {
     setInlineError(null);
     setRetryError(null);
@@ -62,6 +66,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
       setInlineError('Enter your email.');
+      chain.focus('email');
       return;
     }
 
@@ -123,7 +128,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Text style={styles.title}>Forgot Password</Text>
 
       {submitted ? (
@@ -178,6 +183,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
 
           <TextField
             style={styles.input}
+            {...chain.props('email')}
             placeholder="Email"
             autoCapitalize="none"
             autoComplete="email"
@@ -212,12 +218,12 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
           />
         </>
       )}
-    </View>
+    </KeyboardAwareScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  container: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   title: {
     ...typography.h1,
     color: colors.textPrimary,

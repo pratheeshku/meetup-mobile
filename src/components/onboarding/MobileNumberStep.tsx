@@ -6,11 +6,12 @@
  * The number is never logged.
  */
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import type { MobileNumberConfig } from '../../hooks/useMobileNumberConfig';
 import { useMobileNumberSave } from '../../hooks/useMobileNumberSave';
 import { spacing } from '../../theme/tokens';
+import KeyboardAwareScreen from '../KeyboardAwareScreen';
 import MobileNumberInput from '../MobileNumberInput';
 import type { MobileNumberChange } from '../MobileNumberInput';
 import StepFooter from './StepFooter';
@@ -43,7 +44,7 @@ export default function MobileNumberStep({
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <MobileNumberInput
         countries={config.countries}
         consentText={config.consent.text}
@@ -61,7 +62,7 @@ export default function MobileNumberStep({
         error={saver.error}
         saveLabel={saver.needsReconfirm ? 'Confirm and save' : 'Save'}
       />
-    </ScrollView>
+    </KeyboardAwareScreen>
   );
 }
 

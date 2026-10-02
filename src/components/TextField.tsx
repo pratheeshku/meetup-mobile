@@ -9,10 +9,11 @@
  * invisible on this app's light surfaces. Centralising the explicit
  * text/placeholder colours here means no screen can forget them.
  */
-import React, { useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { StyleSheet, TextInput } from 'react-native';
 import type { TextInputProps } from 'react-native';
 
+import { useKeyboardAwareScroll } from './KeyboardAwareScreen';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 
 // Derived from `TextInputProps` so the handler signatures track whatever the
@@ -20,21 +21,38 @@ import { borderWidth, colors, radius, sizes, spacing, typography } from '../them
 type FocusHandler = NonNullable<TextInputProps['onFocus']>;
 type BlurHandler = NonNullable<TextInputProps['onBlur']>;
 
-export default function TextField({
-  style,
-  onFocus,
-  onBlur,
-  ...rest
-}: TextInputProps): React.JSX.Element {
+type ContentSizeHandler = NonNullable<TextInputProps['onContentSizeChange']>;
+
+/**
+ * Inside a `KeyboardAwareScreen` a focused field scrolls itself above the
+ * keyboard, and a focused multiline field keeps doing so as it grows. The
+ * forwarded ref is the underlying `TextInput` (for focus chains).
+ */
+const TextField = forwardRef<TextInput, TextInputProps>(function TextFieldInner(
+  { style, onFocus, onBlur, onContentSizeChange, ...rest },
+  forwardedRef,
+): React.JSX.Element {
   const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const keyboardAware = useKeyboardAwareScroll();
+
+  useImperativeHandle(forwardedRef, () => inputRef.current as TextInput);
 
   const handleFocus: FocusHandler = event => {
     setIsFocused(true);
+    keyboardAware?.scrollIntoView(inputRef.current);
     onFocus?.(event);
   };
   const handleBlur: BlurHandler = event => {
     setIsFocused(false);
+    keyboardAware?.clearFocus(inputRef.current);
     onBlur?.(event);
+  };
+  const handleContentSizeChange: ContentSizeHandler = event => {
+    if (isFocused) {
+      keyboardAware?.scrollIntoView(inputRef.current);
+    }
+    onContentSizeChange?.(event);
   };
 
   return (
@@ -42,12 +60,16 @@ export default function TextField({
       placeholderTextColor={colors.textSecondary}
       selectionColor={colors.primary}
       {...rest}
+      ref={inputRef}
       onFocus={handleFocus}
       onBlur={handleBlur}
+      onContentSizeChange={handleContentSizeChange}
       style={[styles.input, isFocused ? styles.focused : null, style]}
     />
   );
-}
+});
+
+export default TextField;
 
 const styles = StyleSheet.create({
   input: {

@@ -487,20 +487,21 @@ describe('CreateGameScreen — keyboard avoidance and date/time picker integrati
     expect(kav.props.behavior).toBe('padding');
   });
 
-  // Regression test: this app ships Android only (CLAUDE.md), and the
-  // wrapper previously set `behavior={Platform.OS === 'ios' ? 'padding' :
-  // undefined}` — a no-op KeyboardAvoidingView on the one platform this
-  // app actually ships to, so a focused field at the bottom of the form
-  // (e.g. Description) stayed hidden behind the on-screen keyboard. The
-  // previous test above never caught this because it only ever asserted
-  // the iOS branch.
-  it('wraps the form in a KeyboardAvoidingView with height behavior on Android (the shipped platform)', async () => {
+  // Regression test (rewritten for the shared KeyboardAwareScreen): the
+  // wrapper once was a no-op on Android, so a focused field at the bottom of
+  // the form (e.g. Description) stayed hidden behind the keyboard. Android
+  // keyboard handling now lives in KeyboardAwareScreen (measured padding, not a
+  // KeyboardAvoidingView — edge-to-edge is forced at targetSdk 36, which makes
+  // `adjustResize`/`height` unreliable), so assert that it is in place: no
+  // KeyboardAvoidingView, and the form's fields sit in the persisted-taps scroll view.
+  it('handles the keyboard on Android through KeyboardAwareScreen (no KeyboardAvoidingView behavior prop)', async () => {
     Platform.OS = 'android';
     const root = await mount();
-    const kav = root.find(n => n.props.behavior === 'height');
-    expect(kav).toBeDefined();
-    expect(kav.props.behavior).toBe('height');
-    expect(() => root.find(n => n.props.behavior === 'padding')).toThrow();
+    expect(root.findAll(n => n.props.behavior === 'height')).toHaveLength(0);
+    expect(root.findAll(n => n.props.behavior === 'padding')).toHaveLength(0);
+    const scroll = root.findAll(n => n.props.keyboardShouldPersistTaps === 'handled')[0];
+    expect(scroll).toBeDefined();
+    expect(scroll.findAll(n => (n.type as unknown) === 'TextInput').length).toBeGreaterThan(0);
   });
 
   it('Casual Game: manual picker interaction produces the correct UTC ISO 8601 starts_at timestamp', async () => {

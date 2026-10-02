@@ -25,7 +25,7 @@
  * breakdown and every Proposed Assumption below.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -42,7 +42,9 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
 import type { ChipOption } from '../components/OptionChips';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
+import { useFieldChain } from '../hooks/useFieldChain';
 import { colors, getSportColor, spacing, typography } from '../theme/tokens';
 import type { CreateEventInput, EventSkillLevel, EventVisibility } from '../types/event';
 import type { Group } from '../types/group';
@@ -160,17 +162,33 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     );
   }, [loadSports]);
 
+  const chain = useFieldChain([
+    'gTitle',
+    'gCapacity',
+    'gVenueName',
+    'gVenueAddress',
+    'gCost',
+    'gCurrency',
+    'gDescription',
+    'tTitle',
+    'tDescription',
+    'tCapacity',
+    'tVenueName',
+  ]);
+
   const handleSubmitCasual = async (): Promise<void> => {
     setError(null);
 
     const trimmedTitle = gTitle.trim();
     if (!trimmedTitle) {
       setError('Enter a game title.');
+      chain.focus('gTitle');
       return;
     }
     const capacityNumber = Number(gCapacity.trim());
     if (!/^\d+$/.test(gCapacity.trim()) || capacityNumber < 2 || capacityNumber > 200) {
       setError('Capacity must be a whole number between 2 and 200.');
+      chain.focus('gCapacity');
       return;
     }
     const startsAtIso = parseLocalDateTime(gStart);
@@ -188,6 +206,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       const parsedCost = parseFloat(gCost.trim());
       if (isNaN(parsedCost) || parsedCost < 0) {
         setError('Estimated cost must be a non-negative number.');
+        chain.focus('gCost');
         return;
       }
       costCents = Math.round(parsedCost * 100);
@@ -197,6 +216,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       const trimmedCurrency = gCurrency.trim().toUpperCase();
       if (trimmedCurrency.length !== 3) {
         setError('Currency code must be 3 letters (e.g. USD, SGD).');
+        chain.focus('gCurrency');
         return;
       }
       currencyCode = trimmedCurrency;
@@ -236,6 +256,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     const trimmedTitle = tTitle.trim();
     if (!trimmedTitle) {
       setError('Enter a tournament title.');
+      chain.focus('tTitle');
       return;
     }
     if (!tSport) {
@@ -249,6 +270,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     const capacityNumber = Number(tCapacity.trim());
     if (!/^\d+$/.test(tCapacity.trim()) || capacityNumber < 2) {
       setError('Capacity must be a whole number of at least 2.');
+      chain.focus('tCapacity');
       return;
     }
     const startsAtIso = parseLocalDate(tStart);
@@ -380,17 +402,14 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   );
 
   return (
-    <KeyboardAvoidingView
-      style={styles.keyboardAvoid}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
         <OptionChips options={MODE_OPTIONS} value={mode} onChange={setMode} disabled={isSubmitting} />
 
       {mode === 'game' ? (
         <>
           <Text style={[styles.label, styles.section]}>Title</Text>
           <TextField
+            {...chain.props('gTitle')}
             style={styles.input}
             placeholder="e.g. Sunday 5-a-side Football"
             value={gTitle}
@@ -427,6 +446,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           <Text style={[styles.label, styles.section]}>Capacity</Text>
           <TextField
+            {...chain.props('gCapacity')}
             style={styles.input}
             keyboardType="number-pad"
             placeholder="e.g. 10"
@@ -459,6 +479,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           <Text style={styles.label}>Venue Name</Text>
           <TextField
+            {...chain.props('gVenueName')}
             style={styles.input}
             placeholder="e.g. Bishan Sports Hall"
             value={gVenueName}
@@ -468,6 +489,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           <Text style={styles.label}>Venue Address</Text>
           <TextField
+            {...chain.props('gVenueAddress')}
             style={styles.input}
             placeholder="e.g. 5 Bishan St 14, Singapore"
             value={gVenueAddress}
@@ -478,6 +500,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           <Text style={[styles.label, styles.section]}>Cost (optional)</Text>
           <View style={styles.costCurrencyRow}>
             <TextField
+              {...chain.props('gCost')}
               style={[styles.input, styles.costField]}
               placeholder="e.g. 15.00"
               accessibilityLabel="Estimated Cost"
@@ -487,6 +510,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               editable={!isSubmitting}
             />
             <TextField
+              {...chain.props('gCurrency')}
               style={[styles.input, styles.currencyField]}
               placeholder="USD"
               accessibilityLabel="Currency"
@@ -500,6 +524,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           <Text style={styles.label}>Description</Text>
           <TextField
+            ref={chain.ref('gDescription')}
             style={[styles.input, styles.multiline]}
             placeholder="Optional description..."
             value={gDescription}
@@ -526,6 +551,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         <>
           <Text style={[styles.label, styles.section]}>Tournament Title</Text>
           <TextField
+            {...chain.props('tTitle')}
             style={styles.input}
             placeholder="e.g. Summer League"
             value={tTitle}
@@ -564,6 +590,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           <Text style={[styles.label, styles.section]}>Description (optional)</Text>
           <TextField
+            ref={chain.ref('tDescription')}
             style={[styles.input, styles.multiline]}
             placeholder="Details about rules, scheduling..."
             value={tDescription}
@@ -597,6 +624,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           <Text style={[styles.label, styles.section]}>Capacity</Text>
           <TextField
+            {...chain.props('tCapacity')}
             style={styles.input}
             keyboardType="number-pad"
             value={tCapacity}
@@ -606,6 +634,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           <Text style={styles.label}>Venue Name</Text>
           <TextField
+            {...chain.props('tVenueName')}
             style={styles.input}
             placeholder="e.g. Sports Hub Court 3"
             value={tVenueName}
@@ -628,13 +657,11 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           />
         </>
       )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboardAvoid: { flex: 1 },
   container: { padding: spacing.lg },
   label: { ...typography.bodyBold, color: colors.textPrimary, marginBottom: spacing.xs },
   section: { marginTop: spacing.md },

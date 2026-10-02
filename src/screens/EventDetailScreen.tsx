@@ -17,7 +17,7 @@
  * seamlessly when active.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
@@ -44,6 +44,7 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import OptionChips, { ChipOption } from '../components/OptionChips';
 import ShareActionSheet from '../components/ShareActionSheet';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import Toast from '../components/Toast';
@@ -55,6 +56,7 @@ import {
   shareGeneric,
   shareToWhatsApp,
 } from '../utils/shareLink';
+import { useFieldChain } from '../hooks/useFieldChain';
 import {
   borderWidth,
   colors,
@@ -279,10 +281,21 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     setCancelReason('');
   };
 
+  const editChain = useFieldChain([
+    'editTitle',
+    'editSport',
+    'editDescription',
+    'editVenueName',
+    'editVenueAddress',
+    'editCapacity',
+  ]);
+  const cancelChain = useFieldChain(['cancelReason']);
+
   const handleConfirmCancel = async (): Promise<void> => {
     const trimmed = cancelReason.trim();
     if (!trimmed) {
       setCancelError('Please provide a reason for cancelling this event.');
+      cancelChain.focus('cancelReason');
       return;
     }
     setCancelError(null);
@@ -442,16 +455,19 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     const trimmedTitle = editTitle.trim();
     if (!trimmedTitle) {
       setEditError('Title cannot be empty.');
+      editChain.focus('editTitle');
       return;
     }
     const trimmedSport = editSport.trim();
     if (!trimmedSport) {
       setEditError('Sport cannot be empty.');
+      editChain.focus('editSport');
       return;
     }
     const cap = parseInt(editCapacity, 10);
     if (isNaN(cap) || cap <= 0) {
       setEditError('Capacity must be a positive number.');
+      editChain.focus('editCapacity');
       return;
     }
     const startIso = parseLocalDateTime(editStartsAt);
@@ -562,8 +578,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const overflowParticipantsCount = Math.max(0, event.participant_count - displayParticipants.length);
 
   return (
-    <KeyboardAvoidingView style={styles.keyboardAvoid} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <View style={styles.keyboardAvoid}>
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       {/* Back button */}
       {navigation?.goBack ? (
         <Pressable
@@ -739,6 +755,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             All participants will be notified. A cancellation reason is required.
           </Text>
           <TextField
+            {...cancelChain.props('cancelReason')}
             placeholder="Reason for cancellation (required)"
             accessibilityLabel="Cancellation Reason"
             value={cancelReason}
@@ -875,6 +892,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           <Text style={styles.fieldLabel}>Title</Text>
           <TextField
+            {...editChain.props('editTitle')}
             placeholder="Event title"
             accessibilityLabel="Event Title"
             value={editTitle}
@@ -886,6 +904,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           <Text style={styles.fieldLabel}>Sport</Text>
           <TextField
+            {...editChain.props('editSport')}
             placeholder="Sport (e.g. badminton)"
             accessibilityLabel="Sport"
             value={editSport}
@@ -907,6 +926,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           <Text style={styles.fieldLabel}>Description</Text>
           <TextField
+            ref={editChain.ref('editDescription')}
             placeholder="Description (optional)"
             accessibilityLabel="Event Description"
             value={editDescription}
@@ -918,6 +938,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           <Text style={styles.fieldLabel}>Venue Name</Text>
           <TextField
+            {...editChain.props('editVenueName')}
             placeholder="e.g. Riverside Courts"
             accessibilityLabel="Venue Name"
             value={editVenueName}
@@ -928,6 +949,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           <Text style={styles.fieldLabel}>Venue Address</Text>
           <TextField
+            {...editChain.props('editVenueAddress')}
             placeholder="e.g. 123 Sports Way"
             accessibilityLabel="Venue Address"
             value={editVenueAddress}
@@ -946,6 +968,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           <Text style={styles.fieldLabel}>Capacity</Text>
           <TextField
+            {...editChain.props('editCapacity')}
             placeholder="Capacity"
             accessibilityLabel="Capacity"
             value={editCapacity}
@@ -1079,7 +1102,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           ) : null}
         </View>
       </Card>
-    </ScrollView>
+    </KeyboardAwareScreen>
 
       <ShareActionSheet
         visible={isShareSheetOpen}
@@ -1091,7 +1114,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       />
 
       <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

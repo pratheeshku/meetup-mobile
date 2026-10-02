@@ -18,7 +18,7 @@
  * No member-invite step on this screen.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
@@ -30,8 +30,10 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
 import type { ChipOption } from '../components/OptionChips';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
 import { getLabel, useLabels } from '../labels/LabelsContext';
+import { useFieldChain } from '../hooks/useFieldChain';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Sport } from '../types/sport';
 import type { TeamVisibility } from '../types/team';
@@ -88,6 +90,9 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
     loadSports();
   }, [loadSports]);
 
+  const groupChain = useFieldChain(['gName', 'gDescription']);
+  const teamChain = useFieldChain(['tName']);
+
   // --- Players Group submit ---
   const handleSubmitGroup = async (): Promise<void> => {
     setError(null);
@@ -95,6 +100,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
     const trimmedName = gName.trim();
     if (!trimmedName) {
       setError('Enter a group name.');
+      groupChain.focus('gName');
       return;
     }
 
@@ -121,6 +127,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
     const trimmedName = tName.trim();
     if (!trimmedName) {
       setError('Enter a team name.');
+      teamChain.focus('tName');
       return;
     }
     if (!tSport) {
@@ -173,7 +180,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
   ];
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <OptionChips options={MODE_OPTIONS} value={mode} onChange={setMode} disabled={isSubmitting} />
 
       {mode === 'group' ? (
@@ -181,6 +188,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
           <Text style={[styles.label, styles.section]}>Name</Text>
           <TextField
             style={styles.input}
+            {...groupChain.props('gName')}
             placeholder="e.g. Sunday Footballers"
             value={gName}
             onChangeText={setGName}
@@ -190,6 +198,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
 
           <Text style={styles.label}>Description (optional)</Text>
           <TextField
+            ref={groupChain.ref('gDescription')}
             style={[styles.input, styles.multiline]}
             placeholder="What is this group about?"
             value={gDescription}
@@ -212,6 +221,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
           <Text style={[styles.label, styles.section]}>Team Name</Text>
           <TextField
             style={styles.input}
+            {...teamChain.props('tName')}
             placeholder="e.g. Real Madrid FC"
             value={tName}
             onChangeText={setTName}
@@ -243,7 +253,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
           <Button label="Create Team" onPress={handleSubmitTeam} loading={isSubmitting} />
         </>
       )}
-    </ScrollView>
+    </KeyboardAwareScreen>
   );
 }
 

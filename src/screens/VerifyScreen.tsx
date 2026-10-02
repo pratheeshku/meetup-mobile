@@ -12,14 +12,16 @@
  *   "Failed to resend verification code. Please try again." on resend.
  */
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { resendVerification, verifyEmail } from '../auth/emailAuth';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import { useFieldChain } from '../hooks/useFieldChain';
 import { colors, spacing, typography } from '../theme/tokens';
 import {
   isNetworkError,
@@ -53,6 +55,8 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     return () => clearInterval(timer);
   }, [cooldown]);
 
+  const chain = useFieldChain(['code']);
+
   const handleVerify = async (): Promise<void> => {
     setError(null);
     setInfoMessage(null);
@@ -62,6 +66,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     const trimmedCode = code.trim();
     if (!trimmedCode || trimmedCode.length !== 6) {
       setError("That code didn't work. Check it or request a new one.");
+      chain.focus('code');
       return;
     }
 
@@ -122,7 +127,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
   const resendLabel = cooldown > 0 ? `Resend (${cooldown}s)` : 'Resend';
 
   return (
-    <View style={styles.container}>
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Text style={styles.title}>Verify Email</Text>
 
       {explanation ? <Text style={styles.explanation}>{explanation}</Text> : null}
@@ -134,6 +139,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
 
       <TextField
         style={styles.input}
+        {...chain.props('code')}
         placeholder="6-digit code"
         autoCapitalize="none"
         keyboardType="number-pad"
@@ -179,12 +185,12 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
         disabled={isVerifying || isResending}
         style={styles.link}
       />
-    </View>
+    </KeyboardAwareScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  container: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   title: {
     ...typography.h1,
     color: colors.textPrimary,

@@ -24,7 +24,7 @@
  * rejected server-side regardless.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -39,6 +39,7 @@ import {
 import Badge from '../components/Badge';
 import type { BadgeVariant } from '../components/Badge';
 import Button from '../components/Button';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
@@ -336,7 +337,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
   const canLeave = currentUserRole !== 'owner' && currentUserRole !== 'none';
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Card style={styles.infoCard}>
         <Text style={styles.title}>{group.name}</Text>
         <Text style={styles.description}>{group.description}</Text>
@@ -538,7 +539,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
       />
 
       <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
-    </ScrollView>
+    </KeyboardAwareScreen>
   );
 }
 

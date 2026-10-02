@@ -31,7 +31,6 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -60,6 +59,7 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
 import type { ChipOption } from '../components/OptionChips';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import appConfig from '../../config/appConfig.json';
@@ -70,6 +70,7 @@ import { toSupportLink } from '../utils/supportLink';
 import MobileNumberCard from '../components/MobileNumberCard';
 import { getDisplayName } from '../utils/displayName';
 import { useSportDisplayName } from '../utils/labels';
+import { useFieldChain } from '../hooks/useFieldChain';
 import { borderWidth, colors, radius, shadows, sizes, spacing, typography } from '../theme/tokens';
 import type { SkillLevelValue, UserProfile } from '../types/user';
 import type { Sport } from '../types/sport';
@@ -343,9 +344,13 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
     setDisplayNameError(null);
   };
 
+  const nameChain = useFieldChain(['displayName']);
+  const deletionChain = useFieldChain(['confirmationCode']);
+
   const handleSaveDisplayName = async (): Promise<void> => {
     if (!displayNameDraft.trim()) {
       setDisplayNameError('Display name cannot be empty.');
+      nameChain.focus('displayName');
       return;
     }
     setDisplayNameError(null);
@@ -484,6 +489,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const handleConfirmDeletion = async (): Promise<void> => {
     if (!confirmationCodeDraft.trim()) {
       setDeletionError('Enter the confirmation code.');
+      deletionChain.focus('confirmationCode');
       return;
     }
     setDeletionError(null);
@@ -520,7 +526,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   }));
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Card style={styles.header}>
         <Pressable
           onPress={handleAvatarPress}
@@ -579,6 +585,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           <View style={styles.editRow}>
             <TextField
               style={styles.input}
+              {...nameChain.props('displayName')}
               value={displayNameDraft}
               onChangeText={setDisplayNameDraft}
               editable={!isSavingDisplayName}
@@ -762,6 +769,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
             <TextField
               style={styles.input}
               placeholder="Confirmation code"
+              {...deletionChain.props('confirmationCode')}
               value={confirmationCodeDraft}
               onChangeText={setConfirmationCodeDraft}
               editable={!isConfirmingDeletion}
@@ -794,7 +802,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           />
         )}
       </View>
-    </ScrollView>
+    </KeyboardAwareScreen>
   );
 }
 

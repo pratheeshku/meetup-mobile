@@ -1024,21 +1024,20 @@ describe('keyboard avoidance (same class of bug as Create Game — the Edit Even
     expect(kav.props.behavior).toBe('padding');
   });
 
-  it('wraps the screen in a KeyboardAvoidingView with height behavior on Android (the shipped platform)', async () => {
+  it('handles the keyboard on Android through KeyboardAwareScreen (no KeyboardAvoidingView behavior prop)', async () => {
     Platform.OS = 'android';
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    const kav = root.find(n => n.props.behavior === 'height');
-    expect(kav).toBeDefined();
-    expect(kav.props.behavior).toBe('height');
-    expect(() => root.find(n => n.props.behavior === 'padding')).toThrow();
+    expect(root.findAll(n => n.props.behavior === 'height')).toHaveLength(0);
+    expect(root.findAll(n => n.props.behavior === 'padding')).toHaveLength(0);
+    expect(root.findAll(n => n.props.keyboardShouldPersistTaps === 'handled').length).toBeGreaterThan(0);
   });
 
-  it('the Edit Event form (with its TextInputs) renders inside that KeyboardAvoidingView', async () => {
+  it('the Edit Event form (with its TextInputs) renders inside the keyboard-aware scroll view', async () => {
     Platform.OS = 'android';
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     act(() => pressableLabelled(root, 'Edit Game').props.onPress());
-    const kav = root.find(n => n.props.behavior === 'height');
-    expect(kav.findAll(n => (n.type as unknown) === 'TextInput').length).toBeGreaterThan(0);
+    const scroll = root.findAll(n => n.props.keyboardShouldPersistTaps === 'handled')[0];
+    expect(scroll.findAll(n => (n.type as unknown) === 'TextInput').length).toBeGreaterThan(0);
   });
 });
 

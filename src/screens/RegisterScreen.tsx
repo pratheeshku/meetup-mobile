@@ -21,8 +21,10 @@ import appConfig from '../../config/appConfig.json';
 import { signup } from '../auth/emailAuth';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import { useFieldChain } from '../hooks/useFieldChain';
 import { colors, spacing, typography } from '../theme/tokens';
 import {
   isNetworkError,
@@ -52,6 +54,8 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
 
   const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
 
+  const chain = useFieldChain(['nickname', 'displayName', 'email', 'password']);
+
   const handleRegister = async (): Promise<void> => {
     setError(null);
     setIsEmailRegistered(false);
@@ -64,11 +68,15 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
 
     if (!trimmedNickname || !trimmedDisplayName || !trimmedEmail || !password) {
       setError('Fill in every field.');
+      chain.focus(
+        !trimmedNickname ? 'nickname' : !trimmedDisplayName ? 'displayName' : !trimmedEmail ? 'email' : 'password',
+      );
       return;
     }
 
     if (password.length < 8) {
       setError('Password must be at least 8 characters long.');
+      chain.focus('password');
       return;
     }
 
@@ -127,11 +135,12 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Text style={styles.title}>Register</Text>
 
       <TextField
         style={styles.input}
+        {...chain.props('nickname')}
         placeholder="Nickname"
         autoCapitalize="none"
         value={nickname}
@@ -140,6 +149,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       />
       <TextField
         style={styles.input}
+        {...chain.props('displayName')}
         placeholder="Display Name"
         value={displayName}
         onChangeText={setDisplayName}
@@ -147,6 +157,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       />
       <TextField
         style={styles.input}
+        {...chain.props('email')}
         placeholder="Email"
         autoCapitalize="none"
         autoComplete="email"
@@ -159,6 +170,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       <View style={styles.passwordRow}>
         <TextField
           style={styles.passwordField}
+          {...chain.props('password')}
           placeholder="Password"
           secureTextEntry={!showPassword}
           autoComplete="new-password"
@@ -223,12 +235,12 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
           style={styles.link}
         />
       ) : null}
-    </View>
+    </KeyboardAwareScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: spacing.lg },
+  container: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
   title: {
     ...typography.h1,
     color: colors.textPrimary,
