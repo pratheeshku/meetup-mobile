@@ -1,0 +1,135 @@
+# iOS compile check (DES-MEETUP-ADDENDUM-IOS-App.md section 5).
+#
+# Builds the app for the iOS Simulator without code signing, to catch native
+# build breaks early. Uses NO repository secrets: Firebase's GoogleService-Info.plist
+# is replaced by a clearly fake placeholder generated at run time and never committed.
+#
+# Triggers are limited because macOS runner minutes are expensive on private repositories.
+name: iOS CI (compile check)
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_frameworks:
+        description: "CocoaPods linkage: 'none' (Podfile default), 'static' or 'dynamic' (sets USE_FRAMEWORKS)"
+        type: choice
+        options: [none, static, dynamic]
+        default: none
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'config/appConfig.json'
+      - 'scripts/ios-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Simulator build (Debug, unsigned)
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
+      USE_FRAMEWORKS_INPUT: ${{ inputs.use_frameworks || 'none' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # react-native 0.86.3 needs Node ^20.19.4 || ^22.13.0 || ^24.3.0 || >=25 (package.json engines: >=20.19.4).
+      - name: Set scratch paths
+        run: |
+          set -euo pipefail
+          echo "XCODEBUILD_LOG=$RUNNER_TEMP/xcodebuild.log" >> "$GITHUB_ENV"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Set up Ruby and the Gemfile (CocoaPods, xcodeproj)
+        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Install JavaScript dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: Read workspace, scheme and bundle identifier from the Xcode project
+        run: |
+          set -euo pipefail
+          bundle exec ruby scripts/ios-project-info.rb | tee -a "$GITHUB_ENV"
+
+      - name: Write the placeholder GoogleService-Info.plist (compile-only)
+        run: |
+          set -euo pipefail
+          bundle exec ruby scripts/ios-write-dummy-google-service-plist.rb
+
+      - name: Reference the plist as an app resource
+        run: |
+          set -euo pipefail
+          bundle exec ruby scripts/ios-add-google-service-plist.rb
+
+      - name: Cache Pods
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ios/Pods
+          key: pods-${{ runner.os }}-${{ inputs.use_frameworks || 'none' }}-${{ hashFiles('ios/Podfile', 'ios/Podfile.lock', 'package-lock.json') }}
+          restore-keys: |
+            pods-${{ runner.os }}-${{ inputs.use_frameworks || 'none' }}-
+
+      - name: Install Pods
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          if [ "$USE_FRAMEWORKS_INPUT" != "none" ]; then
+            export USE_FRAMEWORKS="$USE_FRAMEWORKS_INPUT"
+          fi
+          bundle exec pod install
+
+      - name: Build for the iOS Simulator (Debug, no code signing)
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -workspace "ios/$IOS_WORKSPACE" \
+            -scheme "$IOS_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            > "$XCODEBUILD_LOG" 2>&1 || {
+              status=$?
+              echo "xcodebuild failed (exit $status). First errors:"
+              grep -E "error:" "$XCODEBUILD_LOG" | head -n 40 || true
+              exit "$status"
+            }
+          echo "Build succeeded."
+
+      - name: Upload the full xcodebuild log
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xcodebuild-log
+          path: ${{ runner.temp }}/xcodebuild.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Remove the placeholder plist
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -n "${IOS_PLIST_PATH:-}" ]; then rm -f "$IOS_PLIST_PATH"; fi

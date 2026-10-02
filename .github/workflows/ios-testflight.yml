@@ -1,0 +1,270 @@
+# Build the iOS app and upload it to TestFlight (DES-MEETUP-ADDENDUM-IOS-App.md section 5).
+#
+# Manual only (workflow_dispatch). The job is bound to the GitHub Environment
+# "testflight"; add required reviewers there if each upload should need approval.
+#
+# SECRETS (names are fixed; define them as secrets of the "testflight" Environment):
+#   IOS_GOOGLE_SERVICE_INFO_PLIST_B64  base64 of the real GoogleService-Info.plist
+#   ASC_API_KEY_ID                     App Store Connect API key ID
+#   ASC_API_ISSUER_ID                  App Store Connect API issuer ID
+#   ASC_API_KEY_P8_B64                 base64 of the AuthKey_<id>.p8 file
+#   APPLE_TEAM_ID                      Apple Developer Team ID
+#
+# Version, build number and display name come from config/appConfig.json
+# (ios.marketingVersion, ios.buildNumber, displayName). App Store Connect rejects
+# a build number it has already seen for the same version: raise ios.buildNumber
+# for every upload (and the matching defaults in the Xcode project, which a test
+# keeps in sync).
+#
+# Signing is Xcode automatic and cloud-managed through the App Store Connect API
+# key; no certificate or provisioning-profile files are used.
+#
+# Xcode: Apple requires uploads to be built with Xcode 26 or later (iOS 26 SDK) since
+# 2026-04-28 (https://developer.apple.com/news/upcoming-requirements/). The newest
+# non-beta Xcode installed on the runner is selected and checked against that minimum.
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      use_frameworks:
+        description: "CocoaPods linkage: 'none' (Podfile default), 'static' or 'dynamic' (sets USE_FRAMEWORKS)"
+        type: choice
+        options: [none, static, dynamic]
+        default: none
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Archive and upload to TestFlight
+    runs-on: macos-26
+    environment: testflight
+    timeout-minutes: 90
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
+      USE_FRAMEWORKS_INPUT: ${{ inputs.use_frameworks || 'none' }}
+      MIN_XCODE_MAJOR: '26' # Apple's current upload requirement, see header
+    steps:
+      - name: Fail fast if a secret is missing
+        env:
+          IOS_GOOGLE_SERVICE_INFO_PLIST_B64: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST_B64 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+          ASC_API_KEY_P8_B64: ${{ secrets.ASC_API_KEY_P8_B64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in IOS_GOOGLE_SERVICE_INFO_PLIST_B64 ASC_API_KEY_ID ASC_API_ISSUER_ID ASC_API_KEY_P8_B64 APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is empty or not defined in the 'testflight' Environment."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set scratch paths
+        run: |
+          set -euo pipefail
+          {
+            echo "ASC_KEY_PATH=$RUNNER_TEMP/asc-api-key.p8"
+            echo "EXPORT_OPTIONS_PATH=$RUNNER_TEMP/ExportOptions.plist"
+            echo "ARCHIVE_PATH=$RUNNER_TEMP/app.xcarchive"
+            echo "EXPORT_PATH=$RUNNER_TEMP/export"
+            echo "XCODEBUILD_LOG=$RUNNER_TEMP/xcodebuild.log"
+          } >> "$GITHUB_ENV"
+
+      # react-native 0.86.3 needs Node ^20.19.4 || ^22.13.0 || ^24.3.0 || >=25 (package.json engines: >=20.19.4).
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Set up Ruby and the Gemfile (CocoaPods, xcodeproj)
+        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          xcode_app="$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)"
+          if [ -z "$xcode_app" ]; then
+            echo "::error::No non-beta Xcode found in /Applications on this runner image."
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode_app/Contents/Developer"
+          xcodebuild -version
+          major="$(xcodebuild -version | awk '/^Xcode/ {split($2, v, "."); print v[1]}')"
+          if [ "$major" -lt "$MIN_XCODE_MAJOR" ]; then
+            echo "::error::Xcode $major is older than the Xcode $MIN_XCODE_MAJOR that App Store Connect requires."
+            exit 1
+          fi
+
+      - name: Install JavaScript dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: Read project facts and build settings from the project and config
+        run: |
+          set -euo pipefail
+          bundle exec ruby scripts/ios-project-info.rb >> "$GITHUB_ENV"
+          {
+            echo "APP_MARKETING_VERSION=$(node -p "require('./config/appConfig.json').ios.marketingVersion")"
+            echo "APP_BUILD_NUMBER=$(node -p "require('./config/appConfig.json').ios.buildNumber")"
+            echo "APP_DISPLAY_NAME_CONFIG=$(node -p "require('./config/appConfig.json').displayName")"
+          } >> "$GITHUB_ENV"
+
+      - name: Check the configuration values
+        run: |
+          set -euo pipefail
+          for name in APP_MARKETING_VERSION APP_BUILD_NUMBER APP_DISPLAY_NAME_CONFIG; do
+            if [ -z "${!name}" ]; then
+              echo "::error::config/appConfig.json does not give a value for $name."
+              exit 1
+            fi
+          done
+          echo "Version $APP_MARKETING_VERSION ($APP_BUILD_NUMBER) as '$APP_DISPLAY_NAME_CONFIG'"
+
+      - name: Decode GoogleService-Info.plist and reference it as an app resource
+        env:
+          PLIST_B64: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST_B64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PLIST_B64" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$IOS_PLIST_PATH"
+          plutil -lint "$IOS_PLIST_PATH" > /dev/null
+          for key in API_KEY GCM_SENDER_ID GOOGLE_APP_ID CLIENT_ID; do
+            value="$(/usr/libexec/PlistBuddy -c "Print :$key" "$IOS_PLIST_PATH" 2>/dev/null || true)"
+            if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+          done
+          plist_bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$IOS_PLIST_PATH")"
+          if [ "$plist_bundle_id" != "$IOS_BUNDLE_ID" ]; then
+            echo "::error::GoogleService-Info.plist is for bundle id '$plist_bundle_id', but the Xcode project uses '$IOS_BUNDLE_ID'."
+            exit 1
+          fi
+          bundle exec ruby scripts/ios-add-google-service-plist.rb
+
+      - name: Write the App Store Connect API key
+        env:
+          KEY_B64: ${{ secrets.ASC_API_KEY_P8_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$KEY_B64" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$ASC_KEY_PATH"
+          chmod 600 "$ASC_KEY_PATH"
+          while IFS= read -r line; do
+            if [ -n "$line" ]; then echo "::add-mask::$line"; fi
+          done < "$ASC_KEY_PATH"
+
+      - name: Cache Pods
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ios/Pods
+          key: pods-${{ runner.os }}-${{ inputs.use_frameworks || 'none' }}-${{ hashFiles('ios/Podfile', 'ios/Podfile.lock', 'package-lock.json') }}
+          restore-keys: |
+            pods-${{ runner.os }}-${{ inputs.use_frameworks || 'none' }}-
+
+      - name: Install Pods
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          if [ "$USE_FRAMEWORKS_INPUT" != "none" ]; then
+            export USE_FRAMEWORKS="$USE_FRAMEWORKS_INPUT"
+          fi
+          bundle exec pod install
+
+      - name: Archive (Release, generic iOS device, automatic signing)
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -workspace "ios/$IOS_WORKSPACE" \
+            -scheme "$IOS_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="$APP_MARKETING_VERSION" \
+            CURRENT_PROJECT_VERSION="$APP_BUILD_NUMBER" \
+            APP_DISPLAY_NAME="$APP_DISPLAY_NAME_CONFIG" \
+            > "$XCODEBUILD_LOG" 2>&1 || {
+              status=$?
+              echo "xcodebuild archive failed (exit $status). First errors:"
+              grep -E "error:" "$XCODEBUILD_LOG" | head -n 40 || true
+              exit "$status"
+            }
+
+      - name: Export and upload to App Store Connect
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          cat > "$EXPORT_OPTIONS_PATH" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$EXPORT_OPTIONS_PATH" > /dev/null
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID" \
+            > "$XCODEBUILD_LOG" 2>&1 || {
+              status=$?
+              echo "xcodebuild -exportArchive failed (exit $status). Last lines:"
+              tail -n 60 "$XCODEBUILD_LOG" || true
+              exit "$status"
+            }
+          echo "Upload to App Store Connect finished; the build appears in TestFlight after processing."
+
+      - name: Clean up secrets from the runner
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f "$ASC_KEY_PATH" "$EXPORT_OPTIONS_PATH" "$XCODEBUILD_LOG"
+          if [ -n "${IOS_PLIST_PATH:-}" ]; then rm -f "$IOS_PLIST_PATH"; fi
