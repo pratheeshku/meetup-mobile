@@ -43,7 +43,7 @@ export const dashRadius = {
   sportTile: 20,
   chip: 20,
   bannerBottom: 32,
-  appIconTile: 14,
+  brandIcon: 12,
   rowTile: 14,
   circle: 999,
 } as const;
@@ -52,8 +52,7 @@ export const dashSize = {
   bannerHeight: 208,
   /** How far the next-game card overlaps the banner. */
   nextGameOverlap: 40,
-  appIconTile: 46,
-  appIconImage: 34,
+  brandIcon: 52,
   avatar: 48,
   avatarRing: 2,
   touchTarget: 44,
@@ -65,4 +64,18 @@ export const dashSize = {
   navIcon: 30,
   navLabel: 11,
   chipRing: 2,
+} as const;
+
+/**
+ * Phone brand block (AD-17): the single constant for the wordmark, tagline
+ * and their colours. The wordmark renders as `wordmarkLead` in white followed
+ * by `wordmarkAccent` in `accent`.
+ */
+export const brandBlock = {
+  accessibilityLabel: 'Shuttlr',
+  wordmarkLead: 'Shuttl',
+  wordmarkAccent: 'r',
+  tagline: 'PLAY TOGETHER',
+  accent: '#FDE68A',
+  taglineColor: '#DBEAFE',
 } as const;

@@ -3,8 +3,9 @@
  * brand-blue, height 208 (plus the status-bar inset), bottom corners radius
  * 32, decorative SVG background (Appendix B).
  *
- * - Left: the Shuttlr app icon (`src/assets/shuttlr-icon.png`) at 34x34 in a
- *   46x46 white tile with a 14px radius. No app-name text.
+ * - Left (AD-17 brand block): the Shuttlr app icon (`src/assets/shuttlr-icon.png`)
+ *   at 52x52 with a 12px radius straight on the blue (no tile), then the
+ *   two-tone "Shuttlr" wordmark and the "PLAY TOGETHER" tagline. Not interactive.
  * - Right: bell (44px target, red count badge hidden at zero) and the
  *   profile picture (48px circle, 2px white ring) — the uploaded photo,
  *   falling back to the letter avatar when there is none or it fails to load.
@@ -18,7 +19,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BannerBackground } from '../icons/DashboardIcons';
-import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
+import { brandBlock, dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
 
 const APP_ICON = require('../../assets/shuttlr-icon.png');
@@ -57,21 +58,30 @@ export default function DashboardBanner({
   return (
     <View
       testID="dashboard-banner"
-      style={[styles.banner, { height: dashSize.bannerHeight + insets.top, paddingTop: insets.top }]}
+      style={[styles.banner, { minHeight: dashSize.bannerHeight + insets.top, paddingTop: insets.top }]}
     >
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <BannerBackground width="100%" height="100%" />
       </View>
 
       <View style={styles.topRow}>
-        <View style={styles.iconTile}>
-          <Image
-            testID="banner-app-icon"
-            source={APP_ICON}
-            style={styles.iconImage}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
+        <View
+          style={styles.brand}
+          testID="banner-brand-block"
+          accessible
+          accessibilityLabel={brandBlock.accessibilityLabel}
+          pointerEvents="none"
+        >
+          <Image testID="banner-app-icon" source={APP_ICON} style={styles.brandIcon} />
+          <View style={styles.brandText}>
+            <Text style={styles.wordmark} numberOfLines={1}>
+              {brandBlock.wordmarkLead}
+              <Text style={styles.wordmarkAccent}>{brandBlock.wordmarkAccent}</Text>
+            </Text>
+            <Text style={styles.tagline} numberOfLines={1}>
+              {brandBlock.tagline}
+            </Text>
+          </View>
         </View>
         <View style={styles.topRight}>
           <Pressable
@@ -151,15 +161,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.md,
   },
-  iconTile: {
-    width: dashSize.appIconTile,
-    height: dashSize.appIconTile,
-    borderRadius: dashRadius.appIconTile,
-    backgroundColor: dash.white,
-    alignItems: 'center',
-    justifyContent: 'center',
+  brand: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  brandIcon: {
+    width: dashSize.brandIcon,
+    height: dashSize.brandIcon,
+    borderRadius: dashRadius.brandIcon,
+    overflow: 'hidden',
   },
-  iconImage: { width: dashSize.appIconImage, height: dashSize.appIconImage },
+  brandText: { marginLeft: 12, flexShrink: 1 },
+  wordmark: {
+    color: dash.white,
+    fontSize: 26,
+    lineHeight: 28,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  wordmarkAccent: { color: brandBlock.accent },
+  tagline: {
+    color: brandBlock.taglineColor,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 2.5,
+    marginTop: 2,
+  },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   pressed: { opacity: 0.8 },
   bell: {
