@@ -120,8 +120,91 @@ describe('GroupsScreen GroupCard rendering', () => {
     expect(renderedTexts).toContain('View →');
 
     // Press card button
-    const cardButton = root.findByProps({ accessibilityRole: 'button' });
+    const cardButton = root.findByProps({ accessibilityLabel: 'Weekend Badminton Warriors' });
     act(() => cardButton.props.onPress());
     expect(navigate).toHaveBeenCalledWith('GroupDetail', { groupId: 'grp-42' });
   });
 });
+
+describe('GroupsScreen enhanced landing page and filtering', () => {
+  const MIXED_GROUPS_FIXTURE = {
+    items: [
+      {
+        id: 'grp-owned',
+        name: 'My Owned Club',
+        description: 'I run this group',
+        owner_id: 'user-me',
+        created_at: '2026-01-01T00:00:00Z',
+        current_user_role: 'owner' as const,
+        member_count: 10,
+        owner_nickname: 'selfnick',
+      },
+      {
+        id: 'grp-member',
+        name: 'Joined Casual Runners',
+        description: 'Running with friends',
+        owner_id: 'other-user',
+        created_at: '2026-01-02T00:00:00Z',
+        current_user_role: 'member' as const,
+        member_count: 25,
+        owner_nickname: 'runner_bob',
+      },
+    ],
+    total: 2,
+    page: 1,
+    page_size: 2,
+  };
+
+  it('renders landing page header and filter pills', async () => {
+    mockGetMyGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
+    const root = await renderAsync(element());
+
+    const renderedTexts = texts(root);
+    expect(renderedTexts).toContain('My Groups');
+    expect(renderedTexts).toContain('Communities and clubs you organise and belong to.');
+    expect(renderedTexts).toContain('All');
+    expect(renderedTexts).toContain('Organised');
+    expect(renderedTexts).toContain('Member');
+  });
+
+  it('filters by "Organised" when Organised pill is tapped', async () => {
+    mockGetMyGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
+    const root = await renderAsync(element());
+
+    const organisedPill = root.findByProps({ accessibilityLabel: 'Organised' });
+    act(() => organisedPill.props.onPress());
+
+    const renderedTexts = texts(root);
+    expect(renderedTexts).toContain('My Owned Club');
+    expect(renderedTexts).not.toContain('Joined Casual Runners');
+  });
+
+  it('filters by "Member" when Member pill is tapped', async () => {
+    mockGetMyGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
+    const root = await renderAsync(element());
+
+    const memberPill = root.findByProps({ accessibilityLabel: 'Member' });
+    act(() => memberPill.props.onPress());
+
+    const renderedTexts = texts(root);
+    expect(renderedTexts).not.toContain('My Owned Club');
+    expect(renderedTexts).toContain('Joined Casual Runners');
+  });
+
+  it('shows contextual empty state when filtered category has no items', async () => {
+    mockGetMyGroups.mockResolvedValue({
+      items: [MIXED_GROUPS_FIXTURE.items[0]],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    const root = await renderAsync(element());
+
+    const memberPill = root.findByProps({ accessibilityLabel: 'Member' });
+    act(() => memberPill.props.onPress());
+
+    const renderedTexts = texts(root);
+    expect(renderedTexts).toContain('No member groups.');
+  });
+});
+

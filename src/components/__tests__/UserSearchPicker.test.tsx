@@ -176,3 +176,81 @@ describe('stale-response guard', () => {
     expect(texts(root)).toContain('sam99');
   });
 });
+
+describe('email invite affordance (Decision 22 & 23)', () => {
+  it('shows affordance when query is valid email, results empty, and onSelectEmail provided', async () => {
+    mockSearchUsers.mockResolvedValue([]);
+    const onSelectEmail = jest.fn();
+    const root = render(<UserSearchPicker onSelect={jest.fn()} onSelectEmail={onSelectEmail} />);
+
+    type(root, 'newuser@example.com');
+    await settle();
+
+    expect(texts(root)).not.toContain('No users found.');
+    expect(texts(root)).toContain('✉️ Invite newuser@example.com as new member');
+    expect(texts(root)).toContain('Send an email invitation to join');
+
+    const emailRow = root.find(
+      node =>
+        node.props.accessibilityRole === 'button' &&
+        node.props.accessibilityLabel === 'Invite newuser@example.com as new member',
+    );
+    act(() => emailRow.props.onPress());
+
+    expect(onSelectEmail).toHaveBeenCalledWith('newuser@example.com');
+    expect(searchInput(root).props.value).toBe('');
+  });
+
+  it('uses custom entityLabel when provided', async () => {
+    mockSearchUsers.mockResolvedValue([]);
+    const root = render(
+      <UserSearchPicker
+        onSelect={jest.fn()}
+        onSelectEmail={jest.fn()}
+        entityLabel="participant"
+      />,
+    );
+
+    type(root, 'player@example.com');
+    await settle();
+
+    expect(texts(root)).toContain('✉️ Invite player@example.com as new participant');
+  });
+
+  it('does NOT show affordance when query is an invalid email address', async () => {
+    mockSearchUsers.mockResolvedValue([]);
+    const root = render(<UserSearchPicker onSelect={jest.fn()} onSelectEmail={jest.fn()} />);
+
+    type(root, 'not-an-email');
+    await settle();
+
+    expect(texts(root)).toContain('No users found.');
+    expect(texts(root)).not.toContain('Invite not-an-email as new member');
+  });
+
+  it('does NOT show affordance when search returns matches (Decision 22: email not displayed in results)', async () => {
+    mockSearchUsers.mockResolvedValue([USER]);
+    const root = render(<UserSearchPicker onSelect={jest.fn()} onSelectEmail={jest.fn()} />);
+
+    type(root, 'sam@example.com');
+    await settle();
+
+    // Matching user is shown with nickname and display name
+    expect(texts(root)).toEqual(expect.arrayContaining(['sam99', 'Sam Smith']));
+    // Affordance is NOT shown
+    expect(texts(root)).not.toContain('Invite sam@example.com as new member');
+    // Matched email is NEVER displayed in results (Decision 22)
+    expect(texts(root)).not.toContain('sam@example.com');
+  });
+
+  it('does NOT show affordance when onSelectEmail is not provided even if valid email and 0 results', async () => {
+    mockSearchUsers.mockResolvedValue([]);
+    const root = render(<UserSearchPicker onSelect={jest.fn()} />);
+
+    type(root, 'alone@example.com');
+    await settle();
+
+    expect(texts(root)).toContain('No users found.');
+    expect(texts(root)).not.toContain('Invite alone@example.com as new member');
+  });
+});

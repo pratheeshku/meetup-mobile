@@ -87,9 +87,12 @@ export interface UpdateEventInput {
 export interface EventInvitation {
   id: string;
   event_id: string;
-  invitee_user_id: string;
+  invitee_user_id?: string | null;
+  invited_email?: string | null;
   status: string;
   created_at?: string;
+  invited_at?: string;
+  invited_by_user_id?: string;
 }
 
 export interface EventsListResponse {

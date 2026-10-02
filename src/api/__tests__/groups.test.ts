@@ -67,6 +67,54 @@ describe('getMyGroups', () => {
     expect(result.items[0].member_count).toBeUndefined();
     expect(result.items[0].owner_nickname).toBeUndefined();
   });
+
+  it('enriches items with member_count and owner_nickname when enrich is true', async () => {
+    mockedGet.mockImplementation((url: string) => {
+      if (url === '/settings/groups-owned') {
+        return Promise.resolve({
+          data: [
+            {
+              id: 'g-owned',
+              name: 'My Owned Group',
+              description: 'desc',
+              owner_id: 'u-1',
+              members_can_invite: true,
+              created_at: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+      }
+      if (url === '/settings/groups-member') {
+        return Promise.resolve({ data: [] });
+      }
+      if (url === '/groups/g-owned/members') {
+        return Promise.resolve({
+          data: [
+            {
+              user_id: 'u-1',
+              role: 'owner',
+              joined_at: '2026-01-01T00:00:00Z',
+              user_display_name: 'Sam Owner',
+              user_nickname: 'sam',
+            },
+            {
+              user_id: 'u-2',
+              role: 'member',
+              joined_at: '2026-01-02T00:00:00Z',
+              user_display_name: 'Alex Member',
+              user_nickname: 'alex',
+            },
+          ],
+        });
+      }
+      throw new Error(`unexpected url ${url}`);
+    });
+
+    const result = await getMyGroups({ enrich: true });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].member_count).toBe(2);
+    expect(result.items[0].owner_nickname).toBe('sam');
+  });
 });
 
 describe('getGroup', () => {
@@ -225,6 +273,27 @@ describe('createGroupInvitation', () => {
       token: 'tok-abc',
       invitation_url: 'https://meetups.duckdns.org/groups/invite/tok-abc',
     });
+  });
+
+  it('posts to /groups/invitations with { group_id, invited_email } when invitedEmail provided (Decision 24)', async () => {
+    mockedPost.mockResolvedValueOnce({
+      data: {
+        token: 'tok-email-123',
+        invitation_url: 'https://meetups.duckdns.org/groups/invite/tok-email-123',
+      },
+    });
+
+    const res = await createGroupInvitation('grp-999', {
+      invitedEmail: 'friend@example.com',
+      correlationId: 'cid-email-inv',
+    });
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/groups/invitations',
+      { group_id: 'grp-999', invited_email: 'friend@example.com' },
+      { correlationId: 'cid-email-inv' },
+    );
+    expect(res.token).toBe('tok-email-123');
   });
 
   it('propagates a failed request to the caller', async () => {

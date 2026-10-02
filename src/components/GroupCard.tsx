@@ -17,6 +17,7 @@ import Card from './Card';
 export interface GroupCardProps {
   group: Group;
   onPress: () => void;
+  currentUserId?: string;
 }
 
 export const ROLE_BADGE_LABEL: Record<GroupRole, string> = {
@@ -43,9 +44,17 @@ export function getRolePillColor(role: GroupRole): string {
   return ROLE_PILL_BACKGROUND[variant] ?? colors.textSecondary;
 }
 
-export default function GroupCard({ group, onPress }: GroupCardProps): React.JSX.Element {
-  const roleLabel = ROLE_BADGE_LABEL[group.current_user_role] ?? 'Member';
-  const roleBg = getRolePillColor(group.current_user_role);
+export default function GroupCard({ group, onPress, currentUserId }: GroupCardProps): React.JSX.Element {
+  const isOwner = Boolean(
+    group.current_user_role === 'owner' ||
+      (currentUserId && group.owner_id === currentUserId),
+  );
+
+  const roleLabel = isOwner ? 'Owner' : ROLE_BADGE_LABEL[group.current_user_role] ?? 'Member';
+  const roleBg = getRolePillColor(isOwner ? 'owner' : group.current_user_role);
+
+  const ownerName = isOwner ? 'Self' : group.owner_nickname || 'Organiser';
+  const ownerDisplay = `Owner: ${ownerName}`;
 
   const memberText =
     group.member_count !== undefined
@@ -53,7 +62,7 @@ export default function GroupCard({ group, onPress }: GroupCardProps): React.JSX
       : '';
 
   return (
-    <Card style={styles.card} onPress={onPress}>
+    <Card style={styles.card} onPress={onPress} accessibilityLabel={group.name}>
       {/* Row 1: Role pill */}
       <View style={styles.topRow}>
         <View style={[styles.rolePill, { backgroundColor: roleBg }]}>
@@ -66,16 +75,20 @@ export default function GroupCard({ group, onPress }: GroupCardProps): React.JSX
         {group.name}
       </Text>
 
-      {/* Row 3: Description (1 line, textMuted; if empty, fall back to blank) */}
+      {/* Row 3: Description (up to 2 lines, textMuted; if empty, fall back to blank) */}
       {group.description ? (
-        <Text style={styles.description} numberOfLines={1}>
+        <Text style={styles.description} numberOfLines={2}>
           {group.description}
         </Text>
       ) : null}
 
-      {/* Row 4: Member count & Action link */}
+      {/* Row 4: Member count & Owner on left, Action link on right */}
       <View style={styles.bottomRow}>
-        <Text style={styles.memberCount}>{memberText}</Text>
+        <View style={styles.metaContainer}>
+          {memberText ? <Text style={styles.memberCount}>{memberText}</Text> : null}
+          {memberText ? <Text style={styles.metaDot}> · </Text> : null}
+          <Text style={styles.ownerText}>{ownerDisplay}</Text>
+        </View>
         <Text style={styles.actionLink}>View →</Text>
       </View>
     </Card>
@@ -126,7 +139,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  metaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+    marginRight: spacing.sm,
+  },
   memberCount: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  metaDot: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  ownerText: {
     fontSize: 13,
     fontWeight: '500',
     color: colors.textSecondary,

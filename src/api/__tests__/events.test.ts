@@ -14,6 +14,7 @@ import {
   getEventParticipants,
   inviteGroupToEvent,
   inviteUserToEvent,
+  inviteEmailToEvent,
   rsvpEvent,
   updateEvent,
   withdrawEvent,
@@ -371,6 +372,39 @@ describe('getEventParticipants (GET /events/{id}/participants)', () => {
     );
     expect(result).toHaveLength(2);
     expect(result[0].user_nickname).toBe('PK');
+  });
+});
+
+describe('inviteEmailToEvent (POST /events/{id}/invite-email)', () => {
+  afterEach(() => {
+    mockedPost.mockReset();
+  });
+
+  it('posts { email } to /events/{id}/invite-email and returns invitation', async () => {
+    const rawInvite = {
+      id: 'inv-e1',
+      event_id: 'evt-1',
+      invited_email: 'guest@example.com',
+      status: 'pending',
+    };
+    mockedPost.mockResolvedValueOnce({ data: rawInvite });
+
+    const result = await inviteEmailToEvent('evt-1', 'guest@example.com', {
+      correlationId: 'cid-eml',
+    });
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/events/evt-1/invite-email',
+      { email: 'guest@example.com' },
+      { correlationId: 'cid-eml' },
+    );
+    expect(result.id).toBe('inv-e1');
+    expect(result.invited_email).toBe('guest@example.com');
+  });
+
+  it('propagates failure when inviteEmailToEvent fails', async () => {
+    mockedPost.mockRejectedValueOnce(new Error('Invite failed'));
+    await expect(inviteEmailToEvent('evt-1', 'bad@example.com')).rejects.toThrow('Invite failed');
   });
 });
 
