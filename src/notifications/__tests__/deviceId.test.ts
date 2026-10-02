@@ -1,7 +1,7 @@
 /**
  * `getDeviceId()` (bug fix: device-scoped push-token registration). Covers
  * the memoization contract (one native call per process lifetime) and the
- * Android-only guard, using the centralised `react-native-device-info`
+ * Android path (the iOS path is covered by `deviceIdIos.test.ts`), using the centralised `react-native-device-info`
  * mock from `jest.setup.js`.
  */
 import { Platform } from 'react-native';
@@ -35,11 +35,4 @@ it('memoizes the value and calls the native bridge only once', async () => {
   await getDeviceId();
 
   expect(mockGetAndroidId).toHaveBeenCalledTimes(1);
-});
-
-it('resolves an empty string without calling the native bridge off Android', async () => {
-  jest.replaceProperty(Platform, 'OS', 'ios');
-
-  await expect(getDeviceId()).resolves.toBe('');
-  expect(mockGetAndroidId).not.toHaveBeenCalled();
 });

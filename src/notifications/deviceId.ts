@@ -9,9 +9,10 @@
  * per stale row. `deviceId` lets the backend's registration function
  * `UPDATE ... ON CONFLICT` on (user, device) instead of always inserting.
  *
- * Android only, per current scope (iOS is not in play for this fix).
+ * Android uses the platform id below; iOS has none, so it uses a UUID kept
+ * in the Keychain (`iosDeviceId.ts`, DES-MEETUP-ADDENDUM-IOS-App.md §3).
  *
- * Deliberately `Settings.Secure.ANDROID_ID` (via
+ * On Android, deliberately `Settings.Secure.ANDROID_ID` (via
  * `react-native-device-info`'s `getAndroidId()`), not a locally generated
  * UUID: a fresh UUID per install would defeat the fix by minting a "new
  * device" on every reinstall, which is exactly the bug being fixed.
@@ -28,13 +29,25 @@
 import { Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 
+import { getOrCreateKeychainDeviceId } from './iosDeviceId';
+
 let cachedDeviceIdPromise: Promise<string> | null = null;
 
 /** Resolves the stable device id to send with every push-token registration. */
 export function getDeviceId(): Promise<string> {
   if (!cachedDeviceIdPromise) {
-    cachedDeviceIdPromise =
-      Platform.OS === 'android' ? DeviceInfo.getAndroidId() : Promise.resolve('');
+    if (Platform.OS === 'android') {
+      cachedDeviceIdPromise = DeviceInfo.getAndroidId();
+    } else {
+      const pending = getOrCreateKeychainDeviceId();
+      cachedDeviceIdPromise = pending;
+      // A Keychain failure must not be remembered: the next call retries.
+      pending.catch(() => {
+        if (cachedDeviceIdPromise === pending) {
+          cachedDeviceIdPromise = null;
+        }
+      });
+    }
   }
   return cachedDeviceIdPromise;
 }

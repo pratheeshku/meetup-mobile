@@ -22,6 +22,7 @@ import { getApp } from '@react-native-firebase/app';
 import {
   getMessaging,
   requestPermission as requestFirebasePermission,
+  hasPermission as hasFirebasePermission,
   AuthorizationStatus,
   getToken as getFcmToken,
   onTokenRefresh as onFcmTokenRefresh,
@@ -54,6 +55,11 @@ const messaging = getMessaging(getApp());
  * runtime permission, so they always report `true`.
  */
 export async function hasNotificationPermission(): Promise<boolean> {
+  if (Platform.OS === 'ios') {
+    // iOS has no implicit grant: only an explicit authorization counts.
+    const status = await hasFirebasePermission(messaging);
+    return status === AuthorizationStatus.AUTHORIZED || status === AuthorizationStatus.PROVISIONAL;
+  }
   if (Platform.OS === 'android' && Platform.Version >= 33) {
     return PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
   }
@@ -76,12 +82,17 @@ export async function requestPermission(): Promise<boolean> {
     return result === PermissionsAndroid.RESULTS.GRANTED;
   }
 
-  // Pre-33 Android needs no runtime prompt. `messaging().requestPermission()`
-  // itself is a deprecated, largely iOS-oriented API in this SDK version;
-  // calling it here would not reflect Android's actual permission model.
+  // iOS: Firebase's `requestPermission` shows the system prompt
+  // (DES-MEETUP-ADDENDUM-IOS-App.md §3). Pre-33 Android needs no runtime
+  // prompt; there the same call is only a fallback.
   const status = await requestFirebasePermission(messaging);
   return status === AuthorizationStatus.AUTHORIZED || status === AuthorizationStatus.PROVISIONAL;
 }
+
+const USER_AGENT_PLATFORM_NAMES: Partial<Record<typeof Platform.OS, string>> = {
+  android: 'Android',
+  ios: 'iOS',
+};
 
 /**
  * Proposed Assumption (Implementation Report #2): the exact `userAgent`
@@ -91,7 +102,7 @@ export async function requestPermission(): Promise<boolean> {
  * backend contract on conformance review.
  */
 function buildUserAgent(): string {
-  return `MeetupMobile-Android/${Platform.Version}`;
+  return `MeetupMobile-${USER_AGENT_PLATFORM_NAMES[Platform.OS] ?? Platform.OS}/${Platform.Version}`;
 }
 
 /**
@@ -114,7 +125,7 @@ export async function registerDeviceToken(deviceToken: string): Promise<void> {
   const deviceId = await getDeviceId();
   await apiClient.post('/notifications/mobile-subscriptions', {
     deviceToken,
-    platform: 'android',
+    platform: Platform.OS,
     userAgent: buildUserAgent(),
     deviceId,
   });
@@ -318,6 +329,13 @@ export function onMessage(): () => void {
  */
 export function registerBackgroundMessageHandler(): void {
   setFcmBackgroundMessageHandler(messaging, async remoteMessage => {
+    // iOS: the backend sends a visible alert (`notification` block) for every
+    // type (DES-MEETUP-ADDENDUM-IOS-App.md §4), which the system already
+    // displayed. Rendering it again here would duplicate it.
+    if (Platform.OS === 'ios' && remoteMessage.notification) {
+      return;
+    }
+
     if (isParticipantNotificationType(remoteMessage.data?.notification_type)) {
       try {
         await displayParticipantNotification(toStringRecord(remoteMessage.data));

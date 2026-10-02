@@ -28,7 +28,12 @@ import { apiClient, endSession, refreshAccessToken, SessionEndedError } from '..
 import { authEvents } from '../api/authEvents';
 import { getAccessToken } from '../storage/tokens';
 import { describeError } from '../utils/logSafeError';
-import { configureGoogleSignIn, signIn as googleSignIn, signOut as sharedSignOut } from './googleAuth';
+import {
+  configureGoogleSignIn,
+  signIn as googleSignIn,
+  signOut as sharedSignOut,
+} from './googleAuth';
+import { isGoogleSignInAvailable } from './googleSupport';
 import { login as emailLogin, register as emailRegister } from './emailAuth';
 import { startPushRegistration } from '../notifications/pushRegistration';
 import type { UserProfile } from '../types/user';
@@ -69,7 +74,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   const userId = user?.id ?? null;
 
   const restoreStoredSession = useCallback(async () => {
-    configureGoogleSignIn();
+    if (isGoogleSignInAvailable()) {
+      configureGoogleSignIn();
+    }
 
     let accessToken: string | null = null;
     try {
