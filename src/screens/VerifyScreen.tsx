@@ -137,6 +137,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
         placeholder="6-digit code"
         autoCapitalize="none"
         keyboardType="number-pad"
+        textContentType="oneTimeCode"
         maxLength={6}
         value={code}
         onChangeText={setCode}

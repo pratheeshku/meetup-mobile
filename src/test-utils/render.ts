@@ -10,10 +10,34 @@ import ReactTestRenderer from 'react-test-renderer';
 
 export type Instance = ReactTestRenderer.ReactTestInstance;
 
+/**
+ * Every tree rendered through this module is unmounted after each test.
+ * react-test-renderer never unmounts on its own, so a mounted component's
+ * effect cleanups never ran: a pending real timer (e.g. `Toast`'s 2.5 s
+ * auto-dismiss after "Link copied") survived its test file, then fired after
+ * the file's Jest environment was torn down and crashed whichever test file
+ * the worker was running by then (`Cannot read properties of undefined
+ * (reading 'timing')`) — a failure that never reproduced when a file ran alone.
+ */
+const mountedRenderers: ReactTestRenderer.ReactTestRenderer[] = [];
+
+afterEach(() => {
+  const pending = mountedRenderers.splice(0);
+  ReactTestRenderer.act(() => {
+    pending.forEach(renderer => renderer.unmount());
+  });
+});
+
+function mount(element: React.ReactElement): ReactTestRenderer.ReactTestRenderer {
+  const renderer = ReactTestRenderer.create(element);
+  mountedRenderers.push(renderer);
+  return renderer;
+}
+
 export function render(element: React.ReactElement): Instance {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   ReactTestRenderer.act(() => {
-    renderer = ReactTestRenderer.create(element);
+    renderer = mount(element);
   });
   return renderer.root;
 }
@@ -22,7 +46,7 @@ export function render(element: React.ReactElement): Instance {
 export async function renderAsync(element: React.ReactElement): Promise<Instance> {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(element);
+    renderer = mount(element);
   });
   return renderer.root;
 }

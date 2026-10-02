@@ -72,20 +72,3 @@ export async function requestPasswordReset(
   );
   return data;
 }
-
-/**
- * Legacy wrapper: signs up and returns void (does not auto-login).
- * @deprecated Use `signup` directly.
- */
-export async function register(
-  email: string,
-  password: string,
-  nickname: string,
-): Promise<void> {
-  await signup({
-    email,
-    password,
-    display_name: nickname,
-    nickname,
-  });
-}

@@ -34,7 +34,7 @@ import {
   signOut as sharedSignOut,
 } from './googleAuth';
 import { isGoogleSignInAvailable } from './googleSupport';
-import { login as emailLogin, register as emailRegister } from './emailAuth';
+import { login as emailLogin } from './emailAuth';
 import { startPushRegistration } from '../notifications/pushRegistration';
 import type { UserProfile } from '../types/user';
 
@@ -49,7 +49,6 @@ interface AuthContextValue {
   sessionExpired: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  registerWithEmail: (email: string, password: string, nickname: string) => Promise<void>;
   signOut: () => Promise<void>;
   /**
    * Merges fields into the in-memory user (e.g. a `display_name` the user
@@ -184,14 +183,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     [establishSession],
   );
 
-  const registerWithEmail = useCallback(
-    async (email: string, password: string, nickname: string) => {
-      setSessionExpired(false);
-      await emailRegister(email, password, nickname);
-    },
-    [],
-  );
-
   const signOut = useCallback(async () => {
     // Stop first: a foreground event between the token de-registration and
     // the user clearing must not re-register this device.
@@ -219,7 +210,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       sessionExpired,
       signInWithGoogle,
       signInWithEmail,
-      registerWithEmail,
       signOut,
       updateUser,
     }),
@@ -229,7 +219,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       sessionExpired,
       signInWithGoogle,
       signInWithEmail,
-      registerWithEmail,
       signOut,
       updateUser,
     ],
