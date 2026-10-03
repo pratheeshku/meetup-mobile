@@ -42,7 +42,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Shuttlr uses the camera to take your profile photo and to scan event QR codes.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Shuttlr uses your location to show games and venues near you.</string>
+	<string>Shuttlr does not use your location. This notice is required because the app includes standard system components that can reference location services.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Shuttlr needs access to your photos so you can choose a profile picture.</string>
 	<key>UIBackgroundModes</key>
