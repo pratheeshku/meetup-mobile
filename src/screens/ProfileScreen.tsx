@@ -11,9 +11,10 @@
  *   iOS-only and this app is Android-only (CLAUDE.md) — Android's
  *   `Alert.alert` has no text-input capability at all. Step 1 (a plain
  *   yes/no confirmation) uses `Alert.alert` exactly as specified.
- * - Skill level's "Beginner/Intermediate/Expert picker" is three
- *   selectable buttons, not a native picker component — no picker
- *   library is installed and this task didn't ask for one.
+ * - Skill levels ("My sports"): read-only rows; tapping one opens a bottom
+ *   sheet for that sport (segmented level control, Save, Remove). "Add sport"
+ *   opens the shared sport-picker -> level-card flow in a sheet. Components
+ *   live in `components/skills/`; no picker library is involved.
  * - Errors are shown inline (this screen has no navigation back-stack
  *   concept to redirect through) rather than via `Alert`, except the
  *   deletion confirmation dialog itself which the brief explicitly asks
@@ -57,9 +58,12 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
-import OptionChips from '../components/OptionChips';
-import type { ChipOption } from '../components/OptionChips';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
+import MySportRow from '../components/skills/MySportRow';
+import BottomSheet from '../components/skills/BottomSheet';
+import SkillLevelFlow from '../components/skills/SkillLevelFlow';
+import type { SkillLevelMap } from '../components/skills/SkillLevelFlow';
+import SportLevelSheet from '../components/skills/SportLevelSheet';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import appConfig from '../../config/appConfig.json';
@@ -69,71 +73,14 @@ import { openLink } from '../utils/openLink';
 import { toSupportLink } from '../utils/supportLink';
 import MobileNumberCard from '../components/MobileNumberCard';
 import { getDisplayName } from '../utils/displayName';
-import { useSportDisplayName } from '../utils/labels';
+import { getLabel, useLabels } from '../labels/LabelsContext';
 import { useFieldChain } from '../hooks/useFieldChain';
 import { borderWidth, colors, radius, shadows, sizes, spacing, typography } from '../theme/tokens';
 import type { SkillLevelValue, UserProfile } from '../types/user';
 import type { Sport } from '../types/sport';
 import type { ProfileStackParamList } from '../navigation/types';
 
-const SKILL_LEVEL_OPTIONS: SkillLevelValue[] = ['Beginner', 'Intermediate', 'Expert'];
-
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
-
-/**
- * `skillLevels.map(...)` can't call `useSportDisplayName` (BUG-M02) directly
- * — a hook call count that varies with the list's length, inside the same
- * component instance, violates the Rules of Hooks. Extracted into its own
- * component instead, one per row, same fix as `TournamentsScreen`'s
- * `TournamentRow`.
- *
- * Delete affordance (ADDENDUM-MOBILE-SKILL-DELETE-001) reuses this app's
- * existing destructive-action pattern verbatim — same as
- * `GroupDetailScreen`'s per-row "Remove" member action: a `TextLink`
- * `tone="destructive"` with a `loading` state, gated behind an
- * `Alert.alert` yes/no confirmation whose destructive button fires the
- * call. The confirmation is built here (not in the parent) because only
- * this row owns the resolved `sportLabel` from `useSportDisplayName`.
- */
-function SkillLevelRow({
-  sport,
-  skillLevel,
-  onPress,
-  onDelete,
-  isDeleting,
-}: {
-  sport: string;
-  skillLevel: SkillLevelValue;
-  onPress: () => void;
-  onDelete: () => void;
-  isDeleting: boolean;
-}): React.JSX.Element {
-  const sportLabel = useSportDisplayName(sport);
-
-  const handleDeletePress = (): void => {
-    Alert.alert('Remove Skill Level', `Remove your ${sportLabel} skill level?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: onDelete },
-    ]);
-  };
-
-  return (
-    <View style={styles.skillLevelRow}>
-      <Pressable style={styles.skillLevelInfo} onPress={onPress} accessibilityRole="button">
-        <Text style={styles.skillLevelSport}>{sportLabel}</Text>
-        <Text style={styles.skillLevelValue}>{skillLevel}</Text>
-      </Pressable>
-      <TextLink
-        label="Remove"
-        tone="destructive"
-        onPress={handleDeletePress}
-        loading={isDeleting}
-        disabled={isDeleting}
-        style={styles.skillLevelRemoveLink}
-      />
-    </View>
-  );
-}
 
 export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
   const { signOut, updateUser } = useAuth();
@@ -142,11 +89,13 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // BUG-M05: sport choices for the skill-level picker, reusing the same
-  // `GET /admin/sports/public` source and `OptionChips` component as
-  // `CreateGameScreen`. Secondary/non-blocking (same pattern as that
-  // screen's Group picker) — a failure just leaves the picker empty; it
-  // never blocks the rest of Profile from loading.
+  const labels = useLabels();
+
+  // BUG-M05: sport choices for "Add sport", from the same
+  // `GET /admin/sports/public` source as `CreateGameScreen`.
+  // Secondary/non-blocking (same pattern as that screen's Group picker) — a
+  // failure just leaves the picker empty; it never blocks the rest of
+  // Profile from loading.
   const [sports, setSports] = useState<Sport[]>([]);
 
   const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
@@ -154,14 +103,17 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const [isSavingDisplayName, setIsSavingDisplayName] = useState(false);
   const [displayNameError, setDisplayNameError] = useState<string | null>(null);
 
-  const [isEditingSkillLevel, setIsEditingSkillLevel] = useState(false);
-  const [sportDraft, setSportDraft] = useState<string | null>(null);
-  const [skillLevelDraft, setSkillLevelDraft] = useState<SkillLevelValue>('Beginner');
+  // Skill-level sheets: edit one sport (`editingSkill`) or add sports.
+  // `skillLevelError` is shown inside whichever sheet is open — for a delete
+  // blocked by an active tournament registration (409) it is the backend's
+  // own message, verbatim.
+  const [editingSkill, setEditingSkill] = useState<{ sport: string; level: SkillLevelValue } | null>(
+    null,
+  );
+  const [isAddingSport, setIsAddingSport] = useState(false);
   const [isSavingSkillLevel, setIsSavingSkillLevel] = useState(false);
+  const [isDeletingSkillLevel, setIsDeletingSkillLevel] = useState(false);
   const [skillLevelError, setSkillLevelError] = useState<string | null>(null);
-
-  const [deletingSkillLevelSport, setDeletingSkillLevelSport] = useState<string | null>(null);
-  const [skillLevelDeleteError, setSkillLevelDeleteError] = useState<string | null>(null);
 
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -373,36 +325,32 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
   const handleStartAddSkillLevel = (): void => {
     setSkillLevelError(null);
-    setSportDraft(null);
-    setSkillLevelDraft('Beginner');
-    setIsEditingSkillLevel(true);
+    setIsAddingSport(true);
   };
 
   const handleStartEditSkillLevel = (sport: string, skillLevel: SkillLevelValue): void => {
     setSkillLevelError(null);
-    setSportDraft(sport);
-    setSkillLevelDraft(skillLevel);
-    setIsEditingSkillLevel(true);
+    setEditingSkill({ sport, level: skillLevel });
   };
 
-  const handleCancelEditSkillLevel = (): void => {
-    setIsEditingSkillLevel(false);
+  const handleCloseSkillLevelSheet = (): void => {
+    setEditingSkill(null);
+    setIsAddingSport(false);
     setSkillLevelError(null);
   };
 
-  const handleSaveSkillLevel = async (): Promise<void> => {
-    if (!sportDraft) {
-      setSkillLevelError('Choose a sport.');
-      return;
-    }
+  /** Saves the given levels (one PUT each), re-fetches, then closes the open sheet. */
+  const handleSaveSkillLevels = async (levels: SkillLevelMap): Promise<void> => {
     setSkillLevelError(null);
     setIsSavingSkillLevel(true);
     try {
       await withCorrelationId(async correlationId => {
-        await updateSkillLevel(sportDraft, skillLevelDraft, { correlationId });
+        for (const [sport, level] of Object.entries(levels)) {
+          await updateSkillLevel(sport, level, { correlationId });
+        }
         setProfile(await getProfile({ correlationId }));
       });
-      setIsEditingSkillLevel(false);
+      handleCloseSkillLevelSheet();
     } catch {
       setSkillLevelError('Could not save your skill level. Please try again.');
     } finally {
@@ -413,26 +361,35 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   /**
    * ADDENDUM-MOBILE-SKILL-DELETE-001 §4: on 409 (active tournament
    * registration guard), the backend's message is shown verbatim via
-   * `getApiErrorMessage` — not swallowed into a generic string — and the
-   * entry stays in the list (no optimistic removal). On success, re-fetch
-   * via `getProfile()`/`getSkillLevels()`, same refresh pattern already
-   * used by Add/Modify above.
+   * `getApiErrorMessage` — not swallowed into a generic string — inside the
+   * edit sheet, and the entry stays in the list (no optimistic removal). On
+   * success, re-fetch via `getProfile()`/`getSkillLevels()`, same refresh
+   * pattern as Add/Modify above, and close the sheet.
    */
   const handleDeleteSkillLevel = async (sport: string): Promise<void> => {
-    setSkillLevelDeleteError(null);
-    setDeletingSkillLevelSport(sport);
+    setSkillLevelError(null);
+    setIsDeletingSkillLevel(true);
     try {
       await withCorrelationId(async correlationId => {
         await deleteSkillLevel(sport, { correlationId });
         setProfile(await getProfile({ correlationId }));
       });
+      handleCloseSkillLevelSheet();
     } catch (e) {
-      setSkillLevelDeleteError(
+      setSkillLevelError(
         getApiErrorMessage(e, 'Could not remove this skill level. Please try again.'),
       );
     } finally {
-      setDeletingSkillLevelSport(null);
+      setIsDeletingSkillLevel(false);
     }
+  };
+
+  /** Same yes/no confirmation the old per-row Remove link used. */
+  const handleDeleteSkillLevelPress = (sport: string, sportLabel: string): void => {
+    Alert.alert('Remove Skill Level', `Remove your ${sportLabel} skill level?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => handleDeleteSkillLevel(sport) },
+    ]);
   };
 
   const handleSignOut = async (): Promise<void> => {
@@ -521,10 +478,8 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   // consolidation, since the actual `GET /users/me` response always
   // includes it in practice (Proposed Assumption, unchanged).
   const skillLevels = profile.skill_levels ?? [];
-  const sportOptions: ChipOption<string>[] = sports.map(item => ({
-    value: item.name,
-    label: item.display_name,
-  }));
+  const declaredSports = new Set(skillLevels.map(item => item.sport));
+  const addableSports = sports.filter(item => !declaredSports.has(item.name));
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
@@ -628,85 +583,57 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Skill Levels</Text>
-          {!isEditingSkillLevel ? (
-            <TextLink label="Add" onPress={handleStartAddSkillLevel} />
-          ) : null}
+          <Text style={styles.sectionTitle}>{getLabel(labels, 'mob_my_sports_title')}</Text>
+          <TextLink label={getLabel(labels, 'mob_add_sport')} onPress={handleStartAddSkillLevel} />
         </View>
-
-        {skillLevelDeleteError ? (
-          <Text style={styles.errorText}>{skillLevelDeleteError}</Text>
-        ) : null}
 
         {skillLevels.length === 0 ? (
           <Text style={styles.emptyText}>No skill levels declared yet.</Text>
         ) : (
           skillLevels.map(item => (
-            <SkillLevelRow
+            <MySportRow
               key={item.sport}
               sport={item.sport}
               skillLevel={item.skill_level}
               onPress={() => handleStartEditSkillLevel(item.sport, item.skill_level)}
-              onDelete={() => handleDeleteSkillLevel(item.sport)}
-              isDeleting={deletingSkillLevelSport === item.sport}
             />
           ))
         )}
-
-        {isEditingSkillLevel ? (
-          <View style={styles.editRow}>
-            {sportOptions.length === 0 ? (
-              <Text style={styles.hint}>No sports are available right now.</Text>
-            ) : (
-              <OptionChips
-                options={sportOptions}
-                value={sportDraft}
-                onChange={setSportDraft}
-                disabled={isSavingSkillLevel}
-              />
-            )}
-            <View style={styles.skillLevelPickerRow}>
-              {SKILL_LEVEL_OPTIONS.map(option => (
-                <Pressable
-                  key={option}
-                  style={[
-                    styles.skillLevelOption,
-                    skillLevelDraft === option && styles.skillLevelOptionSelected,
-                  ]}
-                  onPress={() => setSkillLevelDraft(option)}
-                  disabled={isSavingSkillLevel}
-                >
-                  <Text
-                    style={[
-                      styles.skillLevelOptionText,
-                      skillLevelDraft === option && styles.skillLevelOptionTextSelected,
-                    ]}
-                  >
-                    {option}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            {skillLevelError ? <Text style={styles.errorText}>{skillLevelError}</Text> : null}
-            <View style={styles.editActionsRow}>
-              <Button
-                label="Save"
-                size="sm"
-                onPress={handleSaveSkillLevel}
-                loading={isSavingSkillLevel}
-                style={styles.actionSpacing}
-              />
-              <Button
-                label="Cancel"
-                size="sm"
-                variant="secondary"
-                onPress={handleCancelEditSkillLevel}
-                disabled={isSavingSkillLevel}
-              />
-            </View>
-          </View>
-        ) : null}
       </Card>
+
+      {editingSkill ? (
+        <SportLevelSheet
+          sport={editingSkill.sport}
+          initialLevel={editingSkill.level}
+          saving={isSavingSkillLevel}
+          deleting={isDeletingSkillLevel}
+          error={skillLevelError}
+          saveLabel="Save"
+          deleteLabel="Remove"
+          closeLabel="Cancel"
+          onSave={level => handleSaveSkillLevels({ [editingSkill.sport]: level })}
+          onDelete={sportLabel => handleDeleteSkillLevelPress(editingSkill.sport, sportLabel)}
+          onClose={handleCloseSkillLevelSheet}
+        />
+      ) : null}
+
+      {isAddingSport ? (
+        <BottomSheet onClose={handleCloseSkillLevelSheet} closeLabel="Cancel">
+          {addableSports.length === 0 ? (
+            <Text style={styles.hint}>No sports are available right now.</Text>
+          ) : (
+            <SkillLevelFlow
+              sports={addableSports}
+              saving={isSavingSkillLevel}
+              error={skillLevelError}
+              nextLabel="Next"
+              backLabel="Back"
+              saveLabel="Save"
+              onSave={handleSaveSkillLevels}
+            />
+          )}
+        </BottomSheet>
+      ) : null}
 
       <MobileNumberCard
         storedNumber={profile.mobile_number}
@@ -876,43 +803,6 @@ const styles = StyleSheet.create({
   sectionTitle: { ...typography.h3, color: colors.textPrimary },
   emptyText: { ...typography.body, color: colors.textSecondary },
   hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
-  skillLevelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    minHeight: sizes.controlSmall,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: colors.border,
-  },
-  skillLevelInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  skillLevelRemoveLink: { marginLeft: spacing.sm },
-  skillLevelSport: { ...typography.body, color: colors.textPrimary },
-  skillLevelValue: { ...typography.bodyBold, color: colors.textSecondary },
-  skillLevelPickerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  skillLevelOption: {
-    minHeight: sizes.controlSmall,
-    justifyContent: 'center',
-    borderWidth: borderWidth.thin,
-    borderColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    marginRight: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  skillLevelOptionSelected: { backgroundColor: colors.primary },
-  skillLevelOptionText: { ...typography.bodyBold, color: colors.primary },
-  skillLevelOptionTextSelected: { color: colors.white },
   editRow: { marginTop: spacing.sm, width: '100%' },
   input: { marginBottom: spacing.sm },
   editActionsRow: { flexDirection: 'row', marginTop: spacing.xs },

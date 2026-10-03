@@ -28,6 +28,17 @@ export const FALLBACK_LABELS: LabelMap = {
   'skill_level.intermediate': 'Intermediate',
   'skill_level.expert': 'Expert',
   'skill_level.all_levels': 'All Levels',
+  'skill_level.beginner.desc': 'New to the sport or still learning the rules',
+  'skill_level.intermediate.desc': 'Play regularly, comfortable with the basics',
+  'skill_level.expert.desc': 'Competitive, strong technique and match experience',
+
+  mob_skill_sports_title: 'What do you play?',
+  mob_skill_sports_subtitle: 'Select all that apply. Level comes next.',
+  mob_skill_level_title: 'How good are you?',
+  mob_skill_level_subtitle: 'One level per sport. Change it anytime.',
+  mob_skill_pick_level_hint: 'Pick a level to continue',
+  mob_my_sports_title: 'My sports',
+  mob_add_sport: 'Add sport',
 
   'event_visibility.public': 'Public',
   'event_visibility.invite_only': 'Invite Only',

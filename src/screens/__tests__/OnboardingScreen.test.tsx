@@ -72,8 +72,9 @@ const press = (root: Instance, text: string) =>
     }
     matches[0].props.onPress();
   });
+// The screen title is the first header; the skills step adds its own section headings after it.
 const title = (root: Instance): string =>
-  texts(root.find(node => node.props.accessibilityRole === 'header'))[0];
+  texts(root.findAll(node => node.props.accessibilityRole === 'header')[0])[0];
 const progress = (root: Instance): string | undefined => texts(root).find(text => text.startsWith('Step '));
 const httpError = (status: number) => Object.assign(new Error(`HTTP ${status}`), { response: { status } });
 
@@ -111,18 +112,18 @@ describe('step order and navigation', () => {
     expect(progress(root)).toBe('Step 3 of 3');
   });
 
-  it('every step has Save and Skip', async () => {
+  it('every step has Skip, and Save (on the skills step Save follows Next, once a sport is picked)', async () => {
     const root = await mount();
     for (let step = 0; step < 3; step += 1) {
       const labels = pressables(root).map(node => node.props.accessibilityLabel);
-      expect(labels).toEqual(expect.arrayContaining(['Save', 'Skip']));
+      expect(labels).toEqual(expect.arrayContaining([step === 0 ? 'Next' : 'Save', 'Skip']));
       await press(root, 'Skip');
     }
   });
 
-  it('Save advances just like Skip (skills: nothing chosen, notifications: toggles already saved)', async () => {
+  it('Save advances just like Skip (notifications: toggles already saved)', async () => {
     const root = await mount();
-    await press(root, 'Save');
+    await press(root, 'Skip');
     expect(title(root)).toBe('Notifications');
     await press(root, 'Save');
     expect(title(root)).toBe('Mobile number (optional)');
@@ -200,12 +201,24 @@ describe('flags and omitted steps', () => {
 });
 
 describe('skills step', () => {
-  it('saves the chosen levels through the existing skill-level endpoint', async () => {
+  const allControls = (root: Instance, role: string): Instance[] =>
+    root.findAll(node => node.props.accessibilityRole === role && typeof node.props.onPress === 'function');
+  const tapRole = (root: Instance, role: string, label: string) =>
+    act(async () => {
+      const match = allControls(root, role).filter(node => node.props.accessibilityLabel === label);
+      if (match.length !== 1) {
+        throw new Error(`Expected one ${role} labelled "${label}", found ${match.length}`);
+      }
+      match[0].props.onPress();
+    });
+
+  it('picks sports, then a level per sport, and saves through the existing skill-level endpoint', async () => {
     const root = await mount();
-    const beginner = pressables(root).filter(node => node.props.accessibilityLabel === 'Beginner');
-    const expert = pressables(root).filter(node => node.props.accessibilityLabel === 'Expert');
-    await act(async () => beginner[0].props.onPress()); // badminton
-    await act(async () => expert[1].props.onPress()); // tennis
+    await tapRole(root, 'checkbox', 'Badminton');
+    await tapRole(root, 'checkbox', 'Tennis');
+    await press(root, 'Next');
+    await tapRole(root, 'radio', 'Badminton, Beginner');
+    await tapRole(root, 'radio', 'Tennis, Expert');
     await press(root, 'Save');
     expect(mockUpdateSkill.mock.calls.map(([sport, level]) => [sport, level])).toEqual([
       ['badminton', 'Beginner'],
@@ -214,10 +227,33 @@ describe('skills step', () => {
     expect(title(root)).toBe('Notifications');
   });
 
+  it('pre-selects sports that already have a level and only sends changed levels', async () => {
+    mockSkills.mockResolvedValue([{ sport: 'Badminton', skill_level: 'Intermediate' }]);
+    const root = await mount();
+    const checked = allControls(root, 'checkbox').filter(node => node.props.accessibilityState.checked);
+    expect(checked.map(node => node.props.accessibilityLabel)).toEqual(['Badminton']);
+    await press(root, 'Next');
+    await press(root, 'Save');
+    expect(mockUpdateSkill).not.toHaveBeenCalled();
+    expect(title(root)).toBe('Notifications');
+  });
+
+  it('does not save while a selected sport has no level', async () => {
+    const root = await mount();
+    await tapRole(root, 'checkbox', 'Badminton');
+    await press(root, 'Next');
+    await press(root, 'Save');
+    expect(mockUpdateSkill).not.toHaveBeenCalled();
+    expect(title(root)).toBe('Your sports');
+    expect(root.findAll(node => node.props.accessibilityRole === 'alert', { deep: false })).toHaveLength(1);
+  });
+
   it('shows an inline error when a save fails and keeps Skip available', async () => {
     mockUpdateSkill.mockRejectedValue(httpError(500));
     const root = await mount();
-    await act(async () => pressables(root).filter(node => node.props.accessibilityLabel === 'Expert')[0].props.onPress());
+    await tapRole(root, 'checkbox', 'Badminton');
+    await press(root, 'Next');
+    await tapRole(root, 'radio', 'Badminton, Expert');
     await press(root, 'Save');
     expect(texts(root)).toContain('Could not save your skill levels. Please try again.');
     expect(title(root)).toBe('Your sports');

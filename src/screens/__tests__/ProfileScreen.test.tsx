@@ -91,18 +91,24 @@ const mount = (): Promise<Instance> =>
 const displayNameInput = (root: Instance): Instance =>
   root.find(node => (node.type as unknown) === 'TextInput' && node.props.accessibilityLabel === 'Display name');
 
-/**
- * The screen's own Beginner/Intermediate/Expert buttons carry no
- * `accessibilityRole` (pre-existing, unrelated to BUG-M05), so the shared
- * `pressableWithText`/`pressableLabelled` helpers (which require one) can't
- * find them — matched here directly by their `onPress` + text content.
- */
-const pressSkillLevelButton = (root: Instance, label: string): void => {
-  act(() => {
-    root
-      .find(node => typeof node.props.onPress === 'function' && texts(node).includes(label))
-      .props.onPress();
-  });
+/** A control found by role + accessibility label (tiles are checkboxes, level segments are radios). */
+const control = (root: Instance, role: string, label: string): Instance => {
+  const matches = root.findAll(
+    node =>
+      node.props.accessibilityRole === role &&
+      node.props.accessibilityLabel === label &&
+      typeof node.props.onPress === 'function',
+  );
+  if (matches.length !== 1) {
+    throw new Error(`Expected one ${role} labelled "${label}", found ${matches.length}`);
+  }
+  return matches[0];
+};
+const tap = (root: Instance, role: string, label: string): void => {
+  act(() => control(root, role, label).props.onPress());
+};
+const openRow = (root: Instance, label: string): void => {
+  act(() => pressableLabelled(root, label).props.onPress());
 };
 
 beforeEach(() => {
@@ -189,42 +195,72 @@ describe('ProfileScreen display name editing', () => {
   });
 });
 
-describe('ProfileScreen skill-level sport picker (BUG-M05)', () => {
+describe('ProfileScreen add sport (BUG-M05, skill-level redesign)', () => {
   async function startAdd(): Promise<Instance> {
     const root = await mount();
-    await act(async () => pressableWithText(root, 'Add').props.onPress());
+    await act(async () => pressableWithText(root, 'Add sport').props.onPress());
     return root;
   }
 
-  it('offers the sport list from GET /admin/sports/public as chips, not a free-text field', async () => {
+  it('offers the sport list from GET /admin/sports/public as checkbox tiles, not a free-text field', async () => {
     const root = await startAdd();
-    expect(texts(root)).toEqual(expect.arrayContaining(['Table Tennis', 'Badminton']));
+    expect(control(root, 'checkbox', 'Table Tennis')).toBeTruthy();
+    expect(control(root, 'checkbox', 'Badminton')).toBeTruthy();
     expect(root.findAll(node => (node.type as unknown) === 'TextInput')).toHaveLength(0);
   });
 
-  it('saves the chosen sport’s name (not its display label) with the skill level', async () => {
+  it('limits the picker to sports not yet set', async () => {
+    mockGetProfile.mockResolvedValue({
+      ...PROFILE,
+      skill_levels: [{ sport: 'table_tennis', skill_level: 'Beginner' }],
+    });
     const root = await startAdd();
-    act(() => pressableWithText(root, 'Table Tennis').props.onPress());
-    pressSkillLevelButton(root, 'Intermediate');
-    await act(async () => pressableWithText(root, 'Save').props.onPress());
-    expect(mockUpdateSkillLevel).toHaveBeenCalledWith(
-      'table_tennis',
-      'Intermediate',
-      expect.anything(),
-    );
+    expect(control(root, 'checkbox', 'Badminton')).toBeTruthy();
+    expect(
+      root.findAll(node => node.props.accessibilityRole === 'checkbox' && node.props.accessibilityLabel === 'Table Tennis'),
+    ).toHaveLength(0);
   });
 
-  it('rejects saving without a chosen sport', async () => {
+  it('saves the chosen sport’s name (not its display label) with the chosen level', async () => {
+    mockGetProfile.mockResolvedValueOnce(PROFILE).mockResolvedValueOnce({
+      ...PROFILE,
+      skill_levels: [{ sport: 'table_tennis', skill_level: 'Intermediate' }],
+    });
     const root = await startAdd();
+    tap(root, 'checkbox', 'Table Tennis');
+    act(() => pressableWithText(root, 'Next').props.onPress());
+    tap(root, 'radio', 'Table Tennis, Intermediate');
     await act(async () => pressableWithText(root, 'Save').props.onPress());
-    expect(texts(root)).toContain('Choose a sport.');
+    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'Intermediate', expect.anything());
+    expect(mockGetProfile).toHaveBeenCalledTimes(2);
+    // Sheet closed, new row listed.
+    expect(texts(root)).not.toContain('Save');
+    expect(texts(root)).toContain('Intermediate');
+  });
+
+  it('does not save a sport that has no level, and shows the inline hint', async () => {
+    const root = await startAdd();
+    tap(root, 'checkbox', 'Table Tennis');
+    act(() => pressableWithText(root, 'Next').props.onPress());
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
     expect(mockUpdateSkillLevel).not.toHaveBeenCalled();
+    expect(root.findAll(node => node.props.accessibilityRole === 'alert', { deep: false })).toHaveLength(1);
   });
 
   it('shows a hint instead of a broken empty picker when no sports are available', async () => {
     mockGetSports.mockResolvedValue([]);
     const root = await startAdd();
     expect(texts(root)).toContain('No sports are available right now.');
+  });
+
+  it('shows the save error inside the sheet when the PUT fails', async () => {
+    mockUpdateSkillLevel.mockRejectedValue(new Error('down'));
+    const root = await startAdd();
+    tap(root, 'checkbox', 'Badminton');
+    act(() => pressableWithText(root, 'Next').props.onPress());
+    tap(root, 'radio', 'Badminton, Beginner');
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
+    expect(texts(root)).toContain('Could not save your skill level. Please try again.');
   });
 });
 
@@ -249,30 +285,81 @@ describe('ProfileScreen skill-levels list sport display name (BUG-M02)', () => {
   });
 });
 
-describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', () => {
+describe('ProfileScreen My sports rows and edit sheet', () => {
   const WITH_ONE_SKILL_LEVEL: UserProfile = {
     ...PROFILE,
     skill_levels: [{ sport: 'table_tennis', skill_level: 'Intermediate' }],
   };
 
-  it('tapping the row still opens the edit picker (delete affordance does not steal the tap target)', async () => {
+  it('lists read-only rows: no editing controls until a row is tapped', async () => {
     mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
     const root = await mount();
+    expect(texts(root)).toContain('My sports');
+    expect(texts(root)).toEqual(expect.arrayContaining(['Table Tennis', 'Intermediate']));
     expect(texts(root)).not.toContain('Save');
-
-    await act(async () => {
-      pressableWithText(root, 'Intermediate').props.onPress();
-    });
-
-    // Edit form now open, prefilled from the tapped row (Table Tennis /
-    // Intermediate), same as before this addendum's changes.
-    expect(texts(root)).toContain('Save');
-    expect(texts(root)).toContain('Cancel');
+    expect(texts(root)).not.toContain('Remove');
+    // Three dots on every pill: two filled (Intermediate), one empty.
+    expect(root.findAll(node => (node.type as unknown) === 'View' && node.props.testID === 'level-dot-filled')).toHaveLength(2);
+    expect(root.findAll(node => (node.type as unknown) === 'View' && node.props.testID === 'level-dot-empty')).toHaveLength(1);
   });
+
+  it('tapping a row opens a sheet for that sport only, prefilled with its level', async () => {
+    mockGetProfile.mockResolvedValue({
+      ...PROFILE,
+      skill_levels: [
+        { sport: 'table_tennis', skill_level: 'Intermediate' },
+        { sport: 'badminton', skill_level: 'Beginner' },
+      ],
+    });
+    const root = await mount();
+    openRow(root, 'Table Tennis, Intermediate');
+    expect(texts(root)).toEqual(expect.arrayContaining(['Save', 'Remove']));
+    const selected = root.findAll(
+      node =>
+        node.props.accessibilityRole === 'radio' &&
+        typeof node.props.onPress === 'function' &&
+        node.props.accessibilityState?.selected === true,
+    );
+    expect(selected.map(node => node.props.accessibilityLabel)).toEqual(['Table Tennis, Intermediate']);
+    // Only the tapped sport has radios in the sheet.
+    expect(
+      root.findAll(node => node.props.accessibilityRole === 'radio' && String(node.props.accessibilityLabel).startsWith('Badminton')),
+    ).toHaveLength(0);
+  });
+
+  it('changes the level: PUTs the new level for that sport and re-fetches', async () => {
+    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
+    const root = await mount();
+    openRow(root, 'Table Tennis, Intermediate');
+    tap(root, 'radio', 'Table Tennis, Expert');
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
+    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'Expert', expect.anything());
+    expect(mockGetProfile).toHaveBeenCalledTimes(2);
+    expect(texts(root)).not.toContain('Save');
+  });
+
+  it('hardware Back (Modal onRequestClose) closes the sheet without saving', async () => {
+    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
+    const root = await mount();
+    openRow(root, 'Table Tennis, Intermediate');
+    expect(texts(root)).toContain('Save');
+    const modal = root.findAll(node => typeof node.props.onRequestClose === 'function')[0];
+    act(() => modal.props.onRequestClose());
+    expect(texts(root)).not.toContain('Save');
+    expect(mockUpdateSkillLevel).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001), from the edit sheet', () => {
+  const WITH_ONE_SKILL_LEVEL: UserProfile = {
+    ...PROFILE,
+    skill_levels: [{ sport: 'table_tennis', skill_level: 'Intermediate' }],
+  };
 
   it('asks for confirmation before deleting', async () => {
     mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
     const root = await mount();
+    openRow(root, 'Table Tennis, Intermediate');
     act(() => {
       pressableWithText(root, 'Remove').props.onPress();
     });
@@ -284,11 +371,10 @@ describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', 
     expect(mockDeleteSkillLevel).not.toHaveBeenCalled();
   });
 
-  it('on confirm: DELETEs the entry and removes it from the list via a re-fetch', async () => {
+  it('on confirm: DELETEs the entry, closes the sheet and removes the row via a re-fetch', async () => {
     mockGetProfile.mockResolvedValueOnce(WITH_ONE_SKILL_LEVEL).mockResolvedValueOnce(PROFILE);
     const root = await mount();
-    expect(texts(root)).toContain('Table Tennis');
-
+    openRow(root, 'Table Tennis, Intermediate');
     act(() => {
       pressableWithText(root, 'Remove').props.onPress();
     });
@@ -299,10 +385,11 @@ describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', 
     expect(mockDeleteSkillLevel).toHaveBeenCalledWith('table_tennis', expect.anything());
     expect(mockGetProfile).toHaveBeenCalledTimes(2);
     expect(texts(root)).not.toContain('Table Tennis');
+    expect(texts(root)).not.toContain('Save');
     expect(texts(root)).toContain('No skill levels declared yet.');
   });
 
-  it('on 409: surfaces the guard message verbatim and leaves the entry in the list', async () => {
+  it('tournament lock (409): shows the backend message verbatim inside the sheet; entry stays; no extra fetch', async () => {
     mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
     mockDeleteSkillLevel.mockRejectedValue({
       response: {
@@ -311,7 +398,7 @@ describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', 
       },
     });
     const root = await mount();
-
+    openRow(root, 'Table Tennis, Intermediate');
     act(() => {
       pressableWithText(root, 'Remove').props.onPress();
     });
@@ -319,11 +406,13 @@ describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', 
       await confirmAlert('Remove');
     });
 
-    expect(texts(root)).toContain(
+    const alerts = root.findAll(node => node.props.accessibilityRole === 'alert', { deep: false });
+    expect(alerts.map(node => texts(node)[0])).toEqual([
       'Cannot remove: you have an active tournament registration for this sport.',
-    );
-    // Still in the list — no optimistic removal on a blocked delete.
-    expect(texts(root)).toContain('Table Tennis');
+    ]);
+    // Sheet still open, entry still listed, no padlock/locked state anywhere.
+    expect(texts(root)).toContain('Save');
+    expect(pressableLabelled(root, 'Table Tennis, Intermediate')).toBeTruthy();
     // Only the initial mount fetch — the guarded delete never re-fetches.
     expect(mockGetProfile).toHaveBeenCalledTimes(1);
   });
@@ -332,7 +421,7 @@ describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', 
     mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
     mockDeleteSkillLevel.mockRejectedValue(new Error('network down'));
     const root = await mount();
-
+    openRow(root, 'Table Tennis, Intermediate');
     act(() => {
       pressableWithText(root, 'Remove').props.onPress();
     });
@@ -341,7 +430,7 @@ describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', 
     });
 
     expect(texts(root)).toContain('Could not remove this skill level. Please try again.');
-    expect(texts(root)).toContain('Table Tennis');
+    expect(pressableLabelled(root, 'Table Tennis, Intermediate')).toBeTruthy();
   });
 });
 

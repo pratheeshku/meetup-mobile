@@ -5,7 +5,7 @@
  * measured values documented in `tokens.ts` so an edit can't silently
  * regress legibility — `textMuted` previously failed at 2.92:1 / 2.65:1.
  */
-import { colors } from '../tokens';
+import { colors, levelColors } from '../tokens';
 
 function relativeLuminance(hex: string): number {
   const channel = (start: number): number => {
@@ -34,4 +34,14 @@ describe('text colour tokens', () => {
     expect(contrastRatio('#8B97B5', colors.surface)).toBeLessThan(4.5);
     expect(contrastRatio('#8B97B5', colors.background)).toBeLessThan(4.5);
   });
+});
+
+describe('skill level tints', () => {
+  it.each(Object.keys(levelColors) as (keyof typeof levelColors)[])(
+    '%s text meets WCAG AA (>= 4.5:1) on its tint and on surface',
+    level => {
+      expect(contrastRatio(levelColors[level].text, levelColors[level].bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(levelColors[level].text, colors.surface)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 });

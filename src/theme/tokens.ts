@@ -157,3 +157,38 @@ export const sizes = {
   /** Additive: diameter of the notification-bell unread badge. */
   notificationBadge: 18,
 };
+
+/**
+ * Skill-level tints (skill-level selection redesign). Keyed by the STORED
+ * level value (`SkillLevelValue`): Beginner = green, Intermediate = blue,
+ * Expert = violet. `text` on `bg` meets WCAG AA (enforced by
+ * `src/theme/__tests__/tokens.test.ts`); `border` also fills the level dots.
+ * Light theme only — the app has no dark mode.
+ */
+export const levelColors = {
+  Beginner: { bg: '#E8F5E9', text: '#1B5E20', border: '#2E7D32' },
+  Intermediate: { bg: '#E3F2FD', text: '#0D47A1', border: '#1565C0' },
+  Expert: { bg: '#EDE7F6', text: '#4527A0', border: '#5E35B1' },
+} as const;
+
+/** Neutral stand-in for a stored level this app version does not know. */
+export const levelColorsUnknown = {
+  bg: colors.background,
+  text: colors.textSecondary,
+  border: colors.border,
+} as const;
+
+/** Unfilled level dot. */
+export const levelDotEmpty = '#C4BFB8';
+
+/** Fixed sizes for the sport picker, level cards and My sports rows. */
+export const skillSizes = {
+  dot: 8,
+  sportCircle: 56,
+  sportCircleSmall: 36,
+  sportIcon: 32,
+  sportIconSmall: 22,
+  tick: 22,
+  chevron: 18,
+  segmentMinHeight: 64,
+};

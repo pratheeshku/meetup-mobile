@@ -2,7 +2,8 @@
  * First-run step 1: sport skill levels (DES-MEETUP-ADDENDUM-profile-
  * onboarding.md AD-5, §4.3). Uses the EXISTING skill-level endpoints
  * (`getSkillLevels`, `updateSkillLevel`) and the admin sports list
- * (`GET /admin/sports/public`). Tapping the selected level again unselects it.
+ * (`GET /admin/sports/public`). The UI is the shared `SkillLevelFlow`
+ * (sport tiles -> one level card per sport); only changed levels are sent.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -15,25 +16,21 @@ import type { Sport } from '../../types/sport';
 import type { SkillLevelValue } from '../../types/user';
 import Button from '../Button';
 import LoadingView from '../LoadingView';
-import OptionChips from '../OptionChips';
-import type { ChipOption } from '../OptionChips';
+import SkillLevelFlow from '../skills/SkillLevelFlow';
+import type { SkillLevelMap } from '../skills/SkillLevelFlow';
 import StepFooter from './StepFooter';
-
-const LEVELS: ChipOption<SkillLevelValue>[] = [
-  { value: 'Beginner', label: 'Beginner' },
-  { value: 'Intermediate', label: 'Intermediate' },
-  { value: 'Expert', label: 'Expert' },
-];
 
 interface SkillsStepProps {
   onDone: () => void;
 }
 
+const storageKey = (sport: Sport | string): string =>
+  (typeof sport === 'string' ? sport : sport.name).trim().toLowerCase();
+
 export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Element {
   const [sports, setSports] = useState<Sport[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [existing, setExisting] = useState<Record<string, SkillLevelValue>>({});
-  const [chosen, setChosen] = useState<Record<string, SkillLevelValue>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,10 +43,9 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
       );
       const current: Record<string, SkillLevelValue> = {};
       for (const row of levels) {
-        current[row.sport.trim().toLowerCase()] = row.skill_level;
+        current[storageKey(row.sport)] = row.skill_level;
       }
       setExisting(current);
-      setChosen(current);
       setSports(sportList);
     } catch {
       setLoadFailed(true);
@@ -60,8 +56,10 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
     load();
   }, [load]);
 
-  const handleSave = async (): Promise<void> => {
-    const changes = Object.entries(chosen).filter(([sport, level]) => existing[sport] !== level);
+  const handleSave = async (chosen: SkillLevelMap): Promise<void> => {
+    const changes = Object.entries(chosen)
+      .map(([name, level]) => [storageKey(name), level] as const)
+      .filter(([sport, level]) => existing[sport] !== level);
     if (changes.length === 0) {
       onDone();
       return;
@@ -97,34 +95,27 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
     return <LoadingView />;
   }
 
+  const initialLevels: SkillLevelMap = {};
+  for (const sport of sports) {
+    const level = existing[storageKey(sport)];
+    if (level) {
+      initialLevels[sport.name] = level;
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.lead}>Pick your level for the sports you play. You can change this any time in Profile.</Text>
-      {sports.map(sport => {
-        const key = sport.name.trim().toLowerCase();
-        return (
-          <View key={sport.name} style={styles.sportBlock}>
-            <Text style={styles.sportName}>{sport.display_name}</Text>
-            <OptionChips
-              options={LEVELS}
-              value={chosen[key] ?? null}
-              onChange={level =>
-                setChosen(current => {
-                  const next = { ...current };
-                  if (next[key] === level) {
-                    delete next[key];
-                  } else {
-                    next[key] = level;
-                  }
-                  return next;
-                })
-              }
-              disabled={saving}
-            />
-          </View>
-        );
-      })}
-      <StepFooter onSave={handleSave} onSkip={onDone} saving={saving} error={error} />
+      <SkillLevelFlow
+        sports={sports}
+        initialLevels={initialLevels}
+        saving={saving}
+        error={error}
+        nextLabel="Next"
+        backLabel="Back"
+        saveLabel="Save"
+        onSave={handleSave}
+        footer={<Button label="Skip" variant="secondary" onPress={onDone} disabled={saving} style={styles.skip} />}
+      />
     </ScrollView>
   );
 }
@@ -132,8 +123,6 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
 const styles = StyleSheet.create({
   container: { padding: spacing.md },
   centered: { padding: spacing.md },
-  lead: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.md },
-  sportBlock: { marginBottom: spacing.md },
-  sportName: { ...typography.bodyBold, color: colors.textPrimary, marginBottom: spacing.xs },
   error: { ...typography.body, color: colors.error, marginBottom: spacing.sm },
+  skip: { marginTop: spacing.sm },
 });
