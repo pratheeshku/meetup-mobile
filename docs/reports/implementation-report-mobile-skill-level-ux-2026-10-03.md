@@ -47,15 +47,15 @@ Exists; its skill UI was replaced with `SkillLevelFlow`. `steps.ts` and `Onboard
 
 ## Verification
 - `npx tsc --noEmit` and `npx eslint src --ext .ts,.tsx`: clean (run after final edits). Node deps were installed with `npm ci --ignore-scripts` for this (no package file changed).
-- **Jest, run once** (`--coverage`, all `src/**` as collection scope): 113 suites, **1396 tests passed, 0 failed**; 1 suite "failed to run" — my own helper file had been placed inside `__tests__/`, so Jest treated it as a test file with no tests. I moved it to `src/test-utils/skillControls.ts` afterwards and checked it with tsc/eslint only; **Jest was not re-run** per the one-run rule, so the post-move state is not Jest-verified.
+- **Jest (confirming run, architect-approved exception), tree at `8e84082`, `tsc` and `eslint .` clean:** 112 suites passed / 112, **1396 tests passed / 1396**, 0 failures, no suite "failed to run", and no non-test file under any `__tests__/`. This supersedes the earlier run, which was invalidated by the misplaced helper (now `src/test-utils/skillControls.ts`).
 - **Baseline** (separate worktree of origin/main `ce481f7`, same flags): 108 suites, 1362 tests, all passed.
 
-| Coverage | origin/main | this branch |
+| Coverage | origin/main | this branch (final) |
 |---|---|---|
-| Statements | 90.94% (3386/3723) | 91.28% (3478/3810) |
-| Branches | 84.55% (1900/2247) | 84.79% (1947/2296) |
-| Functions | 88.25% (842/954) | 88.79% (880/991) |
-| Lines | 91.22% (3274/3589) | 91.54% (3358/3668) |
+| Statements | 90.94% (3386/3723) | 91.28% (3490/3823) |
+| Branches | 84.55% (1900/2247) | 84.77% (1955/2306) |
+| Functions | 88.25% (842/954) | 88.90% (889/1000) |
+| Lines | 91.22% (3274/3589) | 91.54% (3367/3678) |
 
 New components: 100% lines; branch gaps in `MySportRow` (50%), `LevelSegmentedControl` (89%), `SportPicker` (91%) are the unused `disabled`/default-prop branches.
 
