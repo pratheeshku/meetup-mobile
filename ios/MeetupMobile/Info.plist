@@ -34,7 +34,6 @@
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-	  <!-- Do not change NSAllowsArbitraryLoads to true, or you will risk app rejection! -->
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 		<key>NSAllowsLocalNetworking</key>
@@ -42,6 +41,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Shuttlr uses the camera to take your profile photo and to scan event QR codes.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Shuttlr uses your location to show games and venues near you.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Shuttlr needs access to your photos so you can choose a profile picture.</string>
 	<key>UIBackgroundModes</key>
