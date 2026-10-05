@@ -8,9 +8,14 @@
  * the tapped card so 5 stay shown — when there is none the list shrinks. The
  * full list is never re-queried. Repeated taps are ignored while a call is in
  * flight. Display names, nicknames and image URLs are never logged.
+ *
+ * A search box (the shared `UserSearchPicker`) adds people through the same
+ * `inviteMember` call. Everyone added on this screen moves into an "Added (n)"
+ * list (screen-local state; resets on leave, no remove action) and is excluded
+ * from the suggestions and the search results.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
@@ -18,12 +23,14 @@ import { getSuggestedMembers, inviteMember } from '../api/groups';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
 import LoadingView from '../components/LoadingView';
+import UserAvatar from '../components/UserAvatar';
+import UserSearchPicker from '../components/UserSearchPicker';
 import { useT } from '../labels/LabelsContext';
 import { goToDashboard } from '../navigation/goToDashboard';
 import type { GroupsStackParamList } from '../navigation/types';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { SuggestedMember } from '../types/group';
-import { toHttpsUrl } from '../utils/httpsUrl';
+import type { UserSearchResult } from '../types/user';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'InviteMembers'>;
 
@@ -46,11 +53,7 @@ function SuggestionCard({
   onPress: (member: SuggestedMember) => void;
 }): React.JSX.Element {
   const t = useT();
-  const [imageFailed, setImageFailed] = useState(false);
-  const imageUrl = toHttpsUrl(member.image_url);
-  const showImage = imageUrl !== null && !imageFailed;
-  const nickname = member.nickname.trim();
-  const initial = (member.display_name.trim().charAt(0) || '?').toUpperCase();
+  const nickname = (member.nickname ?? '').trim();
 
   return (
     <Pressable
@@ -60,18 +63,7 @@ function SuggestionCard({
       style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
       testID="suggested-member-card"
     >
-      {showImage ? (
-        <Image
-          source={{ uri: imageUrl }}
-          style={styles.avatar}
-          onError={() => setImageFailed(true)}
-          testID="suggested-member-image"
-        />
-      ) : (
-        <View style={[styles.avatar, styles.avatarPlaceholder]} testID="suggested-member-placeholder">
-          <Text style={styles.avatarInitial}>{initial}</Text>
-        </View>
-      )}
+      <UserAvatar imageUrl={member.image_url} name={member.display_name} size={AVATAR_SIZE} />
       <View style={styles.cardText}>
         <Text style={styles.displayName} numberOfLines={1}>
           {member.display_name}
@@ -94,8 +86,11 @@ export default function InviteMembersScreen({ route }: Props): React.JSX.Element
   tRef.current = t;
 
   const [members, setMembers] = useState<SuggestedMember[] | null>(null);
+  const membersRef = useRef<SuggestedMember[] | null>(null);
+  membersRef.current = members;
   const [loadFailed, setLoadFailed] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [added, setAdded] = useState<SuggestedMember[]>([]);
   const [addingUserId, setAddingUserId] = useState<string | null>(null);
   // Synchronous guard: a state flag alone would let a second tap in the same
   // frame through before the re-render.
@@ -138,6 +133,11 @@ export default function InviteMembersScreen({ route }: Props): React.JSX.Element
       const result = await withCorrelationId(correlationId =>
         inviteMember(groupId, member.user_id, { correlationId }),
       );
+      setAdded(current =>
+        current.some(item => item.user_id === member.user_id) ? current : [...current, member],
+      );
+      // Read from a ref: a state updater may run after this line, so it can't report back.
+      const wasSuggested = membersRef.current?.some(item => item.user_id === member.user_id) ?? false;
       setMembers(current => {
         if (!current) {
           return current;
@@ -156,7 +156,7 @@ export default function InviteMembersScreen({ route }: Props): React.JSX.Element
         }
         return updated;
       });
-      if (!result.nextCandidate) {
+      if (wasSuggested && !result.nextCandidate) {
         await refillSuggestions();
       }
     } catch (e) {
@@ -174,16 +174,66 @@ export default function InviteMembersScreen({ route }: Props): React.JSX.Element
     }
   };
 
+  const handleSelectSearchResult = (user: UserSearchResult): void => {
+    handleAdd({
+      user_id: user.id,
+      display_name: user.display_name ?? '',
+      nickname: user.nickname ?? '',
+      image_url: user.image_url ?? null,
+    });
+  };
+
+  const addedIds = added.map(item => item.user_id);
+  const visibleMembers = members === null ? null : members.filter(item => !addedIds.includes(item.user_id));
+
   const finish = (): void => {
     goToDashboard(t('mob.success.group_created'));
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title} accessibilityRole="header">
         {t('mob.invite.title')}
       </Text>
       <Text style={styles.subtitle}>{t('mob.invite.subtitle')}</Text>
+
+      <View style={styles.search}>
+        <UserSearchPicker
+          onSelect={handleSelectSearchResult}
+          excludeGroupId={groupId}
+          excludeUserIds={addedIds}
+          placeholder={t('mob.invite.search_placeholder')}
+        />
+      </View>
+
+      {added.length > 0 ? (
+        <>
+          <Text style={styles.sectionTitle} accessibilityRole="header">
+            {t('mob.invite.added_title', { count: String(added.length) })}
+          </Text>
+          {added.map(member => (
+            <View
+              key={member.user_id}
+              style={styles.card}
+              accessible
+              accessibilityLabel={t('mob.invite.added_a11y', { name: member.display_name })}
+              testID="added-member-row"
+            >
+              <UserAvatar imageUrl={member.image_url} name={member.display_name} size={AVATAR_SIZE} />
+              <View style={styles.cardText}>
+                <Text style={styles.displayName} numberOfLines={1}>
+                  {member.display_name}
+                </Text>
+                {(member.nickname ?? '').trim() ? (
+                  <Text style={styles.nickname} numberOfLines={1}>
+                    {member.nickname.trim()}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ))}
+        </>
+      ) : null}
 
       <Text style={styles.sectionTitle} accessibilityRole="header">
         {t('mob.invite.suggested_title')}
@@ -191,14 +241,14 @@ export default function InviteMembersScreen({ route }: Props): React.JSX.Element
 
       {loadFailed ? (
         <InlineError message={t('mob.invite.load_error')} onRetry={load} />
-      ) : members === null ? (
+      ) : visibleMembers === null ? (
         <View style={styles.loading}>
           <LoadingView />
         </View>
-      ) : members.length === 0 ? (
+      ) : visibleMembers.length === 0 ? (
         <Text style={styles.empty}>{t('mob.invite.empty')}</Text>
       ) : (
-        members.map(member => (
+        visibleMembers.map(member => (
           <SuggestionCard
             key={member.user_id}
             member={member}
@@ -230,6 +280,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
   },
+  search: { marginTop: spacing.lg },
   loading: { height: sizes.touchTarget * 2 },
   empty: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.md },
   card: {
@@ -244,13 +295,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   pressed: { opacity: 0.85 },
-  avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
-  avatarPlaceholder: {
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: { ...typography.bodyBold, color: colors.white },
   cardText: { flex: 1, marginLeft: spacing.md },
   displayName: { ...typography.bodyBold, color: colors.textPrimary },
   nickname: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },

@@ -124,4 +124,6 @@ export interface UserSearchResult {
   display_name: string;
   nickname: string;
   pending: boolean;
+  /** Optional: search endpoints may omit it; callers show the placeholder avatar. */
+  image_url?: string | null;
 }

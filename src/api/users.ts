@@ -42,6 +42,7 @@ interface UserSearchResultApiItem {
   theme_preference: string;
   created_at: string;
   pending: boolean;
+  image_url?: string | null;
 }
 
 export async function searchUsers(
@@ -62,5 +63,6 @@ export async function searchUsers(
     display_name: item.display_name,
     nickname: item.nickname,
     pending: item.pending,
+    image_url: item.image_url ?? null,
   }));
 }

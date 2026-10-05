@@ -1688,6 +1688,31 @@
       "status": "new-label (was hardcoded)"
     },
     {
+      "key": "mob.invite.search_placeholder",
+      "defaultText": "Search to add group members...",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [],
+      "status": "new-label"
+    },
+    {
+      "key": "mob.invite.added_title",
+      "defaultText": "Added ({count})",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label"
+    },
+    {
+      "key": "mob.invite.added_a11y",
+      "defaultText": "{name} is added to the group",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [
+        "name"
+      ],
+      "status": "new-label"
+    },
+    {
       "key": "mob.group_detail.load_error",
       "defaultText": "Could not load this group. Please try again.",
       "screen": "Group detail",

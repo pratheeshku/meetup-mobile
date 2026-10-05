@@ -10,6 +10,10 @@
  * caller owns what happens on selection (e.g. `GroupDetailScreen` calls
  * `inviteMember(groupId, user.id)`); this component only finds the user.
  *
+ * `excludeUserIds` hides already-chosen users from the results client-side
+ * (e.g. the group-creation "Added" list). Each result shows a `UserAvatar`
+ * (placeholder when the result has no `image_url`).
+ *
  * A `pending` result (an outstanding invite already exists for that user
  * in this context — real backend behaviour, not invented) is shown but
  * not selectable, so the caller can't fire off a redundant invite.
@@ -22,10 +26,12 @@ import { searchUsers } from '../api/users';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { UserSearchResult } from '../types/user';
 import TextField from './TextField';
+import UserAvatar from './UserAvatar';
 import { useT } from '../labels/LabelsContext';
 
 const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_MS = 300;
+const AVATAR_SIZE = 40;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface UserSearchPickerProps {
@@ -35,6 +41,7 @@ interface UserSearchPickerProps {
   excludeGroupId?: string;
   excludeEventId?: string;
   excludeTeamId?: string;
+  excludeUserIds?: string[];
   placeholder?: string;
   disabled?: boolean;
 }
@@ -46,6 +53,7 @@ export default function UserSearchPicker({
   excludeGroupId,
   excludeEventId,
   excludeTeamId,
+  excludeUserIds,
   placeholder,
   disabled = false,
 }: UserSearchPickerProps): React.JSX.Element {
@@ -132,12 +140,15 @@ export default function UserSearchPicker({
     setError(null);
   };
 
+  const visibleResults = excludeUserIds?.length
+    ? results.filter(user => !excludeUserIds.includes(user.id))
+    : results;
   const trimmed = query.trim();
   const isEmail = EMAIL_REGEX.test(trimmed);
   const showEmailAffordance =
-    !isSearching && !error && hasSearched && results.length === 0 && isEmail && Boolean(onSelectEmail);
+    !isSearching && !error && hasSearched && visibleResults.length === 0 && isEmail && Boolean(onSelectEmail);
   const showEmpty =
-    !isSearching && !error && hasSearched && results.length === 0 && !showEmailAffordance;
+    !isSearching && !error && hasSearched && visibleResults.length === 0 && !showEmailAffordance;
 
   return (
     <View>
@@ -178,9 +189,9 @@ export default function UserSearchPicker({
           </Pressable>
         </View>
       ) : null}
-      {!isSearching && results.length > 0 ? (
+      {!isSearching && visibleResults.length > 0 ? (
         <View style={styles.resultsList}>
-          {results.map(user => (
+          {visibleResults.map(user => (
             <Pressable
               key={user.id}
               style={({ pressed }) => [
@@ -198,9 +209,12 @@ export default function UserSearchPicker({
               }
               accessibilityState={{ disabled: user.pending }}
             >
-              <View style={styles.resultText}>
-                <Text style={styles.resultNickname}>{user.nickname}</Text>
-                <Text style={styles.resultDisplayName}>{user.display_name}</Text>
+              <View style={styles.resultLeft}>
+                <UserAvatar imageUrl={user.image_url} name={user.display_name} size={AVATAR_SIZE} />
+                <View style={styles.resultText}>
+                  <Text style={styles.resultNickname}>{user.nickname}</Text>
+                  <Text style={styles.resultDisplayName}>{user.display_name}</Text>
+                </View>
               </View>
               {user.pending ? <Text style={styles.pendingLabel}>{t('mob.user_search.pending')}</Text> : null}
             </Pressable>
@@ -234,7 +248,8 @@ const styles = StyleSheet.create({
   },
   resultRowPressed: { backgroundColor: colors.background },
   resultRowDisabled: { opacity: 0.6 },
-  resultText: { flexShrink: 1 },
+  resultLeft: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  resultText: { flexShrink: 1, marginLeft: spacing.md },
   resultNickname: { ...typography.bodyBold, color: colors.textPrimary },
   resultDisplayName: { ...typography.caption, color: colors.textSecondary },
   emailAffordanceTitle: { ...typography.bodyBold, color: colors.primary },
