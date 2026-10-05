@@ -30,37 +30,24 @@ export function useAppShare(): AppShare {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const open = useCallback(() => {
-    if (!getShareUrl()) {
-      setToastMessage(t('mob.share.unavailable'));
-      return;
-    }
     setSheetVisible(true);
-  }, [t]);
+  }, []);
 
   const close = useCallback(() => setSheetVisible(false), []);
   const clearToast = useCallback(() => setToastMessage(null), []);
 
   const shareViaSystem = useCallback(async () => {
     const url = getShareUrl();
-    if (!url) {
-      return;
-    }
     await shareGeneric({ message: t('mob.share.message', { link: url }) });
   }, [t]);
 
   const shareViaWhatsApp = useCallback(async () => {
     const url = getShareUrl();
-    if (!url) {
-      return;
-    }
     await shareToWhatsApp(t('mob.share.message', { link: url }));
   }, [t]);
 
   const copyLink = useCallback(() => {
     const url = getShareUrl();
-    if (!url) {
-      return;
-    }
     copyLinkToClipboard(url);
     setSheetVisible(false);
     setToastMessage(t('mob.share.link_copied'));

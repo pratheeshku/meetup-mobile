@@ -258,7 +258,6 @@ export const DEFAULT_LABELS = {
   'mob.user_search.pending': 'Pending',
   'mob.share.message': 'Join me on Shuttlr! Download the app: {link}',
   'mob.share.link_copied': 'Link copied to clipboard',
-  'mob.share.unavailable': 'Sharing is not available right now.',
   'mob.share_sheet.title': 'Share',
   'mob.share_sheet.close_a11y': 'Close share menu',
   'mob.share_sheet.whatsapp': 'Share via WhatsApp',

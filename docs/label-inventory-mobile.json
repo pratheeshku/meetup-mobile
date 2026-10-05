@@ -1986,13 +1986,6 @@
       "status": "new-label (was hardcoded)"
     },
     {
-      "key": "mob.share.unavailable",
-      "defaultText": "Sharing is not available right now.",
-      "screen": "Share",
-      "placeholders": [],
-      "status": "new-label (was hardcoded)"
-    },
-    {
       "key": "mob.share_sheet.title",
       "defaultText": "Share",
       "screen": "Share sheet",

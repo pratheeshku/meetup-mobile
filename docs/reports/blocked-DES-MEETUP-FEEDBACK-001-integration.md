@@ -24,7 +24,7 @@ in production code.
   (`inviteMember` in `src/api/groups.ts`). If the field differs, the list
   shrinks instead of backfilling — verify.
 
-## B3. Share URL value not provided (task 5)
+## B3. (resolved) Share URL is now API base URL + /public/share; backend must serve it.
 
 - `config/appConfig.json` → `shareUrl` is the backend store-redirect URL. The
   design does not give its value or path, so it is committed **empty**. While

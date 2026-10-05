@@ -3,20 +3,22 @@
  * per-game / per-group invite links of DES-MEETUP-MOBILE-ADDENDUM-shareable-
  * links).
  *
- * The share action shares ONE URL — `shareUrl` from `config/appConfig.json`
- * (P1), the backend redirect that routes to the Play Store or App Store by
- * platform — with text asking the recipient to download the app. The text is
+ * The share action shares ONE URL — the app's API base URL plus
+ * `/public/share` (P1). The backend decides the destination (Play Store, App
+ * Store or a coming-soon page) from admin config, so the app holds no store
+ * URL. It is shared with text asking the recipient to download the app. The text is
  * the `mob.share.message` label. No game or group context is carried in the
  * link or the text (deep-link-after-install is deferred, DD-1).
  */
 import { Clipboard, Linking, Share } from 'react-native';
 
-import appConfig from '../../config/appConfig.json';
-import { toHttpsUrl } from './httpsUrl';
+import { ENV } from '../../config/env';
 
-/** The configured share URL, or `null` when it is missing / not an https URL. */
-export function getShareUrl(): string | null {
-  return toHttpsUrl(appConfig.shareUrl);
+export const SHARE_PATH = '/public/share';
+
+/** The app share URL: API base URL + `/public/share`. */
+export function getShareUrl(): string {
+  return `${ENV.API_BASE_URL.replace(/\/+$/, '')}${SHARE_PATH}`;
 }
 
 /**

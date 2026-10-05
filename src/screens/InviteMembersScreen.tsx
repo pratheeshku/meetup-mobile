@@ -25,6 +25,7 @@ import { borderWidth, colors, radius, sizes, spacing, typography } from '../them
 import type { SuggestedMember } from '../types/group';
 import { getApiErrorMessage } from '../utils/apiError';
 import { toHttpsUrl } from '../utils/httpsUrl';
+import { getHttpStatus } from '../utils/networkError';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'InviteMembers'>;
 
@@ -109,6 +110,18 @@ export default function InviteMembersScreen({ route }: Props): React.JSX.Element
     load();
   }, [load]);
 
+  /** One silent refetch (no loading state) after a response without a next candidate. */
+  const refillSuggestions = async (): Promise<void> => {
+    try {
+      const fresh = await withCorrelationId(correlationId =>
+        getSuggestedMembers(groupId, { correlationId }),
+      );
+      setMembers(fresh);
+    } catch {
+      // Keep the current list; the refetch is best-effort.
+    }
+  };
+
   const handleAdd = async (member: SuggestedMember): Promise<void> => {
     if (inFlight.current) {
       return;
@@ -138,8 +151,18 @@ export default function InviteMembersScreen({ route }: Props): React.JSX.Element
         }
         return updated;
       });
+      if (!result.nextCandidate) {
+        await refillSuggestions();
+      }
     } catch (e) {
-      setAddError(getApiErrorMessage(e, tRef.current('mob.invite.add_error')));
+      if (getHttpStatus(e) === 400) {
+        // Already added or invited: treat as done. Drop the card, no error,
+        // and refetch once to keep up to 5 shown.
+        setMembers(current => current && current.filter(item => item.user_id !== member.user_id));
+        await refillSuggestions();
+      } else {
+        setAddError(getApiErrorMessage(e, tRef.current('mob.invite.add_error')));
+      }
     } finally {
       inFlight.current = false;
       setAddingUserId(null);
