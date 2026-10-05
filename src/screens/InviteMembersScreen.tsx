@@ -23,7 +23,6 @@ import { goToDashboard } from '../navigation/goToDashboard';
 import type { GroupsStackParamList } from '../navigation/types';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { SuggestedMember } from '../types/group';
-import { getApiErrorMessage } from '../utils/apiError';
 import { toHttpsUrl } from '../utils/httpsUrl';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'InviteMembers'>;
@@ -167,7 +166,7 @@ export default function InviteMembersScreen({ route }: Props): React.JSX.Element
         setMembers(current => current && current.filter(item => item.user_id !== member.user_id));
         await refillSuggestions();
       } else {
-        setAddError(getApiErrorMessage(e, tRef.current('mob.invite.add_error')));
+        setAddError(tRef.current('mob.invite.add_error'));
       }
     } finally {
       inFlight.current = false;
