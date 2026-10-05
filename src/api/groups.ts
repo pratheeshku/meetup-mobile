@@ -217,9 +217,14 @@ export async function inviteMember(
  */
 interface SuggestedMemberApiItem {
   user_id: string;
-  display_name: string | null;
-  nickname: string | null;
-  image_url: string | null;
+  display_name?: string | null;
+  nickname?: string | null;
+  image_url?: string | null;
+}
+
+/** Wire shape of `GET /groups/{id}/suggested-members`: an object, not an array. */
+interface SuggestedMembersApiResponse {
+  suggestions?: SuggestedMemberApiItem[] | null;
 }
 
 function mapSuggestedMember(raw: SuggestedMemberApiItem): SuggestedMember {
@@ -244,11 +249,12 @@ export async function getSuggestedMembers(
   groupId: string,
   options?: RequestOptions,
 ): Promise<SuggestedMember[]> {
-  const { data } = await apiClient.get<SuggestedMemberApiItem[]>(
+  const { data } = await apiClient.get<SuggestedMembersApiResponse>(
     `/groups/${groupId}/suggested-members`,
     { correlationId: options?.correlationId },
   );
-  return data.slice(0, MAX_SUGGESTED_MEMBERS).map(mapSuggestedMember);
+  const suggestions = Array.isArray(data?.suggestions) ? data.suggestions : [];
+  return suggestions.slice(0, MAX_SUGGESTED_MEMBERS).map(mapSuggestedMember);
 }
 
 /**
