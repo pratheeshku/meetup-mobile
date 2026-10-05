@@ -25,11 +25,17 @@ import { borderWidth, colors, radius, sizes, spacing, typography } from '../them
 import type { SuggestedMember } from '../types/group';
 import { getApiErrorMessage } from '../utils/apiError';
 import { toHttpsUrl } from '../utils/httpsUrl';
-import { getHttpStatus } from '../utils/networkError';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'InviteMembers'>;
 
 const AVATAR_SIZE = 48;
+
+/** Only a 400 whose body has `code = "already_member_or_invited"` counts as already done. */
+function isAlreadyMemberOrInvited(error: unknown): boolean {
+  const response = (error as { response?: { status?: number; data?: { code?: unknown } } } | null)
+    ?.response;
+  return response?.status === 400 && response?.data?.code === 'already_member_or_invited';
+}
 
 function SuggestionCard({
   member,
@@ -155,8 +161,8 @@ export default function InviteMembersScreen({ route }: Props): React.JSX.Element
         await refillSuggestions();
       }
     } catch (e) {
-      if (getHttpStatus(e) === 400) {
-        // Already added or invited: treat as done. Drop the card, no error,
+      if (isAlreadyMemberOrInvited(e)) {
+        // 400 with code `already_member_or_invited`: treat as done. Drop the card, no error,
         // and refetch once to keep up to 5 shown.
         setMembers(current => current && current.filter(item => item.user_id !== member.user_id));
         await refillSuggestions();
