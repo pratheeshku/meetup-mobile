@@ -28,6 +28,7 @@ import { colors, opacity, radius, shadows, spacing, typography } from '../theme/
 import CreateMenu from './CreateMenu';
 import type { CreateTarget } from './CreateMenu';
 import type { AppTabParamList } from './types';
+import { useT } from '../labels/LabelsContext';
 
 const FAB_SIZE = spacing.xxl + spacing.sm;
 /** How far the button sits above the tab bar's top edge (upward overhang). */
@@ -73,6 +74,7 @@ function CreateFab({
   // target any tab (verified end-to-end in CreateTabButton.test.tsx).
   const navigation = useNavigation<BottomTabNavigationProp<AppTabParamList>>();
   const [menuOpen, setMenuOpen] = useState(false);
+  const t = useT();
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const selectTarget = useCallback(
@@ -87,8 +89,8 @@ function CreateFab({
     <View style={[style, styles.slot]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Create"
-        accessibilityHint="Opens a menu to create a game or group"
+        accessibilityLabel={t('mob.create_fab.a11y_label')}
+        accessibilityHint={t('mob.create_fab.a11y_hint')}
         testID={testID}
         onPress={() => setMenuOpen(true)}
         style={({ pressed }) => [styles.fab, pressed ? styles.pressed : null]}

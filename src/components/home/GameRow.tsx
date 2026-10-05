@@ -14,6 +14,8 @@ import type { Event } from '../../types/event';
 import { sportSlug } from '../icons/DashboardIcons';
 import { formatRowDate } from '../../utils/formatGameTime';
 import type { GameBadge } from '../../utils/gameLists';
+import { useT } from '../../labels/LabelsContext';
+import type { LabelKey } from '../../labels/fallbackLabels';
 
 export function sportTileColor(slug: string | null | undefined): string {
   return sportTileColors[sportSlug(slug)] ?? sportTileColors.fallback;
@@ -26,15 +28,27 @@ interface GameRowProps {
   badge?: GameBadge | null;
 }
 
+const BADGE_LABEL_KEY: Record<GameBadge, LabelKey> = {
+  Hosting: 'mob.game_badge.hosting',
+  Going: 'mob.game_badge.going',
+  Waitlisted: 'mob.game_badge.waitlisted',
+  Open: 'mob.game_badge.open',
+};
+
 export default function GameRow({ event, onPress, badge }: GameRowProps): React.JSX.Element {
+  const t = useT();
+  const badgeText = badge ? t(BADGE_LABEL_KEY[badge]) : null;
   const venue = event.venue_name || event.location || '';
   const dateLine = [formatRowDate(event.starts_at), venue].filter(Boolean).join(' · ');
-  const going = `${event.participant_count}/${event.capacity} going`;
+  const going = t('mob.game_row.going', {
+    count: event.participant_count,
+    capacity: event.capacity,
+  });
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${event.title}, ${dateLine}, ${going}${badge ? `, ${badge}` : ''}`}
+      accessibilityLabel={`${event.title}, ${dateLine}, ${going}${badgeText ? `, ${badgeText}` : ''}`}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
     >
@@ -58,7 +72,7 @@ export default function GameRow({ event, onPress, badge }: GameRowProps): React.
         {badge ? (
           <View style={[styles.statusPill, badge === 'Open' ? styles.statusOpen : null]}>
             <Text style={[styles.statusText, badge === 'Open' ? styles.statusOpenText : null]}>
-              {badge}
+              {badgeText}
             </Text>
           </View>
         ) : null}

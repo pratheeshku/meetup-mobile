@@ -18,6 +18,8 @@ import { GamesIcon, GroupsIcon, HomeIcon, ProfileIcon } from '../components/icon
 import type { IconProps } from '../components/icons/DashboardIcons';
 import { dash, dashSize } from '../theme/dashboardTheme';
 import type { AppTabParamList } from './types';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
 /** `Create` is excluded: the center action button draws its own "+" glyph. */
 export type IconTabName = Exclude<keyof AppTabParamList, 'Create'>;
@@ -29,12 +31,12 @@ export const TAB_ICONS: Record<IconTabName, (props: IconProps) => React.JSX.Elem
   Profile: ProfileIcon,
 };
 
-/** Visible label per tab ("Tournaments" route is the "Games" tab). */
-export const TAB_LABELS: Record<IconTabName, string> = {
-  Home: 'Home',
-  Groups: 'Groups',
-  Tournaments: 'Games',
-  Profile: 'Profile',
+/** Label key per tab ("Tournaments" route is the "Games" tab). */
+export const TAB_LABEL_KEYS: Record<IconTabName, LabelKey> = {
+  Home: 'mob.tabs.home',
+  Groups: 'mob.tabs.groups',
+  Tournaments: 'mob.tabs.games',
+  Profile: 'mob.tabs.profile',
 };
 
 export function TabIcon({ name }: { name: IconTabName }): React.JSX.Element {
@@ -49,9 +51,10 @@ export function TabLabel({
   name: IconTabName;
   focused: boolean;
 }): React.JSX.Element {
+  const t = useT();
   return (
     <Text style={[styles.label, focused ? styles.labelActive : styles.labelIdle]}>
-      {TAB_LABELS[name]}
+      {t(TAB_LABEL_KEYS[name])}
     </Text>
   );
 }

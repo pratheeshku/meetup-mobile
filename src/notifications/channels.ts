@@ -10,6 +10,7 @@
  */
 import { Platform } from 'react-native';
 import notifee, { AndroidImportance } from 'react-native-notify-kit';
+import { currentT } from '../labels/LabelsContext';
 
 export const PLAN_CHANNEL_ID = 'plan';
 
@@ -20,7 +21,7 @@ export async function createNotificationChannels(): Promise<void> {
   }
   await notifee.createChannel({
     id: PLAN_CHANNEL_ID,
-    name: 'Plans & Updates',
+    name: currentT('mob.notification_channel.plans'),
     importance: AndroidImportance.HIGH,
   });
 }

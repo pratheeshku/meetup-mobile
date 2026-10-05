@@ -33,6 +33,7 @@ import {
   spacing,
   typography,
 } from '../theme/tokens';
+import { useT } from '../labels/LabelsContext';
 
 export interface DropdownOption {
   value: string;
@@ -58,6 +59,7 @@ export default function DropdownField({
   disabled = false,
   style,
 }: DropdownFieldProps): React.JSX.Element {
+  const t = useT();
   const [isOpen, setIsOpen] = useState(false);
   const selected = options.find(option => option.value === value) ?? null;
 
@@ -107,10 +109,10 @@ export default function DropdownField({
               <Text style={styles.modalTitle}>{accessibilityLabel}</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Cancel"
+                accessibilityLabel={t('mob.common.cancel')}
                 onPress={handleClose}
               >
-                <Text style={styles.modalActionCancel}>Cancel</Text>
+                <Text style={styles.modalActionCancel}>{t('mob.common.cancel')}</Text>
               </Pressable>
             </View>
             <ScrollView style={styles.optionsScroll} keyboardShouldPersistTaps="handled">

@@ -1,0 +1,3740 @@
+{
+  "doc": "DES-MEETUP-FEEDBACK-001",
+  "version": "v1.0",
+  "app": "meetup-mobile (React Native, Android + iOS)",
+  "glossary": {
+    "Game": "standalone play session (never \"event\")",
+    "Match": "fixture inside a tournament",
+    "Group": "ongoing community",
+    "Group member": "person in a group",
+    "Player": "person joined to a standalone game",
+    "Tournament": "multi-match competition",
+    "Tournament team": "competing unit in a tournament",
+    "Team player": "person on a tournament team"
+  },
+  "resolution": "t(key, params) via src/labels/LabelsContext.tsx; bundled default per key in src/labels/defaultLabels.ts (+ fallbackLabels.ts for pre-existing keys)",
+  "exclusions": [
+    "Brand name \"Shuttlr\" inside default texts and the wordmark (identity, not copy)",
+    "Date/time format tokens (YYYY-MM-DD, YYYY-MM-DD HH:mm) passed as {format} placeholders",
+    "Server-supplied text: push notification title/body, API error `detail`, sport display names, tournament status/format values, consent text",
+    "User-generated content (group, game and tournament names, nicknames, descriptions)",
+    "Internal identifiers, route names, log messages and thrown Error messages that are never rendered",
+    "Backend response strings matched in code (e.g. \"Email already registered\"); not displayed"
+  ],
+  "entries": [
+    {
+      "key": "skill_level.beginner",
+      "defaultText": "Beginner",
+      "screen": "Skills / Create Game / Game detail",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "skill_level.intermediate",
+      "defaultText": "Intermediate",
+      "screen": "Skills / Create Game / Game detail",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "skill_level.expert",
+      "defaultText": "Expert",
+      "screen": "Skills / Create Game / Game detail",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "skill_level.all_levels",
+      "defaultText": "All Levels",
+      "screen": "Create Game / Game detail",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "skill_level.beginner.desc",
+      "defaultText": "New to the sport or still learning the rules",
+      "screen": "Skills",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "skill_level.intermediate.desc",
+      "defaultText": "Play regularly, comfortable with the basics",
+      "screen": "Skills",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "skill_level.expert.desc",
+      "defaultText": "Competitive, strong technique and match experience",
+      "screen": "Skills",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "mob_skill_sports_title",
+      "defaultText": "What do you play?",
+      "screen": "Skills",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "mob_skill_sports_subtitle",
+      "defaultText": "Select all that apply. Level comes next.",
+      "screen": "Skills",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "mob_skill_level_title",
+      "defaultText": "How good are you?",
+      "screen": "Skills",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "mob_skill_level_subtitle",
+      "defaultText": "One level per sport. Change it anytime.",
+      "screen": "Skills",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "mob_skill_pick_level_hint",
+      "defaultText": "Pick a level to continue",
+      "screen": "Skills",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "mob_my_sports_title",
+      "defaultText": "My sports",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "mob_add_sport",
+      "defaultText": "Add sport",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "event_visibility.public",
+      "defaultText": "Public",
+      "screen": "Create Game / Game detail",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "event_visibility.invite_only",
+      "defaultText": "Invite Only",
+      "screen": "Create Game / Game detail",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "event_visibility.group",
+      "defaultText": "Group",
+      "screen": "Create Game / Game detail",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "tournament_visibility.public",
+      "defaultText": "Public",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "tournament_visibility.invite",
+      "defaultText": "Private",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "tournament_visibility.group",
+      "defaultText": "Group Only",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "team_visibility.public",
+      "defaultText": "Public",
+      "screen": "Create Group (tournament team)",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "team_visibility.private",
+      "defaultText": "Private",
+      "screen": "Create Group (tournament team)",
+      "placeholders": [],
+      "status": "existing-label"
+    },
+    {
+      "key": "mob.common.and",
+      "defaultText": "and",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.back",
+      "defaultText": "Back",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.cancel",
+      "defaultText": "Cancel",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.change",
+      "defaultText": "Change",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.close",
+      "defaultText": "Close",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.delete",
+      "defaultText": "Delete",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.done",
+      "defaultText": "Done",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.edit",
+      "defaultText": "Edit",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.loading",
+      "defaultText": "Loading",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.next",
+      "defaultText": "Next",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.no_sports",
+      "defaultText": "No sports are available right now.",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.remove",
+      "defaultText": "Remove",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.retry",
+      "defaultText": "Retry",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.save",
+      "defaultText": "Save",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.skip",
+      "defaultText": "Skip",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.sports_load_error",
+      "defaultText": "Could not load the list of sports. Please try again.",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.common.view_arrow",
+      "defaultText": "View →",
+      "screen": "Shared",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.errors.forbidden",
+      "defaultText": "You do not have permission to do this.",
+      "screen": "Shared (errors)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.errors.network",
+      "defaultText": "Unable to connect to server.",
+      "screen": "Shared (errors)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.errors.open_form_failed",
+      "defaultText": "Could not open the form",
+      "screen": "Shared (errors)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.errors.open_link_failed",
+      "defaultText": "Could not open the link",
+      "screen": "Shared (errors)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.errors.open_page_failed",
+      "defaultText": "Could not open the page",
+      "screen": "Shared (errors)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.errors.rate_limit",
+      "defaultText": "Too many attempts. Try again in a minute.",
+      "screen": "Shared (errors)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.errors.server",
+      "defaultText": "Something went wrong. Try again.",
+      "screen": "Shared (errors)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.errors.session_expired",
+      "defaultText": "Session expired. Please sign in again.",
+      "screen": "Shared (errors)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.errors.try_later",
+      "defaultText": "Please try again later.",
+      "screen": "Shared (errors)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.success.game_created",
+      "defaultText": "Game created",
+      "screen": "Dashboard (post-action success messages)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.success.game_updated",
+      "defaultText": "Game updated",
+      "screen": "Dashboard (post-action success messages)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.success.game_cancelled",
+      "defaultText": "Game cancelled",
+      "screen": "Dashboard (post-action success messages)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.success.tournament_created",
+      "defaultText": "Tournament created",
+      "screen": "Dashboard (post-action success messages)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.success.tournament_cancelled",
+      "defaultText": "Tournament cancelled",
+      "screen": "Dashboard (post-action success messages)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.success.team_created",
+      "defaultText": "Tournament team created",
+      "screen": "Dashboard (post-action success messages)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.success.group_created",
+      "defaultText": "Group created",
+      "screen": "Dashboard (post-action success messages)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.success.group_updated",
+      "defaultText": "Group updated",
+      "screen": "Dashboard (post-action success messages)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.success.group_left",
+      "defaultText": "You left the group",
+      "screen": "Dashboard (post-action success messages)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.auth.email_placeholder",
+      "defaultText": "Email",
+      "screen": "Login / Register / Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.auth.password_placeholder",
+      "defaultText": "Password",
+      "screen": "Login / Register / Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.login.title",
+      "defaultText": "Sign In",
+      "screen": "Login",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.login.submit",
+      "defaultText": "Sign In",
+      "screen": "Login",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.login.forgot_password",
+      "defaultText": "Forgot password?",
+      "screen": "Login",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.login.register_link",
+      "defaultText": "Don't have an account? Register",
+      "screen": "Login",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.login.google_failed",
+      "defaultText": "Google sign-in failed. Please try again.",
+      "screen": "Login",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.login.missing_fields",
+      "defaultText": "Enter your email and password.",
+      "screen": "Login",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.login.verify_first",
+      "defaultText": "Please verify your email before signing in.",
+      "screen": "Login",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.login.invalid_credentials",
+      "defaultText": "Invalid email or password.",
+      "screen": "Login",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.title",
+      "defaultText": "Register",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.submit",
+      "defaultText": "Register",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.nickname_placeholder",
+      "defaultText": "Nickname",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.display_name_placeholder",
+      "defaultText": "Display Name",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.show",
+      "defaultText": "Show",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.hide",
+      "defaultText": "Hide",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.show_password",
+      "defaultText": "Show password",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.hide_password",
+      "defaultText": "Hide password",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.agree_prefix",
+      "defaultText": "I agree to the",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.agree_terms_a11y",
+      "defaultText": "I agree to the Terms of Use",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.agree_terms_privacy_a11y",
+      "defaultText": "I agree to the Terms of Use and Privacy Policy",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.terms_link",
+      "defaultText": "Terms of Use",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.privacy_link",
+      "defaultText": "Privacy Policy",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.fill_all",
+      "defaultText": "Fill in every field.",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.password_short",
+      "defaultText": "Password must be at least 8 characters long.",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.email_taken",
+      "defaultText": "Email already registered",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.nickname_taken",
+      "defaultText": "Nickname already taken",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.failed",
+      "defaultText": "Registration failed. Please try again.",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.sign_in",
+      "defaultText": "Sign in",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.verify_email",
+      "defaultText": "Verify your email",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.register.login_link",
+      "defaultText": "Already have an account? Sign In",
+      "screen": "Register",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.title",
+      "defaultText": "Verify Email",
+      "screen": "Verify Email",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.instructions",
+      "defaultText": "Enter the 6-digit code sent to",
+      "screen": "Verify Email",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.code_placeholder",
+      "defaultText": "6-digit code",
+      "screen": "Verify Email",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.submit",
+      "defaultText": "Verify",
+      "screen": "Verify Email",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.resend",
+      "defaultText": "Resend",
+      "screen": "Verify Email",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.resend_cooldown",
+      "defaultText": "Resend ({seconds}s)",
+      "screen": "Verify Email",
+      "placeholders": [
+        "seconds"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.resent",
+      "defaultText": "Verification code resent.",
+      "screen": "Verify Email",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.resend_failed",
+      "defaultText": "Failed to resend verification code. Please try again.",
+      "screen": "Verify Email",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.bad_code",
+      "defaultText": "That code didn't work. Check it or request a new one.",
+      "screen": "Verify Email",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.verify.verified",
+      "defaultText": "Email verified. Sign in.",
+      "screen": "Verify Email",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.forgot.title",
+      "defaultText": "Forgot Password",
+      "screen": "Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.forgot.instructions",
+      "defaultText": "Enter your email to receive a password reset link.",
+      "screen": "Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.forgot.enter_email",
+      "defaultText": "Enter your email.",
+      "screen": "Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.forgot.submit",
+      "defaultText": "Submit",
+      "screen": "Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.forgot.sent",
+      "defaultText": "If an account exists for that email, we've sent a reset link. Open it on this phone.",
+      "screen": "Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.forgot.oauth_only",
+      "defaultText": "This account signs in with Google, so it has no password. Use Continue with Google to sign in.",
+      "screen": "Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.forgot.continue_google",
+      "defaultText": "Continue with Google",
+      "screen": "Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.forgot.back_to_sign_in",
+      "defaultText": "Back to sign in",
+      "screen": "Forgot Password",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.force_update.title",
+      "defaultText": "Update required",
+      "screen": "Force Update",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.force_update.message",
+      "defaultText": "Please update Shuttlr to continue.",
+      "screen": "Force Update",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.force_update.action",
+      "defaultText": "Update",
+      "screen": "Force Update",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.brand.tagline",
+      "defaultText": "PLAY TOGETHER",
+      "screen": "Dashboard banner",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tabs.home",
+      "defaultText": "Home",
+      "screen": "Navigation (tab bar)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tabs.groups",
+      "defaultText": "Groups",
+      "screen": "Navigation (tab bar)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tabs.games",
+      "defaultText": "Games",
+      "screen": "Navigation (tab bar)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tabs.profile",
+      "defaultText": "Profile",
+      "screen": "Navigation (tab bar)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_game",
+      "defaultText": "Game",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_create_game",
+      "defaultText": "Create Game",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_notifications",
+      "defaultText": "Notifications",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_groups",
+      "defaultText": "Groups",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_group",
+      "defaultText": "Group",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_create_group",
+      "defaultText": "Create Group",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_invite_members",
+      "defaultText": "Invite members",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_games",
+      "defaultText": "Games",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_tournament",
+      "defaultText": "Tournament",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_profile",
+      "defaultText": "Profile",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.nav.title_notification_prefs",
+      "defaultText": "Notification Preferences",
+      "screen": "Navigation (screen titles)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_fab.a11y_label",
+      "defaultText": "Create",
+      "screen": "Navigation (create button)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_fab.a11y_hint",
+      "defaultText": "Opens a menu to create a game or group",
+      "screen": "Navigation (create button)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_menu.title",
+      "defaultText": "Create",
+      "screen": "Navigation (create menu)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_menu.game",
+      "defaultText": "Create Game",
+      "screen": "Navigation (create menu)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_menu.group",
+      "defaultText": "Create Group",
+      "screen": "Navigation (create menu)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_menu.close_a11y",
+      "defaultText": "Close create menu",
+      "screen": "Navigation (create menu)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.greeting",
+      "defaultText": "Good to see you",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.headline",
+      "defaultText": "Ready to play?",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.headline_named",
+      "defaultText": "Ready to play, {name}?",
+      "screen": "Dashboard (Home)",
+      "placeholders": [
+        "name"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.notifications_a11y",
+      "defaultText": "Notifications",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.notifications_unread_a11y",
+      "defaultText": "Notifications, {count} unread",
+      "screen": "Dashboard (Home)",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.profile_a11y",
+      "defaultText": "Profile",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.my_games",
+      "defaultText": "My games",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.my_groups",
+      "defaultText": "My groups",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.recommended",
+      "defaultText": "Recommended for you",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.view_all",
+      "defaultText": "View all",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.view_all_a11y",
+      "defaultText": "View all {title}",
+      "screen": "Dashboard (Home)",
+      "placeholders": [
+        "title"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.sports_all",
+      "defaultText": "All",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.sports_loading",
+      "defaultText": "Loading sports",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.games_empty",
+      "defaultText": "No upcoming games yet — join one below or create your own.",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.games_error",
+      "defaultText": "Couldn't load your games",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.groups_empty",
+      "defaultText": "You haven't joined any groups yet.",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.groups_error",
+      "defaultText": "Couldn't load your groups",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.recommended_empty",
+      "defaultText": "No public games to recommend right now.",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.recommended_error",
+      "defaultText": "Couldn't load recommendations",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.dashboard.filtered_empty",
+      "defaultText": "No {sports} games here — clear the filter to see all",
+      "screen": "Dashboard (Home)",
+      "placeholders": [
+        "sports"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.next_game.kicker",
+      "defaultText": "Next game",
+      "screen": "Dashboard (Home)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.next_game.kicker_day",
+      "defaultText": "Next game · {day}",
+      "screen": "Dashboard (Home)",
+      "placeholders": [
+        "day"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.next_game.a11y",
+      "defaultText": "Next game, {day}, {title}, {detail}",
+      "screen": "Dashboard (Home)",
+      "placeholders": [
+        "day",
+        "detail",
+        "title"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_row.going",
+      "defaultText": "{count}/{capacity} going",
+      "screen": "Dashboard / Games list",
+      "placeholders": [
+        "capacity",
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_badge.hosting",
+      "defaultText": "Hosting",
+      "screen": "Dashboard / Games list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_badge.going",
+      "defaultText": "Going",
+      "screen": "Dashboard / Games list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_badge.waitlisted",
+      "defaultText": "Waitlisted",
+      "screen": "Dashboard / Games list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_badge.open",
+      "defaultText": "Open",
+      "screen": "Dashboard / Games list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.shortcuts.games_active",
+      "defaultText": "{count} active",
+      "screen": "Dashboard (Home)",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.shortcuts.groups_one",
+      "defaultText": "{count} group",
+      "screen": "Dashboard (Home)",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.shortcuts.groups_other",
+      "defaultText": "{count} groups",
+      "screen": "Dashboard (Home)",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.time.today",
+      "defaultText": "Today",
+      "screen": "Shared (relative / day labels)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.time.tomorrow",
+      "defaultText": "Tomorrow",
+      "screen": "Shared (relative / day labels)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.time.yesterday",
+      "defaultText": "Yesterday",
+      "screen": "Shared (relative / day labels)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.time.just_now",
+      "defaultText": "Just now",
+      "screen": "Shared (relative / day labels)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.time.minutes_ago",
+      "defaultText": "{count}m ago",
+      "screen": "Shared (relative / day labels)",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.time.hours_ago",
+      "defaultText": "{count}h ago",
+      "screen": "Shared (relative / day labels)",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.time.days_ago",
+      "defaultText": "{count}d ago",
+      "screen": "Shared (relative / day labels)",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.date_picker.placeholder_date",
+      "defaultText": "YYYY-MM-DD",
+      "screen": "Shared (date picker)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.date_picker.placeholder_datetime",
+      "defaultText": "YYYY-MM-DD HH:mm",
+      "screen": "Shared (date picker)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_card.status_hosting",
+      "defaultText": "Hosting",
+      "screen": "Game card",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_card.status_waitlisted",
+      "defaultText": "Waitlisted",
+      "screen": "Game card",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_card.status_full",
+      "defaultText": "Full",
+      "screen": "Game card",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_card.status_left",
+      "defaultText": "{count} left",
+      "screen": "Game card",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_card.status_open",
+      "defaultText": "Open",
+      "screen": "Game card",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_card.action_manage",
+      "defaultText": "Manage →",
+      "screen": "Game card",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_card.action_join",
+      "defaultText": "Join →",
+      "screen": "Game card",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_role.owner",
+      "defaultText": "Owner",
+      "screen": "Group card / Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_role.admin",
+      "defaultText": "Admin",
+      "screen": "Group card / Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_role.member",
+      "defaultText": "Group member",
+      "screen": "Group card / Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_role.none",
+      "defaultText": "None",
+      "screen": "Group card / Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_card.owner_self",
+      "defaultText": "Self",
+      "screen": "Group card",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_card.owner_fallback",
+      "defaultText": "Organiser",
+      "screen": "Group card",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_card.owner_line",
+      "defaultText": "Owner: {name}",
+      "screen": "Group card",
+      "placeholders": [
+        "name"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_card.members_one",
+      "defaultText": "{count} group member",
+      "screen": "Group card",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_card.members_other",
+      "defaultText": "{count} group members",
+      "screen": "Group card",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.games.segment_games",
+      "defaultText": "Games",
+      "screen": "Games",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.games.segment_tournaments",
+      "defaultText": "Tournaments",
+      "screen": "Games",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.games.scope_all",
+      "defaultText": "All",
+      "screen": "Games",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.games.scope_mine",
+      "defaultText": "Mine",
+      "screen": "Games",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.games.scope_open",
+      "defaultText": "Open",
+      "screen": "Games",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.games.scope_all_a11y",
+      "defaultText": "All games",
+      "screen": "Games",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.games.scope_mine_a11y",
+      "defaultText": "Mine games",
+      "screen": "Games",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.games.scope_open_a11y",
+      "defaultText": "Open games",
+      "screen": "Games",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.title",
+      "defaultText": "My Groups",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.subtitle",
+      "defaultText": "Groups you organise and belong to.",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.create_a11y",
+      "defaultText": "Create Group",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.filter_all",
+      "defaultText": "All",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.filter_organised",
+      "defaultText": "Organised",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.filter_joined",
+      "defaultText": "Joined",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.load_error",
+      "defaultText": "Could not load your groups. Please try again.",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.empty_title",
+      "defaultText": "You're not in any groups yet.",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.empty_subtitle",
+      "defaultText": "Tap '+' above to create a group and invite group members.",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.empty_organised",
+      "defaultText": "No organised groups.",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.empty_joined",
+      "defaultText": "No joined groups.",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.empty_organised_hint",
+      "defaultText": "You don't organise any groups yet.",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.groups.empty_joined_hint",
+      "defaultText": "You haven't joined any other groups yet.",
+      "screen": "Groups list",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.mode_group",
+      "defaultText": "👥 Group",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.mode_team",
+      "defaultText": "🛡️ Tournament team",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.name",
+      "defaultText": "Name",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.name_placeholder",
+      "defaultText": "e.g. Sunday Footballers",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.description",
+      "defaultText": "Description (optional)",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.description_placeholder",
+      "defaultText": "What is this group about?",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.submit_group",
+      "defaultText": "Create Group",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.team_name",
+      "defaultText": "Tournament team name",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.team_name_placeholder",
+      "defaultText": "e.g. Real Madrid FC",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.sport",
+      "defaultText": "Sport",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.visibility",
+      "defaultText": "Visibility",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.submit_team",
+      "defaultText": "Create tournament team",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.err_name",
+      "defaultText": "Enter a group name.",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.err_team_name",
+      "defaultText": "Enter a tournament team name.",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.err_sport",
+      "defaultText": "Choose a sport.",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.err_create",
+      "defaultText": "Could not create the group. Please try again.",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_group.err_team_create",
+      "defaultText": "Could not create the tournament team. Please try again.",
+      "screen": "Create Group",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.invite.title",
+      "defaultText": "Invite members",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.invite.subtitle",
+      "defaultText": "Optional. Add people now, or skip and invite them later.",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.invite.suggested_title",
+      "defaultText": "Suggested members",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.invite.empty",
+      "defaultText": "No suggestions right now.",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.invite.load_error",
+      "defaultText": "Could not load suggested members. Please try again.",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.invite.add_error",
+      "defaultText": "Could not add this person to the group. Please try again.",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.invite.card_a11y",
+      "defaultText": "Add {name} to the group",
+      "screen": "Invite members (group creation step 2)",
+      "placeholders": [
+        "name"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.load_error",
+      "defaultText": "Could not load this group. Please try again.",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.not_found",
+      "defaultText": "Group not found.",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.owned_by",
+      "defaultText": "Owned by {name}",
+      "screen": "Group detail",
+      "placeholders": [
+        "name"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.share_button",
+      "defaultText": "Share app link",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.share_link",
+      "defaultText": "Share Link",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.share_link_a11y",
+      "defaultText": "Share app link",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.share_title",
+      "defaultText": "Share app link",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.members_title",
+      "defaultText": "Group members",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.invite",
+      "defaultText": "Invite",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.invite_by_email",
+      "defaultText": "Invite by email: {email}",
+      "screen": "Group detail",
+      "placeholders": [
+        "email"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.invitee_line",
+      "defaultText": "{nickname} ({name})",
+      "screen": "Group detail",
+      "placeholders": [
+        "name",
+        "nickname"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.remove_invitee_a11y",
+      "defaultText": "Remove {name}",
+      "screen": "Group detail",
+      "placeholders": [
+        "name"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.send_invite",
+      "defaultText": "Send Invite",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.invite_choose",
+      "defaultText": "Search for and choose a user or email to invite.",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.invite_error",
+      "defaultText": "Could not send the invite. Please try again.",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.change_role",
+      "defaultText": "Change Role",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.role_error",
+      "defaultText": "Could not update this group member’s role. Please try again.",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.remove_title",
+      "defaultText": "Remove group member",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.remove_message",
+      "defaultText": "Remove {name} from this group?",
+      "screen": "Group detail",
+      "placeholders": [
+        "name"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.remove_error",
+      "defaultText": "Could not remove this group member. Please try again.",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.leave_button",
+      "defaultText": "Leave Group",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.leave_title",
+      "defaultText": "Leave Group",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.leave_message",
+      "defaultText": "Are you sure you want to leave this group?",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.leave_confirm",
+      "defaultText": "Leave",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.group_detail.leave_error",
+      "defaultText": "Could not leave the group. Please try again.",
+      "screen": "Group detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.placeholder",
+      "defaultText": "Search by name or nickname...",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.a11y",
+      "defaultText": "Search users",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.empty",
+      "defaultText": "No users found.",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.error",
+      "defaultText": "Could not search for users. Please try again.",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.entity_group_member",
+      "defaultText": "group member",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.entity_player",
+      "defaultText": "player",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.invite_email_title",
+      "defaultText": "✉️ Invite {email} as new {entity}",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [
+        "email",
+        "entity"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.invite_email_a11y",
+      "defaultText": "Invite {email} as new {entity}",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [
+        "email",
+        "entity"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.invite_email_hint",
+      "defaultText": "Send an email invitation to join",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.result_a11y",
+      "defaultText": "{nickname}, {name}",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [
+        "name",
+        "nickname"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.result_pending_a11y",
+      "defaultText": "{nickname}, {name}, already invited",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [
+        "name",
+        "nickname"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.pending",
+      "defaultText": "Pending",
+      "screen": "User search (Group detail / Game detail)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share.message",
+      "defaultText": "Join me on Shuttlr! Download the app: {link}",
+      "screen": "Share",
+      "placeholders": [
+        "link"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share.link_copied",
+      "defaultText": "Link copied to clipboard",
+      "screen": "Share",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share.unavailable",
+      "defaultText": "Sharing is not available right now.",
+      "screen": "Share",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share_sheet.title",
+      "defaultText": "Share",
+      "screen": "Share sheet",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share_sheet.close_a11y",
+      "defaultText": "Close share menu",
+      "screen": "Share sheet",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share_sheet.whatsapp",
+      "defaultText": "Share via WhatsApp",
+      "screen": "Share sheet",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share_sheet.whatsapp_hint",
+      "defaultText": "Send the app download link directly",
+      "screen": "Share sheet",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share_sheet.other_apps",
+      "defaultText": "Share via other apps",
+      "screen": "Share sheet",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share_sheet.other_apps_hint",
+      "defaultText": "Open system share sheet",
+      "screen": "Share sheet",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share_sheet.copy_link",
+      "defaultText": "Copy Link",
+      "screen": "Share sheet",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.share_sheet.copy_link_hint",
+      "defaultText": "Copy link to clipboard",
+      "screen": "Share sheet",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.mode_game",
+      "defaultText": "🎮 Game",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.mode_tournament",
+      "defaultText": "🏆 Tournament",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.participation_individual",
+      "defaultText": "Individual",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.participation_team",
+      "defaultText": "Tournament team",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.format_knockout",
+      "defaultText": "Knockout",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.format_round_robin",
+      "defaultText": "Round robin",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.title",
+      "defaultText": "Title",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.title_placeholder",
+      "defaultText": "e.g. Sunday 5-a-side Football",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.sport",
+      "defaultText": "Sport",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.visibility",
+      "defaultText": "Visibility",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.skill_level",
+      "defaultText": "Skill Level",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.capacity",
+      "defaultText": "Capacity",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.capacity_placeholder",
+      "defaultText": "e.g. 10",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.start",
+      "defaultText": "Start Date & Time",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.quick_sat",
+      "defaultText": "This Sat",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.quick_sun",
+      "defaultText": "This Sun",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.venue_name",
+      "defaultText": "Venue Name",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.venue_name_placeholder",
+      "defaultText": "e.g. Bishan Sports Hall",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.venue_address",
+      "defaultText": "Venue Address",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.venue_address_placeholder",
+      "defaultText": "e.g. 5 Bishan St 14, Singapore",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.cost",
+      "defaultText": "Cost (optional)",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.cost_placeholder",
+      "defaultText": "e.g. 15.00",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.cost_a11y",
+      "defaultText": "Estimated Cost",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.currency_placeholder",
+      "defaultText": "USD",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.currency_a11y",
+      "defaultText": "Currency",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.description",
+      "defaultText": "Description",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.description_placeholder",
+      "defaultText": "Optional description...",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.description_optional",
+      "defaultText": "Description (optional)",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.submit_game",
+      "defaultText": "Create Game",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.group",
+      "defaultText": "Group",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.group_placeholder",
+      "defaultText": "Select a group",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.no_groups",
+      "defaultText": "You don't belong to any groups yet.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.tournament_title",
+      "defaultText": "Tournament Title",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.tournament_title_placeholder",
+      "defaultText": "e.g. Summer League",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.tournament_start",
+      "defaultText": "Tournament Start Date",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.tournament_description_placeholder",
+      "defaultText": "Details about rules, scheduling...",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.tournament_venue_placeholder",
+      "defaultText": "e.g. Sports Hub Court 3",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.participation",
+      "defaultText": "Participation",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.reg_close",
+      "defaultText": "Registration closes at (optional)",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.format",
+      "defaultText": "Format",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.timezone_hint",
+      "defaultText": "Times are in your local time zone.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.submit_tournament",
+      "defaultText": "Create Tournament",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_game_title",
+      "defaultText": "Enter a game title.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_game_capacity",
+      "defaultText": "Capacity must be a whole number between 2 and 200.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_game_start",
+      "defaultText": "Enter the start as {format}.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [
+        "format"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_group",
+      "defaultText": "Choose a group.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_cost",
+      "defaultText": "Estimated cost must be a non-negative number.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_currency",
+      "defaultText": "Currency code must be 3 letters (e.g. USD, SGD).",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_game_create",
+      "defaultText": "Could not create the game. Please try again.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_tournament_title",
+      "defaultText": "Enter a tournament title.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_sport",
+      "defaultText": "Choose a sport.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_participation",
+      "defaultText": "Choose individual or tournament team participation.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_tournament_capacity",
+      "defaultText": "Capacity must be a whole number of at least 2.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_tournament_start",
+      "defaultText": "Enter the tournament start date as {format}.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [
+        "format"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_reg_close",
+      "defaultText": "Enter the registration close as {format}, or leave it empty.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [
+        "format"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.create_game.err_tournament_create",
+      "defaultText": "Could not create the tournament. Please try again.",
+      "screen": "Create Game / Tournament",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.load_error",
+      "defaultText": "Could not load this game. Please try again.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.not_found",
+      "defaultText": "Game not found.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.back",
+      "defaultText": "My Games",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.back_arrow",
+      "defaultText": "‹ My Games",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.tag_hosting",
+      "defaultText": "You're hosting",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.tag_going",
+      "defaultText": "You're going",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.tag_waitlisted",
+      "defaultText": "You're waitlisted",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.cancelled_banner",
+      "defaultText": "This game has been cancelled.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.players_going",
+      "defaultText": "players going",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.spots_one",
+      "defaultText": "{count} spot left",
+      "screen": "Game detail",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.spots_other",
+      "defaultText": "{count} spots left",
+      "screen": "Game detail",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.full_waitlist",
+      "defaultText": "Full (waitlist open)",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.full",
+      "defaultText": "Full",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_game",
+      "defaultText": "Edit Game",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_group",
+      "defaultText": "Invite Group",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_player",
+      "defaultText": "Invite Player",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.share",
+      "defaultText": "Share app link",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.share_title",
+      "defaultText": "Share app link",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.cancel_game",
+      "defaultText": "Cancel Game",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.join",
+      "defaultText": "Join",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.leave",
+      "defaultText": "Leave",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.join_error",
+      "defaultText": "Could not join this game. Please try again.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.leave_error",
+      "defaultText": "Could not leave this game. Please try again.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.cancel_hint",
+      "defaultText": "All players will be notified. A cancellation reason is required.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.cancel_reason_placeholder",
+      "defaultText": "Reason for cancellation (required)",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.cancel_reason_a11y",
+      "defaultText": "Cancellation Reason",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.cancel_reason_required",
+      "defaultText": "Please provide a reason for cancelling this game.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.cancel_confirm",
+      "defaultText": "Confirm Cancellation",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.cancel_error",
+      "defaultText": "Could not cancel this game. Please try again.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_group_hint",
+      "defaultText": "Select one of your groups to invite all its group members to this game.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.groups_loading",
+      "defaultText": "Loading groups...",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.send_group_invite",
+      "defaultText": "Send Group Invite",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_group_select",
+      "defaultText": "Please select a group to invite.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_group_sent_one",
+      "defaultText": "Sent {count} group invitation!",
+      "screen": "Game detail",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_group_sent_other",
+      "defaultText": "Sent {count} group invitations!",
+      "screen": "Game detail",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_group_done",
+      "defaultText": "Group members invited successfully!",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_group_error",
+      "defaultText": "Could not invite group members. Please try again.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_player_hint",
+      "defaultText": "Search for and invite a player to this game.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_choose",
+      "defaultText": "Search for and choose a user or email to invite.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_sent",
+      "defaultText": "Invitation sent to {name}!",
+      "screen": "Game detail",
+      "placeholders": [
+        "name"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.invite_error",
+      "defaultText": "Could not send the invite. Please try again.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_title_placeholder",
+      "defaultText": "Game title",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_title_a11y",
+      "defaultText": "Game Title",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_sport_placeholder",
+      "defaultText": "Sport (e.g. badminton)",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_description_placeholder",
+      "defaultText": "Description (optional)",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_description_a11y",
+      "defaultText": "Game Description",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_venue_name_placeholder",
+      "defaultText": "e.g. Riverside Courts",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_venue_address_placeholder",
+      "defaultText": "e.g. 123 Sports Way",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.allow_waitlist",
+      "defaultText": "Allow Waitlist",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.end",
+      "defaultText": "End Date & Time (Optional)",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.save_changes",
+      "defaultText": "Save Changes",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_err_title",
+      "defaultText": "Title cannot be empty.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_err_sport",
+      "defaultText": "Sport cannot be empty.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_err_capacity",
+      "defaultText": "Capacity must be a positive number.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_err_start",
+      "defaultText": "Start date & time is invalid.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_err_end",
+      "defaultText": "End date & time is invalid.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.edit_error",
+      "defaultText": "Could not save game changes. Please try again.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.about",
+      "defaultText": "About this game",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.description_fallback",
+      "defaultText": "Casual doubles, all skill levels welcome.",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.details",
+      "defaultText": "Game details",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.skill_level",
+      "defaultText": "Skill level",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.skill_all_display",
+      "defaultText": "Beginner – Intermediate",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.waitlist",
+      "defaultText": "Waitlist",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.waitlist_open",
+      "defaultText": "Open",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.waitlist_closed",
+      "defaultText": "Closed",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.cost",
+      "defaultText": "Cost",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.players",
+      "defaultText": "Players",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.player_fallback",
+      "defaultText": "Player",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.organizer",
+      "defaultText": "Organizer",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.going",
+      "defaultText": "Going",
+      "screen": "Game detail",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.game_detail.more_going",
+      "defaultText": "and {count} more going",
+      "screen": "Game detail",
+      "placeholders": [
+        "count"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.reg_none",
+      "defaultText": "Not Registered",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.reg_registered",
+      "defaultText": "Registered",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.reg_withdrawn",
+      "defaultText": "Withdrawn",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.status_line",
+      "defaultText": "Status: {status}",
+      "screen": "Tournaments",
+      "placeholders": [
+        "status"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.registered_line",
+      "defaultText": "{count}/{max} registered",
+      "screen": "Tournaments",
+      "placeholders": [
+        "count",
+        "max"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.organised_by",
+      "defaultText": "Organised by {name}",
+      "screen": "Tournaments",
+      "placeholders": [
+        "name"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.starts",
+      "defaultText": "Starts {when}",
+      "screen": "Tournaments",
+      "placeholders": [
+        "when"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.registered_at",
+      "defaultText": "Registered {when}",
+      "screen": "Tournaments",
+      "placeholders": [
+        "when"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.list_error",
+      "defaultText": "Could not load tournaments. Please try again.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.list_empty_title",
+      "defaultText": "No tournaments yet",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.list_empty_subtitle",
+      "defaultText": "Check back soon.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.load_error",
+      "defaultText": "Could not load this tournament. Please try again.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.not_found",
+      "defaultText": "Tournament not found.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.register",
+      "defaultText": "Register",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.register_error",
+      "defaultText": "Could not register for this tournament. Please try again.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.registration_missing",
+      "defaultText": "Could not find your registration. Please try again.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.withdraw",
+      "defaultText": "Withdraw",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.withdraw_error",
+      "defaultText": "Could not withdraw from this tournament. Please try again.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.registration_closed",
+      "defaultText": "Registration is closed for this tournament.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.tab_matches",
+      "defaultText": "Matches",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.tab_registrations",
+      "defaultText": "Registrations",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.no_matches",
+      "defaultText": "No matches yet.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.no_registrations",
+      "defaultText": "No one has registered yet.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.cancel",
+      "defaultText": "Cancel Tournament",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.tournament.cancel_error",
+      "defaultText": "Could not cancel this tournament. Please try again.",
+      "screen": "Tournaments",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.photo_title",
+      "defaultText": "Profile Photo",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.take_photo",
+      "defaultText": "Take Photo",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.choose_photo",
+      "defaultText": "Choose from Library",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.remove_photo",
+      "defaultText": "Remove Photo",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.crop_title",
+      "defaultText": "Edit Photo",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.change_photo_a11y",
+      "defaultText": "Change profile photo",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.photo_upload_error",
+      "defaultText": "Could not upload your photo. Please try again.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.photo_remove_error",
+      "defaultText": "Could not remove your photo. Please try again.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.load_error",
+      "defaultText": "Could not load your profile. Please try again.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.not_found",
+      "defaultText": "Profile not found.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.display_name",
+      "defaultText": "Display name",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.display_name_empty",
+      "defaultText": "Display name cannot be empty.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.display_name_error",
+      "defaultText": "Could not save your display name. Please try again.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.nickname_line",
+      "defaultText": "Nickname: {nickname}",
+      "screen": "Profile",
+      "placeholders": [
+        "nickname"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.nickname_hint",
+      "defaultText": "(can't be changed)",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.no_skills",
+      "defaultText": "No skill levels declared yet.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.skill_save_error",
+      "defaultText": "Could not save your skill level. Please try again.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.skill_remove_error",
+      "defaultText": "Could not remove this skill level. Please try again.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.skill_remove_title",
+      "defaultText": "Remove Skill Level",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.skill_remove_message",
+      "defaultText": "Remove your {sport} skill level?",
+      "screen": "Profile",
+      "placeholders": [
+        "sport"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.notification_prefs",
+      "defaultText": "Notification Preferences",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.sign_out",
+      "defaultText": "Sign Out",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.sign_out_error",
+      "defaultText": "Could not sign out. Please try again.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.contact_support",
+      "defaultText": "Contact support",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.report",
+      "defaultText": "Report a problem or content",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.delete_account",
+      "defaultText": "Delete Account",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.delete_title",
+      "defaultText": "Delete Account",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.delete_message",
+      "defaultText": "Are you sure you want to delete your account? This cannot be undone.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.delete_start_error",
+      "defaultText": "Could not start account deletion. Please try again.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.code_prompt",
+      "defaultText": "Enter the confirmation code sent to your email to proceed.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.code_placeholder",
+      "defaultText": "Confirmation code",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.code_required",
+      "defaultText": "Enter the confirmation code.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.code_invalid",
+      "defaultText": "Invalid or expired confirmation code. Please try again.",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.profile.confirm_delete",
+      "defaultText": "Confirm Deletion",
+      "screen": "Profile",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.title",
+      "defaultText": "Mobile number",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.none",
+      "defaultText": "No mobile number added",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.add",
+      "defaultText": "Add number",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.confirm_save",
+      "defaultText": "Confirm and save",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.invalid",
+      "defaultText": "Enter a valid mobile number.",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.reconfirm",
+      "defaultText": "The consent text has changed. Please review it and confirm to save.",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.save_failed",
+      "defaultText": "Could not save your mobile number. Please try again.",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.code_placeholder",
+      "defaultText": "Code",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.code_a11y",
+      "defaultText": "Country code",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.mobile_number.number_placeholder",
+      "defaultText": "Mobile number",
+      "screen": "Profile / Onboarding (mobile number)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.onboarding.title_skills",
+      "defaultText": "Your sports",
+      "screen": "Onboarding",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.onboarding.title_notifications",
+      "defaultText": "Notifications",
+      "screen": "Onboarding",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.onboarding.title_mobile",
+      "defaultText": "Mobile number (optional)",
+      "screen": "Onboarding",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.onboarding.title_photo",
+      "defaultText": "Profile photo",
+      "screen": "Onboarding",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.onboarding.step_progress",
+      "defaultText": "Step {current} of {total}",
+      "screen": "Onboarding",
+      "placeholders": [
+        "current",
+        "total"
+      ],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.onboarding.skills_save_error",
+      "defaultText": "Could not save your skill levels. Please try again.",
+      "screen": "Onboarding",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.onboarding.sports_load_error",
+      "defaultText": "Could not load sports.",
+      "screen": "Onboarding",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_history.fallback_title",
+      "defaultText": "Notification",
+      "screen": "Notification history",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_history.unread_prefix",
+      "defaultText": "Unread.",
+      "screen": "Notification history",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_history.load_error",
+      "defaultText": "Could not load your notifications. Please try again.",
+      "screen": "Notification history",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_history.empty",
+      "defaultText": "No notifications in the last 5 days",
+      "screen": "Notification history",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_history.more_error",
+      "defaultText": "Could not load more. Tap to retry.",
+      "screen": "Notification history",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.load_error",
+      "defaultText": "Could not load your notification preferences. Please try again.",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.save_error",
+      "defaultText": "Could not save this preference. Please try again.",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.permission_off",
+      "defaultText": "Notifications are turned off for this app on your device. Turn them on in your device settings to receive these.",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.open_settings",
+      "defaultText": "Open settings",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_global",
+      "defaultText": "Announcements",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_event_invite",
+      "defaultText": "Game invitations",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_event_changed",
+      "defaultText": "Game changes",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_event_cancelled",
+      "defaultText": "Game cancellations",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_event_reminder",
+      "defaultText": "Game reminders",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_event_participant_added",
+      "defaultText": "Added to a game",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_event_participant_removed",
+      "defaultText": "Removed from a game",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_group_event_created",
+      "defaultText": "New group games",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_waitlist_promoted",
+      "defaultText": "Waitlist promotions",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_group_invite",
+      "defaultText": "Group invitations",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_tournament_match_scheduled",
+      "defaultText": "Tournament match scheduled",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_tournament_result_posted",
+      "defaultText": "Tournament results",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_tournament_cancelled",
+      "defaultText": "Tournament cancellations",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_tournament_schedule_published",
+      "defaultText": "Tournament schedule published",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_tournament_standings_published",
+      "defaultText": "Tournament standings published",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notif_pref.type_team_invite",
+      "defaultText": "Tournament team invitations",
+      "screen": "Notification preferences",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.push_rationale.title",
+      "defaultText": "Stay up to date",
+      "screen": "Notifications (permission rationale)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.push_rationale.message",
+      "defaultText": "Meetup sends notifications about game invites, changes, cancellations and waitlist updates. Next, your phone will ask whether to allow them. You can change this any time in your phone settings.",
+      "screen": "Notifications (permission rationale)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.push_rationale.continue",
+      "defaultText": "Continue",
+      "screen": "Notifications (permission rationale)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notification_banner.dismiss_a11y",
+      "defaultText": "Dismiss notification",
+      "screen": "Notifications (in-app banner)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notification_action.view",
+      "defaultText": "View",
+      "screen": "Notifications (action buttons)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notification_action.join",
+      "defaultText": "Join",
+      "screen": "Notifications (action buttons)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notification_action.ok",
+      "defaultText": "OK",
+      "screen": "Notifications (action buttons)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.notification_channel.plans",
+      "defaultText": "Plans & Updates",
+      "screen": "Notifications (Android channel)",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
+    }
+  ]
+}

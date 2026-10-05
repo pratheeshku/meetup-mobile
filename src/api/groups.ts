@@ -35,6 +35,8 @@ import type {
   GroupMemberRole,
   GroupRole,
   GroupsListResponse,
+  InviteMemberResult,
+  SuggestedMember,
 } from '../types/group';
 
 interface RequestOptions {
@@ -193,12 +195,60 @@ export async function inviteMember(
   groupId: string,
   userId: string,
   options?: RequestOptions,
-): Promise<void> {
-  await apiClient.post(
+): Promise<InviteMemberResult> {
+  const response = await apiClient.post<{ next_candidate?: SuggestedMemberApiItem | null } | null>(
     `/groups/${groupId}/invite`,
     { user_id: userId },
     { correlationId: options?.correlationId },
   );
+  // DES-MEETUP-FEEDBACK-001 C4: the add response carries the next suggested
+  // candidate (or none when the pool is empty). Callers that don't use
+  // suggestions ignore the result.
+  const next = response?.data?.next_candidate;
+  return { nextCandidate: next ? mapSuggestedMember(next) : null };
+}
+
+/**
+ * Suggested-member card as returned by the suggestions endpoint
+ * (DES-MEETUP-FEEDBACK-001 C4 contract: user ID, display name, nickname,
+ * image URL). Field names follow the backend's snake_case convention; the
+ * exact wire names are an integration-check item (see the Implementation
+ * Report's blocked note).
+ */
+interface SuggestedMemberApiItem {
+  user_id: string;
+  display_name: string | null;
+  nickname: string | null;
+  image_url: string | null;
+}
+
+function mapSuggestedMember(raw: SuggestedMemberApiItem): SuggestedMember {
+  return {
+    user_id: raw.user_id,
+    display_name: raw.display_name ?? '',
+    nickname: raw.nickname ?? '',
+    image_url: raw.image_url ?? null,
+  };
+}
+
+/** Max cards shown in "Suggested members" (DES-MEETUP-FEEDBACK-001 C4). */
+export const MAX_SUGGESTED_MEMBERS = 5;
+
+/**
+ * Suggested members for a newly created group (DES-MEETUP-FEEDBACK-001 C4):
+ * group ID in; up to 5 `{ user_id, display_name, nickname, image_url }` out.
+ * Caller identity comes from the token; the backend enforces that the caller
+ * is an admin of the group.
+ */
+export async function getSuggestedMembers(
+  groupId: string,
+  options?: RequestOptions,
+): Promise<SuggestedMember[]> {
+  const { data } = await apiClient.get<SuggestedMemberApiItem[]>(
+    `/groups/${groupId}/suggested-members`,
+    { correlationId: options?.correlationId },
+  );
+  return data.slice(0, MAX_SUGGESTED_MEMBERS).map(mapSuggestedMember);
 }
 
 /**

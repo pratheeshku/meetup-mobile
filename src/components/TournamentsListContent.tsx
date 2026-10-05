@@ -4,7 +4,7 @@
  * "Tournaments" segment of the Games screen instead of a screen of its own.
  * It loads, empties and fails on its own (`getTournaments()`).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { getTournaments } from '../api/tournaments';
@@ -17,6 +17,8 @@ import LoadingView from './LoadingView';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentRegistrationStatus } from '../types/tournament';
 import { useSportDisplayName } from '../utils/labels';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
 interface Props {
   onOpenTournament: (tournamentId: string) => void;
@@ -24,10 +26,10 @@ interface Props {
   refreshKey?: number;
 }
 
-const REGISTRATION_BADGE_LABEL: Record<TournamentRegistrationStatus, string> = {
-  none: 'Not Registered',
-  registered: 'Registered',
-  withdrawn: 'Withdrawn',
+const REGISTRATION_BADGE_LABEL_KEY: Record<TournamentRegistrationStatus, LabelKey> = {
+  none: 'mob.tournament.reg_none',
+  registered: 'mob.tournament.reg_registered',
+  withdrawn: 'mob.tournament.reg_withdrawn',
 };
 
 const REGISTRATION_BADGE_VARIANT: Record<TournamentRegistrationStatus, BadgeVariant> = {
@@ -50,6 +52,7 @@ function TournamentRow({
   onPress: () => void;
 }): React.JSX.Element {
   const sportLabel = useSportDisplayName(tournament.sport);
+  const t = useT();
   return (
     <Card style={styles.card} onPress={onPress}>
       <View style={styles.cardHeader}>
@@ -57,7 +60,7 @@ function TournamentRow({
           {tournament.name}
         </Text>
         <Badge
-          label={REGISTRATION_BADGE_LABEL[tournament.current_user_registration_status]}
+          label={t(REGISTRATION_BADGE_LABEL_KEY[tournament.current_user_registration_status])}
           variant={REGISTRATION_BADGE_VARIANT[tournament.current_user_registration_status]}
           style={styles.badge}
         />
@@ -65,9 +68,14 @@ function TournamentRow({
       <Text style={styles.cardMeta}>
         {sportLabel} · {tournament.format}
       </Text>
-      <Text style={styles.cardMeta}>Status: {tournament.status}</Text>
       <Text style={styles.cardMeta}>
-        {tournament.participant_count}/{tournament.max_participants} registered
+        {t('mob.tournament.status_line', { status: tournament.status })}
+      </Text>
+      <Text style={styles.cardMeta}>
+        {t('mob.tournament.registered_line', {
+          count: tournament.participant_count,
+          max: tournament.max_participants,
+        })}
       </Text>
     </Card>
   );
@@ -77,6 +85,9 @@ export default function TournamentsListContent({
   onOpenTournament,
   refreshKey,
 }: Props): React.JSX.Element {
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -93,7 +104,7 @@ export default function TournamentsListContent({
       const response = await getTournaments();
       setTournaments(response.items);
     } catch {
-      setError('Could not load tournaments. Please try again.');
+      setError(tRef.current('mob.tournament.list_error'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -143,7 +154,10 @@ export default function TournamentsListContent({
         />
       }
       ListEmptyComponent={
-        <EmptyState title="No tournaments yet" subtitle="Check back soon." />
+        <EmptyState
+          title={t('mob.tournament.list_empty_title')}
+          subtitle={t('mob.tournament.list_empty_subtitle')}
+        />
       }
       renderItem={({ item }) => (
         <TournamentRow

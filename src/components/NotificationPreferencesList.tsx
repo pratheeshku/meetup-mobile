@@ -17,7 +17,7 @@
  * matching this codebase's established pattern of immediate-effect
  * mutations elsewhere (e.g. `GroupDetailScreen`'s role changes).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -41,25 +41,27 @@ import type {
   NotificationPreference,
   NotificationType,
 } from '../types/notification';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
-/** Human-readable labels for every known notification type (§4.8 + the two participant types + group_event_created + event_reminder). */
-const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
-  global: 'Announcements',
-  event_invite: 'Event invitations',
-  event_changed: 'Event changes',
-  event_cancelled: 'Event cancellations',
-  event_reminder: 'Event reminders',
-  event_participant_added: 'Added to an event',
-  event_participant_removed: 'Removed from an event',
-  group_event_created: 'New group events',
-  waitlist_promoted: 'Waitlist promotions',
-  group_invite: 'Group invitations',
-  tournament_match_scheduled: 'Tournament match scheduled',
-  tournament_result_posted: 'Tournament results',
-  tournament_cancelled: 'Tournament cancellations',
-  tournament_schedule_published: 'Tournament schedule published',
-  tournament_standings_published: 'Tournament standings published',
-  team_invite: 'Team invitations',
+/** Label key for every known notification type (§4.8 + the two participant types + group_event_created + event_reminder). */
+const NOTIFICATION_TYPE_LABEL_KEYS: Record<NotificationType, LabelKey> = {
+  global: 'mob.notif_pref.type_global',
+  event_invite: 'mob.notif_pref.type_event_invite',
+  event_changed: 'mob.notif_pref.type_event_changed',
+  event_cancelled: 'mob.notif_pref.type_event_cancelled',
+  event_reminder: 'mob.notif_pref.type_event_reminder',
+  event_participant_added: 'mob.notif_pref.type_event_participant_added',
+  event_participant_removed: 'mob.notif_pref.type_event_participant_removed',
+  group_event_created: 'mob.notif_pref.type_group_event_created',
+  waitlist_promoted: 'mob.notif_pref.type_waitlist_promoted',
+  group_invite: 'mob.notif_pref.type_group_invite',
+  tournament_match_scheduled: 'mob.notif_pref.type_tournament_match_scheduled',
+  tournament_result_posted: 'mob.notif_pref.type_tournament_result_posted',
+  tournament_cancelled: 'mob.notif_pref.type_tournament_cancelled',
+  tournament_schedule_published: 'mob.notif_pref.type_tournament_schedule_published',
+  tournament_standings_published: 'mob.notif_pref.type_tournament_standings_published',
+  team_invite: 'mob.notif_pref.type_team_invite',
 };
 
 interface NotificationPreferencesListProps {
@@ -74,6 +76,9 @@ interface NotificationPreferencesListProps {
 export default function NotificationPreferencesList({
   showPermissionBanner = false,
 }: NotificationPreferencesListProps): React.JSX.Element {
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [preferences, setPreferences] = useState<
     Record<NotificationType, boolean>
   >({} as Record<NotificationType, boolean>);
@@ -96,9 +101,7 @@ export default function NotificationPreferencesList({
       });
       setPreferences(byType);
     } catch {
-      setLoadError(
-        'Could not load your notification preferences. Please try again.',
-      );
+      setLoadError(tRef.current('mob.notif_pref.load_error'));
     } finally {
       setIsLoading(false);
     }
@@ -143,7 +146,7 @@ export default function NotificationPreferencesList({
       );
     } catch {
       setPreferences(current => ({ ...current, [type]: previousEnabled }));
-      setSaveError('Could not save this preference. Please try again.');
+      setSaveError(t('mob.notif_pref.save_error'));
     } finally {
       setSavingType(null);
     }
@@ -162,16 +165,15 @@ export default function NotificationPreferencesList({
       {showPermissionBanner && permissionGranted === false ? (
         <View style={styles.permissionBanner} testID="notification-permission-banner">
           <Text style={styles.permissionText}>
-            Notifications are turned off for this app on your device. Turn them on in Android settings
-            to receive these.
+            {t('mob.notif_pref.permission_off')}
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Open settings"
+            accessibilityLabel={t('mob.notif_pref.open_settings')}
             onPress={() => Linking.openSettings()}
             style={styles.permissionAction}
           >
-            <Text style={styles.permissionActionText}>Open settings</Text>
+            <Text style={styles.permissionActionText}>{t('mob.notif_pref.open_settings')}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -187,7 +189,7 @@ export default function NotificationPreferencesList({
               index < NOTIFICATION_TYPES.length - 1 ? styles.rowDivider : null,
             ]}
           >
-            <Text style={styles.rowLabel}>{NOTIFICATION_TYPE_LABELS[type]}</Text>
+            <Text style={styles.rowLabel}>{t(NOTIFICATION_TYPE_LABEL_KEYS[type])}</Text>
             {savingType === type ? (
               <ActivityIndicator size="small" color={colors.primary} />
             ) : (

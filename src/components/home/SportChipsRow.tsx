@@ -20,6 +20,7 @@ import { dash, dashRadius, dashSize, sportTileColors } from '../../theme/dashboa
 import { spacing } from '../../theme/tokens';
 import type { SportOption } from '../../utils/gameLists';
 import { sportTileColor } from './GameRow';
+import { useT } from '../../labels/LabelsContext';
 
 interface SportChipsRowProps {
   options: readonly SportOption[];
@@ -74,9 +75,10 @@ export default function SportChipsRow({
   onToggle,
   isLoading = false,
 }: SportChipsRowProps): React.JSX.Element {
+  const t = useT();
   if (isLoading) {
     return (
-      <View style={styles.skeletonRow} testID="sport-chips-loading" accessibilityLabel="Loading sports">
+      <View style={styles.skeletonRow} testID="sport-chips-loading" accessibilityLabel={t('mob.dashboard.sports_loading')}>
         {Array.from({ length: 4 }, (_, index) => (
           <View key={index} style={styles.skeletonTile} />
         ))}
@@ -92,7 +94,7 @@ export default function SportChipsRow({
       contentContainerStyle={styles.content}
     >
       <Chip
-        label="All"
+        label={t('mob.dashboard.sports_all')}
         selected={selected.length === 0}
         onPress={() => onToggle(null)}
         tileColor={sportTileColors.all}

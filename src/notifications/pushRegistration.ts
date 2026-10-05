@@ -35,6 +35,7 @@ import {
   registerDeviceToken,
   requestPermission,
 } from './fcm';
+import { currentT } from '../labels/LabelsContext';
 
 /** Device-level (not per-account): the OS permission is per-app. */
 export const RATIONALE_SHOWN_KEY = 'notifications.permissionRationaleShown.v1';
@@ -42,11 +43,9 @@ export const RATIONALE_SHOWN_KEY = 'notifications.permissionRationaleShown.v1';
 function showRationale(): Promise<void> {
   return new Promise(resolve => {
     Alert.alert(
-      'Stay up to date',
-      'Meetup sends notifications about event invites, changes, cancellations and waitlist ' +
-        'updates. Next, your phone will ask whether to allow them. You can change this any time ' +
-        'in your phone settings.',
-      [{ text: 'Continue', onPress: () => resolve() }],
+      currentT('mob.push_rationale.title'),
+      currentT('mob.push_rationale.message'),
+      [{ text: currentT('mob.push_rationale.continue'), onPress: () => resolve() }],
       // No outside-tap / back dismissal: the promise must resolve via the button.
       { cancelable: false },
     );

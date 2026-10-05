@@ -47,6 +47,7 @@ import {
   SectionHeader,
   SkeletonRows,
 } from '../components/home/SectionParts';
+import Toast from '../components/Toast';
 import ShortcutTiles from '../components/home/ShortcutTiles';
 import SportChipsRow from '../components/home/SportChipsRow';
 import { refreshUnreadCount, useUnreadBadgeCount } from '../hooks/useUnreadCount';
@@ -65,6 +66,8 @@ import {
   selectNextGame,
   selectOpenGames,
 } from '../utils/gameLists';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'EventsList'>,
@@ -73,6 +76,8 @@ type Props = CompositeScreenProps<
 
 export default function HomeScreen({ navigation, route }: Props): React.JSX.Element {
   const { user } = useAuth();
+  const t = useT();
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const userId = user?.id;
 
   const events = useResource(options => getEvents(undefined, options));
@@ -109,6 +114,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   // Create Game pops back here with a fresh `refreshKey` on success; refetch
   // once per new key (the initial load is above).
   const refreshKey = route.params?.refreshKey;
+  const successMessage = route.params?.successMessage;
   const lastRefreshKey = useRef(refreshKey);
   useEffect(() => {
     if (refreshKey !== undefined && refreshKey !== lastRefreshKey.current) {
@@ -116,6 +122,17 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       loadAll();
     }
   }, [refreshKey, loadAll]);
+
+  // A successful create / edit / cancel / group change lands here with a
+  // short success message (DES-MEETUP-FEEDBACK-001 C3); each new
+  // `refreshKey` shows its message once.
+  const lastToastKey = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (successMessage && refreshKey !== undefined && refreshKey !== lastToastKey.current) {
+      lastToastKey.current = refreshKey;
+      setToastMessage(successMessage);
+    }
+  }, [refreshKey, successMessage]);
 
   // The bell count is synced on mount and whenever this screen regains focus
   // (including coming back from Notification History).
@@ -137,7 +154,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
   const filter = useSportFilter(sports, profile.data?.skill_levels, profile.status !== 'loading');
   const isFiltered = filter.selected.length > 0;
-  const filteredEmpty = isFiltered ? filteredEmptyMessage(filter.selected, filter.options) : null;
+  const filteredEmpty = isFiltered ? filteredEmptyMessage(filter.selected, filter.options, t) : null;
 
   const lists = useMemo(() => {
     const feed: Event[] | undefined = events.data?.items;
@@ -182,17 +199,17 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   /** One games section body: skeleton / error / filtered-empty / empty / rows. */
   function gamesBody(
     list: Event[] | undefined,
-    errorCopy: string,
-    emptyCopy: string,
+    errorCopy: LabelKey,
+    emptyCopy: LabelKey,
   ): React.JSX.Element {
     if (events.status === 'error') {
-      return <InlineError message={errorCopy} onRetry={retryEvents} />;
+      return <InlineError message={t(errorCopy)} onRetry={retryEvents} />;
     }
     if (!list) {
       return <SkeletonRows count={HOME_SECTION_ROWS} />;
     }
     if (list.length === 0) {
-      return <EmptyText>{filteredEmpty ?? emptyCopy}</EmptyText>;
+      return <EmptyText>{filteredEmpty ?? t(emptyCopy)}</EmptyText>;
     }
     return (
       <>
@@ -206,6 +223,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const groupItems = groups.data?.items.slice(0, HOME_SECTION_ROWS);
 
   return (
+    <View style={styles.root}>
     <ScrollView
       ref={scrollRef}
       style={styles.screen}
@@ -229,14 +247,14 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
       <View style={styles.nextCard} testID="next-game-section">
         {events.status === 'error' ? (
-          <InlineError message={COPY.gamesError} onRetry={retryEvents} />
+          <InlineError message={t(COPY.gamesError)} onRetry={retryEvents} />
         ) : !lists ? (
           <SkeletonRows count={1} testID="next-game-skeleton" />
         ) : lists.next ? (
           <NextGameCard event={lists.next} onPress={() => openEvent(lists.next as Event)} />
         ) : (
           <View style={styles.nextEmpty}>
-            <EmptyText>{filteredEmpty ?? COPY.gamesEmpty}</EmptyText>
+            <EmptyText>{filteredEmpty ?? t(COPY.gamesEmpty)}</EmptyText>
           </View>
         )}
       </View>
@@ -251,18 +269,18 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       </View>
 
       <View style={styles.section} testID="my-games-section">
-        <SectionHeader title="My games" onViewAll={() => openGames('mine')} />
+        <SectionHeader title={t('mob.dashboard.my_games')} onViewAll={() => openGames('mine')} />
         {gamesBody(lists?.myGames, COPY.gamesError, COPY.gamesEmpty)}
       </View>
 
       <View style={styles.section} testID="my-groups-section">
-        <SectionHeader title="My groups" onViewAll={openGroups} />
+        <SectionHeader title={t('mob.dashboard.my_groups')} onViewAll={openGroups} />
         {groups.status === 'error' ? (
-          <InlineError message={COPY.groupsError} onRetry={retryGroups} />
+          <InlineError message={t(COPY.groupsError)} onRetry={retryGroups} />
         ) : !groupItems ? (
           <SkeletonRows count={HOME_SECTION_ROWS} />
         ) : groupItems.length === 0 ? (
-          <EmptyText>{COPY.groupsEmpty}</EmptyText>
+          <EmptyText>{t(COPY.groupsEmpty)}</EmptyText>
         ) : (
           groupItems.map(group => (
             <GroupRow
@@ -281,7 +299,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       </View>
 
       <View style={styles.section} testID="recommended-section">
-        <SectionHeader title="Recommended for you" onViewAll={() => openGames('open')} />
+        <SectionHeader title={t('mob.dashboard.recommended')} onViewAll={() => openGames('open')} />
         {gamesBody(lists?.recommended, COPY.recommendedError, COPY.recommendedEmpty)}
       </View>
 
@@ -294,10 +312,13 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
         />
       </View>
     </ScrollView>
+    <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   screen: { flex: 1, backgroundColor: dash.page },
   content: { paddingBottom: spacing.lg },
   nextCard: { marginTop: -dashSize.nextGameOverlap, paddingHorizontal: spacing.md },

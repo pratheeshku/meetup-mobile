@@ -23,7 +23,7 @@
  * for this task, and §4.4 separately notes last-owner removal is
  * rejected server-side regardless.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -47,20 +47,24 @@ import ShareActionSheet from '../components/ShareActionSheet';
 import TextLink from '../components/TextLink';
 import Toast from '../components/Toast';
 import UserSearchPicker from '../components/UserSearchPicker';
-import {
-  composeShareMessage,
-  copyLinkToClipboard,
-  shareGeneric,
-  shareToWhatsApp,
-} from '../utils/shareLink';
+import { useAppShare } from '../hooks/useAppShare';
+import { goToDashboard } from '../navigation/goToDashboard';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { GroupDetail, GroupMember, GroupMemberRole } from '../types/group';
 import type { UserSearchResult } from '../types/user';
 import type { GroupsStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'GroupDetail'>;
 
 const ROLE_OPTIONS: GroupMemberRole[] = ['member', 'admin'];
+
+const ROLE_LABEL_KEY: Record<GroupMemberRole, LabelKey> = {
+  owner: 'mob.group_role.owner',
+  admin: 'mob.group_role.admin',
+  member: 'mob.group_role.member',
+};
 
 const ROLE_BADGE_VARIANT: Record<GroupMemberRole, BadgeVariant> = {
   owner: 'primary',
@@ -68,13 +72,12 @@ const ROLE_BADGE_VARIANT: Record<GroupMemberRole, BadgeVariant> = {
   member: 'neutral',
 };
 
-function formatRoleLabel(role: GroupMemberRole): string {
-  return role.charAt(0).toUpperCase() + role.slice(1);
-}
-
-export default function GroupDetailScreen({ route, navigation }: Props): React.JSX.Element {
+export default function GroupDetailScreen({ route }: Props): React.JSX.Element {
   const { groupId } = route.params;
   const { user } = useAuth();
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
   const currentUserId = user?.id;
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
@@ -98,58 +101,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
   const [isLeaving, setIsLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
-  const [isCreatingInvite, setIsCreatingInvite] = useState(false);
-  const [inviteLinkError, setInviteLinkError] = useState<string | null>(null);
-  const [shareSheetVisible, setShareSheetVisible] = useState(false);
-  const [groupInviteUrl, setGroupInviteUrl] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const handleShareGroupInvite = async (): Promise<void> => {
-    setInviteLinkError(null);
-    setIsCreatingInvite(true);
-    try {
-      const res = await withCorrelationId(async correlationId => {
-        return await createGroupInvitation(groupId, { correlationId });
-      });
-      setGroupInviteUrl(res.invitation_url);
-      setShareSheetVisible(true);
-    } catch {
-      setInviteLinkError('Could not generate group invite link. Please try again.');
-    } finally {
-      setIsCreatingInvite(false);
-    }
-  };
-
-  const handleCloseShareSheet = (): void => {
-    setShareSheetVisible(false);
-  };
-
-  const handleShareGeneric = async (): Promise<void> => {
-    if (!group || !groupInviteUrl) {
-      return;
-    }
-    const inviterName = user?.display_name || user?.nickname || 'Someone';
-    const message = composeShareMessage(inviterName, group.name, groupInviteUrl);
-    await shareGeneric({ message, url: groupInviteUrl });
-  };
-
-  const handleShareWhatsApp = async (): Promise<void> => {
-    if (!group || !groupInviteUrl) {
-      return;
-    }
-    const inviterName = user?.display_name || user?.nickname || 'Someone';
-    const message = composeShareMessage(inviterName, group.name, groupInviteUrl);
-    await shareToWhatsApp(message);
-  };
-
-  const handleCopyLink = (): void => {
-    if (!groupInviteUrl) {
-      return;
-    }
-    copyLinkToClipboard(groupInviteUrl);
-    setShareSheetVisible(false);
-    setToastMessage('Link copied to clipboard');
-  };
+  const share = useAppShare();
 
   const loadGroup = useCallback(async () => {
     setIsLoading(true);
@@ -158,7 +110,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
       const data = await getGroup(groupId);
       setGroup(data);
     } catch {
-      setLoadError('Could not load this group. Please try again.');
+      setLoadError(tRef.current('mob.group_detail.load_error'));
     } finally {
       setIsLoading(false);
     }
@@ -207,7 +159,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
 
   const handleSendInvite = async (): Promise<void> => {
     if (selectedInviteUsers.length === 0 && !selectedInviteEmail) {
-      setInviteError('Search for and choose a user or email to invite.');
+      setInviteError(t('mob.group_detail.invite_choose'));
       return;
     }
     setInviteError(null);
@@ -226,8 +178,9 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
       setIsInviteFormOpen(false);
       setSelectedInviteUsers([]);
       setSelectedInviteEmail(null);
+      goToDashboard(t('mob.success.group_updated'));
     } catch {
-      setInviteError('Could not send the invite. Please try again.');
+      setInviteError(t('mob.group_detail.invite_error'));
     } finally {
       setIsInviting(false);
     }
@@ -256,8 +209,9 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
         setGroup(await getGroup(groupId, { correlationId }));
       });
       setEditingRoleUserId(null);
+      goToDashboard(t('mob.success.group_updated'));
     } catch {
-      setRoleError('Could not update this member’s role. Please try again.');
+      setRoleError(t('mob.group_detail.role_error'));
     } finally {
       setIsSavingRole(false);
     }
@@ -271,22 +225,27 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
         await removeMember(groupId, userId, { correlationId });
         setGroup(await getGroup(groupId, { correlationId }));
       });
+      goToDashboard(t('mob.success.group_updated'));
     } catch {
-      setRemoveError('Could not remove this member. Please try again.');
+      setRemoveError(t('mob.group_detail.remove_error'));
     } finally {
       setRemovingUserId(null);
     }
   };
 
   const handleRemoveMemberPress = (member: GroupMember): void => {
-    Alert.alert('Remove Member', `Remove ${member.nickname} from this group?`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(
+      t('mob.group_detail.remove_title'),
+      t('mob.group_detail.remove_message', { name: member.nickname }),
+      [
+      { text: t('mob.common.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('mob.common.remove'),
         style: 'destructive',
         onPress: () => handleRemoveMember(member.user_id),
       },
-    ]);
+      ],
+    );
   };
 
   const handleLeaveGroup = async (): Promise<void> => {
@@ -297,17 +256,17 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
     setIsLeaving(true);
     try {
       await removeMember(groupId, currentUserId);
-      navigation.goBack();
+      goToDashboard(t('mob.success.group_left'));
     } catch {
-      setLeaveError('Could not leave the group. Please try again.');
+      setLeaveError(t('mob.group_detail.leave_error'));
       setIsLeaving(false);
     }
   };
 
   const handleLeaveGroupPress = (): void => {
-    Alert.alert('Leave Group', 'Are you sure you want to leave this group?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Leave', style: 'destructive', onPress: handleLeaveGroup },
+    Alert.alert(t('mob.group_detail.leave_title'), t('mob.group_detail.leave_message'), [
+      { text: t('mob.common.cancel'), style: 'cancel' },
+      { text: t('mob.group_detail.leave_confirm'), style: 'destructive', onPress: handleLeaveGroup },
     ]);
   };
 
@@ -316,7 +275,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
   }
 
   if (loadError || !group) {
-    return <ErrorView message={loadError ?? 'Group not found.'} onRetry={loadGroup} />;
+    return <ErrorView message={loadError ?? t('mob.group_detail.not_found')} onRetry={loadGroup} />;
   }
 
   // Full-contract-audit fix (2026-09-18, see
@@ -341,36 +300,38 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
       <Card style={styles.infoCard}>
         <Text style={styles.title}>{group.name}</Text>
         <Text style={styles.description}>{group.description}</Text>
-        <Text style={styles.meta}>Owned by {group.owner_nickname}</Text>
         <Text style={styles.meta}>
-          {group.member_count} {group.member_count === 1 ? 'member' : 'members'}
+          {t('mob.group_detail.owned_by', { name: group.owner_nickname ?? '' })}
+        </Text>
+        <Text style={styles.meta}>
+          {t(
+            group.member_count === 1 ? 'mob.group_card.members_one' : 'mob.group_card.members_other',
+            { count: group.member_count ?? 0 },
+          )}
         </Text>
         {canInvite ? (
           <Button
-            label="Share Group Invite"
+            label={t('mob.group_detail.share_button')}
             variant="secondary"
             size="sm"
-            onPress={handleShareGroupInvite}
-            loading={isCreatingInvite}
-            accessibilityLabel="Share Group Invite"
+            onPress={share.open}
+            accessibilityLabel={t('mob.group_detail.share_button')}
             style={styles.shareGroupBtn}
           />
         ) : null}
-        {inviteLinkError ? <Text style={styles.errorText}>{inviteLinkError}</Text> : null}
       </Card>
 
       <Card>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Members</Text>
+          <Text style={styles.sectionTitle}>{t('mob.group_detail.members_title')}</Text>
           {canInvite && !isInviteFormOpen ? (
             <View style={styles.headerLinksRow}>
               <TextLink
-                label="Share Link"
-                accessibilityLabel="Share Group Link"
-                onPress={handleShareGroupInvite}
-                disabled={isCreatingInvite}
+                label={t('mob.group_detail.share_link')}
+                accessibilityLabel={t('mob.group_detail.share_link_a11y')}
+                onPress={share.open}
               />
-              <TextLink label="Invite" onPress={handleOpenInviteForm} />
+              <TextLink label={t('mob.group_detail.invite')} onPress={handleOpenInviteForm} />
             </View>
           ) : null}
         </View>
@@ -380,11 +341,11 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
             {selectedInviteEmail ? (
               <View style={styles.selectedInviteRow}>
                 <Text style={styles.selectedInviteText}>
-                  Invite by email: {selectedInviteEmail}
+                  {t('mob.group_detail.invite_by_email', { email: selectedInviteEmail })}
                 </Text>
                 <TextLink
-                  label="Change"
-                  accessibilityLabel={`Remove ${selectedInviteEmail}`}
+                  label={t('mob.common.change')}
+                  accessibilityLabel={t('mob.group_detail.remove_invitee_a11y', { name: selectedInviteEmail })}
                   onPress={handleRemoveEmail}
                   disabled={isInviting}
                 />
@@ -393,11 +354,14 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
             {selectedInviteUsers.map(invitee => (
               <View key={invitee.id} style={styles.selectedInviteRow}>
                 <Text style={styles.selectedInviteText}>
-                  {invitee.nickname} ({invitee.display_name})
+                  {t('mob.group_detail.invitee_line', {
+                    nickname: invitee.nickname,
+                    name: invitee.display_name,
+                  })}
                 </Text>
                 <TextLink
-                  label={selectedInviteUsers.length === 1 ? 'Change' : 'Remove'}
-                  accessibilityLabel={`Remove ${invitee.nickname}`}
+                  label={selectedInviteUsers.length === 1 ? t('mob.common.change') : t('mob.common.remove')}
+                  accessibilityLabel={t('mob.group_detail.remove_invitee_a11y', { name: invitee.nickname })}
                   onPress={() => handleRemoveUser(invitee.id)}
                   disabled={isInviting}
                 />
@@ -407,7 +371,6 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
               <UserSearchPicker
                 onSelect={handleSelectUser}
                 onSelectEmail={handleSelectEmail}
-                entityLabel="member"
                 excludeGroupId={groupId}
                 disabled={isInviting}
               />
@@ -415,7 +378,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
             {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
             <View style={styles.editActionsRow}>
               <Button
-                label="Send Invite"
+                label={t('mob.group_detail.send_invite')}
                 size="sm"
                 onPress={handleSendInvite}
                 loading={isInviting}
@@ -423,7 +386,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
                 style={styles.actionSpacing}
               />
               <Button
-                label="Cancel"
+                label={t('mob.common.cancel')}
                 size="sm"
                 variant="secondary"
                 onPress={handleCancelInvite}
@@ -447,7 +410,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
               <View style={styles.memberInfo}>
                 <Text style={styles.memberNickname}>{member.nickname}</Text>
                 <Badge
-                  label={formatRoleLabel(member.role)}
+                  label={t(ROLE_LABEL_KEY[member.role])}
                   variant={ROLE_BADGE_VARIANT[member.role]}
                 />
               </View>
@@ -471,7 +434,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
                             roleDraft === option && styles.roleOptionTextSelected,
                           ]}
                         >
-                          {option}
+                          {t(ROLE_LABEL_KEY[option])}
                         </Text>
                       </Pressable>
                     ))}
@@ -479,14 +442,14 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
                   {roleError ? <Text style={styles.errorText}>{roleError}</Text> : null}
                   <View style={styles.editActionsRow}>
                     <Button
-                      label="Save"
+                      label={t('mob.common.save')}
                       size="sm"
                       onPress={handleSaveRole}
                       loading={isSavingRole}
                       style={styles.actionSpacing}
                     />
                     <Button
-                      label="Cancel"
+                      label={t('mob.common.cancel')}
                       size="sm"
                       variant="secondary"
                       onPress={handleCancelEditRole}
@@ -498,14 +461,14 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
                 <View style={styles.memberActionsRow}>
                   {showRoleControl ? (
                     <TextLink
-                      label="Change Role"
+                      label={t('mob.group_detail.change_role')}
                       onPress={() => handleStartEditRole(member)}
                       style={styles.linkSpacing}
                     />
                   ) : null}
                   {showRemoveControl ? (
                     <TextLink
-                      label="Remove"
+                      label={t('mob.common.remove')}
                       tone="destructive"
                       onPress={() => handleRemoveMemberPress(member)}
                       loading={removingUserId === member.user_id}
@@ -522,7 +485,7 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
         <View style={styles.leaveSection}>
           {leaveError ? <Text style={styles.errorText}>{leaveError}</Text> : null}
           <Button
-            label="Leave Group"
+            label={t('mob.group_detail.leave_button')}
             variant="destructive"
             onPress={handleLeaveGroupPress}
             loading={isLeaving}
@@ -530,15 +493,15 @@ export default function GroupDetailScreen({ route, navigation }: Props): React.J
         </View>
       ) : null}
       <ShareActionSheet
-        visible={shareSheetVisible}
-        title="Share Group Invite"
-        onShareGeneric={handleShareGeneric}
-        onShareWhatsApp={handleShareWhatsApp}
-        onCopyLink={handleCopyLink}
-        onClose={handleCloseShareSheet}
+        visible={share.sheetVisible}
+        title={t('mob.group_detail.share_title')}
+        onShareGeneric={share.shareViaSystem}
+        onShareWhatsApp={share.shareViaWhatsApp}
+        onCopyLink={share.copyLink}
+        onClose={share.close}
       />
 
-      <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <Toast message={share.toastMessage} onDismiss={share.clearToast} />
     </KeyboardAwareScreen>
   );
 }

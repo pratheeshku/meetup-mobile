@@ -22,6 +22,7 @@ import { searchUsers } from '../api/users';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { UserSearchResult } from '../types/user';
 import TextField from './TextField';
+import { useT } from '../labels/LabelsContext';
 
 const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_MS = 300;
@@ -41,13 +42,17 @@ interface UserSearchPickerProps {
 export default function UserSearchPicker({
   onSelect,
   onSelectEmail,
-  entityLabel = 'member',
+  entityLabel,
   excludeGroupId,
   excludeEventId,
   excludeTeamId,
-  placeholder = 'Search by name or nickname...',
+  placeholder,
   disabled = false,
 }: UserSearchPickerProps): React.JSX.Element {
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
+  const entity = entityLabel ?? t('mob.user_search.entity_group_member');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UserSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -93,7 +98,7 @@ export default function UserSearchPicker({
           if (thisSearch !== latestSearch.current) {
             return;
           }
-          setError('Could not search for users. Please try again.');
+          setError(tRef.current('mob.user_search.error'));
           setResults([]);
           setIsSearching(false);
         },
@@ -138,13 +143,13 @@ export default function UserSearchPicker({
     <View>
       <TextField
         style={styles.input}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('mob.user_search.placeholder')}
         value={query}
         onChangeText={setQuery}
         editable={!disabled}
         autoCapitalize="none"
         autoCorrect={false}
-        accessibilityLabel="Search users"
+        accessibilityLabel={t('mob.user_search.a11y')}
       />
       {isSearching ? (
         <View style={styles.statusRow}>
@@ -152,7 +157,7 @@ export default function UserSearchPicker({
         </View>
       ) : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      {showEmpty ? <Text style={styles.emptyText}>No users found.</Text> : null}
+      {showEmpty ? <Text style={styles.emptyText}>{t('mob.user_search.empty')}</Text> : null}
       {showEmailAffordance ? (
         <View style={styles.resultsList}>
           <Pressable
@@ -162,13 +167,13 @@ export default function UserSearchPicker({
             ]}
             onPress={() => handleSelectEmail(trimmed)}
             accessibilityRole="button"
-            accessibilityLabel={`Invite ${trimmed} as new ${entityLabel}`}
+            accessibilityLabel={t('mob.user_search.invite_email_a11y', { email: trimmed, entity })}
           >
             <View style={styles.resultText}>
               <Text style={styles.emailAffordanceTitle}>
-                ✉️ Invite {trimmed} as new {entityLabel}
+                {t('mob.user_search.invite_email_title', { email: trimmed, entity })}
               </Text>
-              <Text style={styles.resultDisplayName}>Send an email invitation to join</Text>
+              <Text style={styles.resultDisplayName}>{t('mob.user_search.invite_email_hint')}</Text>
             </View>
           </Pressable>
         </View>
@@ -188,8 +193,8 @@ export default function UserSearchPicker({
               accessibilityRole="button"
               accessibilityLabel={
                 user.pending
-                  ? `${user.nickname}, ${user.display_name}, already invited`
-                  : `${user.nickname}, ${user.display_name}`
+                  ? t('mob.user_search.result_pending_a11y', { nickname: user.nickname, name: user.display_name })
+                  : t('mob.user_search.result_a11y', { nickname: user.nickname, name: user.display_name })
               }
               accessibilityState={{ disabled: user.pending }}
             >
@@ -197,7 +202,7 @@ export default function UserSearchPicker({
                 <Text style={styles.resultNickname}>{user.nickname}</Text>
                 <Text style={styles.resultDisplayName}>{user.display_name}</Text>
               </View>
-              {user.pending ? <Text style={styles.pendingLabel}>Pending</Text> : null}
+              {user.pending ? <Text style={styles.pendingLabel}>{t('mob.user_search.pending')}</Text> : null}
             </Pressable>
           ))}
         </View>

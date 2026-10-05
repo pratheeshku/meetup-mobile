@@ -17,7 +17,7 @@
  * Captain is NOT a form field — backend auto-assigns to the creator.
  * No member-invite step on this screen.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -37,22 +37,26 @@ import { useFieldChain } from '../hooks/useFieldChain';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Sport } from '../types/sport';
 import type { TeamVisibility } from '../types/team';
+import { goToDashboard } from '../navigation/goToDashboard';
 import { getApiErrorMessage } from '../utils/apiError';
 import type { GroupsStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'CreateGroup'>;
 
 type GroupKind = 'group' | 'team';
 
-const MODE_OPTIONS: ChipOption<GroupKind>[] = [
-  { value: 'group', label: '👥 Players Group' },
-  { value: 'team', label: '🛡️ Tournament Team' },
-];
-
 const NAME_MAX_LENGTH = 100;
 
 export default function CreateGroupScreen({ navigation }: Props): React.JSX.Element {
   const labels = useLabels();
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
+  const MODE_OPTIONS: ChipOption<GroupKind>[] = [
+    { value: 'group', label: t('mob.create_group.mode_group') },
+    { value: 'team', label: t('mob.create_group.mode_team') },
+  ];
   const [mode, setMode] = useState<GroupKind>('group');
 
   // Sports loading — only needed for Tournament Team mode, but loaded
@@ -80,7 +84,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
     try {
       setSports(await getSports());
     } catch {
-      setSportsError('Could not load the list of sports. Please try again.');
+      setSportsError(tRef.current('mob.common.sports_load_error'));
     } finally {
       setIsLoadingSports(false);
     }
@@ -99,7 +103,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
 
     const trimmedName = gName.trim();
     if (!trimmedName) {
-      setError('Enter a group name.');
+      setError(t('mob.create_group.err_name'));
       groupChain.focus('gName');
       return;
     }
@@ -112,10 +116,11 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
           { correlationId },
         );
       });
-      // Navigate to GroupDetail for the newly created group.
-      navigation.replace('GroupDetail', { groupId: created.id });
+      // Step 1 done: open step 2 (invite members). `replace` so Back from
+      // step 2 never returns to this form and re-submits the group.
+      navigation.replace('InviteMembers', { groupId: created.id });
     } catch (e) {
-      setError(getApiErrorMessage(e, 'Could not create the group. Please try again.'));
+      setError(getApiErrorMessage(e, t('mob.create_group.err_create')));
       setIsSubmitting(false);
     }
   };
@@ -126,12 +131,12 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
 
     const trimmedName = tName.trim();
     if (!trimmedName) {
-      setError('Enter a team name.');
+      setError(t('mob.create_group.err_team_name'));
       teamChain.focus('tName');
       return;
     }
     if (!tSport) {
-      setError('Choose a sport.');
+      setError(t('mob.create_group.err_sport'));
       return;
     }
 
@@ -143,11 +148,9 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
           { correlationId },
         );
       });
-      // TeamDetailScreen does not exist yet — navigate to the Groups list
-      // instead. Flagged as a known gap in the Implementation Report.
-      navigation.popTo('GroupsList', { refreshKey: Date.now() });
+      goToDashboard(t('mob.success.team_created'));
     } catch (e) {
-      setError(getApiErrorMessage(e, 'Could not create the team. Please try again.'));
+      setError(getApiErrorMessage(e, t('mob.create_group.err_team_create')));
       setIsSubmitting(false);
     }
   };
@@ -185,22 +188,22 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
 
       {mode === 'group' ? (
         <>
-          <Text style={[styles.label, styles.section]}>Name</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_group.name')}</Text>
           <TextField
             style={styles.input}
             {...groupChain.props('gName')}
-            placeholder="e.g. Sunday Footballers"
+            placeholder={t('mob.create_group.name_placeholder')}
             value={gName}
             onChangeText={setGName}
             maxLength={NAME_MAX_LENGTH}
             editable={!isSubmitting}
           />
 
-          <Text style={styles.label}>Description (optional)</Text>
+          <Text style={styles.label}>{t('mob.create_group.description')}</Text>
           <TextField
             ref={groupChain.ref('gDescription')}
             style={[styles.input, styles.multiline]}
-            placeholder="What is this group about?"
+            placeholder={t('mob.create_group.description_placeholder')}
             value={gDescription}
             onChangeText={setGDescription}
             multiline
@@ -214,29 +217,29 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
             </Text>
           ) : null}
 
-          <Button label="Create Group" onPress={handleSubmitGroup} loading={isSubmitting} />
+          <Button label={t('mob.create_group.submit_group')} onPress={handleSubmitGroup} loading={isSubmitting} />
         </>
       ) : (
         <>
-          <Text style={[styles.label, styles.section]}>Team Name</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_group.team_name')}</Text>
           <TextField
             style={styles.input}
             {...teamChain.props('tName')}
-            placeholder="e.g. Real Madrid FC"
+            placeholder={t('mob.create_group.team_name_placeholder')}
             value={tName}
             onChangeText={setTName}
             maxLength={NAME_MAX_LENGTH}
             editable={!isSubmitting}
           />
 
-          <Text style={[styles.label, styles.section]}>Sport</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_group.sport')}</Text>
           {sportOptions.length === 0 ? (
-            <Text style={styles.hint}>No sports are available right now.</Text>
+            <Text style={styles.hint}>{t('mob.common.no_sports')}</Text>
           ) : (
             <OptionChips options={sportOptions} value={tSport} onChange={setTSport} disabled={isSubmitting} />
           )}
 
-          <Text style={[styles.label, styles.section]}>Visibility</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_group.visibility')}</Text>
           <OptionChips
             options={TEAM_VISIBILITY_OPTIONS}
             value={tVisibility}
@@ -250,7 +253,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
             </Text>
           ) : null}
 
-          <Button label="Create Team" onPress={handleSubmitTeam} loading={isSubmitting} />
+          <Button label={t('mob.create_group.submit_team')} onPress={handleSubmitTeam} loading={isSubmitting} />
         </>
       )}
     </KeyboardAwareScreen>

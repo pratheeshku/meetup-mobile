@@ -4,6 +4,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 import { colors, spacing, typography } from '../theme/tokens';
 import Button from './Button';
+import { useT } from '../labels/LabelsContext';
 
 interface InlineErrorProps {
   message: string;
@@ -15,15 +16,16 @@ interface InlineErrorProps {
 export default function InlineError({
   message,
   onRetry,
-  retryLabel = 'Retry',
+  retryLabel,
   style,
 }: InlineErrorProps): React.JSX.Element {
+  const t = useT();
   return (
     <View style={[styles.container, style]} accessibilityRole="alert">
       <Text style={styles.message}>{message}</Text>
       {onRetry ? (
         <Button
-          label={retryLabel}
+          label={retryLabel ?? t('mob.common.retry')}
           variant="secondary"
           size="md"
           onPress={onRetry}

@@ -28,7 +28,7 @@ export type AuthStackParamList = {
  * screen's "Mine" scope — DES-MEETUP-ADDENDUM-dashboard.md AD-15.)
  */
 export type HomeStackParamList = {
-  EventsList: { refreshKey?: number } | undefined;
+  EventsList: { refreshKey?: number; successMessage?: string } | undefined;
   EventDetail: { eventId: string };
   CreateGame: undefined;
   NotificationHistory: undefined;
@@ -43,6 +43,8 @@ export type GroupsStackParamList = {
   GroupsList: { refreshKey?: number } | undefined;
   GroupDetail: { groupId: string };
   CreateGroup: undefined;
+  /** Group creation step 2 (DES-MEETUP-FEEDBACK-001 C4). */
+  InviteMembers: { groupId: string };
 };
 
 /**

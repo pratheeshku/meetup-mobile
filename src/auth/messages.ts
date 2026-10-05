@@ -8,4 +8,5 @@
  * API client could not keep it alive (`auth-expired`) — e.g. the access token
  * expired and there is no refresh token to renew it with.
  */
-export const SESSION_EXPIRED_MESSAGE = 'Session expired. Please sign in again.';
+/** Label key (resolve with `t(...)`). */
+export const SESSION_EXPIRED_MESSAGE = 'mob.errors.session_expired' as const;

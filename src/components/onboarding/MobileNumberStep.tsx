@@ -15,6 +15,7 @@ import KeyboardAwareScreen from '../KeyboardAwareScreen';
 import MobileNumberInput from '../MobileNumberInput';
 import type { MobileNumberChange } from '../MobileNumberInput';
 import StepFooter from './StepFooter';
+import { useT } from '../../labels/LabelsContext';
 
 type ReadyConfig = Extract<MobileNumberConfig, { status: 'ready' }>;
 
@@ -28,6 +29,7 @@ export default function MobileNumberStep({
   const [change, setChange] = useState<MobileNumberChange>({ e164: null, isEmpty: true });
   const [localError, setLocalError] = useState<string | null>(null);
   const saver = useMobileNumberSave(config);
+  const t = useT();
 
   const handleSave = async (): Promise<void> => {
     if (change.isEmpty) {
@@ -35,7 +37,7 @@ export default function MobileNumberStep({
       return;
     }
     if (change.e164 === null) {
-      setLocalError('Enter a valid mobile number.');
+      setLocalError(t('mob.mobile_number.invalid'));
       return;
     }
     if (await saver.save(change.e164)) {
@@ -60,7 +62,7 @@ export default function MobileNumberStep({
         onSkip={onDone}
         saving={saver.isSaving}
         error={saver.error}
-        saveLabel={saver.needsReconfirm ? 'Confirm and save' : 'Save'}
+        saveLabel={saver.needsReconfirm ? t('mob.mobile_number.confirm_save') : t('mob.common.save')}
       />
     </KeyboardAwareScreen>
   );

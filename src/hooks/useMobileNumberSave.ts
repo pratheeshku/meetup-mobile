@@ -16,14 +16,9 @@ import { useCallback, useRef, useState } from 'react';
 import { withCorrelationId } from '../api/correlationId';
 import { classifyMobileNumberError, updateMobileNumber } from '../api/mobileNumber';
 import type { MobileNumberConfig } from './useMobileNumberConfig';
+import { useT } from '../labels/LabelsContext';
 
 type ReadyConfig = Extract<MobileNumberConfig, { status: 'ready' }>;
-
-export const MOBILE_NUMBER_INVALID_MESSAGE = 'Enter a valid mobile number.';
-export const MOBILE_NUMBER_RECONFIRM_MESSAGE =
-  'The consent text has changed. Please review it and confirm to save.';
-export const MOBILE_NUMBER_SAVE_FAILED_MESSAGE =
-  'Could not save your mobile number. Please try again.';
 
 export interface MobileNumberSave {
   isSaving: boolean;
@@ -45,6 +40,9 @@ export function useMobileNumberSave(config: ReadyConfig): MobileNumberSave {
   // changes after a 409 refetch.
   const configRef = useRef(config);
   configRef.current = config;
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const run = useCallback(
     async (payload: { mobile_number: string | null; mobile_consent_version?: string }) => {
@@ -59,11 +57,11 @@ export function useMobileNumberSave(config: ReadyConfig): MobileNumberSave {
         if (kind === 'consent_version_stale') {
           await configRef.current.reloadConsent();
           setNeedsReconfirm(true);
-          setError(MOBILE_NUMBER_RECONFIRM_MESSAGE);
+          setError(tRef.current('mob.mobile_number.reconfirm'));
         } else if (kind === 'invalid_number') {
-          setError(MOBILE_NUMBER_INVALID_MESSAGE);
+          setError(tRef.current('mob.mobile_number.invalid'));
         } else {
-          setError(MOBILE_NUMBER_SAVE_FAILED_MESSAGE);
+          setError(tRef.current('mob.mobile_number.save_failed'));
         }
         return false;
       } finally {

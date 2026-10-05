@@ -19,6 +19,7 @@ import LoadingView from '../LoadingView';
 import SkillLevelFlow from '../skills/SkillLevelFlow';
 import type { SkillLevelMap } from '../skills/SkillLevelFlow';
 import StepFooter from './StepFooter';
+import { useT } from '../../labels/LabelsContext';
 
 interface SkillsStepProps {
   onDone: () => void;
@@ -28,6 +29,7 @@ const storageKey = (sport: Sport | string): string =>
   (typeof sport === 'string' ? sport : sport.name).trim().toLowerCase();
 
 export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Element {
+  const t = useT();
   const [sports, setSports] = useState<Sport[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [existing, setExisting] = useState<Record<string, SkillLevelValue>>({});
@@ -74,7 +76,7 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
       });
       onDone();
     } catch {
-      setError('Could not save your skill levels. Please try again.');
+      setError(t('mob.onboarding.skills_save_error'));
     } finally {
       setSaving(false);
     }
@@ -84,10 +86,10 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
     return (
       <View style={styles.centered}>
         <Text style={styles.error} accessibilityRole="alert">
-          Could not load sports.
+          {t('mob.onboarding.sports_load_error')}
         </Text>
-        <Button label="Retry" onPress={load} />
-        <StepFooter onSave={onDone} onSkip={onDone} saveLabel="Save" />
+        <Button label={t('mob.common.retry')} onPress={load} />
+        <StepFooter onSave={onDone} onSkip={onDone} saveLabel={t('mob.common.save')} />
       </View>
     );
   }
@@ -110,11 +112,11 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
         initialLevels={initialLevels}
         saving={saving}
         error={error}
-        nextLabel="Next"
-        backLabel="Back"
-        saveLabel="Save"
+        nextLabel={t('mob.common.next')}
+        backLabel={t('mob.common.back')}
+        saveLabel={t('mob.common.save')}
         onSave={handleSave}
-        footer={<Button label="Skip" variant="secondary" onPress={onDone} disabled={saving} style={styles.skip} />}
+        footer={<Button label={t('mob.common.skip')} variant="secondary" onPress={onDone} disabled={saving} style={styles.skip} />}
       />
     </ScrollView>
   );

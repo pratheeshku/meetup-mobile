@@ -7,6 +7,8 @@
  * Anything else — network failure, 5xx, unexpected shape — returns the
  * caller's generic `fallback` so internals are never shown. Nothing here logs.
  */
+
+import { currentT } from '../labels/LabelsContext';
 interface ValidationDetail {
   loc?: unknown[];
   msg?: unknown;
@@ -43,5 +45,5 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
       return messages.join('\n');
     }
   }
-  return status === 403 ? 'You do not have permission to do this.' : fallback;
+  return status === 403 ? currentT('mob.errors.forbidden') : fallback;
 }

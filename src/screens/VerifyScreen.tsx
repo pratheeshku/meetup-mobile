@@ -32,11 +32,13 @@ import {
   SERVER_ERROR_MESSAGE,
 } from '../utils/networkError';
 import type { AuthStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Verify'>;
 
 export default function VerifyScreen({ navigation, route }: Props): React.JSX.Element {
   const { email, explanation } = route.params;
+  const t = useT();
 
   const [code, setCode] = useState('');
   const [cooldown, setCooldown] = useState(0);
@@ -65,7 +67,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
 
     const trimmedCode = code.trim();
     if (!trimmedCode || trimmedCode.length !== 6) {
-      setError("That code didn't work. Check it or request a new one.");
+      setError(t('mob.verify.bad_code'));
       chain.focus('code');
       return;
     }
@@ -73,19 +75,19 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     setIsVerifying(true);
     try {
       await verifyEmail(email, trimmedCode);
-      navigation.navigate('Login', { successMessage: 'Email verified. Sign in.' });
+      navigation.navigate('Login', { successMessage: t('mob.verify.verified') });
     } catch (err) {
       if (isNetworkError(err)) {
-        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryError(t(NETWORK_ERROR_MESSAGE));
         setRetryAction(() => handleVerify);
       } else if (isRateLimitError(err)) {
-        setError(RATE_LIMIT_MESSAGE);
+        setError(t(RATE_LIMIT_MESSAGE));
       } else if (isServerError(err)) {
-        setRetryError(SERVER_ERROR_MESSAGE);
+        setRetryError(t(SERVER_ERROR_MESSAGE));
         setRetryAction(() => handleVerify);
       } else {
         // Every other failure comes back as 400 "Verification failed"
-        setError("That code didn't work. Check it or request a new one.");
+        setError(t('mob.verify.bad_code'));
       }
     } finally {
       setIsVerifying(false);
@@ -104,18 +106,18 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     try {
       await resendVerification(email);
       setCooldown(60);
-      setInfoMessage('Verification code resent.');
+      setInfoMessage(t('mob.verify.resent'));
     } catch (err) {
       if (isNetworkError(err)) {
-        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryError(t(NETWORK_ERROR_MESSAGE));
         setRetryAction(() => handleResend);
       } else if (isRateLimitError(err)) {
-        setError(RATE_LIMIT_MESSAGE);
+        setError(t(RATE_LIMIT_MESSAGE));
       } else if (isServerError(err)) {
-        setRetryError(SERVER_ERROR_MESSAGE);
+        setRetryError(t(SERVER_ERROR_MESSAGE));
         setRetryAction(() => handleResend);
       } else {
-        setError('Failed to resend verification code. Please try again.');
+        setError(t('mob.verify.resend_failed'));
       }
       // Note: Cooldown does NOT start on failure (§7)
     } finally {
@@ -124,23 +126,24 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
   };
 
   const resendDisabled = cooldown > 0 || isResending || isVerifying;
-  const resendLabel = cooldown > 0 ? `Resend (${cooldown}s)` : 'Resend';
+  const resendLabel =
+    cooldown > 0 ? t('mob.verify.resend_cooldown', { seconds: cooldown }) : t('mob.verify.resend');
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Verify Email</Text>
+      <Text style={styles.title}>{t('mob.verify.title')}</Text>
 
       {explanation ? <Text style={styles.explanation}>{explanation}</Text> : null}
 
       <Text style={styles.instructions}>
-        Enter the 6-digit code sent to{'\n'}
+        {t('mob.verify.instructions')}{'\n'}
         <Text style={styles.emailHighlight}>{email}</Text>
       </Text>
 
       <TextField
         style={styles.input}
         {...chain.props('code')}
-        placeholder="6-digit code"
+        placeholder={t('mob.verify.code_placeholder')}
         autoCapitalize="none"
         keyboardType="number-pad"
         textContentType="oneTimeCode"
@@ -154,7 +157,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
         <InlineError
           message={retryError}
           onRetry={retryAction}
-          retryLabel="Retry"
+          retryLabel={t('mob.common.retry')}
         />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
@@ -163,7 +166,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
       {infoMessage ? <Text style={styles.info}>{infoMessage}</Text> : null}
 
       <Button
-        label="Verify"
+        label={t('mob.verify.submit')}
         onPress={handleVerify}
         loading={isVerifying}
         disabled={isResending}
@@ -180,7 +183,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
       />
 
       <TextLink
-        label="Back"
+        label={t('mob.common.back')}
         onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Login'))}
         disabled={isVerifying || isResending}
         style={styles.link}

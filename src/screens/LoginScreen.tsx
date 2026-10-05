@@ -39,11 +39,13 @@ import {
   SERVER_ERROR_MESSAGE,
 } from '../utils/networkError';
 import type { AuthStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation, route }: Props): React.JSX.Element {
   const { signInWithGoogle, signInWithEmail, sessionExpired } = useAuth();
+  const t = useT();
 
   const [email, setEmail] = useState(route?.params?.email ?? '');
   const [password, setPassword] = useState('');
@@ -70,15 +72,15 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
     } catch (err) {
       if (!(err instanceof GoogleSignInCancelledError)) {
         if (isNetworkError(err)) {
-          setRetryError(NETWORK_ERROR_MESSAGE);
+          setRetryError(t(NETWORK_ERROR_MESSAGE));
           setRetryAction(() => handleGoogleSignIn);
         } else if (isRateLimitError(err)) {
-          setError(RATE_LIMIT_MESSAGE);
+          setError(t(RATE_LIMIT_MESSAGE));
         } else if (isServerError(err)) {
-          setRetryError(SERVER_ERROR_MESSAGE);
+          setRetryError(t(SERVER_ERROR_MESSAGE));
           setRetryAction(() => handleGoogleSignIn);
         } else {
-          setError('Google sign-in failed. Please try again.');
+          setError(t('mob.login.google_failed'));
         }
       }
     } finally {
@@ -93,7 +95,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
-      setError('Enter your email and password.');
+      setError(t('mob.login.missing_fields'));
       chain.focus(trimmedEmail ? 'password' : 'email');
       return;
     }
@@ -103,18 +105,18 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
       await signInWithEmail(trimmedEmail, password);
     } catch (err) {
       if (isNetworkError(err)) {
-        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryError(t(NETWORK_ERROR_MESSAGE));
         setRetryAction(() => handleEmailSignIn);
         return;
       }
 
       if (isRateLimitError(err)) {
-        setError(RATE_LIMIT_MESSAGE);
+        setError(t(RATE_LIMIT_MESSAGE));
         return;
       }
 
       if (isServerError(err)) {
-        setRetryError(SERVER_ERROR_MESSAGE);
+        setRetryError(t(SERVER_ERROR_MESSAGE));
         setRetryAction(() => handleEmailSignIn);
         return;
       }
@@ -126,19 +128,19 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
       if (status === 403 && typeof detail === 'string' && detail.includes('Email not verified')) {
         navigation.navigate('Verify', {
           email: trimmedEmail,
-          explanation: 'Please verify your email before signing in.',
+          explanation: t('mob.login.verify_first'),
         });
         return;
       }
 
       if (status === 401) {
-        setError('Invalid email or password.');
+        setError(t('mob.login.invalid_credentials'));
         return;
       }
 
       // Enumeration-safe (§4.2): never reveal whether the email or the
       // password was the incorrect part.
-      setError('Invalid email or password.');
+      setError(t('mob.login.invalid_credentials'));
     } finally {
       setIsSubmitting(false);
     }
@@ -148,10 +150,10 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Sign In</Text>
+      <Text style={styles.title}>{t('mob.login.title')}</Text>
 
       {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
-      {sessionExpired ? <Text style={styles.notice}>{SESSION_EXPIRED_MESSAGE}</Text> : null}
+      {sessionExpired ? <Text style={styles.notice}>{t(SESSION_EXPIRED_MESSAGE)}</Text> : null}
 
       {isGoogleSignInAvailable() ? (
         <GoogleSigninButton
@@ -166,7 +168,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
       <TextField
         style={styles.input}
         {...chain.props('email')}
-        placeholder="Email"
+        placeholder={t('mob.auth.email_placeholder')}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -177,7 +179,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
       <TextField
         style={styles.input}
         {...chain.props('password')}
-        placeholder="Password"
+        placeholder={t('mob.auth.password_placeholder')}
         secureTextEntry
         autoComplete="password"
         value={password}
@@ -187,7 +189,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
 
       <View style={styles.forgotPasswordRow}>
         <TextLink
-          label="Forgot password?"
+          label={t('mob.login.forgot_password')}
           onPress={() =>
             navigation.navigate('ForgotPassword', {
               email: email.trim() || undefined,
@@ -202,21 +204,21 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
         <InlineError
           message={retryError}
           onRetry={retryAction}
-          retryLabel="Retry"
+          retryLabel={t('mob.common.retry')}
         />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
       ) : null}
 
       <Button
-        label="Sign In"
+        label={t('mob.login.submit')}
         onPress={handleEmailSignIn}
         loading={isSubmitting}
         style={styles.button}
       />
 
       <TextLink
-        label="Don't have an account? Register"
+        label={t('mob.login.register_link')}
         onPress={() => navigation.navigate('Register')}
         disabled={isSubmitting}
         style={styles.link}

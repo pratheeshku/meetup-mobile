@@ -28,6 +28,7 @@ import { borderWidth, colors, opacity, spacing, typography } from '../theme/toke
 import { NOTIFICATION_TYPES } from '../types/notification';
 import type { NotificationHistoryItem, NotificationType } from '../types/notification';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
+import { useT } from '../labels/LabelsContext';
 
 const UNREAD_BORDER_WIDTH = 4;
 
@@ -52,12 +53,13 @@ interface RowProps {
 }
 
 function NotificationRow({ item, onPress }: RowProps): React.JSX.Element {
+  const t = useT();
   const unread = item.read_at === null;
-  const title = item.title?.trim() ? item.title : 'Notification';
+  const title = item.title?.trim() ? item.title : t('mob.notif_history.fallback_title');
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${unread ? 'Unread. ' : ''}${title}${item.body ? `. ${item.body}` : ''}`}
+      accessibilityLabel={`${unread ? `${t('mob.notif_history.unread_prefix')} ` : ''}${title}${item.body ? `. ${item.body}` : ''}`}
       onPress={() => onPress(item)}
       style={({ pressed }) => [
         styles.row,
@@ -73,12 +75,13 @@ function NotificationRow({ item, onPress }: RowProps): React.JSX.Element {
           {item.body}
         </Text>
       ) : null}
-      <Text style={styles.time}>{formatRelativeTime(item.created_at)}</Text>
+      <Text style={styles.time}>{formatRelativeTime(item.created_at, undefined, t)}</Text>
     </Pressable>
   );
 }
 
 export default function NotificationHistoryScreen(): React.JSX.Element {
+  const t = useT();
   const [items, setItems] = useState<NotificationHistoryItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -156,14 +159,14 @@ export default function NotificationHistoryScreen(): React.JSX.Element {
   if (loadError) {
     return (
       <ErrorView
-        message="Could not load your notifications. Please try again."
+        message={t('mob.notif_history.load_error')}
         onRetry={loadFirstPage}
       />
     );
   }
 
   if (items.length === 0) {
-    return <EmptyState title="No notifications in the last 5 days" />;
+    return <EmptyState title={t('mob.notif_history.empty')} />;
   }
 
   return (
@@ -178,7 +181,7 @@ export default function NotificationHistoryScreen(): React.JSX.Element {
           <ActivityIndicator style={styles.footer} color={colors.primary} />
         ) : moreError ? (
           <Pressable accessibilityRole="button" onPress={loadMore} style={styles.footer}>
-            <Text style={styles.footerError}>Could not load more. Tap to retry.</Text>
+            <Text style={styles.footerError}>{t('mob.notif_history.more_error')}</Text>
           </Pressable>
         ) : (
           <View />

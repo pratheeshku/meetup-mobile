@@ -20,12 +20,14 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Button from '../components/Button';
 import { colors, opacity, radius, shadows, sizes, spacing, typography } from '../theme/tokens';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
 export type CreateTarget = 'game' | 'group';
 
-export const CREATE_MENU_ITEMS: ReadonlyArray<{ target: CreateTarget; emoji: string; label: string }> = [
-  { target: 'game', emoji: '🎮', label: 'Create Game' },
-  { target: 'group', emoji: '👥', label: 'Create Group' },
+export const CREATE_MENU_ITEMS: ReadonlyArray<{ target: CreateTarget; emoji: string; labelKey: LabelKey }> = [
+  { target: 'game', emoji: '🎮', labelKey: 'mob.create_menu.game' },
+  { target: 'group', emoji: '👥', labelKey: 'mob.create_menu.group' },
 ];
 
 interface CreateMenuProps {
@@ -35,6 +37,7 @@ interface CreateMenuProps {
 }
 
 export default function CreateMenu({ visible, onSelect, onClose }: CreateMenuProps): React.JSX.Element {
+  const t = useT();
   return (
     <Modal
       transparent
@@ -46,29 +49,29 @@ export default function CreateMenu({ visible, onSelect, onClose }: CreateMenuPro
       <View style={styles.root}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close create menu"
+          accessibilityLabel={t('mob.create_menu.close_a11y')}
           onPress={onClose}
           style={[StyleSheet.absoluteFill, styles.backdrop]}
         />
         <View style={styles.sheet}>
           <Text style={styles.title} accessibilityRole="header">
-            Create
+            {t('mob.create_menu.title')}
           </Text>
           {CREATE_MENU_ITEMS.map(item => (
             <Pressable
               key={item.target}
               accessibilityRole="button"
-              accessibilityLabel={item.label}
+              accessibilityLabel={t(item.labelKey)}
               onPress={() => onSelect(item.target)}
               style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
             >
               <Text style={styles.emoji} accessibilityElementsHidden importantForAccessibility="no">
                 {item.emoji}
               </Text>
-              <Text style={styles.rowLabel}>{item.label}</Text>
+              <Text style={styles.rowLabel}>{t(item.labelKey)}</Text>
             </Pressable>
           ))}
-          <Button label="Close" variant="secondary" onPress={onClose} style={styles.close} />
+          <Button label={t('mob.common.close')} variant="secondary" onPress={onClose} style={styles.close} />
         </View>
       </View>
     </Modal>

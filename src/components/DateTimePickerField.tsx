@@ -37,6 +37,7 @@ import {
   localDateTimeToDate,
   localDateToDate,
 } from '../utils/localDateTime';
+import { useT } from '../labels/LabelsContext';
 
 export interface DateTimePickerFieldProps {
   value: string;
@@ -59,6 +60,7 @@ export default function DateTimePickerField({
   disabled = false,
   style,
 }: DateTimePickerFieldProps): React.JSX.Element {
+  const t = useT();
   // Parsing the initial Date from string value
   const parseCurrentValue = (): Date => {
     if (mode === 'datetime') {
@@ -160,7 +162,9 @@ export default function DateTimePickerField({
         ]}
       >
         <Text style={value ? styles.valueText : styles.placeholderText}>
-          {value || placeholder || (mode === 'datetime' ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD')}
+          {value ||
+            placeholder ||
+            t(mode === 'datetime' ? 'mob.date_picker.placeholder_datetime' : 'mob.date_picker.placeholder_date')}
         </Text>
       </Pressable>
 
@@ -178,18 +182,18 @@ export default function DateTimePickerField({
               <View style={styles.modalHeader}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Cancel"
+                  accessibilityLabel={t('mob.common.cancel')}
                   onPress={handleIosCancel}
                 >
-                  <Text style={styles.modalActionCancel}>Cancel</Text>
+                  <Text style={styles.modalActionCancel}>{t('mob.common.cancel')}</Text>
                 </Pressable>
                 <Text style={styles.modalTitle}>{accessibilityLabel}</Text>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Done"
+                  accessibilityLabel={t('mob.common.done')}
                   onPress={handleIosDone}
                 >
-                  <Text style={styles.modalActionDone}>Done</Text>
+                  <Text style={styles.modalActionDone}>{t('mob.common.done')}</Text>
                 </Pressable>
               </View>
               <DateTimePicker

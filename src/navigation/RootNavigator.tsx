@@ -112,6 +112,7 @@ import EventDetailScreen from '../screens/EventDetailScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
+import InviteMembersScreen from '../screens/InviteMembersScreen';
 import GamesScreen from '../screens/GamesScreen';
 import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -119,6 +120,7 @@ import NotificationPreferencesScreen from '../screens/NotificationPreferencesScr
 import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
 import NotificationBanner from '../components/NotificationBanner';
 import OnboardingOverlay from './OnboardingOverlay';
+import { useT } from '../labels/LabelsContext';
 
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
@@ -172,6 +174,7 @@ function AuthStack(): React.JSX.Element {
 }
 
 function HomeStack(): React.JSX.Element {
+  const t = useT();
   return (
     <HomeStackNav.Navigator screenOptions={stackScreenOptions}>
       {/*
@@ -188,65 +191,73 @@ function HomeStack(): React.JSX.Element {
       <HomeStackNav.Screen
         name="EventDetail"
         component={EventDetailScreen}
-        options={{ title: 'Event' }}
+        options={{ title: t('mob.nav.title_game') }}
       />
       <HomeStackNav.Screen
         name="CreateGame"
         component={CreateGameScreen}
-        options={{ title: 'Create Game' }}
+        options={{ title: t('mob.nav.title_create_game') }}
       />
       <HomeStackNav.Screen
         name="NotificationHistory"
         component={NotificationHistoryScreen}
-        options={{ title: 'Notifications' }}
+        options={{ title: t('mob.nav.title_notifications') }}
       />
     </HomeStackNav.Navigator>
   );
 }
 
 function GroupsStack(): React.JSX.Element {
+  const t = useT();
   return (
     <GroupsStackNav.Navigator screenOptions={stackScreenOptions}>
-      <GroupsStackNav.Screen name="GroupsList" component={GroupsScreen} options={{ title: 'Groups' }} />
+      <GroupsStackNav.Screen name="GroupsList" component={GroupsScreen} options={{ title: t('mob.nav.title_groups') }} />
       <GroupsStackNav.Screen
         name="GroupDetail"
         component={GroupDetailScreen}
-        options={{ title: 'Group' }}
+        options={{ title: t('mob.nav.title_group') }}
+      />
+      <GroupsStackNav.Screen
+        name="InviteMembers"
+        component={InviteMembersScreen}
+        options={{ title: t('mob.nav.title_invite_members') }}
       />
       <GroupsStackNav.Screen
         name="CreateGroup"
         component={CreateGroupScreen}
-        options={{ title: 'Create Group' }}
+        options={{ title: t('mob.nav.title_create_group') }}
       />
     </GroupsStackNav.Navigator>
   );
 }
 
 function TournamentsStack(): React.JSX.Element {
+  const t = useT();
   return (
     <TournamentsStackNav.Navigator screenOptions={stackScreenOptions}>
       <TournamentsStackNav.Screen
         name="TournamentsList"
         component={GamesScreen}
-        options={{ title: 'Games' }}
+        options={{ title: t('mob.nav.title_games') }}
       />
       <TournamentsStackNav.Screen
         name="TournamentDetail"
         component={TournamentDetailScreen}
-        options={{ title: 'Tournament' }}
+        options={{ title: t('mob.nav.title_tournament') }}
       />
     </TournamentsStackNav.Navigator>
   );
 }
 
 function ProfileStack(): React.JSX.Element {
+  const t = useT();
   return (
     <ProfileStackNav.Navigator screenOptions={stackScreenOptions}>
-      <ProfileStackNav.Screen name="ProfileHome" component={ProfileScreen} options={{ title: 'Profile' }} />
+      <ProfileStackNav.Screen name="ProfileHome" component={ProfileScreen} options={{ title: t('mob.nav.title_profile') }} />
       <ProfileStackNav.Screen
         name="NotificationPreferences"
         component={NotificationPreferencesScreen}
-        options={{ title: 'Notification Preferences' }}
+        options={{ title: t('mob.nav.title_notification_prefs') }}
       />
     </ProfileStackNav.Navigator>
   );

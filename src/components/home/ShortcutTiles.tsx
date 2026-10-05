@@ -11,6 +11,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GamesIcon, GroupsIcon } from '../icons/DashboardIcons';
 import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
+import { useT } from '../../labels/LabelsContext';
 
 interface ShortcutTilesProps {
   /** `null` = the games request failed / not loaded. */
@@ -52,18 +53,25 @@ export default function ShortcutTiles({
   onPressGames,
   onPressGroups,
 }: ShortcutTilesProps): React.JSX.Element {
+  const t = useT();
   return (
     <View style={styles.row}>
       <Tile
-        title="My games"
-        subtitle={gamesCount === null ? '' : `${gamesCount} active`}
+        title={t('mob.dashboard.my_games')}
+        subtitle={gamesCount === null ? '' : t('mob.shortcuts.games_active', { count: gamesCount })}
         onPress={onPressGames}
       >
         <GamesIcon size={dashSize.sportIcon} />
       </Tile>
       <Tile
-        title="My groups"
-        subtitle={groupsCount === null ? '' : `${groupsCount} ${groupsCount === 1 ? 'group' : 'groups'}`}
+        title={t('mob.dashboard.my_groups')}
+        subtitle={
+          groupsCount === null
+            ? ''
+            : t(groupsCount === 1 ? 'mob.shortcuts.groups_one' : 'mob.shortcuts.groups_other', {
+                count: groupsCount,
+              })
+        }
         onPress={onPressGroups}
       >
         <GroupsIcon size={dashSize.sportIcon} />

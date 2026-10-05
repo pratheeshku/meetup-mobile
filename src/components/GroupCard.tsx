@@ -13,6 +13,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { borderWidth, colors, radius, shadows, spacing, typography } from '../theme/tokens';
 import type { Group, GroupRole } from '../types/group';
 import Card from './Card';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
 export interface GroupCardProps {
   group: Group;
@@ -20,11 +22,11 @@ export interface GroupCardProps {
   currentUserId?: string;
 }
 
-export const ROLE_BADGE_LABEL: Record<GroupRole, string> = {
-  owner: 'Owner',
-  admin: 'Admin',
-  member: 'Member',
-  none: 'None',
+export const ROLE_BADGE_LABEL_KEY: Record<GroupRole, LabelKey> = {
+  owner: 'mob.group_role.owner',
+  admin: 'mob.group_role.admin',
+  member: 'mob.group_role.member',
+  none: 'mob.group_role.none',
 };
 
 export const ROLE_BADGE_VARIANT: Record<GroupRole, 'primary' | 'neutral'> = {
@@ -45,20 +47,27 @@ export function getRolePillColor(role: GroupRole): string {
 }
 
 export default function GroupCard({ group, onPress, currentUserId }: GroupCardProps): React.JSX.Element {
+  const t = useT();
   const isOwner = Boolean(
     group.current_user_role === 'owner' ||
       (currentUserId && group.owner_id === currentUserId),
   );
 
-  const roleLabel = isOwner ? 'Owner' : ROLE_BADGE_LABEL[group.current_user_role] ?? 'Member';
+  const roleLabel = t(
+    isOwner
+      ? 'mob.group_role.owner'
+      : ROLE_BADGE_LABEL_KEY[group.current_user_role] ?? 'mob.group_role.member',
+  );
   const roleBg = getRolePillColor(isOwner ? 'owner' : group.current_user_role);
 
-  const ownerName = isOwner ? 'Self' : group.owner_nickname || 'Organiser';
-  const ownerDisplay = `Owner: ${ownerName}`;
+  const ownerName = isOwner ? t('mob.group_card.owner_self') : group.owner_nickname || t('mob.group_card.owner_fallback');
+  const ownerDisplay = t('mob.group_card.owner_line', { name: ownerName });
 
   const memberText =
     group.member_count !== undefined
-      ? `${group.member_count} ${group.member_count === 1 ? 'member' : 'members'}`
+      ? t(group.member_count === 1 ? 'mob.group_card.members_one' : 'mob.group_card.members_other', {
+          count: group.member_count,
+        })
       : '';
 
   return (
@@ -89,7 +98,7 @@ export default function GroupCard({ group, onPress, currentUserId }: GroupCardPr
           {memberText ? <Text style={styles.metaDot}> · </Text> : null}
           <Text style={styles.ownerText}>{ownerDisplay}</Text>
         </View>
-        <Text style={styles.actionLink}>View →</Text>
+        <Text style={styles.actionLink}>{t('mob.common.view_arrow')}</Text>
       </View>
     </Card>
   );

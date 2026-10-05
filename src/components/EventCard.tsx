@@ -19,6 +19,8 @@ import { borderWidth, colors, getSportColor, radius, spacing, typography } from 
 import type { Event } from '../types/event';
 import { useSportDisplayName } from '../utils/labels';
 import Card from './Card';
+import { bundledT, useT } from '../labels/LabelsContext';
+import type { TranslateFn } from '../labels/LabelsContext';
 
 interface EventCardProps {
   event: Event;
@@ -49,50 +51,60 @@ export function formatCardDate(isoString: string): string {
 }
 
 /** Derives the top-right status label */
-export function getEventStatusLabel(event: Event, currentUserId?: string): string {
+export function getEventStatusLabel(
+  event: Event,
+  currentUserId?: string,
+  t: TranslateFn = bundledT,
+): string {
   const isOrganiser = Boolean(
     (currentUserId && (event.organiser_id === currentUserId || event.is_organiser)) ||
       event.is_organiser,
   );
   if (isOrganiser) {
-    return 'Hosting';
+    return t('mob.game_card.status_hosting');
   }
   if (event.current_user_rsvp_status === 'waitlisted') {
-    return 'Waitlisted';
+    return t('mob.game_card.status_waitlisted');
   }
   const remaining = Math.max(0, event.capacity - event.participant_count);
   if (remaining === 0) {
-    return 'Full';
+    return t('mob.game_card.status_full');
   }
   if (event.current_user_rsvp_status === 'going') {
-    return `${remaining} left`;
+    return t('mob.game_card.status_left', { count: remaining });
   }
   // Open / unjoined
-  return remaining <= 3 ? `${remaining} left` : 'Open';
+  return remaining <= 3
+    ? t('mob.game_card.status_left', { count: remaining })
+    : t('mob.game_card.status_open');
 }
 
 /** Derives the right-aligned action link */
-export function getEventActionLabel(event: Event, currentUserId?: string): string {
+export function getEventActionLabel(
+  event: Event,
+  currentUserId?: string,
+  t: TranslateFn = bundledT,
+): string {
   const isOrganiser = Boolean(
     (currentUserId && (event.organiser_id === currentUserId || event.is_organiser)) ||
       event.is_organiser,
   );
   if (isOrganiser) {
-    return 'Manage →';
+    return t('mob.game_card.action_manage');
   }
   if (
     event.current_user_rsvp_status === 'going' ||
     event.current_user_rsvp_status === 'waitlisted'
   ) {
-    return 'View →';
+    return t('mob.common.view_arrow');
   }
-  return 'Join →';
+  return t('mob.game_card.action_join');
 }
 
 /** Returns status text color */
-function getStatusTextColor(status: string): string {
-  if (status === 'Hosting') return colors.accent;
-  if (status === 'Waitlisted') return '#67509B';
+function getStatusTextColor(status: string, t: TranslateFn): string {
+  if (status === t('mob.game_card.status_hosting')) return colors.accent;
+  if (status === t('mob.game_card.status_waitlisted')) return '#67509B';
   return colors.textMuted;
 }
 
@@ -105,8 +117,9 @@ export default function EventCard({
   const effectiveUserId = currentUserId ?? authUser?.id;
   const sportLabel = useSportDisplayName(event.sport);
   const sportColor = getSportColor(event.sport);
-  const statusLabel = getEventStatusLabel(event, effectiveUserId);
-  const actionLabel = getEventActionLabel(event, effectiveUserId);
+  const t = useT();
+  const statusLabel = getEventStatusLabel(event, effectiveUserId, t);
+  const actionLabel = getEventActionLabel(event, effectiveUserId, t);
 
   const formattedDate = formatCardDate(event.starts_at);
   const venue = event.venue_name || event.location || '';
@@ -136,7 +149,7 @@ export default function EventCard({
         ) : (
           <View />
         )}
-        <Text style={[styles.statusText, { color: getStatusTextColor(statusLabel) }]}>
+        <Text style={[styles.statusText, { color: getStatusTextColor(statusLabel, t) }]}>
           {statusLabel}
         </Text>
       </View>

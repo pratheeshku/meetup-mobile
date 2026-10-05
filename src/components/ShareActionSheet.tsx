@@ -14,6 +14,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Button from './Button';
 import { colors, radius, sizes, spacing, typography } from '../theme/tokens';
+import { useT } from '../labels/LabelsContext';
 
 export interface ShareActionSheetProps {
   visible: boolean;
@@ -26,12 +27,13 @@ export interface ShareActionSheetProps {
 
 export default function ShareActionSheet({
   visible,
-  title = 'Share',
+  title,
   onShareGeneric,
   onShareWhatsApp,
   onCopyLink,
   onClose,
 }: ShareActionSheetProps): React.JSX.Element {
+  const t = useT();
   return (
     <Modal
       transparent
@@ -43,18 +45,18 @@ export default function ShareActionSheet({
       <View style={styles.root}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Close share menu"
+          accessibilityLabel={t('mob.share_sheet.close_a11y')}
           onPress={onClose}
           style={[StyleSheet.absoluteFill, styles.backdrop]}
         />
         <View style={styles.sheet}>
           <Text style={styles.title} accessibilityRole="header">
-            {title}
+            {title ?? t('mob.share_sheet.title')}
           </Text>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Share via WhatsApp"
+            accessibilityLabel={t('mob.share_sheet.whatsapp')}
             onPress={onShareWhatsApp}
             style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
           >
@@ -62,14 +64,14 @@ export default function ShareActionSheet({
               💬
             </Text>
             <View style={styles.textContainer}>
-              <Text style={styles.rowLabel}>Share via WhatsApp</Text>
-              <Text style={styles.rowSubLabel}>Send invite message directly</Text>
+              <Text style={styles.rowLabel}>{t('mob.share_sheet.whatsapp')}</Text>
+              <Text style={styles.rowSubLabel}>{t('mob.share_sheet.whatsapp_hint')}</Text>
             </View>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Share via other apps"
+            accessibilityLabel={t('mob.share_sheet.other_apps')}
             onPress={onShareGeneric}
             style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
           >
@@ -77,14 +79,14 @@ export default function ShareActionSheet({
               📤
             </Text>
             <View style={styles.textContainer}>
-              <Text style={styles.rowLabel}>Share via other apps</Text>
-              <Text style={styles.rowSubLabel}>Open system share sheet</Text>
+              <Text style={styles.rowLabel}>{t('mob.share_sheet.other_apps')}</Text>
+              <Text style={styles.rowSubLabel}>{t('mob.share_sheet.other_apps_hint')}</Text>
             </View>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Copy Link"
+            accessibilityLabel={t('mob.share_sheet.copy_link')}
             onPress={onCopyLink}
             style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
           >
@@ -92,12 +94,12 @@ export default function ShareActionSheet({
               🔗
             </Text>
             <View style={styles.textContainer}>
-              <Text style={styles.rowLabel}>Copy Link</Text>
-              <Text style={styles.rowSubLabel}>Copy link to clipboard</Text>
+              <Text style={styles.rowLabel}>{t('mob.share_sheet.copy_link')}</Text>
+              <Text style={styles.rowSubLabel}>{t('mob.share_sheet.copy_link_hint')}</Text>
             </View>
           </Pressable>
 
-          <Button label="Close" variant="secondary" onPress={onClose} style={styles.close} />
+          <Button label={t('mob.common.close')} variant="secondary" onPress={onClose} style={styles.close} />
         </View>
       </View>
     </Modal>

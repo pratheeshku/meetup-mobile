@@ -81,6 +81,7 @@ import {
   resolveNotificationTarget,
 } from './notificationRouting';
 import type { NotificationType, PushNotificationPayload } from '../types/notification';
+import { currentT } from '../labels/LabelsContext';
 
 /** The notification types delivered data-only and rendered locally by this file. */
 export const EVENT_NOTIFICATION_TYPES = [
@@ -137,9 +138,9 @@ export async function displayEventNotification(data: Record<string, string>): Pr
       // launches the app (dismiss-only).
       actions: [
         isJoinShape
-          ? { title: 'Join', pressAction: { id: JOIN_ACTION_ID, launchActivity: 'default' } }
-          : { title: 'View', pressAction: { id: VIEW_ACTION_ID, launchActivity: 'default' } },
-        { title: 'OK', pressAction: { id: OK_ACTION_ID } },
+          ? { title: currentT('mob.notification_action.join'), pressAction: { id: JOIN_ACTION_ID, launchActivity: 'default' } }
+          : { title: currentT('mob.notification_action.view'), pressAction: { id: VIEW_ACTION_ID, launchActivity: 'default' } },
+        { title: currentT('mob.notification_action.ok'), pressAction: { id: OK_ACTION_ID } },
       ],
     },
   });

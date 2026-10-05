@@ -7,17 +7,19 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { colors, spacing, typography } from '../theme/tokens';
+import { useT } from '../labels/LabelsContext';
 
 interface LoadingViewProps {
   message?: string;
 }
 
 export default function LoadingView({ message }: LoadingViewProps): React.JSX.Element {
+  const t = useT();
   return (
     <View
       style={styles.container}
       accessibilityRole="progressbar"
-      accessibilityLabel={message ?? 'Loading'}
+      accessibilityLabel={message ?? t('mob.common.loading')}
     >
       <ActivityIndicator size="large" color={colors.primary} />
       {message ? <Text style={styles.message}>{message}</Text> : null}

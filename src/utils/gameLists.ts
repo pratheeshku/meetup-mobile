@@ -25,6 +25,8 @@
 import type { Event } from '../types/event';
 import type { Sport } from '../types/sport';
 import type { SkillLevel } from '../types/user';
+import { bundledT } from '../labels/LabelsContext';
+import type { TranslateFn } from '../labels/LabelsContext';
 
 /** Rows a Home section shows before "View all" (AD-14). */
 export const HOME_SECTION_ROWS = 2;
@@ -244,18 +246,19 @@ export function effectiveSportSelection(
   return selection.filter(key => available.has(key));
 }
 
-function joinNames(names: readonly string[]): string {
+function joinNames(names: readonly string[], t: TranslateFn): string {
   if (names.length <= 1) {
     return names.join('');
   }
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `${names.slice(0, -1).join(', ')} ${t('mob.common.and')} ${names[names.length - 1]}`;
 }
 
 /** Filtered-empty copy (AD-9). */
 export function filteredEmptyMessage(
   selection: readonly string[],
   options: readonly SportOption[],
+  t: TranslateFn = bundledT,
 ): string {
   const names = selection.map(key => options.find(option => option.key === key)?.label ?? key);
-  return `No ${joinNames(names)} games here — clear the filter to see all`;
+  return t('mob.dashboard.filtered_empty', { sports: joinNames(names, t) });
 }

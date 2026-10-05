@@ -16,6 +16,7 @@ import Button from '../components/Button';
 import { colors, spacing, typography } from '../theme/tokens';
 import { PLAY_STORE_FALLBACK_URL, resolveStoreUrl } from '../utils/playStoreUrl';
 import { describeError } from '../utils/logSafeError';
+import { useT } from '../labels/LabelsContext';
 
 interface ForceUpdateScreenProps {
   /** The backend's `store_url`, unvalidated. */
@@ -41,6 +42,7 @@ async function openStore(storeUrl: string | null): Promise<void> {
 }
 
 export default function ForceUpdateScreen({ storeUrl }: ForceUpdateScreenProps): React.JSX.Element {
+  const t = useT();
   useEffect(() => {
     // Returning true consumes the press: back neither navigates nor exits.
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
@@ -50,10 +52,10 @@ export default function ForceUpdateScreen({ storeUrl }: ForceUpdateScreenProps):
   return (
     <View style={styles.container}>
       <Text style={styles.title} accessibilityRole="header">
-        Update required
+        {t('mob.force_update.title')}
       </Text>
-      <Text style={styles.message}>Please update Shuttlr to continue.</Text>
-      <Button label="Update" onPress={() => openStore(storeUrl)} style={styles.button} />
+      <Text style={styles.message}>{t('mob.force_update.message')}</Text>
+      <Button label={t('mob.force_update.action')} onPress={() => openStore(storeUrl)} style={styles.button} />
     </View>
   );
 }

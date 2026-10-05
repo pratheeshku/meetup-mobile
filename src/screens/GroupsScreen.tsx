@@ -22,12 +22,23 @@ import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { Group } from '../types/group';
 import type { GroupsStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'GroupsList'>;
 
 export type GroupFilter = 'All' | 'Organised' | 'Member';
 
+const FILTER_LABEL_KEYS: Record<GroupFilter, LabelKey> = {
+  All: 'mob.groups.filter_all',
+  Organised: 'mob.groups.filter_organised',
+  Member: 'mob.groups.filter_joined',
+};
+
 export default function GroupsScreen({ navigation, route }: Props): React.JSX.Element {
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeFilter, setActiveFilter] = useState<GroupFilter>('All');
   const [isLoading, setIsLoading] = useState(true);
@@ -54,7 +65,7 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
       const response = await getMyGroups({ enrich: true });
       setGroups(response.items);
     } catch {
-      setError('Could not load your groups. Please try again.');
+      setError(tRef.current('mob.groups.load_error'));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -76,9 +87,9 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: headerAddButton('Create Group', () => navigation.navigate('CreateGroup')),
+      headerRight: headerAddButton(t('mob.groups.create_a11y'), () => navigation.navigate('CreateGroup')),
     });
-  }, [navigation]);
+  }, [navigation, t]);
 
   const filteredGroups = useMemo(() => {
     if (activeFilter === 'Organised') {
@@ -102,10 +113,10 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
     <View style={styles.headerContainer}>
       <View style={styles.headerBlock}>
         <Text style={styles.screenTitle} accessibilityRole="header">
-          My Groups
+          {t('mob.groups.title')}
         </Text>
         <Text style={styles.screenSubtitle}>
-          Communities and clubs you organise and belong to.
+          {t('mob.groups.subtitle')}
         </Text>
       </View>
       {groups.length > 0 ? (
@@ -116,7 +127,7 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
               <Pressable
                 key={tab}
                 accessibilityRole="button"
-                accessibilityLabel={tab}
+                accessibilityLabel={t(FILTER_LABEL_KEYS[tab])}
                 accessibilityState={{ selected: isSelected }}
                 onPress={() => setActiveFilter(tab)}
                 style={[
@@ -130,7 +141,7 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
                     isSelected ? styles.filterTextSelected : styles.filterTextIdle,
                   ]}
                 >
-                  {tab}
+                  {t(FILTER_LABEL_KEYS[tab])}
                 </Text>
               </Pressable>
             );
@@ -158,16 +169,20 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
       ListEmptyComponent={
         groups.length === 0 ? (
           <EmptyState
-            title="You're not in any groups yet."
-            subtitle="Tap '+' above to create a group and invite your teammates."
+            title={t('mob.groups.empty_title')}
+            subtitle={t('mob.groups.empty_subtitle')}
           />
         ) : (
           <EmptyState
-            title={`No ${activeFilter.toLowerCase()} groups.`}
+            title={t(
+              activeFilter === 'Organised' ? 'mob.groups.empty_organised' : 'mob.groups.empty_joined',
+            )}
             subtitle={
-              activeFilter === 'Organised'
-                ? "You don't organise any groups yet."
-                : "You haven't joined any other groups as a member yet."
+              t(
+                activeFilter === 'Organised'
+                  ? 'mob.groups.empty_organised_hint'
+                  : 'mob.groups.empty_joined_hint',
+              )
             }
           />
         )

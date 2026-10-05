@@ -16,7 +16,7 @@
  * Organiser forms (Cancel, Invite Group, Invite Individual, Edit) render
  * seamlessly when active.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -35,7 +35,6 @@ import { getMyGroups } from '../api/groups';
 import { getSports } from '../api/sports';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
-import { useLabels } from '../labels/LabelsContext';
 import { getEventVisibilityLabel } from '../utils/labels';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -49,13 +48,8 @@ import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import Toast from '../components/Toast';
 import UserSearchPicker from '../components/UserSearchPicker';
-import {
-  composeShareMessage,
-  copyLinkToClipboard,
-  getEventShareUrl,
-  shareGeneric,
-  shareToWhatsApp,
-} from '../utils/shareLink';
+import { useAppShare } from '../hooks/useAppShare';
+import { goToDashboard } from '../navigation/goToDashboard';
 import { useFieldChain } from '../hooks/useFieldChain';
 import {
   borderWidth,
@@ -74,27 +68,23 @@ import type { HomeStackParamList } from '../navigation/types';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import {
   formatLocalDateTime,
-  LOCAL_DATE_TIME_PLACEHOLDER,
   parseLocalDateTime,
 } from '../utils/localDateTime';
 import { isOrganiserOf } from '../utils/gameLists';
 import { useSportDisplayName } from '../utils/labels';
 import { getApiErrorMessage } from '../utils/apiError';
+import { useT, useLabels } from '../labels/LabelsContext';
+import type { TranslateFn } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 
-const SKILL_LEVEL_OPTIONS: ChipOption<string>[] = [
-  { value: 'all_levels', label: 'All Levels' },
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
-  { value: 'expert', label: 'Expert' },
-];
+const SKILL_LEVEL_VALUES = ['all_levels', 'beginner', 'intermediate', 'expert'] as const;
 
-function formatSkillLevel(level?: string | null): string {
-  if (!level || level === 'all_levels') return 'Beginner – Intermediate';
-  if (level === 'beginner') return 'Beginner';
-  if (level === 'intermediate') return 'Intermediate';
-  if (level === 'expert') return 'Expert';
+function formatSkillLevel(level: string | null | undefined, t: TranslateFn): string {
+  if (!level || level === 'all_levels') return t('mob.game_detail.skill_all_display');
+  if (level === 'beginner') return t('skill_level.beginner');
+  if (level === 'intermediate') return t('skill_level.intermediate');
+  if (level === 'expert') return t('skill_level.expert');
   return level;
 }
 
@@ -102,6 +92,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const { eventId } = route.params;
   const { user } = useAuth();
   const labels = useLabels();
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
+
+  const SKILL_LEVEL_OPTIONS: ChipOption<string>[] = SKILL_LEVEL_VALUES.map(value => ({
+    value,
+    label: t(`skill_level.${value}`),
+  }));
 
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
@@ -145,46 +143,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const handleOpenShare = (): void => {
-    setIsShareSheetOpen(true);
-  };
-
-  const handleCloseShare = (): void => {
-    setIsShareSheetOpen(false);
-  };
-
-  const handleShareGeneric = async (): Promise<void> => {
-    if (!event) {
-      return;
-    }
-    const inviterName = user?.display_name || user?.nickname || 'Someone';
-    const url = getEventShareUrl(event.id, user?.id);
-    const message = composeShareMessage(inviterName, event.title, url);
-    await shareGeneric({ message, url });
-  };
-
-  const handleShareWhatsApp = async (): Promise<void> => {
-    if (!event) {
-      return;
-    }
-    const inviterName = user?.display_name || user?.nickname || 'Someone';
-    const url = getEventShareUrl(event.id, user?.id);
-    const message = composeShareMessage(inviterName, event.title, url);
-    await shareToWhatsApp(message);
-  };
-
-  const handleCopyLink = (): void => {
-    if (!event) {
-      return;
-    }
-    const url = getEventShareUrl(event.id, user?.id);
-    copyLinkToClipboard(url);
-    setIsShareSheetOpen(false);
-    setToastMessage('Link copied to clipboard');
-  };
+  const share = useAppShare();
 
   const [sports, setSports] = useState<Sport[]>([]);
 
@@ -214,7 +173,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       setEvent(data);
       setParticipants(parts);
     } catch {
-      setLoadError('Could not load this event. Please try again.');
+      setLoadError(tRef.current('mob.game_detail.load_error'));
     } finally {
       setIsLoading(false);
     }
@@ -239,7 +198,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         setParticipants(refreshedParts);
       });
     } catch {
-      setActionError('Could not join this event. Please try again.');
+      setActionError(t('mob.game_detail.join_error'));
     } finally {
       setIsActionLoading(false);
     }
@@ -259,7 +218,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         setParticipants(refreshedParts);
       });
     } catch {
-      setActionError('Could not leave this event. Please try again.');
+      setActionError(t('mob.game_detail.leave_error'));
     } finally {
       setIsActionLoading(false);
     }
@@ -294,7 +253,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const handleConfirmCancel = async (): Promise<void> => {
     const trimmed = cancelReason.trim();
     if (!trimmed) {
-      setCancelError('Please provide a reason for cancelling this event.');
+      setCancelError(t('mob.game_detail.cancel_reason_required'));
       cancelChain.focus('cancelReason');
       return;
     }
@@ -308,8 +267,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       });
       setIsCancelFormOpen(false);
       setCancelReason('');
+      goToDashboard(t('mob.success.game_cancelled'));
     } catch (e) {
-      setCancelError(getApiErrorMessage(e, 'Could not cancel this event. Please try again.'));
+      setCancelError(getApiErrorMessage(e, t('mob.game_detail.cancel_error')));
     } finally {
       setIsCancelSubmitting(false);
     }
@@ -352,7 +312,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   const handleSendGroupInvite = async (): Promise<void> => {
     if (selectedGroupIds.length === 0) {
-      setInviteGroupError('Please select a group to invite.');
+      setInviteGroupError(t('mob.game_detail.invite_group_select'));
       return;
     }
     setInviteGroupError(null);
@@ -367,13 +327,18 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         }
         setInviteGroupSuccess(
           totalInvites > 0
-            ? `Sent ${totalInvites} group invitation${totalInvites === 1 ? '' : 's'}!`
-            : 'Group members invited successfully!',
+            ? t(
+                totalInvites === 1
+                  ? 'mob.game_detail.invite_group_sent_one'
+                  : 'mob.game_detail.invite_group_sent_other',
+                { count: totalInvites },
+              )
+            : t('mob.game_detail.invite_group_done'),
         );
       });
       setSelectedGroupIds([]);
     } catch (e) {
-      setInviteGroupError(getApiErrorMessage(e, 'Could not invite group members. Please try again.'));
+      setInviteGroupError(getApiErrorMessage(e, t('mob.game_detail.invite_group_error')));
     } finally {
       setIsInviteGroupSubmitting(false);
     }
@@ -401,7 +366,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   const handleSendUserInvite = async (): Promise<void> => {
     if (!selectedInviteUser && !selectedInviteEmail) {
-      setInviteUserError('Search for and choose a user or email to invite.');
+      setInviteUserError(t('mob.game_detail.invite_choose'));
       return;
     }
     setInviteUserError(null);
@@ -411,16 +376,16 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       await withCorrelationId(async correlationId => {
         if (selectedInviteEmail) {
           await inviteEmailToEvent(eventId, selectedInviteEmail, { correlationId });
-          setInviteUserSuccess(`Invitation sent to ${selectedInviteEmail}!`);
+          setInviteUserSuccess(t('mob.game_detail.invite_sent', { name: selectedInviteEmail }));
           setSelectedInviteEmail(null);
         } else if (selectedInviteUser) {
           await inviteUserToEvent(eventId, selectedInviteUser.id, { correlationId });
-          setInviteUserSuccess(`Invitation sent to ${selectedInviteUser.nickname}!`);
+          setInviteUserSuccess(t('mob.game_detail.invite_sent', { name: selectedInviteUser.nickname }));
           setSelectedInviteUser(null);
         }
       });
     } catch (e) {
-      setInviteUserError(getApiErrorMessage(e, 'Could not send the invite. Please try again.'));
+      setInviteUserError(getApiErrorMessage(e, t('mob.game_detail.invite_error')));
     } finally {
       setIsInviteUserSubmitting(false);
     }
@@ -454,32 +419,32 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const handleSaveEdit = async (): Promise<void> => {
     const trimmedTitle = editTitle.trim();
     if (!trimmedTitle) {
-      setEditError('Title cannot be empty.');
+      setEditError(t('mob.game_detail.edit_err_title'));
       editChain.focus('editTitle');
       return;
     }
     const trimmedSport = editSport.trim();
     if (!trimmedSport) {
-      setEditError('Sport cannot be empty.');
+      setEditError(t('mob.game_detail.edit_err_sport'));
       editChain.focus('editSport');
       return;
     }
     const cap = parseInt(editCapacity, 10);
     if (isNaN(cap) || cap <= 0) {
-      setEditError('Capacity must be a positive number.');
+      setEditError(t('mob.game_detail.edit_err_capacity'));
       editChain.focus('editCapacity');
       return;
     }
     const startIso = parseLocalDateTime(editStartsAt);
     if (!startIso) {
-      setEditError('Start date & time is invalid.');
+      setEditError(t('mob.game_detail.edit_err_start'));
       return;
     }
     let endIso: string | null = null;
     if (editEndsAt.trim()) {
       endIso = parseLocalDateTime(editEndsAt);
       if (!endIso) {
-        setEditError('End date & time is invalid.');
+        setEditError(t('mob.game_detail.edit_err_end'));
         return;
       }
     }
@@ -504,8 +469,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         setEvent(updated);
       });
       setIsEditing(false);
+      goToDashboard(t('mob.success.game_updated'));
     } catch (e) {
-      setEditError(getApiErrorMessage(e, 'Could not save event changes. Please try again.'));
+      setEditError(getApiErrorMessage(e, t('mob.game_detail.edit_error')));
     } finally {
       setIsEditSubmitting(false);
     }
@@ -516,7 +482,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   }
 
   if (loadError || !event) {
-    return <ErrorView message={loadError ?? 'Event not found.'} onRetry={loadEvent} />;
+    return <ErrorView message={loadError ?? t('mob.game_detail.not_found')} onRetry={loadEvent} />;
   }
 
   const isOrganiser = isOrganiserOf(event, user?.id);
@@ -547,7 +513,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   if (participants.length > 0) {
     participants.slice(0, 3).forEach(p => {
-      const name = p.user_display_name || p.user_nickname || 'Participant';
+      const name = p.user_display_name || p.user_nickname || t('mob.game_detail.player_fallback');
       const inits = name.slice(0, 2).toUpperCase();
       displayParticipants.push({
         id: p.id || p.user_id,
@@ -558,7 +524,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     });
   } else {
     // Fallback: organizer entry
-    const orgName = event.organiser_nickname || 'Organizer';
+    const orgName = event.organiser_nickname || t('mob.game_detail.organizer');
     displayParticipants.push({
       id: event.organiser_id,
       name: orgName,
@@ -568,9 +534,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     if (event.participant_count > 1) {
       displayParticipants.push({
         id: 'p-2',
-        name: 'Rahul S',
+        name: t('mob.game_detail.player_fallback'),
         isOrganiser: false,
-        initials: 'RS',
+        initials: t('mob.game_detail.player_fallback').slice(0, 2).toUpperCase(),
       });
     }
   }
@@ -584,11 +550,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       {navigation?.goBack ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="My Games"
+          accessibilityLabel={t('mob.game_detail.back')}
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Text style={styles.backButtonText}>‹ My Games</Text>
+          <Text style={styles.backButtonText}>{t('mob.game_detail.back_arrow')}</Text>
         </Pressable>
       ) : null}
 
@@ -604,10 +570,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             <View />
           )}
           {isOrganiser ? (
-            <Text style={styles.hostingTag}>You&apos;re hosting</Text>
+            <Text style={styles.hostingTag}>{t('mob.game_detail.tag_hosting')}</Text>
           ) : isGoingOrWaitlisted ? (
             <Text style={styles.participantTag}>
-              {event.current_user_rsvp_status === 'going' ? "You're going" : "You're waitlisted"}
+              {event.current_user_rsvp_status === 'going'
+                ? t('mob.game_detail.tag_going')
+                : t('mob.game_detail.tag_waitlisted')}
             </Text>
           ) : null}
         </View>
@@ -615,7 +583,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         <Text style={styles.title}>{event.title}</Text>
 
         {event.status === 'cancelled' ? (
-          <Text style={styles.cancelledBanner}>This event has been cancelled.</Text>
+          <Text style={styles.cancelledBanner}>{t('mob.game_detail.cancelled_banner')}</Text>
         ) : null}
 
         {/* Date and time */}
@@ -646,7 +614,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           <Text style={styles.capacityNumber}>
             {event.participant_count} / {event.capacity}
           </Text>
-          <Text style={styles.capacityLabel}>players going</Text>
+          <Text style={styles.capacityLabel}>{t('mob.game_detail.players_going')}</Text>
         </View>
         <View style={styles.progressTrack}>
           <View
@@ -658,10 +626,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         </View>
         <Text style={[styles.spotsLeftText, { color: sportColor }]}>
           {spotsLeft > 0
-            ? `${spotsLeft} spot${spotsLeft === 1 ? '' : 's'} left`
+            ? t(spotsLeft === 1 ? 'mob.game_detail.spots_one' : 'mob.game_detail.spots_other', {
+                count: spotsLeft,
+              })
             : event.allow_waitlist
-              ? 'Full (waitlist open)'
-              : 'Full'}
+              ? t('mob.game_detail.full_waitlist')
+              : t('mob.game_detail.full')}
         </Text>
       </Card>
 
@@ -674,61 +644,61 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         <Card style={styles.card}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Edit Game"
+            accessibilityLabel={t('mob.game_detail.edit_game')}
             onPress={handleStartEdit}
             style={[styles.actionBtn, styles.editGameBtn]}
           >
             <View style={styles.actionBtnContent}>
               <Text style={styles.editGameBtnText}>✎ </Text>
-              <Text style={styles.editGameBtnText}>Edit Game</Text>
+              <Text style={styles.editGameBtnText}>{t('mob.game_detail.edit_game')}</Text>
             </View>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Invite Group"
+            accessibilityLabel={t('mob.game_detail.invite_group')}
             onPress={handleOpenInviteGroup}
             style={[styles.actionBtn, styles.whiteActionBtn]}
           >
             <View style={styles.actionBtnContent}>
               <Text style={styles.whiteActionBtnText}>👥 </Text>
-              <Text style={styles.whiteActionBtnText}>Invite Group</Text>
+              <Text style={styles.whiteActionBtnText}>{t('mob.game_detail.invite_group')}</Text>
             </View>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Invite Individual"
+            accessibilityLabel={t('mob.game_detail.invite_player')}
             onPress={handleOpenInviteUser}
             style={[styles.actionBtn, styles.whiteActionBtn]}
           >
             <View style={styles.actionBtnContent}>
               <Text style={styles.whiteActionBtnText}>👤+ </Text>
-              <Text style={styles.whiteActionBtnText}>Invite Individual</Text>
+              <Text style={styles.whiteActionBtnText}>{t('mob.game_detail.invite_player')}</Text>
             </View>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Share Event"
-            onPress={handleOpenShare}
+            accessibilityLabel={t('mob.game_detail.share')}
+            onPress={share.open}
             style={[styles.actionBtn, styles.whiteActionBtn]}
           >
             <View style={styles.actionBtnContent}>
               <Text style={styles.whiteActionBtnText}>🔗 </Text>
-              <Text style={styles.whiteActionBtnText}>Share Event</Text>
+              <Text style={styles.whiteActionBtnText}>{t('mob.game_detail.share')}</Text>
             </View>
           </Pressable>
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Cancel Event"
+            accessibilityLabel={t('mob.game_detail.cancel_game')}
             onPress={handleOpenCancel}
             style={[styles.actionBtn, styles.cancelBtn]}
           >
             <View style={styles.actionBtnContent}>
               <Text style={styles.cancelBtnText}>⊘ </Text>
-              <Text style={styles.cancelBtnText}>Cancel Event</Text>
+              <Text style={styles.cancelBtnText}>{t('mob.game_detail.cancel_game')}</Text>
             </View>
           </Pressable>
         </Card>
@@ -737,7 +707,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       {/* Non-organiser RSVP controls */}
       {isRsvpVisible ? (
         <Button
-          label={isGoingOrWaitlisted ? 'Leave' : 'Join'}
+          label={isGoingOrWaitlisted ? t('mob.game_detail.leave') : t('mob.game_detail.join')}
           variant={isGoingOrWaitlisted ? 'secondary' : 'primary'}
           onPress={isGoingOrWaitlisted ? handleWithdraw : handleRsvp}
           loading={isActionLoading}
@@ -750,14 +720,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       {/* Cancel Event Form */}
       {isCancelFormOpen ? (
         <Card style={styles.card}>
-          <Text style={styles.formTitle}>Cancel Event</Text>
+          <Text style={styles.formTitle}>{t('mob.game_detail.cancel_game')}</Text>
           <Text style={styles.formHint}>
-            All participants will be notified. A cancellation reason is required.
+            {t('mob.game_detail.cancel_hint')}
           </Text>
           <TextField
             {...cancelChain.props('cancelReason')}
-            placeholder="Reason for cancellation (required)"
-            accessibilityLabel="Cancellation Reason"
+            placeholder={t('mob.game_detail.cancel_reason_placeholder')}
+            accessibilityLabel={t('mob.game_detail.cancel_reason_a11y')}
             value={cancelReason}
             onChangeText={setCancelReason}
             editable={!isCancelSubmitting}
@@ -767,14 +737,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           {cancelError ? <Text style={styles.errorText}>{cancelError}</Text> : null}
           <View style={styles.formButtonsRow}>
             <Button
-              label="Confirm Cancellation"
+              label={t('mob.game_detail.cancel_confirm')}
               variant="destructive"
               onPress={handleConfirmCancel}
               loading={isCancelSubmitting}
               style={styles.rowButton}
             />
             <Button
-              label="Close"
+              label={t('mob.common.close')}
               variant="secondary"
               onPress={handleCloseCancel}
               disabled={isCancelSubmitting}
@@ -787,14 +757,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       {/* Invite Group Form */}
       {isInviteGroupOpen ? (
         <Card style={styles.card}>
-          <Text style={styles.formTitle}>Invite Group</Text>
+          <Text style={styles.formTitle}>{t('mob.game_detail.invite_group')}</Text>
           <Text style={styles.formHint}>
-            Select one of your groups to invite all its members to this event.
+            {t('mob.game_detail.invite_group_hint')}
           </Text>
           {isGroupsLoading ? (
-            <Text style={styles.formHint}>Loading groups...</Text>
+            <Text style={styles.formHint}>{t('mob.game_detail.groups_loading')}</Text>
           ) : myGroups.length === 0 ? (
-            <Text style={styles.formHint}>You don&apos;t belong to any groups yet.</Text>
+            <Text style={styles.formHint}>{t('mob.create_game.no_groups')}</Text>
           ) : (
             <OptionChips
               options={myGroups.map(g => ({ value: g.id, label: g.name }))}
@@ -807,7 +777,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           {inviteGroupSuccess ? <Text style={styles.successText}>{inviteGroupSuccess}</Text> : null}
           <View style={styles.formButtonsRow}>
             <Button
-              label="Send Group Invite"
+              label={t('mob.game_detail.send_group_invite')}
               variant="primary"
               onPress={handleSendGroupInvite}
               loading={isInviteGroupSubmitting}
@@ -815,7 +785,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               style={styles.rowButton}
             />
             <Button
-              label="Close"
+              label={t('mob.common.close')}
               variant="secondary"
               onPress={handleCloseInviteGroup}
               disabled={isInviteGroupSubmitting}
@@ -828,17 +798,20 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       {/* Individual Invite User Form */}
       {isInviteUserOpen ? (
         <Card style={styles.card}>
-          <Text style={styles.formTitle}>Invite User</Text>
+          <Text style={styles.formTitle}>{t('mob.game_detail.invite_player')}</Text>
           <Text style={styles.formHint}>
-            Search for and invite an individual user to this event.
+            {t('mob.game_detail.invite_player_hint')}
           </Text>
           {selectedInviteUser ? (
             <View style={styles.selectedInviteRow}>
               <Text style={styles.selectedInviteText}>
-                {selectedInviteUser.nickname} ({selectedInviteUser.display_name})
+                {t('mob.group_detail.invitee_line', {
+                  nickname: selectedInviteUser.nickname,
+                  name: selectedInviteUser.display_name,
+                })}
               </Text>
               <TextLink
-                label="Change"
+                label={t('mob.common.change')}
                 onPress={() => setSelectedInviteUser(null)}
                 disabled={isInviteUserSubmitting}
               />
@@ -846,10 +819,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           ) : selectedInviteEmail ? (
             <View style={styles.selectedInviteRow}>
               <Text style={styles.selectedInviteText}>
-                Invite by email: {selectedInviteEmail}
+                {t('mob.group_detail.invite_by_email', { email: selectedInviteEmail })}
               </Text>
               <TextLink
-                label="Change"
+                label={t('mob.common.change')}
                 onPress={() => setSelectedInviteEmail(null)}
                 disabled={isInviteUserSubmitting}
               />
@@ -858,7 +831,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             <UserSearchPicker
               onSelect={setSelectedInviteUser}
               onSelectEmail={setSelectedInviteEmail}
-              entityLabel="participant"
+              entityLabel={t('mob.user_search.entity_player')}
               excludeEventId={eventId}
               disabled={isInviteUserSubmitting}
             />
@@ -867,7 +840,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           {inviteUserSuccess ? <Text style={styles.successText}>{inviteUserSuccess}</Text> : null}
           <View style={styles.formButtonsRow}>
             <Button
-              label="Send Invite"
+              label={t('mob.group_detail.send_invite')}
               variant="primary"
               onPress={handleSendUserInvite}
               loading={isInviteUserSubmitting}
@@ -875,7 +848,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               style={styles.rowButton}
             />
             <Button
-              label="Close"
+              label={t('mob.common.close')}
               variant="secondary"
               onPress={handleCloseInviteUser}
               disabled={isInviteUserSubmitting}
@@ -888,13 +861,13 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       {/* Edit Event Form */}
       {isEditing ? (
         <Card style={styles.card}>
-          <Text style={styles.formTitle}>Edit Event</Text>
+          <Text style={styles.formTitle}>{t('mob.game_detail.edit_game')}</Text>
 
-          <Text style={styles.fieldLabel}>Title</Text>
+          <Text style={styles.fieldLabel}>{t('mob.create_game.title')}</Text>
           <TextField
             {...editChain.props('editTitle')}
-            placeholder="Event title"
-            accessibilityLabel="Event Title"
+            placeholder={t('mob.game_detail.edit_title_placeholder')}
+            accessibilityLabel={t('mob.game_detail.edit_title_a11y')}
             value={editTitle}
             onChangeText={setEditTitle}
             editable={!isEditSubmitting}
@@ -902,11 +875,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             style={styles.formInput}
           />
 
-          <Text style={styles.fieldLabel}>Sport</Text>
+          <Text style={styles.fieldLabel}>{t('mob.create_game.sport')}</Text>
           <TextField
             {...editChain.props('editSport')}
-            placeholder="Sport (e.g. badminton)"
-            accessibilityLabel="Sport"
+            placeholder={t('mob.game_detail.edit_sport_placeholder')}
+            accessibilityLabel={t('mob.create_game.sport')}
             value={editSport}
             onChangeText={setEditSport}
             editable={!isEditSubmitting}
@@ -924,11 +897,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             </View>
           ) : null}
 
-          <Text style={styles.fieldLabel}>Description</Text>
+          <Text style={styles.fieldLabel}>{t('mob.create_game.description')}</Text>
           <TextField
             ref={editChain.ref('editDescription')}
-            placeholder="Description (optional)"
-            accessibilityLabel="Event Description"
+            placeholder={t('mob.game_detail.edit_description_placeholder')}
+            accessibilityLabel={t('mob.game_detail.edit_description_a11y')}
             value={editDescription}
             onChangeText={setEditDescription}
             editable={!isEditSubmitting}
@@ -936,29 +909,29 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             style={[styles.formInput, styles.multilineInput]}
           />
 
-          <Text style={styles.fieldLabel}>Venue Name</Text>
+          <Text style={styles.fieldLabel}>{t('mob.create_game.venue_name')}</Text>
           <TextField
             {...editChain.props('editVenueName')}
-            placeholder="e.g. Riverside Courts"
-            accessibilityLabel="Venue Name"
+            placeholder={t('mob.game_detail.edit_venue_name_placeholder')}
+            accessibilityLabel={t('mob.create_game.venue_name')}
             value={editVenueName}
             onChangeText={setEditVenueName}
             editable={!isEditSubmitting}
             style={styles.formInput}
           />
 
-          <Text style={styles.fieldLabel}>Venue Address</Text>
+          <Text style={styles.fieldLabel}>{t('mob.create_game.venue_address')}</Text>
           <TextField
             {...editChain.props('editVenueAddress')}
-            placeholder="e.g. 123 Sports Way"
-            accessibilityLabel="Venue Address"
+            placeholder={t('mob.game_detail.edit_venue_address_placeholder')}
+            accessibilityLabel={t('mob.create_game.venue_address')}
             value={editVenueAddress}
             onChangeText={setEditVenueAddress}
             editable={!isEditSubmitting}
             style={styles.formInput}
           />
 
-          <Text style={styles.fieldLabel}>Skill Level</Text>
+          <Text style={styles.fieldLabel}>{t('mob.create_game.skill_level')}</Text>
           <OptionChips
             options={SKILL_LEVEL_OPTIONS}
             value={editSkillLevel}
@@ -966,11 +939,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             disabled={isEditSubmitting}
           />
 
-          <Text style={styles.fieldLabel}>Capacity</Text>
+          <Text style={styles.fieldLabel}>{t('mob.create_game.capacity')}</Text>
           <TextField
             {...editChain.props('editCapacity')}
-            placeholder="Capacity"
-            accessibilityLabel="Capacity"
+            placeholder={t('mob.create_game.capacity')}
+            accessibilityLabel={t('mob.create_game.capacity')}
             value={editCapacity}
             onChangeText={setEditCapacity}
             editable={!isEditSubmitting}
@@ -979,9 +952,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           />
 
           <View style={styles.switchRow}>
-            <Text style={styles.fieldLabel}>Allow Waitlist</Text>
+            <Text style={styles.fieldLabel}>{t('mob.game_detail.allow_waitlist')}</Text>
             <Switch
-              accessibilityLabel="Allow Waitlist"
+              accessibilityLabel={t('mob.game_detail.allow_waitlist')}
               value={editAllowWaitlist}
               onValueChange={setEditAllowWaitlist}
               disabled={isEditSubmitting}
@@ -990,21 +963,19 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             />
           </View>
 
-          <Text style={styles.fieldLabel}>Start Date & Time</Text>
+          <Text style={styles.fieldLabel}>{t('mob.create_game.start')}</Text>
           <DateTimePickerField
-            accessibilityLabel="Start Date & Time"
+            accessibilityLabel={t('mob.create_game.start')}
             mode="datetime"
-            placeholder={LOCAL_DATE_TIME_PLACEHOLDER}
             value={editStartsAt}
             onChange={setEditStartsAt}
             disabled={isEditSubmitting}
           />
 
-          <Text style={styles.fieldLabel}>End Date & Time (Optional)</Text>
+          <Text style={styles.fieldLabel}>{t('mob.game_detail.end')}</Text>
           <DateTimePickerField
-            accessibilityLabel="End Date & Time"
+            accessibilityLabel={t('mob.game_detail.end')}
             mode="datetime"
-            placeholder={LOCAL_DATE_TIME_PLACEHOLDER}
             value={editEndsAt}
             onChange={setEditEndsAt}
             disabled={isEditSubmitting}
@@ -1014,14 +985,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           <View style={styles.formButtonsRow}>
             <Button
-              label="Save Changes"
+              label={t('mob.game_detail.save_changes')}
               variant="primary"
               onPress={handleSaveEdit}
               loading={isEditSubmitting}
               style={styles.rowButton}
             />
             <Button
-              label="Cancel"
+              label={t('mob.common.cancel')}
               variant="secondary"
               onPress={handleCancelEdit}
               disabled={isEditSubmitting}
@@ -1033,30 +1004,30 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
       {/* CARD 3: About this game Card */}
       <Card style={styles.card}>
-        <Text style={styles.cardHeading}>About this game</Text>
+        <Text style={styles.cardHeading}>{t('mob.game_detail.about')}</Text>
         <Text style={styles.descriptionText}>
-          {event.description || 'Casual doubles, all skill levels welcome.'}
+          {event.description || t('mob.game_detail.description_fallback')}
         </Text>
       </Card>
 
       {/* CARD 4: Event Details Card */}
       <Card style={styles.card}>
-        <Text style={styles.cardHeading}>Event Details</Text>
+        <Text style={styles.cardHeading}>{t('mob.game_detail.details')}</Text>
         <View style={styles.metaKeyValRow}>
-          <Text style={styles.metaKey}>Visibility</Text>
+          <Text style={styles.metaKey}>{t('mob.create_game.visibility')}</Text>
           <Text style={styles.metaVal}>{getEventVisibilityLabel(event.visibility, labels)}</Text>
         </View>
         <View style={styles.metaKeyValRow}>
-          <Text style={styles.metaKey}>Skill level</Text>
-          <Text style={styles.metaVal}>{formatSkillLevel(event.skill_level_requirement)}</Text>
+          <Text style={styles.metaKey}>{t('mob.game_detail.skill_level')}</Text>
+          <Text style={styles.metaVal}>{formatSkillLevel(event.skill_level_requirement, t)}</Text>
         </View>
         <View style={styles.metaKeyValRow}>
-          <Text style={styles.metaKey}>Waitlist</Text>
-          <Text style={styles.metaVal}>{event.allow_waitlist !== false ? 'Open' : 'Closed'}</Text>
+          <Text style={styles.metaKey}>{t('mob.game_detail.waitlist')}</Text>
+          <Text style={styles.metaVal}>{event.allow_waitlist !== false ? t('mob.game_detail.waitlist_open') : t('mob.game_detail.waitlist_closed')}</Text>
         </View>
         {event.estimated_cost_cents != null ? (
           <View style={styles.metaKeyValRow}>
-            <Text style={styles.metaKey}>Cost</Text>
+            <Text style={styles.metaKey}>{t('mob.game_detail.cost')}</Text>
             <Text style={styles.metaVal}>
               ${(event.estimated_cost_cents / 100).toFixed(2)}
               {event.estimated_cost_currency ? ` ${event.estimated_cost_currency}` : ''}
@@ -1064,7 +1035,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           </View>
         ) : event.cost != null ? (
           <View style={styles.metaKeyValRow}>
-            <Text style={styles.metaKey}>Cost</Text>
+            <Text style={styles.metaKey}>{t('mob.game_detail.cost')}</Text>
             <Text style={styles.metaVal}>{event.cost}</Text>
           </View>
         ) : null}
@@ -1072,7 +1043,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
       {/* CARD 5: Participants Card */}
       <Card style={styles.card}>
-        <Text style={styles.cardHeading}>Participants</Text>
+        <Text style={styles.cardHeading}>{t('mob.game_detail.players')}</Text>
         <View style={styles.participantsList}>
           {displayParticipants.map(p => (
             <View key={p.id} style={styles.participantRow}>
@@ -1086,7 +1057,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                   p.isOrganiser ? styles.roleOrganizer : styles.roleGoing,
                 ]}
               >
-                {p.isOrganiser ? 'Organizer' : 'Going'}
+                {p.isOrganiser ? t('mob.game_detail.organizer') : t('mob.game_detail.going')}
               </Text>
             </View>
           ))}
@@ -1096,7 +1067,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 <Text style={styles.overflowAvatarText}>+{overflowParticipantsCount}</Text>
               </View>
               <Text style={styles.overflowText}>
-                and {overflowParticipantsCount} more going
+                {t('mob.game_detail.more_going', { count: overflowParticipantsCount })}
               </Text>
             </View>
           ) : null}
@@ -1105,15 +1076,15 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     </KeyboardAwareScreen>
 
       <ShareActionSheet
-        visible={isShareSheetOpen}
-        title="Share Event"
-        onShareGeneric={handleShareGeneric}
-        onShareWhatsApp={handleShareWhatsApp}
-        onCopyLink={handleCopyLink}
-        onClose={handleCloseShare}
+        visible={share.sheetVisible}
+        title={t('mob.game_detail.share_title')}
+        onShareGeneric={share.shareViaSystem}
+        onShareWhatsApp={share.shareViaWhatsApp}
+        onCopyLink={share.copyLink}
+        onClose={share.close}
       />
 
-      <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      <Toast message={share.toastMessage} onDismiss={share.clearToast} />
     </View>
   );
 }

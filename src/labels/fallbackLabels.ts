@@ -22,8 +22,9 @@
  * strings rather than an error.
  */
 import type { LabelMap } from '../api/labels';
+import { DEFAULT_LABELS } from './defaultLabels';
 
-export const FALLBACK_LABELS: LabelMap = {
+const BASE_LABELS = {
   'skill_level.beginner': 'Beginner',
   'skill_level.intermediate': 'Intermediate',
   'skill_level.expert': 'Expert',
@@ -50,4 +51,12 @@ export const FALLBACK_LABELS: LabelMap = {
 
   'team_visibility.public': 'Public',
   'team_visibility.private': 'Private',
-};
+} as const;
+
+const ALL_LABELS = { ...BASE_LABELS, ...DEFAULT_LABELS };
+
+/** Every label key the app resolves; `t()` only accepts these. */
+export type LabelKey = keyof typeof ALL_LABELS;
+
+/** Bundled default per key (DES-MEETUP-FEEDBACK-001 AD-7). */
+export const FALLBACK_LABELS: LabelMap = ALL_LABELS;

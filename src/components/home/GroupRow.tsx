@@ -11,6 +11,7 @@ import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
 import type { Group } from '../../types/group';
 import { sportTileColor } from './GameRow';
+import { useT } from '../../labels/LabelsContext';
 
 interface GroupRowProps {
   group: Group;
@@ -20,9 +21,14 @@ interface GroupRowProps {
 }
 
 export default function GroupRow({ group, onPress, team }: GroupRowProps): React.JSX.Element {
+  const t = useT();
   const metaParts: string[] = [];
   if (typeof group.member_count === 'number') {
-    metaParts.push(`${group.member_count} ${group.member_count === 1 ? 'member' : 'members'}`);
+    metaParts.push(
+      t(group.member_count === 1 ? 'mob.group_card.members_one' : 'mob.group_card.members_other', {
+        count: group.member_count,
+      }),
+    );
   }
   if (team) {
     metaParts.push(team.sportName);

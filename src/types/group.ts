@@ -71,6 +71,23 @@ export interface GroupDetail extends Group {
   members: GroupMember[];
 }
 
+/**
+ * One suggested group member card (DES-MEETUP-FEEDBACK-001 C4, suggestions
+ * endpoint contract: user ID, display name, nickname, image URL — no email
+ * or mobile number). `nickname` may be empty; `image_url` may be absent.
+ */
+export interface SuggestedMember {
+  user_id: string;
+  display_name: string;
+  nickname: string;
+  image_url: string | null;
+}
+
+/** Result of adding a member: the next candidate to backfill the list, or `null` when none remain. */
+export interface InviteMemberResult {
+  nextCandidate: SuggestedMember | null;
+}
+
 export interface GroupsListResponse {
   items: Group[];
   total: number;

@@ -45,23 +45,25 @@ import { dash, dashRadius, dashSize } from '../theme/dashboardTheme';
 import { spacing, typography } from '../theme/tokens';
 import type { Event } from '../types/event';
 import { filteredEmptyMessage, getGameBadge, selectGames } from '../utils/gameLists';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
 type Props = NativeStackScreenProps<TournamentsStackParamList, 'TournamentsList'>;
 
 type Segment = 'games' | 'tournaments';
 
-const SEGMENTS: ReadonlyArray<{ value: Segment; label: string }> = [
-  { value: 'games', label: 'Games' },
-  { value: 'tournaments', label: 'Tournaments' },
+const SEGMENTS: ReadonlyArray<{ value: Segment; labelKey: LabelKey }> = [
+  { value: 'games', labelKey: 'mob.games.segment_games' },
+  { value: 'tournaments', labelKey: 'mob.games.segment_tournaments' },
 ];
 
-const SCOPES: ReadonlyArray<{ value: GamesScope; label: string }> = [
-  { value: 'all', label: 'All' },
-  { value: 'mine', label: 'Mine' },
-  { value: 'open', label: 'Open' },
+const SCOPES: ReadonlyArray<{ value: GamesScope; labelKey: LabelKey; a11yKey: LabelKey }> = [
+  { value: 'all', labelKey: 'mob.games.scope_all', a11yKey: 'mob.games.scope_all_a11y' },
+  { value: 'mine', labelKey: 'mob.games.scope_mine', a11yKey: 'mob.games.scope_mine_a11y' },
+  { value: 'open', labelKey: 'mob.games.scope_open', a11yKey: 'mob.games.scope_open_a11y' },
 ];
 
-const SCOPE_EMPTY: Record<GamesScope, string> = {
+const SCOPE_EMPTY: Record<GamesScope, LabelKey> = {
   all: COPY.gamesEmpty,
   mine: COPY.gamesEmpty,
   open: COPY.recommendedEmpty,
@@ -74,6 +76,7 @@ function ScopeChips({
   value: GamesScope;
   onChange: (scope: GamesScope) => void;
 }): React.JSX.Element {
+  const t = useT();
   return (
     <View style={styles.scopeRow}>
       {SCOPES.map(scope => {
@@ -82,7 +85,7 @@ function ScopeChips({
           <Pressable
             key={scope.value}
             accessibilityRole="button"
-            accessibilityLabel={`${scope.label} games`}
+            accessibilityLabel={t(scope.a11yKey)}
             accessibilityState={{ selected }}
             onPress={() => onChange(scope.value)}
             style={({ pressed }) => [
@@ -92,7 +95,7 @@ function ScopeChips({
             ]}
           >
             <Text style={[styles.scopeText, selected ? styles.scopeTextSelected : null]}>
-              {scope.label}
+              {t(scope.labelKey)}
             </Text>
           </Pressable>
         );
@@ -111,6 +114,7 @@ function GamesSegment({
   onOpenEvent: (event: Event) => void;
 }): React.JSX.Element {
   const { user } = useAuth();
+  const t = useT();
   const userId = user?.id;
 
   const events = useResource(options => getEvents(undefined, options));
@@ -158,8 +162,8 @@ function GamesSegment({
 
   const emptyCopy =
     filter.selected.length > 0
-      ? filteredEmptyMessage(filter.selected, filter.options)
-      : SCOPE_EMPTY[scope];
+      ? filteredEmptyMessage(filter.selected, filter.options, t)
+      : t(SCOPE_EMPTY[scope]);
 
   const retry = useCallback(() => {
     withCorrelationId(correlationId => loadEvents(correlationId));
@@ -169,7 +173,7 @@ function GamesSegment({
   if (events.status === 'error') {
     body = (
       <View style={styles.pad}>
-        <InlineError message={COPY.gamesError} onRetry={retry} />
+        <InlineError message={t(COPY.gamesError)} onRetry={retry} />
       </View>
     );
   } else if (!games) {
@@ -224,6 +228,7 @@ function GamesSegment({
 }
 
 export default function GamesScreen({ navigation, route }: Props): React.JSX.Element {
+  const t = useT();
   const [segment, setSegment] = useState<Segment>('games');
   const [scope, setScope] = useState<GamesScope>(route.params?.scope ?? 'all');
   // Tournaments mounts the first time it is shown, then stays mounted.
@@ -270,7 +275,11 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
   return (
     <View style={styles.screen}>
       <View style={styles.switchWrap}>
-        <SegmentedSwitch options={SEGMENTS} value={segment} onChange={changeSegment} />
+        <SegmentedSwitch
+          options={SEGMENTS.map(option => ({ value: option.value, label: t(option.labelKey) }))}
+          value={segment}
+          onChange={changeSegment}
+        />
       </View>
       <View style={[styles.flex, segment === 'games' ? null : styles.hidden]}>
         <GamesSegment scope={scope} onScopeChange={setScope} onOpenEvent={openEvent} />

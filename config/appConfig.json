@@ -7,5 +7,7 @@
   "ios": {
     "marketingVersion": "0.1.0",
     "buildNumber": "5"
-  }
+  },
+  "labelsCacheTtlSeconds": 300,
+  "shareUrl": ""
 }

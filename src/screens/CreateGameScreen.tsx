@@ -24,7 +24,7 @@
  * defaults. See the Implementation Report for the full source-by-source
  * breakdown and every Proposed Assumption below.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -56,6 +56,7 @@ import type {
   TournamentVisibility,
 } from '../types/tournament';
 import { getLabel, useLabels } from '../labels/LabelsContext';
+import { goToDashboard } from '../navigation/goToDashboard';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getEventVisibilityLabel } from '../utils/labels';
 import {
@@ -67,6 +68,7 @@ import {
   quickDate,
 } from '../utils/localDateTime';
 import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'CreateGame'>,
@@ -75,27 +77,30 @@ type Props = CompositeScreenProps<
 
 type GameKind = 'game' | 'tournament';
 
-const MODE_OPTIONS: ChipOption<GameKind>[] = [
-  { value: 'game', label: '🎮 Casual Game' },
-  { value: 'tournament', label: '🏆 Tournament' },
-];
-
-const PARTICIPATION_OPTIONS: ChipOption<TournamentParticipationMode>[] = [
-  { value: 'individual', label: 'Individual' },
-  { value: 'team', label: 'Team' },
-];
-
-/** Group Stage intentionally excluded — see `TournamentFormat`'s type comment. */
-const FORMAT_OPTIONS: ChipOption<TournamentFormat>[] = [
-  { value: 'knockout', label: 'Knockout' },
-  { value: 'round_robin', label: 'Round robin' },
-];
-
 const TITLE_MAX_LENGTH = 150;
 const DEFAULT_TOURNAMENT_CAPACITY = '8';
 
-export default function CreateGameScreen({ navigation }: Props): React.JSX.Element {
+export default function CreateGameScreen(_props: Props): React.JSX.Element {
   const labels = useLabels();
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
+
+  const MODE_OPTIONS: ChipOption<GameKind>[] = [
+    { value: 'game', label: t('mob.create_game.mode_game') },
+    { value: 'tournament', label: t('mob.create_game.mode_tournament') },
+  ];
+
+  const PARTICIPATION_OPTIONS: ChipOption<TournamentParticipationMode>[] = [
+    { value: 'individual', label: t('mob.create_game.participation_individual') },
+    { value: 'team', label: t('mob.create_game.participation_team') },
+  ];
+
+  /** Group Stage intentionally excluded — see `TournamentFormat`'s type comment. */
+  const FORMAT_OPTIONS: ChipOption<TournamentFormat>[] = [
+    { value: 'knockout', label: t('mob.create_game.format_knockout') },
+    { value: 'round_robin', label: t('mob.create_game.format_round_robin') },
+  ];
   const [mode, setMode] = useState<GameKind>('game');
 
   const [sports, setSports] = useState<Sport[]>([]);
@@ -148,7 +153,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     try {
       setSports(await getSports());
     } catch {
-      setSportsError('Could not load the list of sports. Please try again.');
+      setSportsError(tRef.current('mob.common.sports_load_error'));
     } finally {
       setIsLoadingSports(false);
     }
@@ -181,23 +186,23 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
     const trimmedTitle = gTitle.trim();
     if (!trimmedTitle) {
-      setError('Enter a game title.');
+      setError(t('mob.create_game.err_game_title'));
       chain.focus('gTitle');
       return;
     }
     const capacityNumber = Number(gCapacity.trim());
     if (!/^\d+$/.test(gCapacity.trim()) || capacityNumber < 2 || capacityNumber > 200) {
-      setError('Capacity must be a whole number between 2 and 200.');
+      setError(t('mob.create_game.err_game_capacity'));
       chain.focus('gCapacity');
       return;
     }
     const startsAtIso = parseLocalDateTime(gStart);
     if (!startsAtIso) {
-      setError(`Enter the start as ${LOCAL_DATE_TIME_PLACEHOLDER}.`);
+      setError(t('mob.create_game.err_game_start', { format: LOCAL_DATE_TIME_PLACEHOLDER }));
       return;
     }
     if (gVisibility === 'group' && !gGroupId) {
-      setError('Choose a group.');
+      setError(t('mob.create_game.err_group'));
       return;
     }
 
@@ -205,7 +210,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     if (gCost.trim()) {
       const parsedCost = parseFloat(gCost.trim());
       if (isNaN(parsedCost) || parsedCost < 0) {
-        setError('Estimated cost must be a non-negative number.');
+        setError(t('mob.create_game.err_cost'));
         chain.focus('gCost');
         return;
       }
@@ -215,7 +220,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     if (gCurrency.trim()) {
       const trimmedCurrency = gCurrency.trim().toUpperCase();
       if (trimmedCurrency.length !== 3) {
-        setError('Currency code must be 3 letters (e.g. USD, SGD).');
+        setError(t('mob.create_game.err_currency'));
         chain.focus('gCurrency');
         return;
       }
@@ -243,9 +248,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       await withCorrelationId(async correlationId => {
         await createEvent(input, { correlationId });
       });
-      navigation.popTo('EventsList', { refreshKey: Date.now() });
+      goToDashboard(t('mob.success.game_created'));
     } catch (e) {
-      setError(getApiErrorMessage(e, 'Could not create the game. Please try again.'));
+      setError(getApiErrorMessage(e, t('mob.create_game.err_game_create')));
       setIsSubmitting(false);
     }
   };
@@ -255,38 +260,38 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
     const trimmedTitle = tTitle.trim();
     if (!trimmedTitle) {
-      setError('Enter a tournament title.');
+      setError(t('mob.create_game.err_tournament_title'));
       chain.focus('tTitle');
       return;
     }
     if (!tSport) {
-      setError('Choose a sport.');
+      setError(t('mob.create_game.err_sport'));
       return;
     }
     if (!tParticipationMode) {
-      setError('Choose individual or team participation.');
+      setError(t('mob.create_game.err_participation'));
       return;
     }
     const capacityNumber = Number(tCapacity.trim());
     if (!/^\d+$/.test(tCapacity.trim()) || capacityNumber < 2) {
-      setError('Capacity must be a whole number of at least 2.');
+      setError(t('mob.create_game.err_tournament_capacity'));
       chain.focus('tCapacity');
       return;
     }
     const startsAtIso = parseLocalDate(tStart);
     if (!startsAtIso) {
-      setError(`Enter the tournament start date as ${LOCAL_DATE_PLACEHOLDER}.`);
+      setError(t('mob.create_game.err_tournament_start', { format: LOCAL_DATE_PLACEHOLDER }));
       return;
     }
     if (tVisibility === 'group' && !tGroupId) {
-      setError('Choose a group.');
+      setError(t('mob.create_game.err_group'));
       return;
     }
     let closesAtIso: string | undefined;
     if (tRegClose.trim()) {
       const parsed = parseLocalDateTime(tRegClose);
       if (!parsed) {
-        setError(`Enter the registration close as ${LOCAL_DATE_TIME_PLACEHOLDER}, or leave it empty.`);
+        setError(t('mob.create_game.err_reg_close', { format: LOCAL_DATE_TIME_PLACEHOLDER }));
         return;
       }
       closesAtIso = parsed;
@@ -316,12 +321,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       // — land on the Tournaments tab's list instead, refreshed, the
       // closest equivalent to the retired CreateTournamentScreen's
       // `popTo('TournamentsList', ...)`.
-      navigation.navigate('Tournaments', {
-        screen: 'TournamentsList',
-        params: { refreshKey: Date.now() },
-      });
+      goToDashboard(t('mob.success.tournament_created'));
     } catch (e) {
-      setError(getApiErrorMessage(e, 'Could not create the tournament. Please try again.'));
+      setError(getApiErrorMessage(e, t('mob.create_game.err_tournament_create')));
       setIsSubmitting(false);
     }
   };
@@ -385,16 +387,16 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     onChange: (value: string) => void,
   ): React.JSX.Element => (
     <>
-      <Text style={[styles.label, styles.section]}>Group</Text>
+      <Text style={[styles.label, styles.section]}>{t('mob.create_game.group')}</Text>
       {groupOptions.length === 0 ? (
-        <Text style={styles.hint}>You don&apos;t belong to any groups yet.</Text>
+        <Text style={styles.hint}>{t('mob.create_game.no_groups')}</Text>
       ) : (
         <DropdownField
           options={groupOptions}
           value={value}
           onChange={onChange}
-          placeholder="Select a group"
-          accessibilityLabel="Group"
+          placeholder={t('mob.create_game.group_placeholder')}
+          accessibilityLabel={t('mob.create_game.group')}
           disabled={isSubmitting}
         />
       )}
@@ -407,25 +409,25 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
       {mode === 'game' ? (
         <>
-          <Text style={[styles.label, styles.section]}>Title</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.title')}</Text>
           <TextField
             {...chain.props('gTitle')}
             style={styles.input}
-            placeholder="e.g. Sunday 5-a-side Football"
+            placeholder={t('mob.create_game.title_placeholder')}
             value={gTitle}
             onChangeText={setGTitle}
             maxLength={TITLE_MAX_LENGTH}
             editable={!isSubmitting}
           />
 
-          <Text style={styles.label}>Sport</Text>
+          <Text style={styles.label}>{t('mob.create_game.sport')}</Text>
           {sportOptions.length === 0 ? (
-            <Text style={styles.hint}>No sports are available right now.</Text>
+            <Text style={styles.hint}>{t('mob.common.no_sports')}</Text>
           ) : (
             <OptionChips options={sportOptions} value={gSport} onChange={setGSport} disabled={isSubmitting} />
           )}
 
-          <Text style={[styles.label, styles.section]}>Visibility</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.visibility')}</Text>
           <OptionChips
             options={CASUAL_VISIBILITY_OPTIONS}
             value={gVisibility}
@@ -435,7 +437,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           />
           {gVisibility === 'group' ? renderGroupPicker(gGroupId, setGGroupId) : null}
 
-          <Text style={[styles.label, styles.section]}>Skill Level</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.skill_level')}</Text>
           <OptionChips
             options={SKILL_LEVEL_OPTIONS}
             value={gSkill}
@@ -444,66 +446,65 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             selectedColor={colors.textPrimary}
           />
 
-          <Text style={[styles.label, styles.section]}>Capacity</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.capacity')}</Text>
           <TextField
             {...chain.props('gCapacity')}
             style={styles.input}
             keyboardType="number-pad"
-            placeholder="e.g. 10"
+            placeholder={t('mob.create_game.capacity_placeholder')}
             value={gCapacity}
             onChangeText={setGCapacity}
             editable={!isSubmitting}
           />
 
-          <Text style={[styles.label, styles.section]}>Start Date &amp; Time</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.start')}</Text>
           <OptionChips
             options={[
-              { value: 'today', label: 'Today' },
-              { value: 'tomorrow', label: 'Tomorrow' },
-              { value: 'sat', label: 'This Sat' },
-              { value: 'sun', label: 'This Sun' },
+              { value: 'today', label: t('mob.time.today') },
+              { value: 'tomorrow', label: t('mob.time.tomorrow') },
+              { value: 'sat', label: t('mob.create_game.quick_sat') },
+              { value: 'sun', label: t('mob.create_game.quick_sun') },
             ]}
             value={null}
             onChange={which => setGStart(current => applyQuickDate(current, quickDate(which)))}
             disabled={isSubmitting}
           />
           <DateTimePickerField
-            accessibilityLabel="Start Date & Time"
+            accessibilityLabel={t('mob.create_game.start')}
             testID="casual-start-date-time"
             mode="datetime"
-            placeholder={LOCAL_DATE_TIME_PLACEHOLDER}
             value={gStart}
             onChange={setGStart}
             disabled={isSubmitting}
           />
 
-          <Text style={styles.label}>Venue Name</Text>
+          <Text style={styles.label}>{t('mob.create_game.venue_name')}</Text>
           <TextField
             {...chain.props('gVenueName')}
             style={styles.input}
-            placeholder="e.g. Bishan Sports Hall"
+            placeholder={t('mob.create_game.venue_name_placeholder')}
             value={gVenueName}
             onChangeText={setGVenueName}
             editable={!isSubmitting}
           />
 
-          <Text style={styles.label}>Venue Address</Text>
+          <Text style={styles.label}>{t('mob.create_game.venue_address')}</Text>
           <TextField
             {...chain.props('gVenueAddress')}
             style={styles.input}
-            placeholder="e.g. 5 Bishan St 14, Singapore"
+            placeholder={t('mob.create_game.venue_address_placeholder')}
             value={gVenueAddress}
             onChangeText={setGVenueAddress}
             editable={!isSubmitting}
           />
 
-          <Text style={[styles.label, styles.section]}>Cost (optional)</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.cost')}</Text>
           <View style={styles.costCurrencyRow}>
             <TextField
               {...chain.props('gCost')}
               style={[styles.input, styles.costField]}
-              placeholder="e.g. 15.00"
-              accessibilityLabel="Estimated Cost"
+              placeholder={t('mob.create_game.cost_placeholder')}
+              accessibilityLabel={t('mob.create_game.cost_a11y')}
               value={gCost}
               onChangeText={setGCost}
               keyboardType="decimal-pad"
@@ -512,8 +513,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             <TextField
               {...chain.props('gCurrency')}
               style={[styles.input, styles.currencyField]}
-              placeholder="USD"
-              accessibilityLabel="Currency"
+              placeholder={t('mob.create_game.currency_placeholder')}
+              accessibilityLabel={t('mob.create_game.currency_a11y')}
               value={gCurrency}
               onChangeText={text => setGCurrency(text.toUpperCase())}
               maxLength={3}
@@ -522,11 +523,11 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             />
           </View>
 
-          <Text style={styles.label}>Description</Text>
+          <Text style={styles.label}>{t('mob.create_game.description')}</Text>
           <TextField
             ref={chain.ref('gDescription')}
             style={[styles.input, styles.multiline]}
-            placeholder="Optional description..."
+            placeholder={t('mob.create_game.description_placeholder')}
             value={gDescription}
             onChangeText={setGDescription}
             multiline
@@ -541,7 +542,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           ) : null}
 
           <Button
-            label="Create Game"
+            label={t('mob.create_game.submit_game')}
             variant="cta"
             onPress={handleSubmitCasual}
             loading={isSubmitting}
@@ -549,36 +550,35 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         </>
       ) : (
         <>
-          <Text style={[styles.label, styles.section]}>Tournament Title</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.tournament_title')}</Text>
           <TextField
             {...chain.props('tTitle')}
             style={styles.input}
-            placeholder="e.g. Summer League"
+            placeholder={t('mob.create_game.tournament_title_placeholder')}
             value={tTitle}
             onChangeText={setTTitle}
             maxLength={TITLE_MAX_LENGTH}
             editable={!isSubmitting}
           />
 
-          <Text style={styles.label}>Tournament Start Date</Text>
+          <Text style={styles.label}>{t('mob.create_game.tournament_start')}</Text>
           <DateTimePickerField
-            accessibilityLabel="Tournament Start Date"
+            accessibilityLabel={t('mob.create_game.tournament_start')}
             testID="tournament-start-date"
             mode="date"
-            placeholder={LOCAL_DATE_PLACEHOLDER}
             value={tStart}
             onChange={setTStart}
             disabled={isSubmitting}
           />
 
-          <Text style={[styles.label, styles.section]}>Sport</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.sport')}</Text>
           {sportOptions.length === 0 ? (
-            <Text style={styles.hint}>No sports are available right now.</Text>
+            <Text style={styles.hint}>{t('mob.common.no_sports')}</Text>
           ) : (
             <OptionChips options={sportOptions} value={tSport} onChange={setTSport} disabled={isSubmitting} />
           )}
 
-          <Text style={[styles.label, styles.section]}>Visibility</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.visibility')}</Text>
           <OptionChips
             options={TOURNAMENT_VISIBILITY_OPTIONS}
             value={tVisibility}
@@ -588,11 +588,11 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           />
           {tVisibility === 'group' ? renderGroupPicker(tGroupId, setTGroupId) : null}
 
-          <Text style={[styles.label, styles.section]}>Description (optional)</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.description_optional')}</Text>
           <TextField
             ref={chain.ref('tDescription')}
             style={[styles.input, styles.multiline]}
-            placeholder="Details about rules, scheduling..."
+            placeholder={t('mob.create_game.tournament_description_placeholder')}
             value={tDescription}
             onChangeText={setTDescription}
             multiline
@@ -600,7 +600,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             editable={!isSubmitting}
           />
 
-          <Text style={[styles.label, styles.section]}>Participation</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.participation')}</Text>
           <OptionChips
             options={PARTICIPATION_OPTIONS}
             value={tParticipationMode}
@@ -608,21 +608,20 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             disabled={isSubmitting}
           />
 
-          <Text style={[styles.label, styles.section]}>Registration closes at (optional)</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.reg_close')}</Text>
           <DateTimePickerField
-            accessibilityLabel="Registration closes at (optional)"
+            accessibilityLabel={t('mob.create_game.reg_close')}
             testID="tournament-reg-close"
             mode="datetime"
-            placeholder={LOCAL_DATE_TIME_PLACEHOLDER}
             value={tRegClose}
             onChange={setTRegClose}
             disabled={isSubmitting}
           />
 
-          <Text style={[styles.label, styles.section]}>Format</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.format')}</Text>
           <OptionChips options={FORMAT_OPTIONS} value={tFormat} onChange={setTFormat} disabled={isSubmitting} />
 
-          <Text style={[styles.label, styles.section]}>Capacity</Text>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_game.capacity')}</Text>
           <TextField
             {...chain.props('tCapacity')}
             style={styles.input}
@@ -632,16 +631,16 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             editable={!isSubmitting}
           />
 
-          <Text style={styles.label}>Venue Name</Text>
+          <Text style={styles.label}>{t('mob.create_game.venue_name')}</Text>
           <TextField
             {...chain.props('tVenueName')}
             style={styles.input}
-            placeholder="e.g. Sports Hub Court 3"
+            placeholder={t('mob.create_game.tournament_venue_placeholder')}
             value={tVenueName}
             onChangeText={setTVenueName}
             editable={!isSubmitting}
           />
-          <Text style={styles.hint}>Times are in your local time zone.</Text>
+          <Text style={styles.hint}>{t('mob.create_game.timezone_hint')}</Text>
 
           {error ? (
             <Text style={styles.error} accessibilityRole="alert">
@@ -650,7 +649,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           ) : null}
 
           <Button
-            label="Create Tournament"
+            label={t('mob.create_game.submit_tournament')}
             variant="cta"
             onPress={handleSubmitTournament}
             loading={isSubmitting}

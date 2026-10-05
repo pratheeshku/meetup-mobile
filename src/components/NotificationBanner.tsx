@@ -32,6 +32,7 @@ import {
   navigateToNotificationTarget,
 } from '../notifications/notificationRouting';
 import { colors, radius, shadows, spacing, typography } from '../theme/tokens';
+import { useT } from '../labels/LabelsContext';
 
 const AUTO_DISMISS_MS = 4000;
 // A swipe of at least this many px (in any horizontal or upward direction)
@@ -39,6 +40,7 @@ const AUTO_DISMISS_MS = 4000;
 const SWIPE_DISMISS_THRESHOLD = 40;
 
 export default function NotificationBanner(): React.JSX.Element | null {
+  const t = useT();
   const banner = useSyncExternalStore(subscribeToBanner, getBannerState);
   const insets = useSafeAreaInsets();
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,7 +130,7 @@ export default function NotificationBanner(): React.JSX.Element | null {
         style={styles.dismissButton}
         onPress={dismissBanner}
         accessibilityRole="button"
-        accessibilityLabel="Dismiss notification"
+        accessibilityLabel={t('mob.notification_banner.dismiss_a11y')}
         hitSlop={spacing.md}
       >
         <Text style={styles.dismissText}>✕</Text>

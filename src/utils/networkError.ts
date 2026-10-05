@@ -1,8 +1,9 @@
 import axios from 'axios';
 
-export const RATE_LIMIT_MESSAGE = 'Too many attempts. Try again in a minute.';
-export const SERVER_ERROR_MESSAGE = 'Something went wrong. Try again.';
-export const NETWORK_ERROR_MESSAGE = 'Unable to connect to server.';
+/** Label keys (resolve with `t(...)`): rate-limit / server / network error copy. */
+export const RATE_LIMIT_MESSAGE = 'mob.errors.rate_limit' as const;
+export const SERVER_ERROR_MESSAGE = 'mob.errors.server' as const;
+export const NETWORK_ERROR_MESSAGE = 'mob.errors.network' as const;
 
 /**
  * Checks whether an error indicates the server was unreachable (network down,

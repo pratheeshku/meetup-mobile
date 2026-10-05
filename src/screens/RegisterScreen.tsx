@@ -37,10 +37,12 @@ import {
 import { toHttpsUrl } from '../utils/httpsUrl';
 import { openLink } from '../utils/openLink';
 import type { AuthStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export default function RegisterScreen({ navigation }: Props): React.JSX.Element {
+  const t = useT();
   const [nickname, setNickname] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -63,8 +65,8 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   const chain = useFieldChain(['nickname', 'displayName', 'email', 'password']);
 
   const agreeLabel = privacyPolicyUrl
-    ? 'I agree to the Terms of Use and Privacy Policy'
-    : 'I agree to the Terms of Use';
+    ? t('mob.register.agree_terms_privacy_a11y')
+    : t('mob.register.agree_terms_a11y');
 
   const handleRegister = async (): Promise<void> => {
     if (termsBlocking) {
@@ -80,7 +82,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
     const trimmedEmail = email.trim();
 
     if (!trimmedNickname || !trimmedDisplayName || !trimmedEmail || !password) {
-      setError('Fill in every field.');
+      setError(t('mob.register.fill_all'));
       chain.focus(
         !trimmedNickname ? 'nickname' : !trimmedDisplayName ? 'displayName' : !trimmedEmail ? 'email' : 'password',
       );
@@ -88,7 +90,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters long.');
+      setError(t('mob.register.password_short'));
       chain.focus('password');
       return;
     }
@@ -104,18 +106,18 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       navigation.navigate('Verify', { email: trimmedEmail });
     } catch (err) {
       if (isNetworkError(err)) {
-        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryError(t(NETWORK_ERROR_MESSAGE));
         setRetryAction(() => handleRegister);
         return;
       }
 
       if (isRateLimitError(err)) {
-        setError(RATE_LIMIT_MESSAGE);
+        setError(t(RATE_LIMIT_MESSAGE));
         return;
       }
 
       if (isServerError(err)) {
-        setRetryError(SERVER_ERROR_MESSAGE);
+        setRetryError(t(SERVER_ERROR_MESSAGE));
         setRetryAction(() => handleRegister);
         return;
       }
@@ -131,16 +133,16 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       }
 
       if (detailString.includes('Email already registered')) {
-        setError('Email already registered');
+        setError(t('mob.register.email_taken'));
         setIsEmailRegistered(true);
       } else if (detailString.includes('Nickname already taken')) {
-        setError('Nickname already taken');
+        setError(t('mob.register.nickname_taken'));
       } else if (detailString.includes('Password must be at least 8 characters')) {
-        setError('Password must be at least 8 characters long');
+        setError(t('mob.register.password_short'));
       } else if (detailString) {
         setError(detailString);
       } else {
-        setError('Registration failed. Please try again.');
+        setError(t('mob.register.failed'));
       }
     } finally {
       setIsSubmitting(false);
@@ -149,12 +151,12 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Register</Text>
+      <Text style={styles.title}>{t('mob.register.title')}</Text>
 
       <TextField
         style={styles.input}
         {...chain.props('nickname')}
-        placeholder="Nickname"
+        placeholder={t('mob.register.nickname_placeholder')}
         autoCapitalize="none"
         value={nickname}
         onChangeText={setNickname}
@@ -163,7 +165,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       <TextField
         style={styles.input}
         {...chain.props('displayName')}
-        placeholder="Display Name"
+        placeholder={t('mob.register.display_name_placeholder')}
         value={displayName}
         onChangeText={setDisplayName}
         editable={!isSubmitting}
@@ -171,7 +173,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       <TextField
         style={styles.input}
         {...chain.props('email')}
-        placeholder="Email"
+        placeholder={t('mob.auth.email_placeholder')}
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -184,7 +186,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         <TextField
           style={styles.passwordField}
           {...chain.props('password')}
-          placeholder="Password"
+          placeholder={t('mob.auth.password_placeholder')}
           secureTextEntry={!showPassword}
           autoComplete="new-password"
           value={password}
@@ -193,11 +195,11 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         />
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+          accessibilityLabel={showPassword ? t('mob.register.hide_password') : t('mob.register.show_password')}
           onPress={() => setShowPassword(prev => !prev)}
           style={styles.showHideButton}
         >
-          <Text style={styles.showHideText}>{showPassword ? 'Hide' : 'Show'}</Text>
+          <Text style={styles.showHideText}>{showPassword ? t('mob.register.hide') : t('mob.register.show')}</Text>
         </Pressable>
       </View>
 
@@ -216,23 +218,23 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
             </View>
           </Pressable>
           <Text style={styles.agreeText}>
-            I agree to the{' '}
+            {t('mob.register.agree_prefix')}{' '}
             <Text
               style={styles.agreeLink}
               accessibilityRole="link"
-              onPress={() => openLink(termsOfUseUrl, 'Could not open the page')}
+              onPress={() => openLink(termsOfUseUrl, t('mob.errors.open_page_failed'))}
             >
-              Terms of Use
+              {t('mob.register.terms_link')}
             </Text>
             {privacyPolicyUrl ? (
               <>
-                {' '}and{' '}
+                {' '}{t('mob.common.and')}{' '}
                 <Text
                   style={styles.agreeLink}
                   accessibilityRole="link"
-                  onPress={() => openLink(privacyPolicyUrl, 'Could not open the page')}
+                  onPress={() => openLink(privacyPolicyUrl, t('mob.errors.open_page_failed'))}
                 >
-                  Privacy Policy
+                  {t('mob.register.privacy_link')}
                 </Text>
               </>
             ) : null}
@@ -244,7 +246,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         <InlineError
           message={retryError}
           onRetry={retryAction}
-          retryLabel="Retry"
+          retryLabel={t('mob.common.retry')}
         />
       ) : error ? (
         <Text style={styles.error}>{error}</Text>
@@ -253,12 +255,12 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       {isEmailRegistered ? (
         <View style={styles.inlineActions}>
           <TextLink
-            label="Sign in"
+            label={t('mob.register.sign_in')}
             onPress={() => navigation.navigate('Login')}
             style={styles.actionLink}
           />
           <TextLink
-            label="Verify your email"
+            label={t('mob.register.verify_email')}
             onPress={() => navigation.navigate('Verify', { email: email.trim() })}
             style={styles.actionLink}
           />
@@ -266,7 +268,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       ) : null}
 
       <Button
-        label="Register"
+        label={t('mob.register.submit')}
         onPress={handleRegister}
         loading={isSubmitting}
         disabled={termsBlocking}
@@ -274,7 +276,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       />
 
       <TextLink
-        label="Already have an account? Sign In"
+        label={t('mob.register.login_link')}
         onPress={() => navigation.navigate('Login')}
         disabled={isSubmitting}
         style={styles.link}
@@ -282,8 +284,8 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
 
       {privacyPolicyUrl ? (
         <TextLink
-          label="Privacy Policy"
-          onPress={() => openLink(privacyPolicyUrl, 'Could not open the page')}
+          label={t('mob.register.privacy_link')}
+          onPress={() => openLink(privacyPolicyUrl, t('mob.errors.open_page_failed'))}
           disabled={isSubmitting}
           style={styles.link}
         />

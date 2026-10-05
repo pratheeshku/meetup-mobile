@@ -40,6 +40,7 @@ import {
   resolveNotificationTarget,
 } from './notificationRouting';
 import type { NotificationType, PushNotificationPayload } from '../types/notification';
+import { currentT } from '../labels/LabelsContext';
 
 /** The two notification types delivered data-only and rendered locally. */
 export const PARTICIPANT_NOTIFICATION_TYPES = [
@@ -88,8 +89,8 @@ export async function displayParticipantNotification(
       pressAction: { id: DEFAULT_PRESS_ID },
       actions: [
         // launchActivity: see file header — required for View to open the app.
-        { title: 'View', pressAction: { id: VIEW_ACTION_ID, launchActivity: 'default' } },
-        { title: 'OK', pressAction: { id: OK_ACTION_ID } },
+        { title: currentT('mob.notification_action.view'), pressAction: { id: VIEW_ACTION_ID, launchActivity: 'default' } },
+        { title: currentT('mob.notification_action.ok'), pressAction: { id: OK_ACTION_ID } },
       ],
     },
   });

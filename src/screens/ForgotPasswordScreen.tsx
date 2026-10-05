@@ -36,21 +36,20 @@ import {
   SERVER_ERROR_MESSAGE,
 } from '../utils/networkError';
 import type { AuthStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 
-const DEFAULT_OAUTH_ONLY_MESSAGE =
-  'This account signs in with Google, so it has no password. Use Continue with Google to sign in.';
-
 export default function ForgotPasswordScreen({ navigation, route }: Props): React.JSX.Element {
   const { signInWithGoogle } = useAuth();
+  const t = useT();
 
   const [email, setEmail] = useState(route.params?.email ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isOAuthOnly, setIsOAuthOnly] = useState(false);
-  const [oauthOnlyMessage, setOAuthOnlyMessage] = useState(DEFAULT_OAUTH_ONLY_MESSAGE);
+  const [oauthOnlyMessage, setOAuthOnlyMessage] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
@@ -65,7 +64,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setInlineError('Enter your email.');
+      setInlineError(t('mob.forgot.enter_email'));
       chain.focus('email');
       return;
     }
@@ -84,12 +83,12 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
       setSubmitted(true);
     } catch (err) {
       if (isNetworkError(err)) {
-        setRetryError(NETWORK_ERROR_MESSAGE);
+        setRetryError(t(NETWORK_ERROR_MESSAGE));
         setRetryAction(() => handleSubmit);
       } else if (isRateLimitError(err)) {
-        setInlineError(RATE_LIMIT_MESSAGE);
+        setInlineError(t(RATE_LIMIT_MESSAGE));
       } else if (isServerError(err)) {
-        setRetryError(SERVER_ERROR_MESSAGE);
+        setRetryError(t(SERVER_ERROR_MESSAGE));
         setRetryAction(() => handleSubmit);
       } else {
         // Any 4xx other than 429: keep generic message and Back to sign in (email enumeration safe)
@@ -111,15 +110,15 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
     } catch (err) {
       if (!(err instanceof GoogleSignInCancelledError)) {
         if (isNetworkError(err)) {
-          setRetryError(NETWORK_ERROR_MESSAGE);
+          setRetryError(t(NETWORK_ERROR_MESSAGE));
           setRetryAction(() => handleGoogleSignIn);
         } else if (isRateLimitError(err)) {
-          setGoogleError(RATE_LIMIT_MESSAGE);
+          setGoogleError(t(RATE_LIMIT_MESSAGE));
         } else if (isServerError(err)) {
-          setRetryError(SERVER_ERROR_MESSAGE);
+          setRetryError(t(SERVER_ERROR_MESSAGE));
           setRetryAction(() => handleGoogleSignIn);
         } else {
-          setGoogleError('Google sign-in failed. Please try again.');
+          setGoogleError(t('mob.login.google_failed'));
         }
       }
     } finally {
@@ -129,13 +128,13 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Forgot Password</Text>
+      <Text style={styles.title}>{t('mob.forgot.title')}</Text>
 
       {submitted ? (
         <View style={styles.confirmationContainer}>
           {isOAuthOnly ? (
             <>
-              <Text style={styles.confirmationText}>{oauthOnlyMessage}</Text>
+              <Text style={styles.confirmationText}>{oauthOnlyMessage ?? t('mob.forgot.oauth_only')}</Text>
 
               {googleError ? <Text style={styles.error}>{googleError}</Text> : null}
 
@@ -143,19 +142,19 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
                 <InlineError
                   message={retryError}
                   onRetry={retryAction}
-                  retryLabel="Retry"
+                  retryLabel={t('mob.common.retry')}
                 />
               ) : null}
 
               <Button
-                label="Continue with Google"
+                label={t('mob.forgot.continue_google')}
                 onPress={handleGoogleSignIn}
                 loading={isGoogleSubmitting}
                 style={styles.button}
               />
 
               <Button
-                label="Back to sign in"
+                label={t('mob.forgot.back_to_sign_in')}
                 variant="secondary"
                 onPress={() => navigation.navigate('Login')}
                 disabled={isGoogleSubmitting}
@@ -165,10 +164,10 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
           ) : (
             <>
               <Text style={styles.confirmationText}>
-                If an account exists for that email, we've sent a reset link. Open it on this phone.
+                {t('mob.forgot.sent')}
               </Text>
               <Button
-                label="Back to sign in"
+                label={t('mob.forgot.back_to_sign_in')}
                 onPress={() => navigation.navigate('Login')}
                 style={styles.button}
               />
@@ -178,13 +177,13 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
       ) : (
         <>
           <Text style={styles.instructions}>
-            Enter your email to receive a password reset link.
+            {t('mob.forgot.instructions')}
           </Text>
 
           <TextField
             style={styles.input}
             {...chain.props('email')}
-            placeholder="Email"
+            placeholder={t('mob.auth.email_placeholder')}
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
@@ -199,19 +198,19 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
             <InlineError
               message={retryError}
               onRetry={retryAction}
-              retryLabel="Retry"
+              retryLabel={t('mob.common.retry')}
             />
           ) : null}
 
           <Button
-            label="Submit"
+            label={t('mob.forgot.submit')}
             onPress={handleSubmit}
             loading={isSubmitting}
             style={styles.button}
           />
 
           <TextLink
-            label="Back to sign in"
+            label={t('mob.forgot.back_to_sign_in')}
             onPress={() => navigation.navigate('Login')}
             disabled={isSubmitting}
             style={styles.link}

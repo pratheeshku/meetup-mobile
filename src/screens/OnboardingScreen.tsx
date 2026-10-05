@@ -24,12 +24,14 @@ import { DEFAULT_STEP_CONTEXT, getActiveSteps } from '../onboarding/steps';
 import type { OnboardingStepId, StepContext } from '../onboarding/steps';
 import { colors, spacing, typography } from '../theme/tokens';
 import LoadingView from '../components/LoadingView';
+import { useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 
-const STEP_TITLES: Record<OnboardingStepId, string> = {
-  skills: 'Your sports',
-  notifications: 'Notifications',
-  mobile: 'Mobile number (optional)',
-  photo: 'Profile photo',
+const STEP_TITLE_KEYS: Record<OnboardingStepId, LabelKey> = {
+  skills: 'mob.onboarding.title_skills',
+  notifications: 'mob.onboarding.title_notifications',
+  mobile: 'mob.onboarding.title_mobile',
+  photo: 'mob.onboarding.title_photo',
 };
 
 interface OnboardingScreenProps {
@@ -46,6 +48,7 @@ export default function OnboardingScreen({
   onDone,
   stepFlags = DEFAULT_STEP_CONTEXT,
 }: OnboardingScreenProps): React.JSX.Element {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const mobileConfig = useMobileNumberConfig();
   const [index, setIndex] = useState(0);
@@ -102,10 +105,13 @@ export default function OnboardingScreen({
     <View style={[styles.screen, { paddingTop: insets.top }]} testID="onboarding-screen">
       <View style={styles.header}>
         <Text style={styles.progress}>
-          Step {Math.min(index, steps.length - 1) + 1} of {steps.length}
+          {t('mob.onboarding.step_progress', {
+            current: Math.min(index, steps.length - 1) + 1,
+            total: steps.length,
+          })}
         </Text>
         <Text style={styles.title} accessibilityRole="header">
-          {step ? STEP_TITLES[step] : ''}
+          {step ? t(STEP_TITLE_KEYS[step]) : ''}
         </Text>
       </View>
       <View style={styles.body}>

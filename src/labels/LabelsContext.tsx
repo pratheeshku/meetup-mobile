@@ -1,80 +1,122 @@
 /**
- * Labels context — bug fix / architecture correction replacing BUG-M02's
- * hardcoded label maps in `src/utils/labels.ts` with the shared
- * `GET /api/labels` endpoint (DES-MEETUP-MOBILE.md §7.10, §4.9), so label
- * text has one source of truth instead of two.
+ * Labels context — every customer-facing string resolves through here
+ * (DES-MEETUP-FEEDBACK-001 C2, AD-7), by key, with a bundled default per key
+ * (`fallbackLabels.ts`). Source of live text: the shared `GET /api/labels`
+ * endpoint (DES-MEETUP-MOBILE.md §7.10, §4.9).
  *
- * Same context/provider shape as `src/auth/AuthContext.tsx` (this repo's
- * established pattern for app-wide fetched state), mounted once at the top
- * of `App.tsx` so the fetch starts at true cold start, independent of auth
- * state — `/api/labels` is unauthenticated by design.
+ * Precedence:
+ *   1. Mount with `FALLBACK_LABELS` (bundled defaults) — never a blank map.
+ *   2. The AsyncStorage cache (if any) replaces the in-memory map at once.
+ *   3. A fetch runs on app launch (always) and on each return to the
+ *      foreground (only when the cached copy is older than
+ *      `labelsCacheTtlSeconds` in `config/appConfig.json`, P1).
+ *   4. On fetch failure the current map stays; `getLabel` falls back to the
+ *      bundled default per key, so the UI never shows a blank or raw key.
  *
- * Precedence, cold start or stale cache:
- *   1. Component mounts with `FALLBACK_LABELS` (bundled snapshot) as the
- *      initial state — never a blank/undefined map.
- *   2. The AsyncStorage cache (if any) is read and, if present, replaces
- *      the in-memory map immediately — this is the "stale cache" case:
- *      whatever the last successful fetch returned, shown without waiting
- *      on the network.
- *   3. A fresh `GET /api/labels` fetch runs concurrently. On success, its
- *      unwrapped `response.labels` map (§7.10 shape correction, see
- *      `src/api/labels.ts`) replaces the in-memory map AND is written back
- *      to AsyncStorage, so the next cold start's step 2 sees it.
- *   4. On fetch failure, whatever is already showing (AsyncStorage cache,
- *      or else the FALLBACK_LABELS the provider mounted with) is left
- *      untouched — this is the "both network and cache unavailable" case
- *      collapsing to FALLBACK_LABELS by construction, never an error.
+ * Label text values are never logged (DES-MEETUP-FEEDBACK-001 Observability).
  */
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import appConfig from '../../config/appConfig.json';
 import { getLabels } from '../api/labels';
 import type { LabelMap } from '../api/labels';
 import { FALLBACK_LABELS } from './fallbackLabels';
+import type { LabelKey } from './fallbackLabels';
 
 export const LABELS_CACHE_KEY = '@meetup/labels-cache';
+export const LABELS_FETCHED_AT_KEY = '@meetup/labels-fetched-at';
+
+export type LabelParams = Record<string, string | number>;
+export type TranslateFn = (key: LabelKey, params?: LabelParams) => string;
+
+// Latest labels held outside React so non-component code (notification
+// action buttons, channel names) resolves through the same keys.
+let latestLabels: LabelMap = FALLBACK_LABELS;
+
+const PLACEHOLDER_PATTERN = /\{(\w+)\}/g;
 
 // Default context value: `FALLBACK_LABELS` itself, so `useLabels()` never
 // throws or returns undefined for a component rendered without a
-// `LabelsProvider` ancestor (e.g. most existing screen unit tests, which
-// don't exercise label-fetching behaviour and shouldn't have to).
+// `LabelsProvider` ancestor.
 const LabelsContext = createContext<LabelMap>(FALLBACK_LABELS);
+
+function cacheTtlMs(): number {
+  const seconds = Number(appConfig.labelsCacheTtlSeconds);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : 0;
+}
 
 export function LabelsProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [labels, setLabels] = useState<LabelMap>(FALLBACK_LABELS);
+  const fetchedAt = useRef(0);
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+
+  const refresh = useCallback(async (force: boolean) => {
+    if (inFlight.current) {
+      return;
+    }
+    if (!force && Date.now() - fetchedAt.current < cacheTtlMs()) {
+      return;
+    }
+    inFlight.current = true;
+    try {
+      const fetched = await getLabels();
+      fetchedAt.current = Date.now();
+      if (mounted.current) {
+        // Keep the same object when nothing changed, so consumers don't re-render.
+        setLabels(current =>
+          JSON.stringify(current) === JSON.stringify(fetched) ? current : fetched,
+        );
+      }
+      await AsyncStorage.setItem(LABELS_CACHE_KEY, JSON.stringify(fetched));
+      await AsyncStorage.setItem(LABELS_FETCHED_AT_KEY, String(fetchedAt.current));
+    } catch {
+      // Fetch/cache failure: keep what is showing (cache or bundled
+      // defaults); never surface as a screen-level error.
+    } finally {
+      inFlight.current = false;
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    mounted.current = true;
 
     (async () => {
       try {
         const cachedRaw = await AsyncStorage.getItem(LABELS_CACHE_KEY);
-        if (cachedRaw && !cancelled) {
+        const cachedAt = await AsyncStorage.getItem(LABELS_FETCHED_AT_KEY);
+        if (cachedRaw && mounted.current) {
           setLabels(JSON.parse(cachedRaw) as LabelMap);
+          fetchedAt.current = Math.max(fetchedAt.current, Number(cachedAt) || 0);
         }
       } catch {
-        // Corrupt/unavailable cache — leave FALLBACK_LABELS in place;
-        // the network fetch below still runs regardless.
+        // Corrupt/unavailable cache — bundled defaults stay in place.
       }
     })();
 
-    (async () => {
-      try {
-        const fetched = await getLabels();
-        if (!cancelled) {
-          setLabels(fetched);
-        }
-        await AsyncStorage.setItem(LABELS_CACHE_KEY, JSON.stringify(fetched));
-      } catch {
-        // Network unavailable — keep whatever's already showing (cache or
-        // FALLBACK_LABELS); never surface this as a screen-level error.
+    // App launch: always refresh.
+    refresh(true);
+
+    // Foreground: refresh when the cache is older than the configured TTL.
+    let previous = AppState.currentState;
+    const subscription = AppState.addEventListener('change', next => {
+      if (next === 'active' && previous !== 'active') {
+        refresh(false);
       }
-    })();
+      previous = next;
+    });
 
     return () => {
-      cancelled = true;
+      mounted.current = false;
+      subscription.remove();
     };
-  }, []);
+  }, [refresh]);
+
+  useEffect(() => {
+    latestLabels = labels;
+  }, [labels]);
 
   return <LabelsContext.Provider value={labels}>{children}</LabelsContext.Provider>;
 }
@@ -83,12 +125,51 @@ export function useLabels(): LabelMap {
   return useContext(LabelsContext);
 }
 
-/**
- * Looks up a dotted label key in a fetched/cached map, falling back to the
- * bundled snapshot's value for that key, and finally to the key itself —
- * defensive against a future backend response that's missing a key this
- * app expects (never blank UI text).
- */
-export function getLabel(labels: LabelMap, key: string): string {
-  return labels[key] ?? FALLBACK_LABELS[key] ?? key;
+/** Fills `{name}` placeholders; an unknown name is replaced with nothing. */
+export function formatLabel(template: string, params?: LabelParams): string {
+  return template.replace(PLACEHOLDER_PATTERN, (_match, name: string) =>
+    params && name in params ? String(params[name]) : '',
+  );
 }
+
+function placeholdersResolvable(template: string, params?: LabelParams): boolean {
+  for (const match of template.matchAll(PLACEHOLDER_PATTERN)) {
+    if (!params || !(match[1] in params)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Resolves a label key: the fetched/cached value when it is a non-empty
+ * string whose placeholders can all be filled, otherwise the bundled default
+ * for that key. Never blank; the raw key is only a last resort for an
+ * unregistered key (not reachable for typed `LabelKey`s).
+ */
+export function getLabel(labels: LabelMap, key: string, params?: LabelParams): string {
+  const remote = labels[key];
+  const fallback = FALLBACK_LABELS[key];
+  let template: string | undefined;
+  if (typeof remote === 'string' && remote.trim() !== '' && placeholdersResolvable(remote, params)) {
+    template = remote;
+  } else {
+    template = fallback;
+  }
+  return formatLabel(template ?? key, params);
+}
+
+/** `const t = useT(); t('mob.login.title')` — resolves by key with bundled default. */
+export function useT(): TranslateFn {
+  const labels = useLabels();
+  return useMemo<TranslateFn>(
+    () => (key, params) => getLabel(labels, key, params),
+    [labels],
+  );
+}
+
+/** Translator over the most recent labels (bundled defaults until the provider has loaded). */
+export const currentT: TranslateFn = (key, params) => getLabel(latestLabels, key, params);
+
+/** Translator over the bundled defaults only — default for pure helpers called without a `t`. */
+export const bundledT: TranslateFn = (key, params) => getLabel(FALLBACK_LABELS, key, params);

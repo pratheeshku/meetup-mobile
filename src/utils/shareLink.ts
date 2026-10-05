@@ -1,56 +1,36 @@
 /**
- * Shareable link composition and native sharing utilities (DES-MEETUP-MOBILE-ADDENDUM-shareable-links).
+ * App share link (DES-MEETUP-FEEDBACK-001 C5, AD-6, R-09; supersedes the
+ * per-game / per-group invite links of DES-MEETUP-MOBILE-ADDENDUM-shareable-
+ * links).
  *
- * Implements:
- * - Decision 2: Client-side event link composition with `?ref=<current_user_id>`
- * - Decision 4: Native share integration (`Share.share({ message, url })` and WhatsApp with `https://wa.me/` fallback)
- * - Decision 5: Clipboard copy via RN core Clipboard
- * - Decision 7: Single shared message-composition template:
- *   `"{inviter_display_name} invited you to {event_or_group_name} on Shuttlr — {link}"`
+ * The share action shares ONE URL — `shareUrl` from `config/appConfig.json`
+ * (P1), the backend redirect that routes to the Play Store or App Store by
+ * platform — with text asking the recipient to download the app. The text is
+ * the `mob.share.message` label. No game or group context is carried in the
+ * link or the text (deep-link-after-install is deferred, DD-1).
  */
 import { Clipboard, Linking, Share } from 'react-native';
-import { ENV } from '../../config/env';
 
-/**
- * Returns canonical web event URL with optional `?ref=<current_user_id>` query param (Decision 2).
- * Matches the web app's client-side router (frontend/app.js line 2564).
- */
-export function getEventShareUrl(eventId: string, currentUserId?: string): string {
-  const base = ENV.API_BASE_URL.replace(/\/+$/, '');
-  const url = `${base}/#event-detail/${eventId}`;
-  return currentUserId ? `${url}?ref=${encodeURIComponent(currentUserId)}` : url;
+import appConfig from '../../config/appConfig.json';
+import { toHttpsUrl } from './httpsUrl';
+
+/** The configured share URL, or `null` when it is missing / not an https URL. */
+export function getShareUrl(): string | null {
+  return toHttpsUrl(appConfig.shareUrl);
 }
 
 /**
- * Single source of truth for share message composition (Decision 4, Decision 7).
- * Default copy:
- * `"{inviter_display_name} invited you to {event_or_group_name} on Shuttlr — {link}"`
+ * System share sheet via React Native core `Share.share`. The URL is part of
+ * the message text, so only `message` is passed (passing `url` as well makes
+ * iOS targets show the link twice).
  */
-export function composeShareMessage(
-  inviterDisplayName: string,
-  eventOrGroupName: string,
-  link: string,
-): string {
-  return `${inviterDisplayName} invited you to ${eventOrGroupName} on Shuttlr \u2014 ${link}`;
+export async function shareGeneric({ message }: { message: string }): Promise<void> {
+  await Share.share({ message });
 }
 
 /**
- * Generic system share sheet integration via React Native core `Share.share` (Decision 4).
- */
-export async function shareGeneric({
-  message,
-  url,
-}: {
-  message: string;
-  url: string;
-}): Promise<void> {
-  await Share.share({ message, url });
-}
-
-/**
- * WhatsApp share integration via Linking (Decision 4).
- * Attempts `whatsapp://send?text=<encoded>` with fallback to `https://wa.me/?text=<encoded>`
- * if WhatsApp is not installed.
+ * WhatsApp share via Linking: `whatsapp://send?text=<encoded>` with fallback
+ * to `https://wa.me/?text=<encoded>` if WhatsApp is not installed.
  */
 export async function shareToWhatsApp(message: string): Promise<void> {
   const encoded = encodeURIComponent(message);
@@ -70,9 +50,7 @@ export async function shareToWhatsApp(message: string): Promise<void> {
   await Linking.openURL(webLink);
 }
 
-/**
- * Copies link to system clipboard via React Native core `Clipboard.setString` (Decision 5).
- */
+/** Copies the share URL to the system clipboard via React Native core `Clipboard.setString`. */
 export function copyLinkToClipboard(url: string): void {
   Clipboard.setString(url);
 }

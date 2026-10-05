@@ -10,6 +10,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
+import { useT } from '../../labels/LabelsContext';
+import type { LabelKey } from '../../labels/fallbackLabels';
 
 export function SectionHeader({
   title,
@@ -18,6 +20,7 @@ export function SectionHeader({
   title: string;
   onViewAll?: () => void;
 }): React.JSX.Element {
+  const t = useT();
   return (
     <View style={styles.header}>
       <Text style={styles.title} accessibilityRole="header">
@@ -26,12 +29,12 @@ export function SectionHeader({
       {onViewAll ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`View all ${title}`}
+          accessibilityLabel={t('mob.dashboard.view_all_a11y', { title })}
           onPress={onViewAll}
           hitSlop={spacing.sm}
           style={({ pressed }) => [styles.viewAll, pressed ? styles.pressed : null]}
         >
-          <Text style={styles.viewAllText}>View all</Text>
+          <Text style={styles.viewAllText}>{t('mob.dashboard.view_all')}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -45,8 +48,9 @@ export function SkeletonRows({
   count?: number;
   testID?: string;
 }): React.JSX.Element {
+  const t = useT();
   return (
-    <View testID={testID} accessibilityLabel="Loading" accessibilityRole="progressbar">
+    <View testID={testID} accessibilityLabel={t('mob.common.loading')} accessibilityRole="progressbar">
       {Array.from({ length: count }, (_, index) => (
         <View key={index} style={styles.skeletonRow}>
           <View style={styles.skeletonTile} />
@@ -67,6 +71,7 @@ export function InlineError({
   message: string;
   onRetry: () => void;
 }): React.JSX.Element {
+  const t = useT();
   return (
     <View style={styles.errorBox}>
       <Text style={styles.errorText} accessibilityRole="alert">
@@ -74,11 +79,11 @@ export function InlineError({
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Retry"
+        accessibilityLabel={t('mob.common.retry')}
         onPress={onRetry}
         style={({ pressed }) => [styles.retry, pressed ? styles.pressed : null]}
       >
-        <Text style={styles.retryText}>Retry</Text>
+        <Text style={styles.retryText}>{t('mob.common.retry')}</Text>
       </Pressable>
     </View>
   );
@@ -88,15 +93,15 @@ export function EmptyText({ children }: { children: string }): React.JSX.Element
   return <Text style={styles.empty}>{children}</Text>;
 }
 
-/** Section copy (§5 "States"). */
+/** Section copy label keys (§5 "States"); resolve with `t(COPY.x)`. */
 export const COPY = {
-  gamesEmpty: 'No upcoming games yet — join one below or create your own.',
-  gamesError: "Couldn't load your games",
-  groupsEmpty: "You haven't joined any groups yet.",
-  groupsError: "Couldn't load your groups",
-  recommendedEmpty: 'No public games to recommend right now.',
-  recommendedError: "Couldn't load recommendations",
-} as const;
+  gamesEmpty: 'mob.dashboard.games_empty',
+  gamesError: 'mob.dashboard.games_error',
+  groupsEmpty: 'mob.dashboard.groups_empty',
+  groupsError: 'mob.dashboard.groups_error',
+  recommendedEmpty: 'mob.dashboard.recommended_empty',
+  recommendedError: 'mob.dashboard.recommended_error',
+} as const satisfies Record<string, LabelKey>;
 
 const styles = StyleSheet.create({
   header: {

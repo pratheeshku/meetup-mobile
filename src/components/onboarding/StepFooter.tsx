@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, spacing, typography } from '../../theme/tokens';
 import Button from '../Button';
+import { useT } from '../../labels/LabelsContext';
 
 interface StepFooterProps {
   onSave: () => void;
@@ -19,8 +20,9 @@ export default function StepFooter({
   onSkip,
   saving = false,
   error,
-  saveLabel = 'Save',
+  saveLabel,
 }: StepFooterProps): React.JSX.Element {
+  const t = useT();
   return (
     <View style={styles.footer}>
       {error ? (
@@ -28,8 +30,8 @@ export default function StepFooter({
           {error}
         </Text>
       ) : null}
-      <Button label={saveLabel} onPress={onSave} loading={saving} />
-      <Button label="Skip" variant="secondary" onPress={onSkip} disabled={saving} style={styles.skip} />
+      <Button label={saveLabel ?? t('mob.common.save')} onPress={onSave} loading={saving} />
+      <Button label={t('mob.common.skip')} variant="secondary" onPress={onSkip} disabled={saving} style={styles.skip} />
     </View>
   );
 }

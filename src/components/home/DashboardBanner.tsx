@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BannerBackground } from '../icons/DashboardIcons';
 import { brandBlock, dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
+import { useT } from '../../labels/LabelsContext';
 
 const APP_ICON = require('../../assets/shuttlr-icon-header.png');
 
@@ -42,6 +43,7 @@ export default function DashboardBanner({
   onAvatarPress,
 }: DashboardBannerProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [photoFailed, setPhotoFailed] = useState(false);
   // A new photo URL gets a fresh chance to load.
   useEffect(() => {
@@ -49,7 +51,9 @@ export default function DashboardBanner({
   }, [photoUrl]);
 
   const trimmed = name.trim();
-  const headline = trimmed ? `Ready to play, ${trimmed}?` : 'Ready to play?';
+  const headline = trimmed
+    ? t('mob.dashboard.headline_named', { name: trimmed })
+    : t('mob.dashboard.headline');
   const hasUnread = unreadCount > 0;
   const badgeLabel = unreadCount > MAX_BADGE_COUNT ? `${MAX_BADGE_COUNT}+` : String(unreadCount);
   const showPhoto = Boolean(photoUrl) && !photoFailed;
@@ -89,14 +93,18 @@ export default function DashboardBanner({
               allowFontScaling={false}
               maxFontSizeMultiplier={1}
             >
-              {brandBlock.tagline}
+              {t('mob.brand.tagline')}
             </Text>
           </View>
         </View>
         <View style={styles.topRight}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={hasUnread ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            accessibilityLabel={
+              hasUnread
+                ? t('mob.dashboard.notifications_unread_a11y', { count: unreadCount })
+                : t('mob.dashboard.notifications_a11y')
+            }
             onPress={onBellPress}
             style={({ pressed }) => [styles.bell, pressed ? styles.pressed : null]}
           >
@@ -109,7 +117,7 @@ export default function DashboardBanner({
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Profile"
+            accessibilityLabel={t('mob.dashboard.profile_a11y')}
             onPress={onAvatarPress}
             style={({ pressed }) => [styles.avatarTouch, pressed ? styles.pressed : null]}
           >
@@ -132,7 +140,7 @@ export default function DashboardBanner({
       </View>
 
       <View style={styles.textBlock}>
-        <Text style={styles.greeting}>Good to see you</Text>
+        <Text style={styles.greeting}>{t('mob.dashboard.greeting')}</Text>
         <Text style={styles.headline} accessibilityRole="header" numberOfLines={1}>
           {headline}
         </Text>

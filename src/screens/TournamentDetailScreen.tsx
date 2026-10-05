@@ -33,7 +33,7 @@
  * explicit "confirmation alert" instructions for their destructive
  * actions.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -53,8 +53,10 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
+import { goToDashboard } from '../navigation/goToDashboard';
 import { useSportDisplayName } from '../utils/labels';
 import type { TournamentsStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<TournamentsStackParamList, 'TournamentDetail'>;
 
@@ -69,9 +71,12 @@ function formatDateTime(isoString: string): string {
 }
 
 export default function TournamentDetailScreen({ route }: Props): React.JSX.Element {
+  const t = useT();
   const { tournamentId } = route.params;
   const { user } = useAuth();
   const currentUserId = user?.id;
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [fixtures, setFixtures] = useState<TournamentFixture[]>([]);
@@ -105,7 +110,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
       setFixtures(fixturesData);
       setRegistrations(registrationsData);
     } catch {
-      setLoadError('Could not load this tournament. Please try again.');
+      setLoadError(tRef.current('mob.tournament.load_error'));
     } finally {
       setIsLoading(false);
     }
@@ -129,7 +134,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         setRegistrations(registrationsData);
       });
     } catch {
-      setRegisterError('Could not register for this tournament. Please try again.');
+      setRegisterError(t('mob.tournament.register_error'));
     } finally {
       setIsRegistering(false);
     }
@@ -139,7 +144,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
     setWithdrawError(null);
     const myRegistration = registrations.find(r => r.user_id === currentUserId);
     if (!myRegistration) {
-      setWithdrawError('Could not find your registration. Please try again.');
+      setWithdrawError(t('mob.tournament.registration_missing'));
       return;
     }
     setIsWithdrawing(true);
@@ -154,7 +159,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         setRegistrations(registrationsData);
       });
     } catch {
-      setWithdrawError('Could not withdraw from this tournament. Please try again.');
+      setWithdrawError(t('mob.tournament.withdraw_error'));
     } finally {
       setIsWithdrawing(false);
     }
@@ -164,12 +169,10 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
     setCancelError(null);
     setIsCancelling(true);
     try {
-      const tournamentData = await cancelTournament(tournamentId).then(() =>
-        getTournament(tournamentId),
-      );
-      setTournament(tournamentData);
+      await cancelTournament(tournamentId);
+      goToDashboard(t('mob.success.tournament_cancelled'));
     } catch {
-      setCancelError('Could not cancel this tournament. Please try again.');
+      setCancelError(t('mob.tournament.cancel_error'));
     } finally {
       setIsCancelling(false);
     }
@@ -180,7 +183,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
   }
 
   if (loadError || !tournament) {
-    return <ErrorView message={loadError ?? 'Tournament not found.'} onRetry={loadAll} />;
+    return <ErrorView message={loadError ?? t('mob.tournament.not_found')} onRetry={loadAll} />;
   }
 
   // Full-contract-audit fix (2026-09-18, see
@@ -210,15 +213,24 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         <Text style={styles.meta}>
           {sportLabel} · {tournament.format}
         </Text>
-        <Text style={styles.meta}>Status: {tournament.status}</Text>
-        <Text style={styles.meta}>Organised by {tournament.organiser_nickname}</Text>
-        <Text style={styles.meta}>Starts {formatDateTime(tournament.starts_at)}</Text>
+        <Text style={styles.meta}>
+          {t('mob.tournament.status_line', { status: tournament.status })}
+        </Text>
+        <Text style={styles.meta}>
+          {t('mob.tournament.organised_by', { name: tournament.organiser_nickname })}
+        </Text>
+        <Text style={styles.meta}>
+          {t('mob.tournament.starts', { when: formatDateTime(tournament.starts_at) })}
+        </Text>
         {/* `registrations.length` used instead of `tournament.participant_count` —
             the real backend has no such field; this screen already fetches
             the registrations list, so this is exact rather than a
             placeholder (see the audit report / mapTournamentApiItem). */}
         <Text style={styles.meta}>
-          {registrations.length}/{tournament.max_participants} registered
+          {t('mob.tournament.registered_line', {
+            count: registrations.length,
+            max: tournament.max_participants,
+          })}
         </Text>
         <Text style={styles.description}>{tournament.description}</Text>
       </Card>
@@ -228,7 +240,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
 
       {canRegister ? (
         <Button
-          label="Register"
+          label={t('mob.tournament.register')}
           onPress={handleRegister}
           loading={isRegistering}
           style={styles.button}
@@ -237,7 +249,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
 
       {canWithdraw ? (
         <Button
-          label="Withdraw"
+          label={t('mob.tournament.withdraw')}
           variant="secondary"
           onPress={handleWithdraw}
           loading={isWithdrawing}
@@ -246,7 +258,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
       ) : null}
 
       {showRegistrationClosedMessage ? (
-        <Text style={styles.closedNotice}>Registration is closed for this tournament.</Text>
+        <Text style={styles.closedNotice}>{t('mob.tournament.registration_closed')}</Text>
       ) : null}
 
       <View style={styles.tabRow}>
@@ -259,7 +271,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
           <Text
             style={[styles.tabButtonText, activeTab === 'fixtures' && styles.tabButtonTextActive]}
           >
-            Fixtures
+            {t('mob.tournament.tab_matches')}
           </Text>
         </Pressable>
         <Pressable
@@ -274,7 +286,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
               activeTab === 'registrations' && styles.tabButtonTextActive,
             ]}
           >
-            Registrations
+            {t('mob.tournament.tab_registrations')}
           </Text>
         </Pressable>
       </View>
@@ -282,7 +294,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
       <Card>
         {activeTab === 'fixtures' ? (
           fixtures.length === 0 ? (
-            <Text style={styles.emptyText}>No fixtures yet.</Text>
+            <Text style={styles.emptyText}>{t('mob.tournament.no_matches')}</Text>
           ) : (
             fixtures.map(fixture => (
               <View key={fixture.id} style={styles.listRow}>
@@ -298,13 +310,15 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
             ))
           )
         ) : registrations.length === 0 ? (
-          <Text style={styles.emptyText}>No one has registered yet.</Text>
+          <Text style={styles.emptyText}>{t('mob.tournament.no_registrations')}</Text>
         ) : (
           registrations.map(registration => (
             <View key={registration.id} style={styles.listRow}>
               <Text style={styles.memberNickname}>{registration.nickname}</Text>
               <Text style={styles.fixtureMeta}>
-                Registered {formatDateTime(registration.registered_at)}
+                {t('mob.tournament.registered_at', {
+                  when: formatDateTime(registration.registered_at),
+                })}
               </Text>
             </View>
           ))
@@ -315,7 +329,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         <View style={styles.cancelSection}>
           {cancelError ? <Text style={styles.errorText}>{cancelError}</Text> : null}
           <Button
-            label="Cancel Tournament"
+            label={t('mob.tournament.cancel')}
             variant="destructive"
             onPress={handleCancel}
             loading={isCancelling}

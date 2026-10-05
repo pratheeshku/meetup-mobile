@@ -21,6 +21,7 @@ import { colors, spacing, typography } from '../theme/tokens';
 import { buildE164, countryLabel, nationalDigits, splitE164 } from '../utils/phoneNumber';
 import DropdownField from './DropdownField';
 import TextField from './TextField';
+import { useT } from '../labels/LabelsContext';
 
 export interface MobileNumberChange {
   e164: string | null;
@@ -46,6 +47,7 @@ export default function MobileNumberInput({
   onChange,
   error,
 }: MobileNumberInputProps): React.JSX.Element {
+  const t = useT();
   const initial = useMemo(() => {
     const split = initialValue ? splitE164(initialValue, countries) : null;
     return {
@@ -77,8 +79,8 @@ export default function MobileNumberInput({
           style={styles.country}
           options={options}
           value={country.iso2}
-          placeholder="Code"
-          accessibilityLabel="Country code"
+          placeholder={t('mob.mobile_number.code_placeholder')}
+          accessibilityLabel={t('mob.mobile_number.code_a11y')}
           onChange={iso2 => {
             const next = countries.find(row => row.iso2 === iso2) ?? country;
             setCountry(next);
@@ -92,8 +94,8 @@ export default function MobileNumberInput({
             setNational(text);
             emit(country, text);
           }}
-          placeholder="Mobile number"
-          accessibilityLabel="Mobile number"
+          placeholder={t('mob.mobile_number.number_placeholder')}
+          accessibilityLabel={t('mob.mobile_number.number_placeholder')}
           keyboardType="phone-pad"
           autoComplete="tel-national"
           textContentType="telephoneNumber"

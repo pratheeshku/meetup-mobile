@@ -12,6 +12,7 @@ import { spacing, typography } from '../../theme/tokens';
 import type { Event } from '../../types/event';
 import { formatDayLabel, formatTimeOfDay } from '../../utils/formatGameTime';
 import { sportTileColor } from './GameRow';
+import { useT } from '../../labels/LabelsContext';
 
 export default function NextGameCard({
   event,
@@ -21,13 +22,14 @@ export default function NextGameCard({
   onPress: () => void;
 }): React.JSX.Element {
   const venue = event.venue_name || event.location || '';
-  const day = formatDayLabel(event.starts_at);
+  const t = useT();
+  const day = formatDayLabel(event.starts_at, undefined, t);
   const detail = [formatTimeOfDay(event.starts_at), venue].filter(Boolean).join(' · ');
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Next game, ${day}, ${event.title}, ${detail}`}
+      accessibilityLabel={t('mob.next_game.a11y', { day, title: event.title, detail })}
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
     >
@@ -35,7 +37,7 @@ export default function NextGameCard({
         <SportIcon slug={event.sport} size={dashSize.sportIcon} />
       </View>
       <View style={styles.body}>
-        <Text style={styles.kicker}>{day ? `Next game · ${day}` : 'Next game'}</Text>
+        <Text style={styles.kicker}>{day ? t('mob.next_game.kicker_day', { day }) : t('mob.next_game.kicker')}</Text>
         <Text style={styles.title} numberOfLines={1}>
           {event.title}
         </Text>

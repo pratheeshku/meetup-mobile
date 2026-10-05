@@ -27,7 +27,7 @@
  * now only describes this screen's own error-handling style, not its
  * navigation context.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -79,11 +79,15 @@ import { borderWidth, colors, radius, shadows, sizes, spacing, typography } from
 import type { SkillLevelValue, UserProfile } from '../types/user';
 import type { Sport } from '../types/sport';
 import type { ProfileStackParamList } from '../navigation/types';
+import { useT } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
 export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
   const { signOut, updateUser } = useAuth();
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -145,31 +149,31 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
     // If there's already an avatar, offer change or remove options
     if (profile?.avatar_url) {
-      Alert.alert('Profile Photo', undefined, [
-        { text: 'Cancel', style: 'cancel' },
+      Alert.alert(t('mob.profile.photo_title'), undefined, [
+        { text: t('mob.common.cancel'), style: 'cancel' },
         {
-          text: 'Take Photo',
+          text: t('mob.profile.take_photo'),
           onPress: () => pickImage('camera'),
         },
         {
-          text: 'Choose from Library',
+          text: t('mob.profile.choose_photo'),
           onPress: () => pickImage('library'),
         },
         {
-          text: 'Remove Photo',
+          text: t('mob.profile.remove_photo'),
           style: 'destructive',
           onPress: handleRemoveAvatar,
         },
       ]);
     } else {
-      Alert.alert('Profile Photo', undefined, [
-        { text: 'Cancel', style: 'cancel' },
+      Alert.alert(t('mob.profile.photo_title'), undefined, [
+        { text: t('mob.common.cancel'), style: 'cancel' },
         {
-          text: 'Take Photo',
+          text: t('mob.profile.take_photo'),
           onPress: () => pickImage('camera'),
         },
         {
-          text: 'Choose from Library',
+          text: t('mob.profile.choose_photo'),
           onPress: () => pickImage('library'),
         },
       ]);
@@ -187,7 +191,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         compressImageQuality: 0.8,
         // iOS only (ignored on Android): HEIC must never reach the backend.
         forceJpg: true,
-        cropperToolbarTitle: 'Edit Photo',
+        cropperToolbarTitle: t('mob.profile.crop_title'),
         hideBottomControls: false,
         enableRotationGesture: true,
         cropperRotateButtonsHidden: false,
@@ -235,7 +239,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       // getApiErrorMessage pattern already established for the skill-level 409
       setAvatarPreviewUri(null);
       setAvatarError(
-        getApiErrorMessage(e, 'Could not upload your photo. Please try again.'),
+        getApiErrorMessage(e, t('mob.profile.photo_upload_error')),
       );
     } finally {
       setIsUploadingAvatar(false);
@@ -257,7 +261,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       });
     } catch (e) {
       setAvatarError(
-        getApiErrorMessage(e, 'Could not remove your photo. Please try again.'),
+        getApiErrorMessage(e, t('mob.profile.photo_remove_error')),
       );
     } finally {
       setIsRemovingAvatar(false);
@@ -271,7 +275,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       const data = await getProfile();
       setProfile(data);
     } catch {
-      setLoadError('Could not load your profile. Please try again.');
+      setLoadError(tRef.current('mob.profile.load_error'));
     } finally {
       setIsLoading(false);
     }
@@ -301,7 +305,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
   const handleSaveDisplayName = async (): Promise<void> => {
     if (!displayNameDraft.trim()) {
-      setDisplayNameError('Display name cannot be empty.');
+      setDisplayNameError(t('mob.profile.display_name_empty'));
       nameChain.focus('displayName');
       return;
     }
@@ -317,7 +321,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       });
       setIsEditingDisplayName(false);
     } catch {
-      setDisplayNameError('Could not save your display name. Please try again.');
+      setDisplayNameError(t('mob.profile.display_name_error'));
     } finally {
       setIsSavingDisplayName(false);
     }
@@ -352,7 +356,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       });
       handleCloseSkillLevelSheet();
     } catch {
-      setSkillLevelError('Could not save your skill level. Please try again.');
+      setSkillLevelError(t('mob.profile.skill_save_error'));
     } finally {
       setIsSavingSkillLevel(false);
     }
@@ -377,7 +381,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       handleCloseSkillLevelSheet();
     } catch (e) {
       setSkillLevelError(
-        getApiErrorMessage(e, 'Could not remove this skill level. Please try again.'),
+        getApiErrorMessage(e, t('mob.profile.skill_remove_error')),
       );
     } finally {
       setIsDeletingSkillLevel(false);
@@ -386,10 +390,14 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
   /** Same yes/no confirmation the old per-row Remove link used. */
   const handleDeleteSkillLevelPress = (sport: string, sportLabel: string): void => {
-    Alert.alert('Remove Skill Level', `Remove your ${sportLabel} skill level?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => handleDeleteSkillLevel(sport) },
-    ]);
+    Alert.alert(
+      t('mob.profile.skill_remove_title'),
+      t('mob.profile.skill_remove_message', { sport: sportLabel }),
+      [
+      { text: t('mob.common.cancel'), style: 'cancel' },
+      { text: t('mob.common.remove'), style: 'destructive', onPress: () => handleDeleteSkillLevel(sport) },
+      ],
+    );
   };
 
   const handleSignOut = async (): Promise<void> => {
@@ -398,7 +406,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
     try {
       await signOut();
     } catch {
-      setSignOutError('Could not sign out. Please try again.');
+      setSignOutError(t('mob.profile.sign_out_error'));
       setIsSigningOut(false);
     }
   };
@@ -413,7 +421,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       // §4.13: admin self-deletion is rejected server-side with an
       // explicit error — surfaced generically here since the backend
       // owns the actual reason (server is the sole authority, §5.3).
-      setDeletionError('Could not start account deletion. Please try again.');
+      setDeletionError(t('mob.profile.delete_start_error'));
     } finally {
       setIsRequestingDeletion(false);
     }
@@ -429,11 +437,11 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
   const handleDeleteAccountPress = (): void => {
     Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This cannot be undone.',
+      t('mob.profile.delete_title'),
+      t('mob.profile.delete_message'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: handleRequestDeletion },
+        { text: t('mob.common.cancel'), style: 'cancel' },
+        { text: t('mob.common.delete'), style: 'destructive', onPress: handleRequestDeletion },
       ],
     );
   };
@@ -446,7 +454,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
   const handleConfirmDeletion = async (): Promise<void> => {
     if (!confirmationCodeDraft.trim()) {
-      setDeletionError('Enter the confirmation code.');
+      setDeletionError(t('mob.profile.code_required'));
       deletionChain.focus('confirmationCode');
       return;
     }
@@ -458,7 +466,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
     } catch {
       // Enumeration-safe per §4.13 ("expired/consumed confirmation
       // token") — never distinguish "wrong code" from "expired code".
-      setDeletionError('Invalid or expired confirmation code. Please try again.');
+      setDeletionError(t('mob.profile.code_invalid'));
       setIsConfirmingDeletion(false);
     }
   };
@@ -468,7 +476,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   }
 
   if (loadError || !profile) {
-    return <ErrorView message={loadError ?? 'Profile not found.'} onRetry={loadProfile} />;
+    return <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadProfile} />;
   }
 
   // `skill_levels` is optional on the canonical `UserProfile` type (it's
@@ -487,7 +495,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         <Pressable
           onPress={handleAvatarPress}
           accessibilityRole="button"
-          accessibilityLabel="Change profile photo"
+          accessibilityLabel={t('mob.profile.change_photo_a11y')}
           disabled={isUploadingAvatar || isRemovingAvatar}
           style={styles.avatarContainer}
         >
@@ -545,21 +553,21 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
               value={displayNameDraft}
               onChangeText={setDisplayNameDraft}
               editable={!isSavingDisplayName}
-              accessibilityLabel="Display name"
-              placeholder="Display name"
+              accessibilityLabel={t('mob.profile.display_name')}
+              placeholder={t('mob.profile.display_name')}
               autoFocus
             />
             {displayNameError ? <Text style={styles.errorText}>{displayNameError}</Text> : null}
             <View style={styles.editActionsRow}>
               <Button
-                label="Save"
+                label={t('mob.common.save')}
                 size="sm"
                 onPress={handleSaveDisplayName}
                 loading={isSavingDisplayName}
                 style={styles.actionSpacing}
               />
               <Button
-                label="Cancel"
+                label={t('mob.common.cancel')}
                 size="sm"
                 variant="secondary"
                 onPress={handleCancelEditDisplayName}
@@ -570,12 +578,13 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         ) : (
           <View style={styles.displayNameRow}>
             <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
-            <TextLink label="Edit" onPress={handleStartEditDisplayName} />
+            <TextLink label={t('mob.common.edit')} onPress={handleStartEditDisplayName} />
           </View>
         )}
 
         <Text style={styles.nicknameLine}>
-          Nickname: {profile.nickname} <Text style={styles.nicknameHint}>(can't be changed)</Text>
+          {t('mob.profile.nickname_line', { nickname: profile.nickname })}{' '}
+          <Text style={styles.nicknameHint}>{t('mob.profile.nickname_hint')}</Text>
         </Text>
 
         <Text style={styles.email}>{profile.email}</Text>
@@ -588,7 +597,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         </View>
 
         {skillLevels.length === 0 ? (
-          <Text style={styles.emptyText}>No skill levels declared yet.</Text>
+          <Text style={styles.emptyText}>{t('mob.profile.no_skills')}</Text>
         ) : (
           skillLevels.map(item => (
             <MySportRow
@@ -608,9 +617,9 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           saving={isSavingSkillLevel}
           deleting={isDeletingSkillLevel}
           error={skillLevelError}
-          saveLabel="Save"
-          deleteLabel="Remove"
-          closeLabel="Cancel"
+          saveLabel={t('mob.common.save')}
+          deleteLabel={t('mob.common.remove')}
+          closeLabel={t('mob.common.cancel')}
           onSave={level => handleSaveSkillLevels({ [editingSkill.sport]: level })}
           onDelete={sportLabel => handleDeleteSkillLevelPress(editingSkill.sport, sportLabel)}
           onClose={handleCloseSkillLevelSheet}
@@ -618,17 +627,17 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       ) : null}
 
       {isAddingSport ? (
-        <BottomSheet onClose={handleCloseSkillLevelSheet} closeLabel="Cancel">
+        <BottomSheet onClose={handleCloseSkillLevelSheet} closeLabel={t('mob.common.cancel')}>
           {addableSports.length === 0 ? (
-            <Text style={styles.hint}>No sports are available right now.</Text>
+            <Text style={styles.hint}>{t('mob.common.no_sports')}</Text>
           ) : (
             <SkillLevelFlow
               sports={addableSports}
               saving={isSavingSkillLevel}
               error={skillLevelError}
-              nextLabel="Next"
-              backLabel="Back"
-              saveLabel="Save"
+              nextLabel={t('mob.common.next')}
+              backLabel={t('mob.common.back')}
+              saveLabel={t('mob.common.save')}
               onSave={handleSaveSkillLevels}
             />
           )}
@@ -643,7 +652,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       />
 
       <Button
-        label="Notification Preferences"
+        label={t('mob.profile.notification_prefs')}
         variant="secondary"
         onPress={() => navigation.navigate('NotificationPreferences')}
         style={styles.stackedButton}
@@ -652,7 +661,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       {signOutError ? <Text style={styles.errorText}>{signOutError}</Text> : null}
 
       <Button
-        label="Sign Out"
+        label={t('mob.profile.sign_out')}
         variant="secondary"
         onPress={handleSignOut}
         loading={isSigningOut}
@@ -661,36 +670,36 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
       {privacyPolicyUrl ? (
         <Button
-          label="Privacy Policy"
+          label={t('mob.register.privacy_link')}
           variant="secondary"
-          onPress={() => openLink(privacyPolicyUrl, 'Could not open the page')}
+          onPress={() => openLink(privacyPolicyUrl, t('mob.errors.open_page_failed'))}
           style={styles.stackedButton}
         />
       ) : null}
 
       {termsOfUseUrl ? (
         <Button
-          label="Terms of Use"
+          label={t('mob.register.terms_link')}
           variant="secondary"
-          onPress={() => openLink(termsOfUseUrl, 'Could not open the page')}
+          onPress={() => openLink(termsOfUseUrl, t('mob.errors.open_page_failed'))}
           style={styles.stackedButton}
         />
       ) : null}
 
       {supportLink ? (
         <Button
-          label="Contact support"
+          label={t('mob.profile.contact_support')}
           variant="secondary"
-          onPress={() => openLink(supportLink, 'Could not open the link')}
+          onPress={() => openLink(supportLink, t('mob.errors.open_link_failed'))}
           style={styles.stackedButton}
         />
       ) : null}
 
       {reportFormUrl ? (
         <Button
-          label="Report a problem or content"
+          label={t('mob.profile.report')}
           variant="secondary"
-          onPress={() => openLink(reportFormUrl, 'Could not open the form')}
+          onPress={() => openLink(reportFormUrl, t('mob.errors.open_form_failed'))}
           style={styles.stackedButton}
         />
       ) : null}
@@ -701,11 +710,11 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         {isAwaitingConfirmationCode ? (
           <View style={styles.editRow}>
             <Text style={styles.dangerZoneText}>
-              Enter the confirmation code sent to your email to proceed.
+              {t('mob.profile.code_prompt')}
             </Text>
             <TextField
               style={styles.input}
-              placeholder="Confirmation code"
+              placeholder={t('mob.profile.code_placeholder')}
               {...deletionChain.props('confirmationCode')}
               value={confirmationCodeDraft}
               onChangeText={setConfirmationCodeDraft}
@@ -714,7 +723,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
             />
             <View style={styles.editActionsRow}>
               <Button
-                label="Confirm Deletion"
+                label={t('mob.profile.confirm_delete')}
                 size="sm"
                 variant="destructive"
                 onPress={handleConfirmDeletion}
@@ -722,7 +731,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
                 style={styles.actionSpacing}
               />
               <Button
-                label="Cancel"
+                label={t('mob.common.cancel')}
                 size="sm"
                 variant="secondary"
                 onPress={handleCancelDeletionCode}
@@ -732,7 +741,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           </View>
         ) : (
           <Button
-            label="Delete Account"
+            label={t('mob.profile.delete_account')}
             variant="destructive"
             onPress={handleDeleteAccountPress}
             loading={isRequestingDeletion}

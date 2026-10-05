@@ -16,6 +16,7 @@ import Button from './Button';
 import Card from './Card';
 import MobileNumberInput from './MobileNumberInput';
 import type { MobileNumberChange } from './MobileNumberInput';
+import { useT } from '../labels/LabelsContext';
 
 interface MobileNumberCardProps {
   /** Stored E.164 number, or `null`/absent when none. */
@@ -46,6 +47,7 @@ function ReadyCard({
   const [change, setChange] = useState<MobileNumberChange>({ e164: null, isEmpty: true });
   const [localError, setLocalError] = useState<string | null>(null);
   const saver = useMobileNumberSave(config);
+  const t = useT();
 
   const startEditing = (): void => {
     setChange({ e164: null, isEmpty: true });
@@ -56,7 +58,7 @@ function ReadyCard({
 
   const handleSave = async (): Promise<void> => {
     if (change.e164 === null) {
-      setLocalError('Enter a valid mobile number.');
+      setLocalError(t('mob.mobile_number.invalid'));
       return;
     }
     setLocalError(null);
@@ -76,7 +78,7 @@ function ReadyCard({
   return (
     <Card style={styles.card}>
       <Text style={styles.title} accessibilityRole="header">
-        Mobile number
+        {t('mob.mobile_number.title')}
       </Text>
       {isEditing ? (
         <View>
@@ -93,13 +95,13 @@ function ReadyCard({
           />
           <View style={styles.actions}>
             <Button
-              label={saver.needsReconfirm ? 'Confirm and save' : 'Save'}
+              label={saver.needsReconfirm ? t('mob.mobile_number.confirm_save') : t('mob.common.save')}
               onPress={handleSave}
               loading={saver.isSaving}
               size="sm"
             />
             <Button
-              label="Cancel"
+              label={t('mob.common.cancel')}
               variant="secondary"
               size="sm"
               disabled={saver.isSaving}
@@ -112,7 +114,7 @@ function ReadyCard({
         </View>
       ) : (
         <View>
-          <Text style={styles.value}>{storedNumber ? storedNumber : 'No mobile number added'}</Text>
+          <Text style={styles.value}>{storedNumber ? storedNumber : t('mob.mobile_number.none')}</Text>
           {saver.error ? (
             <Text style={styles.error} accessibilityRole="alert">
               {saver.error}
@@ -120,14 +122,14 @@ function ReadyCard({
           ) : null}
           <View style={styles.actions}>
             <Button
-              label={storedNumber ? 'Change' : 'Add number'}
+              label={storedNumber ? t('mob.common.change') : t('mob.mobile_number.add')}
               variant="secondary"
               size="sm"
               onPress={startEditing}
             />
             {storedNumber ? (
               <Button
-                label="Remove"
+                label={t('mob.common.remove')}
                 variant="destructive"
                 size="sm"
                 loading={saver.isSaving}

@@ -7,6 +7,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, spacing, typography } from '../theme/tokens';
 import Button from './Button';
+import { useT } from '../labels/LabelsContext';
 
 interface ErrorViewProps {
   message: string;
@@ -17,14 +18,15 @@ interface ErrorViewProps {
 export default function ErrorView({
   message,
   onRetry,
-  retryLabel = 'Retry',
+  retryLabel,
 }: ErrorViewProps): React.JSX.Element {
+  const t = useT();
   return (
     <View style={styles.container}>
       <Text style={styles.message} accessibilityRole="alert">
         {message}
       </Text>
-      {onRetry ? <Button label={retryLabel} onPress={onRetry} /> : null}
+      {onRetry ? <Button label={retryLabel ?? t('mob.common.retry')} onPress={onRetry} /> : null}
     </View>
   );
 }
