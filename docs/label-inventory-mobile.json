@@ -3753,6 +3753,69 @@
       "screen": "Notifications (Android channel)",
       "placeholders": [],
       "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.user_search.no_matches",
+      "defaultText": "No matches",
+      "screen": "User search (all invite screens)",
+      "placeholders": [],
+      "status": "new-label"
+    },
+    {
+      "key": "mob.user_search.heading_players",
+      "defaultText": "Suggested players",
+      "screen": "User search (all invite screens)",
+      "placeholders": [],
+      "status": "new-label"
+    },
+    {
+      "key": "mob.user_search.heading_group_members",
+      "defaultText": "Suggested group members",
+      "screen": "User search (all invite screens)",
+      "placeholders": [],
+      "status": "new-label"
+    },
+    {
+      "key": "mob.user_search.heading_team_players",
+      "defaultText": "Suggested team players",
+      "screen": "User search (all invite screens)",
+      "placeholders": [],
+      "status": "new-label"
+    },
+    {
+      "key": "mob.user_search.heading_other",
+      "defaultText": "Other players",
+      "screen": "User search (all invite screens)",
+      "placeholders": [],
+      "status": "new-label"
+    },
+    {
+      "key": "mob.user_search.invite_button",
+      "defaultText": "Invite",
+      "screen": "User search (all invite screens)",
+      "placeholders": [],
+      "status": "new-label"
+    },
+    {
+      "key": "mob.user_search.chip_more",
+      "defaultText": "{group} +{count}",
+      "screen": "User search (all invite screens)",
+      "placeholders": [
+        "group",
+        "count"
+      ],
+      "status": "new-label"
+    },
+    {
+      "key": "mob.user_search.result_group_a11y",
+      "defaultText": "{nickname}, {name}, in your group {group}",
+      "screen": "User search (all invite screens)",
+      "placeholders": [
+        "nickname",
+        "name",
+        "group"
+      ],
+      "status": "new-label"
     }
   ]
 }
