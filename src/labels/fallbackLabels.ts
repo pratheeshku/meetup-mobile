@@ -46,8 +46,8 @@ const BASE_LABELS = {
   'event_visibility.group': 'Group',
 
   'tournament_visibility.public': 'Public',
-  'tournament_visibility.invite': 'Private',
-  'tournament_visibility.group': 'Group Only',
+  'tournament_visibility.invite': 'Invite',
+  'tournament_visibility.group': 'Group',
 
   'team_visibility.public': 'Public',
   'team_visibility.private': 'Private',
