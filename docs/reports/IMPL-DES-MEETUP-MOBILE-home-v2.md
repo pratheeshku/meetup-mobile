@@ -84,4 +84,20 @@ $ grep -rn "getHomeMenu" src/screens/HomeScreen.tsx
 ```
 
 **Git evidence**:
-[git log and git push output inserted post-commit]
+```
+$ git log --oneline -3
+6dff78c feat(home): Home v2 round 2 live endpoints, drawer menu wiring, tab and row icons, and banner sizing
+849b9d3 docs(reports): add completion proof to IMPL-DES-MEETUP-MOBILE-home-v2.md
+d937079 feat(home): Shuttlr Home v2 with top bar, banner carousel, tab tiles, unified cards, and drawer menu
+
+$ git status
+On branch feat/home-v2
+Your branch is up to date with 'origin/feat/home-v2'.
+```
+
+**Git push evidence**:
+```
+$ git push origin feat/home-v2
+To https://github.com/pratheeshku/meetup-mobile.git
+   849b9d3..6dff78c  feat/home-v2 -> feat/home-v2
+```
