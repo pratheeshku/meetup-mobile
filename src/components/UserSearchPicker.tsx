@@ -288,7 +288,10 @@ export default function UserSearchPicker({
   const renderHeading = (text: string, inGroup: boolean): React.JSX.Element => (
     <View style={styles.headingRow}>
       <View style={[styles.dot, inGroup ? styles.dotGroup : styles.dotOther]} />
-      <Text style={styles.headingText} accessibilityRole="header">
+      <Text
+        style={[styles.headingText, inGroup ? styles.headingTextGroup : null]}
+        accessibilityRole="header"
+      >
         {text}
       </Text>
     </View>
@@ -335,10 +338,15 @@ export default function UserSearchPicker({
         </View>
       ) : null}
       {!isSearching && visibleResults.length > 0 ? (
+        <Text style={styles.listTitle} accessibilityRole="header">
+          {t(HEADING_KEYS[suggestionContext])}
+        </Text>
+      ) : null}
+      {!isSearching && visibleResults.length > 0 ? (
         <View style={styles.resultsList}>
           {groupRows.length > 0 ? (
             <>
-              {renderHeading(t(HEADING_KEYS[suggestionContext]), true)}
+              {renderHeading(t('mob.user_search.heading_in_your_groups'), true)}
               {groupRows.map(user => renderRow(user, true))}
             </>
           ) : null}
@@ -374,7 +382,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: borderWidth.thin,
     borderBottomColor: colors.border,
   },
-  headingText: { ...typography.bodyBold, color: colors.textPrimary, marginLeft: spacing.sm },
+  listTitle: { ...typography.bodyBold, color: colors.textPrimary, marginTop: spacing.md, marginBottom: spacing.sm },
+  headingText: { ...typography.caption, fontWeight: '700', color: colors.textSecondary, marginLeft: spacing.sm },
+  headingTextGroup: { color: colors.primaryDark },
   dot: { width: DOT_SIZE, height: DOT_SIZE, borderRadius: DOT_SIZE / 2 },
   dotGroup: { backgroundColor: colors.primary },
   dotOther: {

@@ -264,6 +264,7 @@ export const DEFAULT_LABELS = {
   'mob.user_search.heading_group_members': 'Suggested group members',
   'mob.user_search.heading_team_players': 'Suggested team players',
   'mob.user_search.heading_other': 'Other players',
+  'mob.user_search.heading_in_your_groups': 'In your groups',
   'mob.user_search.invite_button': 'Invite',
   'mob.user_search.chip_more': '{group} +{count}',
   'mob.user_search.result_group_a11y': '{nickname}, {name}, in your group {group}',

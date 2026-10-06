@@ -3816,6 +3816,13 @@
         "group"
       ],
       "status": "new-label"
+    },
+    {
+      "key": "mob.user_search.heading_in_your_groups",
+      "defaultText": "In your groups",
+      "screen": "User search (all invite screens)",
+      "placeholders": [],
+      "status": "new-label"
     }
   ]
 }
