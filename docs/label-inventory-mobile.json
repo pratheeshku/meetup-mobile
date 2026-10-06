@@ -150,14 +150,14 @@
     },
     {
       "key": "tournament_visibility.invite",
-      "defaultText": "Private",
+      "defaultText": "Invite",
       "screen": "Create Game / Tournament",
       "placeholders": [],
       "status": "existing-label"
     },
     {
       "key": "tournament_visibility.group",
-      "defaultText": "Group Only",
+      "defaultText": "Group",
       "screen": "Create Game / Tournament",
       "placeholders": [],
       "status": "existing-label"
