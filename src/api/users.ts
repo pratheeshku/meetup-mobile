@@ -16,9 +16,12 @@
  *   like `GET /admin/sports/public`.
  * - Response: `list[UserSearchResult]`, capped at 10 server-side
  *   (`stmt.limit(10)`), matched on `nickname`/`display_name` via `ILIKE`.
- * - Server treats an empty/whitespace `q` as `len(q.strip()) < 1` -> `[]`
- *   (no 1-char floor); the 2-character client-side floor (`UserSearchPicker`)
- *   is a UX choice, not a contract requirement.
+ * - Empty `q` is valid: the server returns the default list (up to 10 people
+ *   who share a group with the caller). Typed text is filtered server-side
+ *   (people sharing a group first, then everyone else), max 10 in total.
+ * - Additive result fields `in_my_groups` (boolean), `shared_group`
+ *   (string | null), `shared_group_count` (integer). An older backend omits
+ *   them: they map to `in_my_groups = false` (plain list, no sections).
  */
 import { apiClient } from './client';
 import type { UserSearchResult } from '../types/user';
@@ -43,6 +46,9 @@ interface UserSearchResultApiItem {
   created_at: string;
   pending: boolean;
   image_url?: string | null;
+  in_my_groups?: boolean;
+  shared_group?: string | null;
+  shared_group_count?: number;
 }
 
 export async function searchUsers(
@@ -64,5 +70,9 @@ export async function searchUsers(
     nickname: item.nickname,
     pending: item.pending,
     image_url: item.image_url ?? null,
+    in_my_groups: item.in_my_groups === true,
+    shared_group: item.shared_group ?? null,
+    shared_group_count: item.shared_group_count ?? 0,
+    has_group_info: typeof item.in_my_groups === 'boolean',
   }));
 }

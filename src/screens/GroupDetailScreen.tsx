@@ -372,6 +372,8 @@ export default function GroupDetailScreen({ route }: Props): React.JSX.Element {
                 onSelect={handleSelectUser}
                 onSelectEmail={handleSelectEmail}
                 excludeGroupId={groupId}
+                excludeUserIds={selectedInviteUsers.map(invitee => invitee.id)}
+                suggestionContext="group_members"
                 disabled={isInviting}
               />
             ) : null}
