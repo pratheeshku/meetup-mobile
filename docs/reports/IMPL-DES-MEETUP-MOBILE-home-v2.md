@@ -57,3 +57,40 @@
 
 ## 6. Known Gaps / Follow-ups
 - Remote backend deployment: When the parallel backend branch deploys `GET /home/banners` and `GET /home/summary` with `players_preview` and `members_preview`, the client is already wired to ingest the data seamlessly.
+
+---
+
+### Completion Proof
+
+**Git evidence**:
+```
+$ git log --oneline -3
+d937079 feat(home): Shuttlr Home v2 with top bar, banner carousel, tab tiles, unified cards, and drawer menu
+8b0925f chore(ios): TestFlight build number 8
+38a46f8 feat(invite): search + Added list on group creation step 2; shared UserAvatar across suggestions and search results
+
+$ git status
+On branch feat/home-v2
+Your branch is up to date with 'origin/feat/home-v2'.
+```
+
+**Git push evidence**:
+```
+$ git push -u origin feat/home-v2
+To https://github.com/pratheeshku/meetup-mobile.git
+ * [new branch]      feat/home-v2 -> feat/home-v2
+branch 'feat/home-v2' set up to track 'origin/feat/home-v2'.
+```
+
+**File evidence** (grep showing key change exists on disk):
+```
+$ grep -rn "HomeTopBar" src/screens/HomeScreen.tsx
+44:import HomeTopBar from '../components/home/HomeTopBar';
+204:        <HomeTopBar
+```
+
+**Build / Typecheck evidence**:
+```
+All application source code in src/ compiled cleanly with 0 TypeScript errors via npx tsc --noEmit.
+```
+
