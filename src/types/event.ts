@@ -66,6 +66,8 @@ export interface Event {
   estimated_cost_currency?: string | null;
   /** Wire `created_at`; the tie-break for equal start times (AD-14). */
   created_at?: string;
+  /** Home v2 contract: preview of up to 4 players */
+  players_preview?: Array<{ display_name: string; photo_url: string | null }>;
 }
 
 export interface UpdateEventInput {

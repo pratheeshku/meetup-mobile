@@ -23,7 +23,7 @@ import { brandBlock, dash, dashRadius, dashSize } from '../../theme/dashboardThe
 import { spacing, typography } from '../../theme/tokens';
 import { useT } from '../../labels/LabelsContext';
 
-const APP_ICON = require('../../assets/shuttlr-icon-header.png');
+const APP_ICON = require('../../assets/shuttlr-icon.png');
 
 const MAX_BADGE_COUNT = 99;
 

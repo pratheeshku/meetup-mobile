@@ -88,6 +88,7 @@ interface EventApiItem {
   user_rsvp_status: string | null;
   skill_level_requirement?: string | null;
   created_at?: string;
+  players_preview?: Array<{ display_name: string; photo_url: string | null }>;
 }
 
 /**
@@ -145,6 +146,7 @@ function mapEventApiItem(raw: EventApiItem): Event {
     estimated_cost_cents: raw.estimated_cost_cents ?? null,
     estimated_cost_currency: raw.estimated_cost_currency ?? null,
     created_at: raw.created_at,
+    players_preview: raw.players_preview,
   };
 }
 

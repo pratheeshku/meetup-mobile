@@ -1,0 +1,110 @@
+/**
+ * Home API (Shuttlr Home v2 backend contract).
+ *
+ * Endpoints (built in parallel):
+ * - GET /home/banners (authenticated)
+ * - GET /home/summary (authenticated, query param sports)
+ *
+ * Caching:
+ * If /home/banners fails, returns last good response from AsyncStorage cache
+ * (`@meetup/home_banners_cache`), or bundled fallback banner data if no cache exists.
+ */
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiClient } from './client';
+
+export interface BannerItem {
+  id: string;
+  image_url: string;
+  alt_text: string;
+  click_url: string | null;
+  is_sponsored: boolean;
+}
+
+export interface BannerFallback {
+  image_url: string | null;
+  alt_text: string;
+  click_url: string | null;
+  is_sponsored: boolean;
+}
+
+export interface HomeBannersResponse {
+  interval_seconds: number;
+  banners: BannerItem[];
+  fallback: BannerFallback;
+}
+
+export interface HomeSummaryResponse {
+  upcoming_games_this_week: number;
+  active_groups: number;
+}
+
+interface RequestOptions {
+  correlationId?: string;
+}
+
+export const BANNERS_CACHE_KEY = '@meetup/home_banners_cache';
+
+export const BUNDLED_FALLBACK_BANNER: HomeBannersResponse = {
+  interval_seconds: 5,
+  banners: [],
+  fallback: {
+    image_url: null,
+    alt_text: 'Welcome to Shuttlr — Play together',
+    click_url: null,
+    is_sponsored: false,
+  },
+};
+
+export async function getCachedBanners(): Promise<HomeBannersResponse | null> {
+  try {
+    const raw = await AsyncStorage.getItem(BANNERS_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    return JSON.parse(raw) as HomeBannersResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function setCachedBanners(data: HomeBannersResponse): Promise<void> {
+  try {
+    await AsyncStorage.setItem(BANNERS_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    // Non-blocking cache write failure
+  }
+}
+
+export async function getHomeBanners(options?: RequestOptions): Promise<HomeBannersResponse> {
+  try {
+    const { data } = await apiClient.get<HomeBannersResponse>('/home/banners', {
+      correlationId: options?.correlationId,
+    });
+    if (data && Array.isArray(data.banners)) {
+      await setCachedBanners(data);
+      return data;
+    }
+    throw new Error('Invalid banners response');
+  } catch {
+    const cached = await getCachedBanners();
+    if (cached) {
+      return cached;
+    }
+    return BUNDLED_FALLBACK_BANNER;
+  }
+}
+
+export async function getHomeSummary(
+  sports?: string[],
+  options?: RequestOptions,
+): Promise<HomeSummaryResponse> {
+  const params: Record<string, string> = {};
+  if (sports && sports.length > 0) {
+    params.sports = sports.join(',');
+  }
+  const { data } = await apiClient.get<HomeSummaryResponse>('/home/summary', {
+    params,
+    correlationId: options?.correlationId,
+  });
+  return data;
+}

@@ -60,6 +60,10 @@ interface GroupApiItem {
   description: string | null;
   owner_id: string;
   created_at: string;
+  logo_url?: string | null;
+  owner?: { display_name: string; nickname?: string };
+  member_count?: number;
+  members_preview?: Array<{ display_name: string; photo_url: string | null }>;
 }
 
 /**
@@ -102,6 +106,11 @@ function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
     name: raw.name,
     description: raw.description ?? '',
     owner_id: raw.owner_id,
+    owner_nickname: raw.owner?.nickname ?? raw.owner?.display_name,
+    owner: raw.owner,
+    logo_url: raw.logo_url ?? null,
+    member_count: raw.member_count,
+    members_preview: raw.members_preview,
     created_at: raw.created_at,
     current_user_role: currentUserRole,
   };

@@ -113,6 +113,7 @@ import GroupsScreen from '../screens/GroupsScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import InviteMembersScreen from '../screens/InviteMembersScreen';
+import TournamentTeamsScreen from '../screens/TournamentTeamsScreen';
 import GamesScreen from '../screens/GamesScreen';
 import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -226,6 +227,11 @@ function GroupsStack(): React.JSX.Element {
         name="CreateGroup"
         component={CreateGroupScreen}
         options={{ title: t('mob.nav.title_create_group') }}
+      />
+      <GroupsStackNav.Screen
+        name="TournamentTeams"
+        component={TournamentTeamsScreen}
+        options={{ title: t('mob.menu.tournament_teams') }}
       />
     </GroupsStackNav.Navigator>
   );

@@ -35,6 +35,9 @@ export interface Group {
    * are optional here.
    */
   owner_nickname?: string;
+  owner?: { display_name: string; nickname?: string };
+  logo_url?: string | null;
+  members_preview?: Array<{ display_name: string; photo_url: string | null }>;
   member_count?: number;
   created_at: string;
   /**
