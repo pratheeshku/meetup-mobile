@@ -61,8 +61,8 @@ interface GroupApiItem {
   owner_id: string;
   created_at: string;
   logo_url?: string | null;
-  owner?: { display_name: string; nickname?: string };
-  member_count?: number;
+  owner?: { display_name: string; nickname?: string } | null;
+  member_count?: number | null;
   members_preview?: Array<{ display_name: string; photo_url: string | null }>;
 }
 
@@ -93,7 +93,7 @@ function mapGroupMember(raw: GroupMembershipApiItem): GroupMember {
 /**
  * Proposed Assumption: `current_user_role` is set per the caller's own
  * knowledge of which source list an item came from ('owner' for
- * `/settings/groups-owned`, 'member' for `/settings/groups-member') —
+ * `/settings/groups-owned`, 'member' for `/settings/groups-member`) —
  * see `getMyGroups()`. `owner_nickname`/`member_count` are left
  * `undefined` here: deriving them accurately needs the group's member
  * list, which would mean an N+1 fan-out call per group for a list
@@ -107,12 +107,38 @@ function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
     description: raw.description ?? '',
     owner_id: raw.owner_id,
     owner_nickname: raw.owner?.nickname ?? raw.owner?.display_name,
-    owner: raw.owner,
+    owner: raw.owner ?? null,
     logo_url: raw.logo_url ?? null,
-    member_count: raw.member_count,
-    members_preview: raw.members_preview,
+    member_count: raw.member_count !== undefined ? raw.member_count : null,
+    members_preview: raw.members_preview ?? [],
     created_at: raw.created_at,
     current_user_role: currentUserRole,
+  };
+}
+
+export interface GetGroupsParams {
+  mine?: boolean;
+  limit?: number;
+}
+
+/**
+ * `GET /groups` (Home v2 contract): accepts `mine` (bool) and `limit` (1-100).
+ * Note: `sports` and `upcoming` are NOT parameters on `/groups`.
+ */
+export async function getGroups(
+  params?: GetGroupsParams,
+  options?: RequestOptions,
+): Promise<GroupsListResponse> {
+  const { data } = await apiClient.get<GroupApiItem[]>('/groups', {
+    params,
+    correlationId: options?.correlationId,
+  });
+  const items = data.map(raw => mapGroupApiItem(raw, params?.mine ? 'member' : 'none'));
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    page_size: items.length,
   };
 }
 

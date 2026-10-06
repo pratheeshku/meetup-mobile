@@ -64,7 +64,7 @@ export default function GroupCard({ group, onPress, currentUserId }: GroupCardPr
   const ownerDisplay = t('mob.group_card.owner_line', { name: ownerName });
 
   const memberText =
-    group.member_count !== undefined
+    group.member_count !== undefined && group.member_count !== null
       ? t(group.member_count === 1 ? 'mob.group_card.members_one' : 'mob.group_card.members_other', {
           count: group.member_count,
         })

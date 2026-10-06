@@ -38,11 +38,14 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
 import { getEvents } from '../api/events';
-import { getMyGroups } from '../api/groups';
+import { getGroups, getMyGroups } from '../api/groups';
 import {
   BUNDLED_FALLBACK_BANNER,
+  getCachedMenu,
   getHomeBanners,
+  getHomeMenu,
   getHomeSummary,
+  type HomeMenuResponse,
   type HomeSummaryResponse,
 } from '../api/home';
 import { getProfile } from '../api/profile';
@@ -68,6 +71,7 @@ import { useT } from '../labels/LabelsContext';
 import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
 import { colors, spacing } from '../theme/tokens';
 import type { Event } from '../types/event';
+import type { Group } from '../types/group';
 import { getDisplayName } from '../utils/displayName';
 import { filteredEmptyMessage } from '../utils/gameLists';
 
@@ -83,12 +87,24 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState<HomeTab>('upcoming');
   const [summaryData, setSummaryData] = useState<HomeSummaryResponse | null>(null);
+  const [menuData, setMenuData] = useState<HomeMenuResponse | null>(null);
+
+  // Live endpoints state with local calculation fallbacks
+  const [liveUpcoming, setLiveUpcoming] = useState<{
+    items: Event[] | null;
+    status: 'idle' | 'loading' | 'success' | 'error';
+  }>({ items: null, status: 'loading' });
+
+  const [liveGroups, setLiveGroups] = useState<{
+    items: Group[] | null;
+    status: 'idle' | 'loading' | 'success' | 'error';
+  }>({ items: null, status: 'loading' });
 
   const scrollRef = useRef<ScrollView>(null);
   useScrollToTop(scrollRef);
   const unreadCount = useUnreadBadgeCount();
 
-  // Resources
+  // Resources (fallback sources for network failures)
   const events = useResource(options => getEvents(undefined, options));
   const groups = useResource(options => getMyGroups(options));
   const sports = useResource(options => getSports(options));
@@ -103,6 +119,78 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Load cached menu on mount
+  useEffect(() => {
+    getCachedMenu().then(cached => {
+      if (cached) {
+        setMenuData(cached);
+      }
+    });
+  }, []);
+
+  // Menu loader: GET /home/menu once per Home load
+  const loadMenu = useCallback(async (correlationId?: string) => {
+    try {
+      const data = await getHomeMenu({ correlationId });
+      if (data) {
+        setMenuData(data);
+      }
+    } catch {
+      // Handled internally by getHomeMenu falling back to cache
+    }
+  }, []);
+
+  // Live upcoming games: GET /events?mine=true&upcoming=true&limit=2&sports=...
+  const loadLiveUpcoming = useCallback(
+    async (selectedSports: string[], correlationId?: string) => {
+      setLiveUpcoming(prev => ({ ...prev, status: 'loading' }));
+      try {
+        const res = await getEvents(
+          {
+            mine: true,
+            upcoming: true,
+            limit: 2,
+            sports: selectedSports.length > 0 ? selectedSports.join(',') : undefined,
+          },
+          { correlationId },
+        );
+        setLiveUpcoming({ items: res.items, status: 'success' });
+      } catch {
+        setLiveUpcoming(prev => ({ ...prev, status: 'error' }));
+      }
+    },
+    [],
+  );
+
+  // Live groups: GET /groups?mine=true&limit=3
+  const loadLiveGroups = useCallback(async (correlationId?: string) => {
+    setLiveGroups(prev => ({ ...prev, status: 'loading' }));
+    try {
+      const res = await getGroups({ mine: true, limit: 3 }, { correlationId });
+      setLiveGroups({ items: res.items, status: 'success' });
+    } catch {
+      setLiveGroups(prev => ({ ...prev, status: 'error' }));
+    }
+  }, []);
+
+  // Live summary: GET /home/summary?sports=...
+  const loadSummary = useCallback(
+    async (selectedSports: string[], correlationId?: string) => {
+      try {
+        const res = await getHomeSummary(selectedSports, { correlationId });
+        setSummaryData(res);
+      } catch {
+        setSummaryData(null);
+      }
+    },
+    [],
+  );
+
+  // Sport filter
+  const filter = useSportFilter(sports, profile.data?.skill_levels, profile.status !== 'loading');
+  const isFiltered = filter.selected.length > 0;
+  const filteredEmpty = isFiltered ? filteredEmptyMessage(filter.selected, filter.options, t) : null;
+
   const loadAll = useCallback(
     () =>
       withCorrelationId(correlationId =>
@@ -112,14 +200,39 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
           loadSports(correlationId),
           loadProfile(correlationId),
           loadBanners(correlationId),
+          loadMenu(correlationId),
+          loadLiveUpcoming(filter.selected, correlationId),
+          loadLiveGroups(correlationId),
+          loadSummary(filter.selected, correlationId),
         ]).then(() => undefined),
       ),
-    [loadEvents, loadGroups, loadSports, loadProfile, loadBanners],
+    [
+      loadEvents,
+      loadGroups,
+      loadSports,
+      loadProfile,
+      loadBanners,
+      loadMenu,
+      loadLiveUpcoming,
+      loadLiveGroups,
+      loadSummary,
+      filter.selected,
+    ],
   );
 
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  // Re-fetch live upcoming and summary when sport filter changes
+  useEffect(() => {
+    withCorrelationId(correlationId =>
+      Promise.all([
+        loadLiveUpcoming(filter.selected, correlationId),
+        loadSummary(filter.selected, correlationId),
+      ]),
+    );
+  }, [filter.selected, loadLiveUpcoming, loadSummary]);
 
   // Handle route params refreshKey & toast
   const refreshKey = route.params?.refreshKey;
@@ -157,29 +270,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     }
   }, [loadAll]);
 
-  // Sport filter
-  const filter = useSportFilter(sports, profile.data?.skill_levels, profile.status !== 'loading');
-  const isFiltered = filter.selected.length > 0;
-  const filteredEmpty = isFiltered ? filteredEmptyMessage(filter.selected, filter.options, t) : null;
-
-  // Attempt to fetch /home/summary in parallel; fallback to client calculations
-  useEffect(() => {
-    let isCurrent = true;
-    getHomeSummary(filter.selected)
-      .then(res => {
-        if (isCurrent && res) {
-          setSummaryData(res);
-        }
-      })
-      .catch(() => {
-        // Backend built in parallel - silently fallback to client calculation
-      });
-    return () => {
-      isCurrent = false;
-    };
-  }, [filter.selected]);
-
-  // Upcoming games calculation: games in next 7 days, sport filter applies
+  // Local calculation fallback for upcoming games
   const upcomingGamesThisWeek = useMemo(() => {
     const feed = events.data?.items;
     if (!feed) {
@@ -195,11 +286,9 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
           return false;
         }
         const time = new Date(e.starts_at).getTime();
-        // Within next 7 days
         if (time < now || time > sevenDaysLater) {
           return false;
         }
-        // Sport filter
         if (filter.selected.length > 0 && !filter.selected.includes(e.sport)) {
           return false;
         }
@@ -208,25 +297,63 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
   }, [events.data, filter.selected]);
 
-  // Upcoming tile count
-  const upcomingCount =
-    summaryData?.upcoming_games_this_week ?? (upcomingGamesThisWeek ? upcomingGamesThisWeek.length : null);
-  // Next 2 upcoming games, earliest first
+  // Next 2 upcoming games fallback
   const nextTwoUpcoming = upcomingGamesThisWeek ? upcomingGamesThisWeek.slice(0, 2) : null;
 
-  // Groups calculation: active groups, sport filter does NOT apply
+  // Local calculation fallback for groups
   const activeGroups = groups.data?.items ?? null;
-  const groupsCount = summaryData?.active_groups ?? (activeGroups ? activeGroups.length : null);
-  // Up to 3 groups
+  // Up to 3 groups fallback
   const nextThreeGroups = activeGroups ? activeGroups.slice(0, 3) : null;
 
-  const retryEvents = useCallback(() => {
-    withCorrelationId(correlationId => loadEvents(correlationId));
-  }, [loadEvents]);
+  // Resolved counts: live summary data preferred, local calculation fallback on failure
+  const upcomingCount =
+    summaryData?.upcoming_games_this_week ??
+    (upcomingGamesThisWeek ? upcomingGamesThisWeek.length : null);
+  const groupsCount =
+    summaryData?.active_groups ?? (activeGroups ? activeGroups.length : null);
 
-  const retryGroups = useCallback(() => {
-    withCorrelationId(correlationId => loadGroups(correlationId));
-  }, [loadGroups]);
+  // Resolved list items: live endpoints preferred, local calculation fallback on failure
+  const displayedUpcoming =
+    liveUpcoming.status === 'success' && liveUpcoming.items !== null
+      ? liveUpcoming.items
+      : nextTwoUpcoming;
+
+  const isUpcomingLoading =
+    liveUpcoming.status === 'loading' &&
+    (!nextTwoUpcoming && events.status === 'loading');
+
+  const upcomingError =
+    liveUpcoming.status === 'error' && events.status === 'error';
+
+  const displayedGroups =
+    liveGroups.status === 'success' && liveGroups.items !== null
+      ? liveGroups.items
+      : nextThreeGroups;
+
+  const isGroupsLoading =
+    liveGroups.status === 'loading' &&
+    (!nextThreeGroups && groups.status === 'loading');
+
+  const groupsError =
+    liveGroups.status === 'error' && groups.status === 'error';
+
+  const retryUpcoming = useCallback(() => {
+    withCorrelationId(correlationId =>
+      Promise.all([
+        loadLiveUpcoming(filter.selected, correlationId),
+        loadEvents(correlationId),
+      ]),
+    );
+  }, [loadLiveUpcoming, loadEvents, filter.selected]);
+
+  const retryGroupsAction = useCallback(() => {
+    withCorrelationId(correlationId =>
+      Promise.all([
+        loadLiveGroups(correlationId),
+        loadGroups(correlationId),
+      ]),
+    );
+  }, [loadLiveGroups, loadGroups]);
 
   const openEvent = useCallback(
     (event: Event) => navigation.navigate('EventDetail', { eventId: event.id }),
@@ -301,14 +428,14 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
               onViewAll={openAllGames}
             />
 
-            {events.status === 'error' ? (
-              <InlineError message={t('mob.dashboard.games_error')} onRetry={retryEvents} />
-            ) : !nextTwoUpcoming ? (
+            {upcomingError ? (
+              <InlineError message={t('mob.dashboard.games_error')} onRetry={retryUpcoming} />
+            ) : isUpcomingLoading || !displayedUpcoming ? (
               <SkeletonRows count={2} />
-            ) : nextTwoUpcoming.length === 0 ? (
+            ) : displayedUpcoming.length === 0 ? (
               <EmptyText>{filteredEmpty ?? t('mob.home.upcoming_empty')}</EmptyText>
             ) : (
-              nextTwoUpcoming.map(event => (
+              displayedUpcoming.map(event => (
                 <UnifiedGameCard
                   key={event.id}
                   event={event}
@@ -324,14 +451,14 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
               onViewAll={openAllGroups}
             />
 
-            {groups.status === 'error' ? (
-              <InlineError message={t('mob.dashboard.groups_error')} onRetry={retryGroups} />
-            ) : !nextThreeGroups ? (
+            {groupsError ? (
+              <InlineError message={t('mob.dashboard.groups_error')} onRetry={retryGroupsAction} />
+            ) : isGroupsLoading || !displayedGroups ? (
               <SkeletonRows count={3} />
-            ) : nextThreeGroups.length === 0 ? (
+            ) : displayedGroups.length === 0 ? (
               <EmptyText>{t('mob.home.groups_empty')}</EmptyText>
             ) : (
-              nextThreeGroups.map(group => (
+              displayedGroups.map(group => (
                 <UnifiedGroupCard
                   key={group.id}
                   group={group}
@@ -358,8 +485,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
         onClose={() => setIsDrawerOpen(false)}
         user={user}
         avatarUrl={profile.data?.avatar_url}
-        groupsCount={groupsCount}
-        gamesCount={events.data?.items?.length ?? null}
+        menuData={menuData}
         onNavigateHome={() => {
           scrollRef.current?.scrollTo({ y: 0, animated: true });
         }}

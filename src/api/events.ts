@@ -30,6 +30,10 @@ import type {
 
 export interface GetEventsParams {
   sport?: string;
+  sports?: string;
+  mine?: boolean;
+  upcoming?: boolean;
+  limit?: number;
   page?: number;
   page_size?: number;
 }

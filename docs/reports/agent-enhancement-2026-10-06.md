@@ -25,3 +25,18 @@ Strict TypeScript compilation checks catch discrepancies between expected stylin
 ### Suggested Addition
 Under **Pre-code gates (Gate 2)**:
 > When styling components using local design tokens (`typography`, `dashRadius`, `colors`), inspect the exported interface directly rather than inferring standard suffixes (`*Bold`, `*Large`).
+
+---
+
+## 3. Responsive Banner Aspect Ratio Calculations on Heterogeneous Viewports
+
+### What Happened
+In mobile carousels receiving promotional assets with specified aspect ratios (e.g. 3:1), hardcoding a fixed height (e.g. `height: 140`) results in vertical cropping or letterboxing across varying phone and tablet display widths. Calculating `bannerHeight = Math.round(containerWidth / 3)` and pairing with `aspectRatio: 3` guarantees the asset fills the content width completely without distortion or cutoffs.
+
+### Why It Matters Generally
+Banner images designed with a fixed aspect ratio across screen widths should never use static pixel heights when the container width varies with the device screen. Deriving container height dynamically from container width preserves image fidelity across all devices.
+
+### Suggested Addition
+Under **Fidelity rules**:
+> When a design specifies an exact aspect ratio for an asset across all viewports without a width cap, derive height dynamically from the measured container width (`width / aspect_ratio`) rather than fixing a pixel height.
+

@@ -527,6 +527,12 @@ export const DEFAULT_LABELS = {
   'mob.home.members_one': '{count} member',
   'mob.home.members_other': '{count} members',
   'mob.home.players_more': '+{count}',
+  'mob.home.more_avatars': '{count} more',
+  'mob.home.card.location_tbc': 'Location TBC',
+  'mob.home.card.owner': 'Owner',
+  'mob.home.card.you': 'you',
+  'mob.home.card.players': 'players',
+  'mob.home.card.members': 'group members',
 
   // WIP banners (admin labels)
   'admin.tournaments.wip_banner': 'Tournaments are currently in development. Full scheduling and brackets are coming soon!',

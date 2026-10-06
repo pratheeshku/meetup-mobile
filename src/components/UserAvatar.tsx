@@ -15,9 +15,15 @@ interface UserAvatarProps {
   imageUrl?: string | null;
   name?: string | null;
   size?: number;
+  accessibilityLabel?: string;
 }
 
-export default function UserAvatar({ imageUrl, name, size = 48 }: UserAvatarProps): React.JSX.Element {
+export default function UserAvatar({
+  imageUrl,
+  name,
+  size = 48,
+  accessibilityLabel,
+}: UserAvatarProps): React.JSX.Element {
   const [failed, setFailed] = useState(false);
   const url = toHttpsUrl(imageUrl);
 
@@ -26,20 +32,30 @@ export default function UserAvatar({ imageUrl, name, size = 48 }: UserAvatarProp
   }, [url]);
 
   const dimension = { width: size, height: size, borderRadius: size / 2 };
+  const hasA11y = Boolean(accessibilityLabel);
+
   if (url !== null && !failed) {
     return (
       <Image
         source={{ uri: url }}
         style={dimension}
         onError={() => setFailed(true)}
-        accessible={false}
+        accessible={hasA11y}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole={hasA11y ? 'image' : undefined}
         testID="user-avatar-image"
       />
     );
   }
   const initial = ((name ?? '').trim().charAt(0) || '?').toUpperCase();
   return (
-    <View style={[styles.placeholder, dimension]} accessible={false} testID="user-avatar-placeholder">
+    <View
+      style={[styles.placeholder, dimension]}
+      accessible={hasA11y}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={hasA11y ? 'image' : undefined}
+      testID="user-avatar-placeholder"
+    >
       <Text style={styles.initial}>{initial}</Text>
     </View>
   );

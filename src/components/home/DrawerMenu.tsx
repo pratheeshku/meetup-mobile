@@ -24,11 +24,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import appConfig from '../../../config/appConfig.json';
+import type { HomeMenuResponse } from '../../api/home';
 import UserAvatar from '../UserAvatar';
 import { GamesIcon, GroupsIcon, HomeIcon } from '../icons/DashboardIcons';
-import { useLabels, useT } from '../../labels/LabelsContext';
-import { dash, dashRadius } from '../../theme/dashboardTheme';
+import { useT } from '../../labels/LabelsContext';
+import { dash } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import type { UserProfile } from '../../types/user';
 import { getDisplayName } from '../../utils/displayName';
@@ -39,8 +39,7 @@ interface DrawerMenuProps {
   onClose: () => void;
   user: UserProfile | null;
   avatarUrl?: string | null;
-  groupsCount?: number | null;
-  gamesCount?: number | null;
+  menuData?: HomeMenuResponse | null;
   onNavigateHome: () => void;
   onNavigateGroups: () => void;
   onNavigateTournamentTeams: () => void;
@@ -54,8 +53,7 @@ export default function DrawerMenu({
   onClose,
   user,
   avatarUrl,
-  groupsCount,
-  gamesCount,
+  menuData,
   onNavigateHome,
   onNavigateGroups,
   onNavigateTournamentTeams,
@@ -65,25 +63,25 @@ export default function DrawerMenu({
 }: DrawerMenuProps): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const t = useT();
-  const labels = useLabels();
 
   const displayName = getDisplayName(user);
 
-  // URLs for About section: check both labels and appConfig
-  const aboutUrl = toHttpsUrl(labels['mob.menu.about_url'] || (appConfig as Record<string, unknown>).aboutUrl as string || '');
-  const privacyUrl = toHttpsUrl(labels['mob.menu.privacy_url'] || appConfig.privacyPolicyUrl || '');
-  const termsUrl = toHttpsUrl(labels['mob.menu.terms_url'] || appConfig.termsOfUseUrl || '');
-  const helpUrl = toHttpsUrl(
-    labels['mob.menu.help_url'] ||
-      ((appConfig as Record<string, unknown>).helpUrl as string) ||
-      (appConfig.supportContact?.startsWith('https://') ? appConfig.supportContact : '') ||
-      '',
-  );
+  // Groups and Games badges from GET /home/menu; hide at 0
+  const groupsBadgeCount = menuData?.active_groups ?? 0;
+  const gamesBadgeCount = menuData?.upcoming_games ?? 0;
+
+  // URLs for About section: re-check https scheme; empty/null hides item
+  const aboutUrl = toHttpsUrl(menuData?.links?.about_url);
+  const privacyUrl = toHttpsUrl(menuData?.links?.privacy_url);
+  const termsUrl = toHttpsUrl(menuData?.links?.terms_url);
+  const helpUrl = toHttpsUrl(menuData?.links?.help_url);
+  const showAboutSection = Boolean(aboutUrl || privacyUrl || termsUrl || helpUrl);
 
   const openUrl = async (url: string | null) => {
-    if (!url) return;
+    const safeUrl = toHttpsUrl(url);
+    if (!safeUrl) return;
     try {
-      await Linking.openURL(url);
+      await Linking.openURL(safeUrl);
     } catch {
       // Ignored
     }
@@ -178,9 +176,9 @@ export default function DrawerMenu({
               style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
             >
               <Text style={styles.subItemText}>{t('mob.menu.groups')}</Text>
-              {groupsCount !== undefined && groupsCount !== null ? (
+              {groupsBadgeCount > 0 ? (
                 <View style={styles.countBadge}>
-                  <Text style={styles.countText}>{groupsCount}</Text>
+                  <Text style={styles.countText}>{groupsBadgeCount}</Text>
                 </View>
               ) : null}
             </Pressable>
@@ -218,9 +216,9 @@ export default function DrawerMenu({
               style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
             >
               <Text style={styles.subItemText}>{t('mob.menu.games')}</Text>
-              {gamesCount !== undefined && gamesCount !== null ? (
+              {gamesBadgeCount > 0 ? (
                 <View style={styles.countBadge}>
-                  <Text style={styles.countText}>{gamesCount}</Text>
+                  <Text style={styles.countText}>{gamesBadgeCount}</Text>
                 </View>
               ) : null}
             </Pressable>
@@ -240,72 +238,76 @@ export default function DrawerMenu({
               </View>
             </Pressable>
 
-            {/* About Section */}
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIconWrap, { backgroundColor: '#f3f4f6' }]}>
-                <Text style={styles.infoIcon}>ℹ️</Text>
-              </View>
-              <Text style={styles.sectionTitle}>{t('mob.menu.about_heading')}</Text>
-            </View>
+            {/* About Section: hidden when all four URLs are empty */}
+            {showAboutSection ? (
+              <>
+                <View style={styles.sectionHeader}>
+                  <View style={[styles.sectionIconWrap, { backgroundColor: '#f3f4f6' }]}>
+                    <Text style={styles.infoIcon}>ℹ️</Text>
+                  </View>
+                  <Text style={styles.sectionTitle}>{t('mob.menu.about_heading')}</Text>
+                </View>
 
-            {aboutUrl ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('mob.menu.about')}
-                onPress={() => {
-                  onClose();
-                  openUrl(aboutUrl);
-                }}
-                style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
-              >
-                <Text style={styles.subItemText}>{t('mob.menu.about')}</Text>
-                <Text style={styles.externalArrow}>↗</Text>
-              </Pressable>
-            ) : null}
+                {aboutUrl ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.menu.about')}
+                    onPress={() => {
+                      onClose();
+                      openUrl(aboutUrl);
+                    }}
+                    style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
+                  >
+                    <Text style={styles.subItemText}>{t('mob.menu.about')}</Text>
+                    <Text style={styles.externalArrow}>↗</Text>
+                  </Pressable>
+                ) : null}
 
-            {privacyUrl ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('mob.menu.privacy')}
-                onPress={() => {
-                  onClose();
-                  openUrl(privacyUrl);
-                }}
-                style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
-              >
-                <Text style={styles.subItemText}>{t('mob.menu.privacy')}</Text>
-                <Text style={styles.externalArrow}>↗</Text>
-              </Pressable>
-            ) : null}
+                {privacyUrl ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.menu.privacy')}
+                    onPress={() => {
+                      onClose();
+                      openUrl(privacyUrl);
+                    }}
+                    style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
+                  >
+                    <Text style={styles.subItemText}>{t('mob.menu.privacy')}</Text>
+                    <Text style={styles.externalArrow}>↗</Text>
+                  </Pressable>
+                ) : null}
 
-            {termsUrl ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('mob.menu.terms')}
-                onPress={() => {
-                  onClose();
-                  openUrl(termsUrl);
-                }}
-                style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
-              >
-                <Text style={styles.subItemText}>{t('mob.menu.terms')}</Text>
-                <Text style={styles.externalArrow}>↗</Text>
-              </Pressable>
-            ) : null}
+                {termsUrl ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.menu.terms')}
+                    onPress={() => {
+                      onClose();
+                      openUrl(termsUrl);
+                    }}
+                    style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
+                  >
+                    <Text style={styles.subItemText}>{t('mob.menu.terms')}</Text>
+                    <Text style={styles.externalArrow}>↗</Text>
+                  </Pressable>
+                ) : null}
 
-            {helpUrl ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('mob.menu.help')}
-                onPress={() => {
-                  onClose();
-                  openUrl(helpUrl);
-                }}
-                style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
-              >
-                <Text style={styles.subItemText}>{t('mob.menu.help')}</Text>
-                <Text style={styles.externalArrow}>↗</Text>
-              </Pressable>
+                {helpUrl ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.menu.help')}
+                    onPress={() => {
+                      onClose();
+                      openUrl(helpUrl);
+                    }}
+                    style={({ pressed }) => [styles.subItemRow, pressed ? styles.pressed : null]}
+                  >
+                    <Text style={styles.subItemText}>{t('mob.menu.help')}</Text>
+                    <Text style={styles.externalArrow}>↗</Text>
+                  </Pressable>
+                ) : null}
+              </>
             ) : null}
           </ScrollView>
 

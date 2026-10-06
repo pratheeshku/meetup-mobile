@@ -21,6 +21,12 @@ import {
 } from 'react-native';
 
 import { GroupsIcon } from '../icons/DashboardIcons';
+import {
+  ClockIcon,
+  MapPinIcon,
+  OwnerCrownIcon,
+  PeopleGreenIcon,
+} from '../icons/HomeV2Icons';
 import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius } from '../../theme/dashboardTheme';
@@ -40,7 +46,7 @@ interface UnifiedCardProps {
   details: React.ReactNode;
   avatars: AvatarItem[];
   moreCount: number;
-  countLabel: string;
+  countLabel: string | null;
   actionButtonLabel: string;
   onPress: () => void;
   accessibilityLabel: string;
@@ -57,6 +63,8 @@ export function UnifiedCard({
   onPress,
   accessibilityLabel,
 }: UnifiedCardProps): React.JSX.Element {
+  const t = useT();
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -73,7 +81,12 @@ export function UnifiedCard({
             <Text style={styles.title} numberOfLines={1}>
               {title}
             </Text>
-            {countLabel ? <Text style={styles.countText}>{countLabel}</Text> : null}
+            {countLabel ? (
+              <View style={styles.countContainer}>
+                <PeopleGreenIcon size={14} />
+                <Text style={styles.countText}>{countLabel}</Text>
+              </View>
+            ) : null}
           </View>
           <View style={styles.detailsContainer}>{details}</View>
         </View>
@@ -86,16 +99,24 @@ export function UnifiedCard({
             <View
               key={idx}
               style={[styles.avatarOverlap, { zIndex: 10 - idx }]}
+              accessible
+              accessibilityRole="image"
+              accessibilityLabel={person.display_name}
             >
               <UserAvatar
                 imageUrl={person.photo_url}
                 name={person.display_name}
                 size={24}
+                accessibilityLabel={person.display_name}
               />
             </View>
           ))}
           {moreCount > 0 ? (
-            <View style={[styles.moreBadge, { zIndex: 5 }]}>
+            <View
+              style={[styles.moreBadge, { zIndex: 5 }]}
+              accessible
+              accessibilityLabel={t('mob.home.more_avatars', { count: moreCount })}
+            >
               <Text style={styles.moreText}>+{moreCount}</Text>
             </View>
           ) : null}
@@ -164,10 +185,9 @@ export function UnifiedGameCard({
 }): React.JSX.Element {
   const t = useT();
 
-  const venue = event.venue_name || event.location || '';
-  const dateLine = [formatRowDate(event.starts_at), venue, event.sport]
-    .filter(Boolean)
-    .join(' · ');
+  const venue = event.venue_name || event.location || t('mob.home.card.location_tbc');
+  const dateFormatted = formatRowDate(event.starts_at);
+  const timeLine = event.sport ? `${dateFormatted} · ${event.sport}` : dateFormatted;
 
   const going = t('mob.game_row.going', {
     count: event.participant_count,
@@ -181,13 +201,28 @@ export function UnifiedGameCard({
     <UnifiedCard
       leftTile={<DateBlock dateString={event.starts_at} />}
       title={event.title}
-      details={<Text style={styles.metaText} numberOfLines={1}>{dateLine}</Text>}
+      details={
+        <View style={styles.detailsContainer}>
+          <View style={styles.detailRow}>
+            <ClockIcon size={16} />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {timeLine}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <MapPinIcon size={16} />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {venue}
+            </Text>
+          </View>
+        </View>
+      }
       avatars={preview}
       moreCount={more}
       countLabel={going}
       actionButtonLabel={t('mob.home.view_game')}
       onPress={onPress}
-      accessibilityLabel={`${event.title}, ${dateLine}, ${going}`}
+      accessibilityLabel={`${event.title}, ${timeLine}, ${venue}, ${going}`}
     />
   );
 }
@@ -207,24 +242,35 @@ export function UnifiedGroupCard({
     group.owner?.nickname ||
     group.owner_nickname ||
     (group.current_user_role === 'owner' ? t('mob.group_card.owner_self') : t('mob.group_card.owner_fallback'));
-  const ownerLine = t('mob.home.owner_label', { name: ownerName });
+  const isMine = group.current_user_role === 'owner';
+  const ownerLine = `${t('mob.home.card.owner')}: ${ownerName}${isMine ? ` (${t('mob.home.card.you')})` : ''}`;
 
-  const memberCount = group.member_count ?? 1;
-  const countLabel = t(
-    memberCount === 1 ? 'mob.home.members_one' : 'mob.home.members_other',
-    { count: memberCount },
-  );
+  const memberCount = group.member_count;
+  const countLabel =
+    memberCount !== null && memberCount !== undefined
+      ? t(memberCount === 1 ? 'mob.home.members_one' : 'mob.home.members_other', {
+          count: memberCount,
+        })
+      : null;
 
   const preview = group.members_preview ?? [];
-  const more = Math.max(0, memberCount - preview.length);
+  const more =
+    memberCount !== null && memberCount !== undefined
+      ? Math.max(0, memberCount - preview.length)
+      : 0;
 
   return (
     <UnifiedCard
       leftTile={<GroupLogoBlock logoUrl={group.logo_url} />}
       title={group.name}
       details={
-        <View>
-          <Text style={styles.ownerText} numberOfLines={1}>{ownerLine}</Text>
+        <View style={styles.detailsContainer}>
+          <View style={styles.detailRow}>
+            <OwnerCrownIcon size={16} />
+            <Text style={styles.ownerText} numberOfLines={1}>
+              {ownerLine}
+            </Text>
+          </View>
           {group.description ? (
             <Text style={styles.descriptionText} numberOfLines={2}>
               {group.description}
@@ -237,7 +283,7 @@ export function UnifiedGroupCard({
       countLabel={countLabel}
       actionButtonLabel={t('mob.home.view_group')}
       onPress={onPress}
-      accessibilityLabel={`${group.name}, ${ownerLine}, ${countLabel}`}
+      accessibilityLabel={`${group.name}, ${ownerLine}${countLabel ? `, ${countLabel}` : ''}`}
     />
   );
 }
@@ -271,7 +317,7 @@ const styles = StyleSheet.create({
   },
   titleCountRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
   },
   title: {
@@ -280,6 +326,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     flex: 1,
     paddingRight: spacing.xs,
+  },
+  countContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
   },
   countText: {
     ...typography.caption,
@@ -290,17 +342,26 @@ const styles = StyleSheet.create({
   detailsContainer: {
     marginTop: 3,
   },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 2,
+  },
   metaText: {
     ...typography.caption,
     color: colors.textSecondary,
     fontSize: 12,
+    flexShrink: 1,
   },
   ownerText: {
     ...typography.caption,
     fontWeight: '700',
     color: colors.textSecondary,
     fontSize: 11,
+    flexShrink: 1,
   },
+
   descriptionText: {
     ...typography.caption,
     color: colors.textSecondary,

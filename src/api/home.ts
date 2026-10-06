@@ -38,11 +38,25 @@ export interface HomeSummaryResponse {
   active_groups: number;
 }
 
+export interface HomeMenuLinks {
+  about_url: string | null;
+  privacy_url: string | null;
+  terms_url: string | null;
+  help_url: string | null;
+}
+
+export interface HomeMenuResponse {
+  links: HomeMenuLinks;
+  active_groups: number;
+  upcoming_games: number;
+}
+
 interface RequestOptions {
   correlationId?: string;
 }
 
 export const BANNERS_CACHE_KEY = '@meetup/home_banners_cache';
+export const MENU_CACHE_KEY = '@meetup/home_menu_cache';
 
 export const BUNDLED_FALLBACK_BANNER: HomeBannersResponse = {
   interval_seconds: 5,
@@ -107,4 +121,39 @@ export async function getHomeSummary(
     correlationId: options?.correlationId,
   });
   return data;
+}
+
+export async function getCachedMenu(): Promise<HomeMenuResponse | null> {
+  try {
+    const raw = await AsyncStorage.getItem(MENU_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    return JSON.parse(raw) as HomeMenuResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function setCachedMenu(data: HomeMenuResponse): Promise<void> {
+  try {
+    await AsyncStorage.setItem(MENU_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    // Non-blocking cache write failure
+  }
+}
+
+export async function getHomeMenu(options?: RequestOptions): Promise<HomeMenuResponse | null> {
+  try {
+    const { data } = await apiClient.get<HomeMenuResponse>('/home/menu', {
+      correlationId: options?.correlationId,
+    });
+    if (data && typeof data.active_groups === 'number') {
+      await setCachedMenu(data);
+      return data;
+    }
+    throw new Error('Invalid menu response');
+  } catch {
+    return await getCachedMenu();
+  }
 }

@@ -3,6 +3,11 @@
  *
  * Requirements:
  * - Two tab tiles: "Upcoming games" (default selected) and "Your groups".
+ * - On the two Home tab tiles show a coloured icon, 40px inside a 56px tinted rounded square
+ *   (blue tint for Upcoming games, green tint for Your groups).
+ * - Reuse the existing bottom-bar Groups icon asset for Your groups.
+ * - For Upcoming games, add a coloured calendar icon in the same flat filled style
+ *   as the bottom-bar icons (CalendarIcon).
  * - Selected has a border plus tint, accessibilityRole tab with selected state, no chevrons.
  * - Upcoming tile count = games in the next 7 days.
  * - Groups tile count = active groups.
@@ -10,6 +15,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { GroupsIcon } from '../icons/DashboardIcons';
+import { CalendarIcon } from '../icons/HomeV2Icons';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, spacing, typography } from '../../theme/tokens';
@@ -49,15 +56,20 @@ export default function HomeTabTiles({
         ]}
         testID="tab-tile-upcoming"
       >
-        <View style={styles.topRow}>
-          <Text style={[styles.title, isUpcoming ? styles.titleSelected : null]}>
-            {t('mob.home.tab_upcoming')}
-          </Text>
+        <View style={styles.tileHeader}>
+          <View style={[styles.iconBox, styles.iconBoxBlue]}>
+            <CalendarIcon size={40} />
+          </View>
           <Text style={[styles.count, isUpcoming ? styles.countSelected : null]}>
             {upcomingCount !== null ? upcomingCount : '—'}
           </Text>
         </View>
-        <Text style={styles.subtitle}>{t('mob.home.tile_upcoming_sub')}</Text>
+        <View style={styles.textContainer}>
+          <Text style={[styles.title, isUpcoming ? styles.titleSelected : null]}>
+            {t('mob.home.tab_upcoming')}
+          </Text>
+          <Text style={styles.subtitle}>{t('mob.home.tile_upcoming_sub')}</Text>
+        </View>
       </Pressable>
 
       {/* Your groups tab tile */}
@@ -73,15 +85,20 @@ export default function HomeTabTiles({
         ]}
         testID="tab-tile-groups"
       >
-        <View style={styles.topRow}>
-          <Text style={[styles.title, isGroups ? styles.titleSelected : null]}>
-            {t('mob.home.tab_groups')}
-          </Text>
+        <View style={styles.tileHeader}>
+          <View style={[styles.iconBox, styles.iconBoxGreen]}>
+            <GroupsIcon size={40} />
+          </View>
           <Text style={[styles.count, isGroups ? styles.countSelected : null]}>
             {groupsCount !== null ? groupsCount : '—'}
           </Text>
         </View>
-        <Text style={styles.subtitle}>{t('mob.home.tile_groups_sub')}</Text>
+        <View style={styles.textContainer}>
+          <Text style={[styles.title, isGroups ? styles.titleSelected : null]}>
+            {t('mob.home.tab_groups')}
+          </Text>
+          <Text style={styles.subtitle}>{t('mob.home.tile_groups_sub')}</Text>
+        </View>
       </Pressable>
     </View>
   );
@@ -96,11 +113,10 @@ const styles = StyleSheet.create({
   },
   tile: {
     flex: 1,
-    minHeight: 74,
+    minHeight: 116,
     borderRadius: dashRadius.tile,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    justifyContent: 'center',
+    padding: spacing.sm + 2,
+    justifyContent: 'space-between',
   },
   tileIdle: {
     backgroundColor: '#ffffff',
@@ -112,10 +128,38 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: dash.brand,
   },
-  topRow: {
+  tileHeader: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  iconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBoxBlue: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+  },
+  iconBoxGreen: {
+    backgroundColor: '#ecfdf5',
+    borderWidth: 1,
+    borderColor: '#d1fae5',
+  },
+  count: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  countSelected: {
+    color: dash.brand,
+  },
+  textContainer: {
+    marginTop: spacing.xs + 2,
   },
   title: {
     ...typography.bodyBold,
@@ -123,14 +167,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   titleSelected: {
-    color: dash.brand,
-  },
-  count: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  countSelected: {
     color: dash.brand,
   },
   subtitle: {

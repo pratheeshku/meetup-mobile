@@ -56,6 +56,8 @@ export default function BannerCarousel({
 
   const scrollRef = useRef<ScrollView>(null);
   const bannerCount = banners.length;
+  // 3:1 aspect ratio sizing: height is exactly containerWidth / 3
+  const bannerHeight = Math.round(containerWidth / 3);
 
   // OS Reduce-Motion check
   useEffect(() => {
@@ -129,7 +131,7 @@ export default function BannerCarousel({
 
     const content = (
       <View
-        style={[styles.bannerCard, { width: containerWidth }]}
+        style={[styles.bannerCard, { width: containerWidth, height: bannerHeight }]}
         accessible
         accessibilityRole={safeFallbackClick ? 'button' : 'image'}
         accessibilityLabel={fallbackAlt}
@@ -178,7 +180,7 @@ export default function BannerCarousel({
 
     const content = (
       <View
-        style={[styles.bannerCard, { width: containerWidth }]}
+        style={[styles.bannerCard, { width: containerWidth, height: bannerHeight }]}
         accessible
         accessibilityRole={isPressable ? 'button' : 'image'}
         accessibilityLabel={banner.alt_text}
@@ -237,7 +239,7 @@ export default function BannerCarousel({
 
           const cardContent = (
             <View
-              style={[styles.bannerCard, { width: containerWidth }]}
+              style={[styles.bannerCard, { width: containerWidth, height: bannerHeight }]}
               accessible
               accessibilityRole={isPressable ? 'button' : 'image'}
               accessibilityLabel={banner.alt_text}
@@ -297,7 +299,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   bannerCard: {
-    height: 140,
+    aspectRatio: 3,
     borderRadius: dashRadius.card,
     overflow: 'hidden',
     backgroundColor: '#1e293b',
