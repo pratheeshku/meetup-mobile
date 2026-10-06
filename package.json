@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "check:labels": "node scripts/check-labels.js",
     "build:aab": "bash scripts/build-release-aab.sh",
     "ios": "react-native run-ios",
     "lint": "eslint .",

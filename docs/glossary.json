@@ -1,0 +1,22 @@
+{
+  "doc_id": "DES-MEETUP-FEEDBACK-001",
+  "version": "1.0",
+  "version_note": "Tracks the approved design version this glossary was taken from. A glossary change is a label edit plus a bump of this value (design C1/Operability).",
+  "owner": "project owner",
+  "scope": "Customer-facing text only: app screens, errors, push, email, store listing, public pages. Internal table/column/API/code identifiers keep their names (AD-2) and user-generated content is never rewritten.",
+  "terms": [
+    {"concept": "Standalone scheduled play session", "term": "Game", "avoid": ["Event", "session"]},
+    {"concept": "Fixture inside a tournament", "term": "Match", "avoid": ["Game", "fixture"]},
+    {"concept": "Ongoing community of players", "term": "Group", "avoid": ["Club", "community"]},
+    {"concept": "Multi-match competition", "term": "Tournament", "avoid": ["Event", "league"]},
+    {"concept": "Competing unit in a tournament", "term": "Tournament team", "avoid": ["Team (bare)"]},
+    {"concept": "Person in a group", "term": "Group member", "avoid": ["Member (bare)"]},
+    {"concept": "Person joined to a standalone game", "term": "Player", "avoid": ["Participant"]},
+    {"concept": "Person on a tournament team", "term": "Team player", "avoid": ["Player (in a match context)"]}
+  ],
+  "banned": [
+    {"term": "event", "pattern": "\\bevents?\\b", "use": "game (standalone play session) or tournament"},
+    {"term": "bare team", "pattern": "(?<!tournament )\\bteams?\\b(?! player)", "use": "tournament team / team player"},
+    {"term": "bare member", "pattern": "(?<!group )\\bmembers?\\b", "use": "group member (or team player on a tournament team)"}
+  ]
+}
