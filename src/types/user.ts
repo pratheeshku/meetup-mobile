@@ -126,4 +126,11 @@ export interface UserSearchResult {
   pending: boolean;
   /** Optional: search endpoints may omit it; callers show the placeholder avatar. */
   image_url?: string | null;
+  /** Shares at least one group with the caller; `false` when the backend omits it. */
+  in_my_groups?: boolean;
+  /** Name of one shared group (user-generated content); `null` when none. */
+  shared_group?: string | null;
+  shared_group_count?: number;
+  /** The response carried `in_my_groups` (false for an older backend: plain list). */
+  has_group_info?: boolean;
 }
