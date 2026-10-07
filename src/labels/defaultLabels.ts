@@ -529,6 +529,8 @@ export const DEFAULT_LABELS = {
   'mob.home.card.owner': 'Owner',
   'mob.home.card.you': 'you',
   'mob.home.card.members': 'group members',
+  'mob.home.card.players_count': '{count} / {capacity} players',
+  'mob.home.card.players_count_open': '{count} players',
 
   // WIP banners
   'mob.wip.banner_text': 'Work in progress: this section is still being built and may change.',

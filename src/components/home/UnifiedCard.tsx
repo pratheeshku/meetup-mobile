@@ -189,10 +189,15 @@ export function UnifiedGameCard({
   const dateFormatted = formatRowDate(event.starts_at);
   const timeLine = event.sport ? `${dateFormatted} · ${event.sport}` : dateFormatted;
 
-  const going = t('mob.game_row.going', {
-    count: event.participant_count,
-    capacity: event.capacity,
-  });
+  const countLabel =
+    event.capacity != null
+      ? t('mob.home.card.players_count', {
+          count: event.participant_count,
+          capacity: event.capacity,
+        })
+      : t('mob.home.card.players_count_open', {
+          count: event.participant_count,
+        });
 
   const preview = event.players_preview ?? [];
   const more = Math.max(0, event.participant_count - preview.length);
@@ -219,10 +224,10 @@ export function UnifiedGameCard({
       }
       avatars={preview}
       moreCount={more}
-      countLabel={going}
+      countLabel={countLabel}
       actionButtonLabel={t('mob.home.view_game')}
       onPress={onPress}
-      accessibilityLabel={`${event.title}, ${timeLine}, ${venue}, ${going}`}
+      accessibilityLabel={`${event.title}, ${timeLine}, ${venue}, ${countLabel}`}
     />
   );
 }
