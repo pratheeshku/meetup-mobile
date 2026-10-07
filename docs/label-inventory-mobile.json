@@ -3823,6 +3823,13 @@
       "screen": "User search (all invite screens)",
       "placeholders": [],
       "status": "new-label"
+    },
+    {
+      "key": "mob.brand.name",
+      "defaultText": "Shuttlr",
+      "screen": "Global",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
     }
   ]
 }

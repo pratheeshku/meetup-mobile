@@ -45,6 +45,7 @@ export type GroupsStackParamList = {
   CreateGroup: undefined;
   /** Group creation step 2 (DES-MEETUP-FEEDBACK-001 C4). */
   InviteMembers: { groupId: string };
+  TournamentTeams: undefined;
 };
 
 /**
@@ -67,7 +68,7 @@ export type GroupsStackParamList = {
  * stack).
  */
 export type TournamentsStackParamList = {
-  TournamentsList: { refreshKey?: number; scope?: GamesScope; entryKey?: number } | undefined;
+  TournamentsList: { refreshKey?: number; scope?: GamesScope; entryKey?: number; segment?: 'games' | 'tournaments' } | undefined;
   TournamentDetail: { tournamentId: string };
 };
 

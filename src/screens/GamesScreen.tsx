@@ -38,6 +38,7 @@ import {
 import SportChipsRow from '../components/home/SportChipsRow';
 import SegmentedSwitch from '../components/SegmentedSwitch';
 import TournamentsListContent from '../components/TournamentsListContent';
+import WipStrip from '../components/WipStrip';
 import { useResource } from '../hooks/useResource';
 import { useSportFilter } from '../hooks/useSportFilter';
 import type { GamesScope, TournamentsStackParamList } from '../navigation/types';
@@ -237,14 +238,27 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
   // Home entry points: land on Games with the requested scope.
   const entryKey = route.params?.entryKey;
   const routeScope = route.params?.scope;
+  const routeSegment = route.params?.segment;
   const lastEntryKey = useRef(entryKey);
   useEffect(() => {
     if (entryKey !== undefined && entryKey !== lastEntryKey.current) {
       lastEntryKey.current = entryKey;
       setScope(routeScope ?? 'all');
-      setSegment('games');
+      if (routeSegment) {
+        if (routeSegment === 'tournaments') {
+          setTournamentsVisited(true);
+        }
+        setSegment(routeSegment);
+      } else {
+        setSegment('games');
+      }
+    } else if (routeSegment) {
+      if (routeSegment === 'tournaments') {
+        setTournamentsVisited(true);
+      }
+      setSegment(routeSegment);
     }
-  }, [entryKey, routeScope]);
+  }, [entryKey, routeScope, routeSegment]);
 
   // Create Tournament lands here with a fresh `refreshKey`.
   const refreshKey = route.params?.refreshKey;
@@ -286,6 +300,7 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
       </View>
       {tournamentsVisited ? (
         <View style={[styles.flex, segment === 'tournaments' ? null : styles.hidden]}>
+          <WipStrip labelKey="mob.wip.banner_text" />
           <TournamentsListContent
             refreshKey={refreshKey}
             onOpenTournament={tournamentId =>

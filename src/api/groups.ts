@@ -25,6 +25,7 @@
  * the endpoints that actually exist. See the Implementation Report for
  * the full discrepancy write-up.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from './client';
 import type {
   CreateGroupInput,
@@ -57,9 +58,35 @@ interface RequestOptions {
 interface GroupApiItem {
   id: string;
   name: string;
-  description: string | null;
-  owner_id: string;
-  created_at: string;
+  description?: string | null;
+  owner_id?: string;
+  ownerId?: string;
+  created_at?: string;
+  createdAt?: string;
+  logo_url?: string | null;
+  logoUrl?: string | null;
+  owner?: {
+    display_name?: string;
+    displayName?: string;
+    nickname?: string;
+  } | null;
+  member_count?: number | null;
+  memberCount?: number | null;
+  members_preview?: Array<{
+    display_name?: string;
+    displayName?: string;
+    photo_url?: string | null;
+    photoUrl?: string | null;
+  }>;
+  membersPreview?: Array<{
+    display_name?: string;
+    displayName?: string;
+    photo_url?: string | null;
+    photoUrl?: string | null;
+  }>;
+  current_user_role?: GroupRole;
+  currentUserRole?: GroupRole;
+  role?: GroupRole;
 }
 
 /**
@@ -89,7 +116,7 @@ function mapGroupMember(raw: GroupMembershipApiItem): GroupMember {
 /**
  * Proposed Assumption: `current_user_role` is set per the caller's own
  * knowledge of which source list an item came from ('owner' for
- * `/settings/groups-owned`, 'member' for `/settings/groups-member') —
+ * `/settings/groups-owned`, 'member' for `/settings/groups-member`) —
  * see `getMyGroups()`. `owner_nickname`/`member_count` are left
  * `undefined` here: deriving them accurately needs the group's member
  * list, which would mean an N+1 fan-out call per group for a list
@@ -97,14 +124,127 @@ function mapGroupMember(raw: GroupMembershipApiItem): GroupMember {
  * not implemented.
  */
 function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
+  const ownerObj = raw.owner
+    ? {
+        display_name: raw.owner.display_name ?? raw.owner.displayName ?? raw.owner.nickname ?? '',
+        nickname: raw.owner.nickname,
+      }
+    : null;
+  const rawPreviews = raw.members_preview ?? raw.membersPreview ?? [];
+  const membersPreview = rawPreviews.map(m => ({
+    display_name: m.display_name ?? m.displayName ?? '',
+    photo_url: m.photo_url ?? m.photoUrl ?? null,
+  }));
+  const memberCount =
+    raw.member_count !== undefined
+      ? raw.member_count
+      : raw.memberCount !== undefined
+      ? raw.memberCount
+      : null;
+
+  const role = (raw.current_user_role ?? raw.currentUserRole ?? raw.role ?? currentUserRole) as GroupRole;
+
   return {
     id: raw.id,
     name: raw.name,
     description: raw.description ?? '',
-    owner_id: raw.owner_id,
-    created_at: raw.created_at,
-    current_user_role: currentUserRole,
+    owner_id: raw.owner_id ?? raw.ownerId ?? '',
+    owner_nickname: ownerObj?.nickname ?? ownerObj?.display_name,
+    owner: ownerObj,
+    logo_url: raw.logo_url ?? raw.logoUrl ?? null,
+    member_count: memberCount,
+    members_preview: membersPreview,
+    created_at: raw.created_at ?? raw.createdAt ?? '',
+    current_user_role: role,
   };
+}
+
+export interface GetGroupsParams {
+  mine?: boolean;
+  limit?: number;
+}
+
+export const HOME_GROUPS_CACHE_KEY = '@meetup/home_groups_cache';
+export const HOME_GROUPS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+export async function getCachedHomeGroups(): Promise<Group[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(HOME_GROUPS_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.savedAt !== 'number' || !Array.isArray(parsed.data)) {
+      return null;
+    }
+    const age = Date.now() - parsed.savedAt;
+    if (age > HOME_GROUPS_CACHE_TTL_MS || age < 0) {
+      return null;
+    }
+    return parsed.data as Group[];
+  } catch {
+    return null;
+  }
+}
+
+export async function setCachedHomeGroups(data: Group[], isLimited = false): Promise<void> {
+  try {
+    if (isLimited) {
+      const existing = await getCachedHomeGroups();
+      if (existing && existing.length > data.length) {
+        return;
+      }
+    }
+    const envelope = {
+      savedAt: Date.now(),
+      data,
+    };
+    await AsyncStorage.setItem(HOME_GROUPS_CACHE_KEY, JSON.stringify(envelope));
+  } catch {
+    // Non-blocking cache write failure
+  }
+}
+
+/**
+ * `GET /groups` (Home v2 contract): accepts `mine` (bool) and `limit` (1-100).
+ * Note: `sports` and `upcoming` are NOT parameters on `/groups`.
+ */
+export async function getGroups(
+  params?: GetGroupsParams,
+  options?: RequestOptions,
+): Promise<GroupsListResponse> {
+  try {
+    const { data } = await apiClient.get<GroupApiItem[] | { items: GroupApiItem[] }>('/groups', {
+      params,
+      correlationId: options?.correlationId,
+    });
+    const rawList = Array.isArray(data)
+      ? data
+      : (data as { items?: GroupApiItem[] })?.items ?? [];
+    const items = rawList.map(raw => mapGroupApiItem(raw, params?.mine ? 'member' : 'none'));
+    if (items.length > 0 && params?.mine) {
+      await setCachedHomeGroups(items, params?.limit !== undefined);
+    }
+    return {
+      items,
+      total: items.length,
+      page: 1,
+      page_size: items.length,
+    };
+  } catch (error) {
+    if (params?.mine) {
+      const cached = await getCachedHomeGroups();
+      if (cached) {
+        return {
+          items: cached,
+          total: cached.length,
+          page: 1,
+          page_size: cached.length,
+        };
+      }
+    }
+    throw error;
+  }
 }
 
 export interface GetMyGroupsOptions extends RequestOptions {

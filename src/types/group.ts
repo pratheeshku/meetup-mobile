@@ -35,7 +35,10 @@ export interface Group {
    * are optional here.
    */
   owner_nickname?: string;
-  member_count?: number;
+  owner?: { display_name: string; nickname?: string } | null;
+  logo_url?: string | null;
+  members_preview?: Array<{ display_name: string; photo_url: string | null }>;
+  member_count?: number | null;
   created_at: string;
   /**
    * On `getMyGroups()` list items: a Proposed Assumption ('owner' for
