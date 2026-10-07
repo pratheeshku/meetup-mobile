@@ -27,12 +27,13 @@ import {
   OwnerCrownIcon,
   PeopleGreenIcon,
 } from '../icons/HomeV2Icons';
+import { getRolePillColor, ROLE_BADGE_LABEL_KEY } from '../GroupCard';
 import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import type { Event } from '../../types/event';
-import type { Group } from '../../types/group';
+import type { Group, GroupRole } from '../../types/group';
 import { formatRowDate } from '../../utils/formatGameTime';
 
 interface AvatarItem {
@@ -50,6 +51,7 @@ interface UnifiedCardProps {
   actionButtonLabel: string;
   onPress: () => void;
   accessibilityLabel: string;
+  badge?: React.ReactNode;
 }
 
 export function UnifiedCard({
@@ -62,8 +64,10 @@ export function UnifiedCard({
   actionButtonLabel,
   onPress,
   accessibilityLabel,
+  badge,
 }: UnifiedCardProps): React.JSX.Element {
   const t = useT();
+  const hasAvatars = (avatars && avatars.length > 0) || moreCount > 0;
 
   return (
     <Pressable
@@ -72,58 +76,62 @@ export function UnifiedCard({
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
     >
-      {/* Top row: Left tile, Title + Details, Count on right */}
-      <View style={styles.topRow}>
+      <View style={styles.cardContent}>
+        {/* (1) Left tile: date block or logo */}
         <View style={styles.leftTileContainer}>{leftTile}</View>
 
+        {/* (2) Details column: badge (if present), title, details, and (3) avatars */}
         <View style={styles.infoCol}>
-          <View style={styles.titleCountRow}>
-            <Text style={styles.title} numberOfLines={1}>
-              {title}
-            </Text>
-            {countLabel ? (
-              <View style={styles.countContainer}>
-                <PeopleGreenIcon size={14} />
-                <Text style={styles.countText}>{countLabel}</Text>
-              </View>
-            ) : null}
-          </View>
+          {badge ? <View style={styles.badgeRow}>{badge}</View> : null}
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
           <View style={styles.detailsContainer}>{details}</View>
-        </View>
-      </View>
-
-      {/* Bottom row: Avatars with +N on left, Action button on right */}
-      <View style={styles.bottomRow}>
-        <View style={styles.avatarRow}>
-          {avatars.slice(0, 4).map((person, idx) => (
-            <View
-              key={idx}
-              style={[styles.avatarOverlap, { zIndex: 10 - idx }]}
-              accessible
-              accessibilityRole="image"
-              accessibilityLabel={person.display_name}
-            >
-              <UserAvatar
-                imageUrl={person.photo_url}
-                name={person.display_name}
-                size={24}
-                accessibilityLabel={person.display_name}
-              />
-            </View>
-          ))}
-          {moreCount > 0 ? (
-            <View
-              style={[styles.moreBadge, { zIndex: 5 }]}
-              accessible
-              accessibilityLabel={t('mob.home.more_avatars', { count: moreCount })}
-            >
-              <Text style={styles.moreText}>+{moreCount}</Text>
+          {hasAvatars ? (
+            <View style={styles.avatarRow}>
+              {avatars.slice(0, 4).map((person, idx) => (
+                <View
+                  key={idx}
+                  style={[styles.avatarOverlap, { zIndex: 10 - idx }]}
+                  accessible
+                  accessibilityRole="image"
+                  accessibilityLabel={person.display_name}
+                >
+                  <UserAvatar
+                    imageUrl={person.photo_url}
+                    name={person.display_name}
+                    size={22}
+                    accessibilityLabel={person.display_name}
+                  />
+                </View>
+              ))}
+              {moreCount > 0 ? (
+                <View
+                  style={[styles.moreBadge, { zIndex: 5 }]}
+                  accessible
+                  accessibilityLabel={t('mob.home.more_avatars', { count: moreCount })}
+                >
+                  <Text style={styles.moreText}>+{moreCount}</Text>
+                </View>
+              ) : null}
             </View>
           ) : null}
         </View>
 
-        <View style={styles.actionBtn}>
-          <Text style={styles.actionBtnText}>{actionButtonLabel}</Text>
+        {/* (4) Right-hand column: count and action button */}
+        <View style={styles.rightCol}>
+          {countLabel ? (
+            <View style={styles.countContainer}>
+              <PeopleGreenIcon size={14} />
+              <Text style={styles.countText}>{countLabel}</Text>
+            </View>
+          ) : (
+            <View />
+          )}
+
+          <View style={styles.actionBtn}>
+            <Text style={styles.actionBtnText}>{actionButtonLabel}</Text>
+          </View>
         </View>
       </View>
     </Pressable>
@@ -182,7 +190,8 @@ export function UnifiedGameCard({
 }: {
   event: Event;
   onPress: () => void;
-}): React.JSX.Element {
+  }
+): React.JSX.Element {
   const t = useT();
 
   const venue = event.venue_name || event.location || t('mob.home.card.location_tbc');
@@ -207,7 +216,7 @@ export function UnifiedGameCard({
       leftTile={<DateBlock dateString={event.starts_at} />}
       title={event.title}
       details={
-        <View style={styles.detailsContainer}>
+        <View>
           <View style={styles.detailRow}>
             <ClockIcon size={16} />
             <Text style={styles.metaText} numberOfLines={1}>
@@ -237,16 +246,26 @@ export function UnifiedGroupCard({
   group,
   onPress,
   currentUserId,
+  showRolePill = false,
 }: {
   group: Group;
   onPress: () => void;
   currentUserId?: string;
+  showRolePill?: boolean;
 }): React.JSX.Element {
   const t = useT();
 
   const isMine =
     group.current_user_role === 'owner' ||
     (Boolean(currentUserId) && Boolean(group.owner_id) && group.owner_id === currentUserId);
+
+  const effectiveRole: GroupRole = isMine ? 'owner' : (group.current_user_role ?? 'member');
+  const roleLabel = t(
+    isMine
+      ? 'mob.group_role.owner'
+      : (ROLE_BADGE_LABEL_KEY[effectiveRole] ?? 'mob.group_role.member'),
+  );
+  const roleBg = getRolePillColor(effectiveRole);
 
   const ownerName =
     group.owner?.display_name ||
@@ -271,9 +290,16 @@ export function UnifiedGroupCard({
   return (
     <UnifiedCard
       leftTile={<GroupLogoBlock logoUrl={group.logo_url} />}
+      badge={
+        showRolePill && effectiveRole !== 'none' ? (
+          <View style={[styles.rolePill, { backgroundColor: roleBg }]}>
+            <Text style={styles.roleText}>{roleLabel}</Text>
+          </View>
+        ) : null
+      }
       title={group.name}
       details={
-        <View style={styles.detailsContainer}>
+        <View>
           <View style={styles.detailRow}>
             <OwnerCrownIcon size={16} />
             <Text style={styles.ownerText} numberOfLines={1}>
@@ -314,27 +340,47 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.88,
   },
-  topRow: {
+  cardContent: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
   },
   leftTileContainer: {
     marginRight: spacing.sm + 2,
+    flexShrink: 0,
   },
   infoCol: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
-  titleCountRow: {
+  badgeRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  rolePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    alignSelf: 'flex-start',
+  },
+  roleText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: '600',
   },
   title: {
     ...typography.bodyBold,
     color: colors.textPrimary,
     fontSize: 15,
-    flex: 1,
-    paddingRight: spacing.xs,
+  },
+  rightCol: {
+    flexShrink: 0,
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginLeft: spacing.sm,
+    minHeight: 48,
   },
   countContainer: {
     flexDirection: 'row',
@@ -370,7 +416,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     flexShrink: 1,
   },
-
   descriptionText: {
     ...typography.caption,
     color: colors.textSecondary,
@@ -378,32 +423,27 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 2,
   },
-  bottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm + 4,
-    paddingTop: spacing.xs,
-  },
   avatarRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 7,
   },
   avatarOverlap: {
-    marginRight: -6,
-    borderWidth: 1.5,
+    marginRight: -8,
+    borderWidth: 2,
     borderColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 13,
   },
   moreBadge: {
     backgroundColor: '#f1f5f9',
     borderColor: '#ffffff',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderRadius: 12,
-    paddingHorizontal: 4,
+    width: 24,
     height: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: -8,
   },
   moreText: {
     ...typography.caption,
@@ -416,6 +456,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: 5,
+    marginTop: spacing.xs,
   },
   actionBtnText: {
     ...typography.caption,

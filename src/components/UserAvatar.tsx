@@ -56,7 +56,14 @@ export default function UserAvatar({
       accessibilityRole={hasA11y ? 'image' : undefined}
       testID="user-avatar-placeholder"
     >
-      <Text style={styles.initial}>{initial}</Text>
+      <Text
+        style={[
+          styles.initial,
+          size < 32 ? { fontSize: Math.max(9, Math.round(size * 0.45)), lineHeight: Math.round(size * 0.55) } : null,
+        ]}
+      >
+        {initial}
+      </Text>
     </View>
   );
 }

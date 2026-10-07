@@ -13,11 +13,12 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { getMyGroups } from '../api/groups';
+import { getCachedHomeGroups, getGroups } from '../api/groups';
+import { useAuth } from '../auth/AuthContext';
 import EmptyState from '../components/EmptyState';
 import ErrorView from '../components/ErrorView';
-import GroupCard from '../components/GroupCard';
 import { headerAddButton } from '../components/HeaderAddButton';
+import { UnifiedGroupCard } from '../components/home/UnifiedCard';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { Group } from '../types/group';
@@ -39,6 +40,7 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
   const t = useT();
   const tRef = useRef(t);
   tRef.current = t;
+  const { user } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeFilter, setActiveFilter] = useState<GroupFilter>('All');
   const [isLoading, setIsLoading] = useState(true);
@@ -54,18 +56,38 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
     }, []),
   );
 
+  // Load cached groups on mount so groups display immediately if cached
+  useEffect(() => {
+    getCachedHomeGroups().then(cached => {
+      if (cached && cached.length > 0) {
+        setGroups(prev => (prev.length > 0 ? prev : cached));
+        setIsLoading(false);
+      }
+    });
+  }, []);
+
   const loadGroups = useCallback(async (isRefresh: boolean) => {
     if (isRefresh) {
       setIsRefreshing(true);
     } else {
-      setIsLoading(true);
+      setGroups(current => {
+        if (current.length === 0) {
+          setIsLoading(true);
+        }
+        return current;
+      });
     }
     setError(null);
     try {
-      const response = await getMyGroups({ enrich: true });
+      const response = await getGroups({ mine: true });
       setGroups(response.items);
     } catch {
-      setError(tRef.current('mob.groups.load_error'));
+      setGroups(current => {
+        if (current.length === 0) {
+          setError(tRef.current('mob.groups.load_error'));
+        }
+        return current;
+      });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -93,19 +115,23 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
 
   const filteredGroups = useMemo(() => {
     if (activeFilter === 'Organised') {
-      return groups.filter(g => g.current_user_role === 'owner');
+      return groups.filter(
+        g => g.current_user_role === 'owner' || (Boolean(user?.id) && Boolean(g.owner_id) && g.owner_id === user?.id),
+      );
     }
     if (activeFilter === 'Member') {
-      return groups.filter(g => g.current_user_role !== 'owner');
+      return groups.filter(
+        g => g.current_user_role !== 'owner' && (!user?.id || g.owner_id !== user?.id),
+      );
     }
     return groups;
-  }, [groups, activeFilter]);
+  }, [groups, activeFilter, user?.id]);
 
-  if (isLoading) {
+  if (isLoading && groups.length === 0) {
     return <LoadingView />;
   }
 
-  if (error) {
+  if (error && groups.length === 0) {
     return <ErrorView message={error} onRetry={() => loadGroups(false)} />;
   }
 
@@ -188,8 +214,10 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
         )
       }
       renderItem={({ item }) => (
-        <GroupCard
+        <UnifiedGroupCard
           group={item}
+          currentUserId={user?.id}
+          showRolePill
           onPress={() => navigation.navigate('GroupDetail', { groupId: item.id })}
         />
       )}
