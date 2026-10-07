@@ -47,7 +47,7 @@ export default function BannerCarousel({
   intervalSeconds = 5,
 }: BannerCarouselProps): React.JSX.Element {
   const t = useT();
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(1);
   const [isTouched, setIsTouched] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [containerWidth, setContainerWidth] = useState(
@@ -55,9 +55,35 @@ export default function BannerCarousel({
   );
 
   const scrollRef = useRef<ScrollView>(null);
+  const jumpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentIndexRef = useRef(1);
+  currentIndexRef.current = currentIndex;
+
+  const containerWidthRef = useRef(containerWidth);
+  containerWidthRef.current = containerWidth;
+
   const bannerCount = banners.length;
   // 3:1 aspect ratio sizing: height is exactly containerWidth / 3
   const bannerHeight = Math.round(containerWidth / 3);
+
+  // Jump helper: when at trailing clone (N+1) jump to 1; when at leading clone (0) jump to N
+  const handleJumpIfNeeded = useCallback((idx: number) => {
+    if (bannerCount < 2) return;
+    const width = containerWidthRef.current;
+    if (idx >= bannerCount + 1) {
+      setCurrentIndex(1);
+      scrollRef.current?.scrollTo({
+        x: 1 * width,
+        animated: false,
+      });
+    } else if (idx <= 0) {
+      setCurrentIndex(bannerCount);
+      scrollRef.current?.scrollTo({
+        x: bannerCount * width,
+        animated: false,
+      });
+    }
+  }, [bannerCount]);
 
   // OS Reduce-Motion check
   useEffect(() => {
@@ -81,6 +107,15 @@ export default function BannerCarousel({
     };
   }, []);
 
+  // Clean up jump timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (jumpTimeoutRef.current) {
+        clearTimeout(jumpTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Auto-advance timer (2+ banners, not touched, reduce motion off)
   useEffect(() => {
     if (bannerCount < 2 || isTouched || reduceMotion) {
@@ -89,30 +124,44 @@ export default function BannerCarousel({
 
     const intervalMs = Math.max((intervalSeconds || 5) * 1000, 1000);
     const timer = setInterval(() => {
-      setCurrentIndex(prev => {
-        const next = (prev + 1) % bannerCount;
-        scrollRef.current?.scrollTo({
-          x: next * containerWidth,
-          animated: true,
-        });
-        return next;
+      const next = currentIndexRef.current + 1;
+      setCurrentIndex(next);
+      scrollRef.current?.scrollTo({
+        x: next * containerWidthRef.current,
+        animated: true,
       });
+
+      if (jumpTimeoutRef.current) {
+        clearTimeout(jumpTimeoutRef.current);
+      }
+      jumpTimeoutRef.current = setTimeout(() => {
+        handleJumpIfNeeded(next);
+      }, 450);
     }, intervalMs);
 
-    return () => clearInterval(timer);
-  }, [bannerCount, isTouched, reduceMotion, intervalSeconds, containerWidth]);
+    return () => {
+      clearInterval(timer);
+      if (jumpTimeoutRef.current) {
+        clearTimeout(jumpTimeoutRef.current);
+      }
+    };
+  }, [bannerCount, isTouched, reduceMotion, intervalSeconds, handleJumpIfNeeded]);
 
-  const onScroll = useCallback(
+  const onMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (jumpTimeoutRef.current) {
+        clearTimeout(jumpTimeoutRef.current);
+        jumpTimeoutRef.current = null;
+      }
       const offsetX = event.nativeEvent.contentOffset.x;
-      if (containerWidth > 0) {
-        const index = Math.round(offsetX / containerWidth);
-        if (index >= 0 && index < bannerCount) {
-          setCurrentIndex(index);
-        }
+      const width = containerWidthRef.current;
+      if (width > 0) {
+        const index = Math.round(offsetX / width);
+        setCurrentIndex(index);
+        handleJumpIfNeeded(index);
       }
     },
-    [containerWidth, bannerCount],
+    [handleJumpIfNeeded],
   );
 
   const handleBannerPress = useCallback((clickUrl: string | null | undefined) => {
@@ -218,11 +267,26 @@ export default function BannerCarousel({
     );
   }
 
-  // Case 2+ banners: carousel
+  // Case 2+ banners: carousel with leading and trailing clones
+  const slides = [
+    { banner: banners[bannerCount - 1], isClone: true, key: 'clone-leading' },
+    ...banners.map((b, i) => ({ banner: b, isClone: false, key: b.id || `banner-${i}` })),
+    { banner: banners[0], isClone: true, key: 'clone-trailing' },
+  ];
+
+  const realIndex = ((currentIndex - 1) % bannerCount + bannerCount) % bannerCount;
+
   return (
     <View
       style={styles.container}
-      onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}
+      onLayout={e => {
+        const newWidth = e.nativeEvent.layout.width;
+        setContainerWidth(newWidth);
+        scrollRef.current?.scrollTo({
+          x: currentIndexRef.current * newWidth,
+          animated: false,
+        });
+      }}
       onTouchStart={() => setIsTouched(true)}
       onTouchEnd={() => setIsTouched(false)}
       onTouchCancel={() => setIsTouched(false)}
@@ -233,19 +297,23 @@ export default function BannerCarousel({
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onScroll}
+        contentOffset={{ x: 1 * containerWidth, y: 0 }}
+        onMomentumScrollEnd={onMomentumScrollEnd}
         style={{ width: containerWidth }}
       >
-        {banners.map((banner, index) => {
+        {slides.map(slide => {
+          const { banner, isClone, key } = slide;
           const safeClick = toHttpsUrl(banner.click_url);
           const isPressable = Boolean(safeClick);
 
           const cardContent = (
             <View
               style={[styles.bannerCard, { width: containerWidth, height: bannerHeight }]}
-              accessible
+              accessible={!isClone}
+              accessibilityElementsHidden={isClone}
+              importantForAccessibility={isClone ? 'no-hide-descendants' : 'auto'}
               accessibilityRole={isPressable ? 'button' : 'image'}
-              accessibilityLabel={banner.alt_text}
+              accessibilityLabel={isClone ? undefined : banner.alt_text}
             >
               <Image
                 source={{ uri: banner.image_url }}
@@ -263,8 +331,11 @@ export default function BannerCarousel({
           if (isPressable) {
             return (
               <Pressable
-                key={banner.id || String(index)}
+                key={key}
                 onPress={() => handleBannerPress(banner.click_url)}
+                accessible={!isClone}
+                accessibilityElementsHidden={isClone}
+                importantForAccessibility={isClone ? 'no-hide-descendants' : 'auto'}
               >
                 {cardContent}
               </Pressable>
@@ -272,7 +343,12 @@ export default function BannerCarousel({
           }
 
           return (
-            <View key={banner.id || String(index)}>
+            <View
+              key={key}
+              accessible={!isClone}
+              accessibilityElementsHidden={isClone}
+              importantForAccessibility={isClone ? 'no-hide-descendants' : 'auto'}
+            >
               {cardContent}
             </View>
           );
@@ -282,7 +358,7 @@ export default function BannerCarousel({
       {/* Dots */}
       <View style={styles.dotsRow} testID="banner-dots">
         {banners.map((banner, index) => {
-          const isActive = index === currentIndex;
+          const isActive = index === realIndex;
           return (
             <View
               key={banner.id || String(index)}
