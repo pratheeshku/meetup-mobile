@@ -58,6 +58,14 @@ interface RequestOptions {
 export const BANNERS_CACHE_KEY = '@meetup/home_banners_cache';
 export const MENU_CACHE_KEY = '@meetup/home_menu_cache';
 
+export const BANNERS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+export const MENU_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+export interface CacheEnvelope<T> {
+  savedAt: number;
+  data: T;
+}
+
 export const BUNDLED_FALLBACK_BANNER: HomeBannersResponse = {
   interval_seconds: 5,
   banners: [],
@@ -75,7 +83,16 @@ export async function getCachedBanners(): Promise<HomeBannersResponse | null> {
     if (!raw) {
       return null;
     }
-    return JSON.parse(raw) as HomeBannersResponse;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.savedAt !== 'number' || !parsed.data) {
+      // Old format without savedAt counts as expired
+      return null;
+    }
+    const age = Date.now() - parsed.savedAt;
+    if (age > BANNERS_CACHE_TTL_MS || age < 0) {
+      return null;
+    }
+    return parsed.data as HomeBannersResponse;
   } catch {
     return null;
   }
@@ -83,7 +100,11 @@ export async function getCachedBanners(): Promise<HomeBannersResponse | null> {
 
 export async function setCachedBanners(data: HomeBannersResponse): Promise<void> {
   try {
-    await AsyncStorage.setItem(BANNERS_CACHE_KEY, JSON.stringify(data));
+    const envelope: CacheEnvelope<HomeBannersResponse> = {
+      savedAt: Date.now(),
+      data,
+    };
+    await AsyncStorage.setItem(BANNERS_CACHE_KEY, JSON.stringify(envelope));
   } catch {
     // Non-blocking cache write failure
   }
@@ -129,7 +150,16 @@ export async function getCachedMenu(): Promise<HomeMenuResponse | null> {
     if (!raw) {
       return null;
     }
-    return JSON.parse(raw) as HomeMenuResponse;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.savedAt !== 'number' || !parsed.data) {
+      // Old format without savedAt counts as expired
+      return null;
+    }
+    const age = Date.now() - parsed.savedAt;
+    if (age > MENU_CACHE_TTL_MS || age < 0) {
+      return null;
+    }
+    return parsed.data as HomeMenuResponse;
   } catch {
     return null;
   }
@@ -137,7 +167,11 @@ export async function getCachedMenu(): Promise<HomeMenuResponse | null> {
 
 export async function setCachedMenu(data: HomeMenuResponse): Promise<void> {
   try {
-    await AsyncStorage.setItem(MENU_CACHE_KEY, JSON.stringify(data));
+    const envelope: CacheEnvelope<HomeMenuResponse> = {
+      savedAt: Date.now(),
+      data,
+    };
+    await AsyncStorage.setItem(MENU_CACHE_KEY, JSON.stringify(envelope));
   } catch {
     // Non-blocking cache write failure
   }

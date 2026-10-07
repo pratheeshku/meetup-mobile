@@ -71,7 +71,7 @@ export default function HomeTopBar({
     <View style={[styles.root, { paddingTop: insets.top + spacing.xs }]}>
       {/* Row 1: Hamburger, App Icon + Shuttlr, Bell with dot, Profile Avatar */}
       <View style={styles.topRow}>
-        {/* Left: Hamburger & Brand */}
+        {/* Left: Hamburger */}
         <View style={styles.topLeft}>
           <Pressable
             accessibilityRole="button"
@@ -85,16 +85,17 @@ export default function HomeTopBar({
               <View style={styles.hamburgerBar} />
             </View>
           </Pressable>
+        </View>
 
-          <View style={styles.brand}>
-            <Image
-              testID="home-app-icon"
-              source={SHUTTLR_ICON}
-              style={styles.brandIcon}
-              resizeMode="contain"
-            />
-            <Text style={styles.brandTitle}>Shuttlr</Text>
-          </View>
+        {/* Center: Brand (App Icon + Shuttlr) centred between hamburger and bell */}
+        <View style={styles.brandCenter}>
+          <Image
+            testID="home-app-icon"
+            source={SHUTTLR_ICON}
+            style={styles.brandIcon}
+            resizeMode="contain"
+          />
+          <Text style={styles.brandTitle}>Shuttlr</Text>
         </View>
 
         {/* Right: Bell & Profile */}
@@ -238,7 +239,6 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm,
   },
   hamburgerIcon: {
     width: 20,
@@ -251,9 +251,11 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     width: '100%',
   },
-  brand: {
+  brandCenter: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   brandIcon: {
     width: 30,

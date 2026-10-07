@@ -517,6 +517,7 @@ export const DEFAULT_LABELS = {
   'mob.home.groups_empty': 'You haven\'t joined any groups yet — create or join a group!',
   'mob.home.ad_tag': 'Ad',
   'mob.home.banner_fallback_alt': 'Welcome to Shuttlr — Play sports together',
+  'mob.home.banner_fallback_tagline': 'Find your next game. Play together.',
   'mob.home.create_game_card_title': 'Create a Game',
   'mob.home.create_game_card_desc': 'Host a match, set the venue, and invite players.',
   'mob.home.create_game_button': 'Create Game',

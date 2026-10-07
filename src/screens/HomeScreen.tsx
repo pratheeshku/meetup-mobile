@@ -486,6 +486,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
         user={user}
         avatarUrl={profile.data?.avatar_url}
         menuData={menuData}
+        currentScreen="Home"
         onNavigateHome={() => {
           scrollRef.current?.scrollTo({ y: 0, animated: true });
         }}

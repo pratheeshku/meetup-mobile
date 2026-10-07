@@ -161,3 +161,147 @@ export function PeopleGreenIcon({ size = 14 }: HomeIconProps): React.JSX.Element
     </Svg>
   );
 }
+
+export interface DrawerIconProps {
+  size?: number;
+  color?: string;
+}
+
+/**
+ * 18px SVG close icon (✕) for Drawer header. Fixed color.
+ */
+export function CloseIcon({ size = 18, color = '#6B7280' }: DrawerIconProps): React.JSX.Element {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <G>
+        <Path
+          d="M18 6L6 18M6 6l12 12"
+          stroke={color}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </G>
+    </Svg>
+  );
+}
+
+/**
+ * 16px SVG info icon for About section. Fixed color.
+ */
+export function InfoIcon({ size = 16, color = '#6B5CE0' }: DrawerIconProps): React.JSX.Element {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <G>
+        <Circle cx={12} cy={12} r={10} fill={color} />
+        <Circle cx={12} cy={8} r={1.5} fill="#FFFFFF" />
+        <Path
+          d="M12 11v6"
+          stroke="#FFFFFF"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+        />
+      </G>
+    </Svg>
+  );
+}
+
+/**
+ * 14px SVG external link icon (↗) for external URLs. Fixed color.
+ */
+export function ExternalLinkIcon({ size = 14, color = '#9CA3AF' }: DrawerIconProps): React.JSX.Element {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <G>
+        <Path
+          d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"
+          stroke={color}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <Path
+          d="M15 3h6v6M10 14L21 3"
+          stroke={color}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </G>
+    </Svg>
+  );
+}
+
+/**
+ * 14px SVG chevron up icon for expanded drawer sections.
+ */
+export function ChevronUpIcon({ size = 14, color = '#6B7280' }: DrawerIconProps): React.JSX.Element {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <G>
+        <Path
+          d="M18 15l-6-6-6 6"
+          stroke={color}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </G>
+    </Svg>
+  );
+}
+
+/**
+ * 14px SVG chevron down icon for collapsed drawer sections.
+ */
+export function ChevronDownIcon({ size = 14, color = '#6B7280' }: DrawerIconProps): React.JSX.Element {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <G>
+        <Path
+          d="M6 9l6 6 6-6"
+          stroke={color}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </G>
+    </Svg>
+  );
+}
+

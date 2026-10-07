@@ -149,7 +149,10 @@ export default function BannerCarousel({
               style={styles.fallbackLogo}
               resizeMode="contain"
             />
-            <Text style={styles.fallbackText}>{fallbackAlt}</Text>
+            <Text style={styles.fallbackText}>Shuttlr</Text>
+            <Text style={styles.fallbackTagline}>
+              {t('mob.home.banner_fallback_tagline')}
+            </Text>
           </View>
         )}
       </View>
@@ -343,7 +346,15 @@ const styles = StyleSheet.create({
   fallbackText: {
     ...typography.bodyBold,
     color: '#ffffff',
+    fontSize: 16,
     textAlign: 'center',
+  },
+  fallbackTagline: {
+    ...typography.caption,
+    color: '#ffffff',
+    textAlign: 'center',
+    marginTop: 2,
+    opacity: 0.9,
   },
   dotsRow: {
     flexDirection: 'row',
