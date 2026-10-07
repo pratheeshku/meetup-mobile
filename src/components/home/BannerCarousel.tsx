@@ -35,6 +35,8 @@ import { toHttpsUrl } from '../../utils/httpsUrl';
 
 const SHUTTLR_ICON = require('../../assets/shuttlr-icon.png');
 
+const GAP = 12;
+
 interface BannerCarouselProps {
   banners: BannerItem[];
   fallback: BannerFallback;
@@ -65,21 +67,22 @@ export default function BannerCarousel({
   const bannerCount = banners.length;
   // 3:1 aspect ratio sizing: height is exactly containerWidth / 3
   const bannerHeight = Math.round(containerWidth / 3);
+  const step = containerWidth + GAP;
 
   // Jump helper: when at trailing clone (N+1) jump to 1; when at leading clone (0) jump to N
   const handleJumpIfNeeded = useCallback((idx: number) => {
     if (bannerCount < 2) return;
-    const width = containerWidthRef.current;
+    const currentStep = containerWidthRef.current + GAP;
     if (idx >= bannerCount + 1) {
       setCurrentIndex(1);
       scrollRef.current?.scrollTo({
-        x: 1 * width,
+        x: 1 * currentStep,
         animated: false,
       });
     } else if (idx <= 0) {
       setCurrentIndex(bannerCount);
       scrollRef.current?.scrollTo({
-        x: bannerCount * width,
+        x: bannerCount * currentStep,
         animated: false,
       });
     }
@@ -125,9 +128,10 @@ export default function BannerCarousel({
     const intervalMs = Math.max((intervalSeconds || 5) * 1000, 1000);
     const timer = setInterval(() => {
       const next = currentIndexRef.current + 1;
+      const currentStep = containerWidthRef.current + GAP;
       setCurrentIndex(next);
       scrollRef.current?.scrollTo({
-        x: next * containerWidthRef.current,
+        x: next * currentStep,
         animated: true,
       });
 
@@ -154,9 +158,9 @@ export default function BannerCarousel({
         jumpTimeoutRef.current = null;
       }
       const offsetX = event.nativeEvent.contentOffset.x;
-      const width = containerWidthRef.current;
-      if (width > 0) {
-        const index = Math.round(offsetX / width);
+      const currentStep = containerWidthRef.current + GAP;
+      if (currentStep > 0) {
+        const index = Math.round(offsetX / currentStep);
         setCurrentIndex(index);
         handleJumpIfNeeded(index);
       }
@@ -282,8 +286,9 @@ export default function BannerCarousel({
       onLayout={e => {
         const newWidth = e.nativeEvent.layout.width;
         setContainerWidth(newWidth);
+        const currentStep = newWidth + GAP;
         scrollRef.current?.scrollTo({
-          x: currentIndexRef.current * newWidth,
+          x: currentIndexRef.current * currentStep,
           animated: false,
         });
       }}
@@ -292,68 +297,81 @@ export default function BannerCarousel({
       onTouchCancel={() => setIsTouched(false)}
       testID="home-banner-carousel"
     >
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        contentOffset={{ x: 1 * containerWidth, y: 0 }}
-        onMomentumScrollEnd={onMomentumScrollEnd}
-        style={{ width: containerWidth }}
+      <View
+        style={[
+          styles.carouselWrapper,
+          { width: containerWidth, height: bannerHeight },
+        ]}
       >
-        {slides.map(slide => {
-          const { banner, isClone, key } = slide;
-          const safeClick = toHttpsUrl(banner.click_url);
-          const isPressable = Boolean(safeClick);
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={step}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          disableIntervalMomentum
+          contentOffset={{ x: 1 * step, y: 0 }}
+          onMomentumScrollEnd={onMomentumScrollEnd}
+          style={[styles.carouselScrollView, { width: containerWidth }]}
+        >
+          {slides.map(slide => {
+            const { banner, isClone, key } = slide;
+            const safeClick = toHttpsUrl(banner.click_url);
+            const isPressable = Boolean(safeClick);
 
-          const cardContent = (
-            <View
-              style={[styles.bannerCard, { width: containerWidth, height: bannerHeight }]}
-              accessible={!isClone}
-              accessibilityElementsHidden={isClone}
-              importantForAccessibility={isClone ? 'no-hide-descendants' : 'auto'}
-              accessibilityRole={isPressable ? 'button' : 'image'}
-              accessibilityLabel={isClone ? undefined : banner.alt_text}
-            >
-              <Image
-                source={{ uri: banner.image_url }}
-                style={styles.bannerImage}
-                resizeMode="cover"
-              />
-              {banner.is_sponsored ? (
-                <View style={styles.adTag} testID="banner-ad-tag">
-                  <Text style={styles.adTagText}>{t('mob.home.ad_tag')}</Text>
-                </View>
-              ) : null}
-            </View>
-          );
+            const cardContent = (
+              <View
+                style={[
+                  styles.bannerCard,
+                  { width: containerWidth, height: bannerHeight, marginRight: GAP },
+                ]}
+                accessible={!isClone}
+                accessibilityElementsHidden={isClone}
+                importantForAccessibility={isClone ? 'no-hide-descendants' : 'auto'}
+                accessibilityRole={isPressable ? 'button' : 'image'}
+                accessibilityLabel={isClone ? undefined : banner.alt_text}
+              >
+                <Image
+                  source={{ uri: banner.image_url }}
+                  style={styles.bannerImage}
+                  resizeMode="cover"
+                />
+                {banner.is_sponsored ? (
+                  <View style={styles.adTag} testID="banner-ad-tag">
+                    <Text style={styles.adTagText}>{t('mob.home.ad_tag')}</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
 
-          if (isPressable) {
+            if (isPressable) {
+              return (
+                <Pressable
+                  key={key}
+                  onPress={() => handleBannerPress(banner.click_url)}
+                  accessible={!isClone}
+                  accessibilityElementsHidden={isClone}
+                  importantForAccessibility={isClone ? 'no-hide-descendants' : 'auto'}
+                >
+                  {cardContent}
+                </Pressable>
+              );
+            }
+
             return (
-              <Pressable
+              <View
                 key={key}
-                onPress={() => handleBannerPress(banner.click_url)}
                 accessible={!isClone}
                 accessibilityElementsHidden={isClone}
                 importantForAccessibility={isClone ? 'no-hide-descendants' : 'auto'}
               >
                 {cardContent}
-              </Pressable>
+              </View>
             );
-          }
-
-          return (
-            <View
-              key={key}
-              accessible={!isClone}
-              accessibilityElementsHidden={isClone}
-              importantForAccessibility={isClone ? 'no-hide-descendants' : 'auto'}
-            >
-              {cardContent}
-            </View>
-          );
-        })}
-      </ScrollView>
+          })}
+        </ScrollView>
+      </View>
 
       {/* Dots */}
       <View style={styles.dotsRow} testID="banner-dots">
@@ -377,9 +395,16 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm + 4,
     marginBottom: spacing.md,
   },
+  carouselWrapper: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  carouselScrollView: {
+    overflow: 'visible',
+  },
   bannerCard: {
     aspectRatio: 3,
-    borderRadius: dashRadius.card,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#1e293b',
     position: 'relative',
