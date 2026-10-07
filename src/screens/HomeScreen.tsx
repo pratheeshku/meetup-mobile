@@ -30,7 +30,7 @@
  *    - Drawer with Home, Groups, Tournament teams, Games, Tournaments, About links.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { AppState, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useScrollToTop } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
@@ -41,10 +41,14 @@ import { getEvents } from '../api/events';
 import { getGroups, getMyGroups } from '../api/groups';
 import {
   BUNDLED_FALLBACK_BANNER,
+  getCachedBanners,
   getCachedMenu,
   getHomeBanners,
   getHomeMenu,
   getHomeSummary,
+  type BannerFallback,
+  type BannerItem,
+  type HomeBannersResponse,
   type HomeMenuResponse,
   type HomeSummaryResponse,
 } from '../api/home';
@@ -88,6 +92,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const [selectedTab, setSelectedTab] = useState<HomeTab>('upcoming');
   const [summaryData, setSummaryData] = useState<HomeSummaryResponse | null>(null);
   const [menuData, setMenuData] = useState<HomeMenuResponse | null>(null);
+  const [persistedBanners, setPersistedBanners] = useState<HomeBannersResponse | null>(null);
 
   // Live endpoints state with local calculation fallbacks
   const [liveUpcoming, setLiveUpcoming] = useState<{
@@ -128,6 +133,40 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     });
   }, []);
 
+  // Load cached banners on mount so banners display immediately if cached
+  useEffect(() => {
+    getCachedBanners().then(cached => {
+      if (cached) {
+        setPersistedBanners(prev => (prev ? prev : cached));
+      }
+    });
+  }, []);
+
+  // Update persisted banners when banners resource arrives, keeping last real data
+  useEffect(() => {
+    if (banners.data) {
+      setPersistedBanners(prev => {
+        const next = banners.data!;
+        if (next.banners.length > 0 || next.fallback?.image_url) {
+          if (
+            prev &&
+            prev.banners.length === next.banners.length &&
+            prev.banners.every((b, i) => b.id === next.banners[i]?.id) &&
+            prev.interval_seconds === next.interval_seconds &&
+            prev.fallback?.image_url === next.fallback?.image_url
+          ) {
+            return prev;
+          }
+          return next;
+        }
+        if (prev && prev.banners.length > 0) {
+          return prev;
+        }
+        return next;
+      });
+    }
+  }, [banners.data]);
+
   // Menu loader: GET /home/menu once per Home load
   const loadMenu = useCallback(async (correlationId?: string) => {
     try {
@@ -156,7 +195,10 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
         );
         setLiveUpcoming({ items: res.items, status: 'success' });
       } catch {
-        setLiveUpcoming(prev => ({ ...prev, status: 'error' }));
+        setLiveUpcoming(prev => ({
+          items: prev.items,
+          status: prev.items !== null ? 'success' : 'error',
+        }));
       }
     },
     [],
@@ -169,7 +211,10 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       const res = await getGroups({ mine: true, limit: 3 }, { correlationId });
       setLiveGroups({ items: res.items, status: 'success' });
     } catch {
-      setLiveGroups(prev => ({ ...prev, status: 'error' }));
+      setLiveGroups(prev => ({
+        items: prev.items,
+        status: prev.items !== null ? 'success' : 'error',
+      }));
     }
   }, []);
 
@@ -180,7 +225,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
         const res = await getHomeSummary(selectedSports, { correlationId });
         setSummaryData(res);
       } catch {
-        setSummaryData(null);
+        // Keep old summary data on failure; do not wipe it
       }
     },
     [],
@@ -191,48 +236,95 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const isFiltered = filter.selected.length > 0;
   const filteredEmpty = isFiltered ? filteredEmptyMessage(filter.selected, filter.options, t) : null;
 
-  const loadAll = useCallback(
-    () =>
-      withCorrelationId(correlationId =>
-        Promise.all([
-          loadEvents(correlationId),
-          loadGroups(correlationId),
-          loadSports(correlationId),
-          loadProfile(correlationId),
-          loadBanners(correlationId),
-          loadMenu(correlationId),
-          loadLiveUpcoming(filter.selected, correlationId),
-          loadLiveGroups(correlationId),
-          loadSummary(filter.selected, correlationId),
-        ]).then(() => undefined),
-      ),
-    [
-      loadEvents,
-      loadGroups,
-      loadSports,
-      loadProfile,
-      loadBanners,
-      loadMenu,
-      loadLiveUpcoming,
-      loadLiveGroups,
-      loadSummary,
-      filter.selected,
-    ],
+  const isLoadInProgressRef = useRef(false);
+  const lastAutoLoadTimeRef = useRef(0);
+  const selectedSportsRef = useRef(filter.selected);
+  selectedSportsRef.current = filter.selected;
+
+  // Dynamic Home endpoints loader (banners, menu, live upcoming, live groups, summary)
+  const loadDynamicHomeData = useCallback(
+    (selectedSports: string[], correlationId: string) =>
+      Promise.all([
+        loadBanners(correlationId),
+        loadMenu(correlationId),
+        loadLiveUpcoming(selectedSports, correlationId),
+        loadLiveGroups(correlationId),
+        loadSummary(selectedSports, correlationId),
+      ]).then(() => undefined),
+    [loadBanners, loadMenu, loadLiveUpcoming, loadLiveGroups, loadSummary],
   );
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  // Bootstrap shared endpoints loader (sports, profile, events, groups)
+  const loadBootstrapData = useCallback(
+    (correlationId: string) =>
+      Promise.all([
+        loadEvents(correlationId),
+        loadGroups(correlationId),
+        loadSports(correlationId),
+        loadProfile(correlationId),
+      ]).then(() => undefined),
+    [loadEvents, loadGroups, loadSports, loadProfile],
+  );
 
-  // Re-fetch live upcoming and summary when sport filter changes
+  const executeHomeLoad = useCallback(
+    async (options?: { isManualRefresh?: boolean; isBootstrap?: boolean }) => {
+      const isManual = Boolean(options?.isManualRefresh);
+      const isBootstrap = Boolean(options?.isBootstrap);
+
+      // Re-entrancy guard: ignore if a load is already in flight
+      if (isLoadInProgressRef.current) {
+        return;
+      }
+
+      // Minimum gap: automatic reloads run at most once per 30 seconds
+      const now = Date.now();
+      if (!isManual && now - lastAutoLoadTimeRef.current < 30_000) {
+        return;
+      }
+
+      isLoadInProgressRef.current = true;
+      try {
+        await withCorrelationId(async correlationId => {
+          const promises: Promise<unknown>[] = [
+            loadDynamicHomeData(selectedSportsRef.current, correlationId),
+          ];
+          if (isBootstrap || isManual) {
+            promises.push(loadBootstrapData(correlationId));
+          }
+          await Promise.all(promises);
+        });
+        lastAutoLoadTimeRef.current = Date.now();
+      } finally {
+        isLoadInProgressRef.current = false;
+      }
+    },
+    [loadDynamicHomeData, loadBootstrapData],
+  );
+
+  // Initial load on mount (bootstrap + dynamic)
   useEffect(() => {
+    executeHomeLoad({ isBootstrap: true });
+  }, [executeHomeLoad]);
+
+  // Re-fetch live upcoming and summary only when sport filter selection changes
+  const selectedSportsKey = filter.selected.slice().sort().join(',');
+  const lastSportsKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastSportsKeyRef.current === null) {
+      lastSportsKeyRef.current = selectedSportsKey;
+      return;
+    }
+    if (lastSportsKeyRef.current === selectedSportsKey) {
+      return;
+    }
+    lastSportsKeyRef.current = selectedSportsKey;
     withCorrelationId(correlationId =>
       Promise.all([
         loadLiveUpcoming(filter.selected, correlationId),
         loadSummary(filter.selected, correlationId),
       ]),
     );
-  }, [filter.selected, loadLiveUpcoming, loadSummary]);
+  }, [selectedSportsKey, filter.selected, loadLiveUpcoming, loadSummary]);
 
   // Handle route params refreshKey & toast
   const refreshKey = route.params?.refreshKey;
@@ -241,9 +333,9 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   useEffect(() => {
     if (refreshKey !== undefined && refreshKey !== lastRefreshKey.current) {
       lastRefreshKey.current = refreshKey;
-      loadAll();
+      executeHomeLoad({ isManualRefresh: true, isBootstrap: false });
     }
-  }, [refreshKey, loadAll]);
+  }, [refreshKey, executeHomeLoad]);
 
   const lastToastKey = useRef<number | undefined>(undefined);
   useEffect(() => {
@@ -253,22 +345,38 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     }
   }, [refreshKey, successMessage]);
 
-  // Sync bell unread count on mount and focus
+  // Sync bell unread count and throttled dynamic reload on focus
   useEffect(() => {
     refreshUnreadCount();
-    return navigation.addListener('focus', () => {
+    const unsubscribe = navigation.addListener('focus', () => {
       refreshUnreadCount();
+      executeHomeLoad({ isManualRefresh: false, isBootstrap: false });
     });
-  }, [navigation]);
+    return unsubscribe;
+  }, [navigation, executeHomeLoad]);
+
+  // Throttled dynamic reload when app returns to foreground
+  useEffect(() => {
+    let previousState = AppState.currentState;
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (previousState?.match(/inactive|background/) && nextState === 'active') {
+        executeHomeLoad({ isManualRefresh: false, isBootstrap: false });
+      }
+      previousState = nextState;
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [executeHomeLoad]);
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await loadAll();
+      await executeHomeLoad({ isManualRefresh: true, isBootstrap: true });
     } finally {
       setIsRefreshing(false);
     }
-  }, [loadAll]);
+  }, [executeHomeLoad]);
 
   // Local calculation fallback for upcoming games
   const upcomingGamesThisWeek = useMemo(() => {
@@ -314,28 +422,26 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
   // Resolved list items: live endpoints preferred, local calculation fallback on failure
   const displayedUpcoming =
-    liveUpcoming.status === 'success' && liveUpcoming.items !== null
+    liveUpcoming.items !== null
       ? liveUpcoming.items
       : nextTwoUpcoming;
 
   const isUpcomingLoading =
-    liveUpcoming.status === 'loading' &&
-    (!nextTwoUpcoming && events.status === 'loading');
+    liveUpcoming.status === 'loading' && displayedUpcoming === null;
 
   const upcomingError =
-    liveUpcoming.status === 'error' && events.status === 'error';
+    liveUpcoming.status === 'error' && events.status === 'error' && displayedUpcoming === null;
 
   const displayedGroups =
-    liveGroups.status === 'success' && liveGroups.items !== null
+    liveGroups.items !== null
       ? liveGroups.items
       : nextThreeGroups;
 
   const isGroupsLoading =
-    liveGroups.status === 'loading' &&
-    (!nextThreeGroups && groups.status === 'loading');
+    liveGroups.status === 'loading' && displayedGroups === null;
 
   const groupsError =
-    liveGroups.status === 'error' && groups.status === 'error';
+    liveGroups.status === 'error' && groups.status === 'error' && displayedGroups === null;
 
   const retryUpcoming = useCallback(() => {
     withCorrelationId(correlationId =>
@@ -371,10 +477,12 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     navigation.navigate('Groups', { screen: 'GroupsList' });
   }, [navigation]);
 
-  // Banner data
-  const bannerList = banners.data?.banners ?? [];
-  const bannerFallback = banners.data?.fallback ?? BUNDLED_FALLBACK_BANNER.fallback;
-  const intervalSec = banners.data?.interval_seconds ?? 5;
+  // Banner data: preferred from persisted/cached, fallback to resource data
+  const bannerList = persistedBanners?.banners ?? (banners.data?.banners ?? []);
+  const bannerFallback =
+    persistedBanners?.fallback ?? (banners.data?.fallback ?? BUNDLED_FALLBACK_BANNER.fallback);
+  const intervalSec =
+    persistedBanners?.interval_seconds ?? (banners.data?.interval_seconds ?? 5);
 
   return (
     <View style={styles.root}>

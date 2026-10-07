@@ -64,7 +64,16 @@ export default function BannerCarousel({
   const containerWidthRef = useRef(containerWidth);
   containerWidthRef.current = containerWidth;
 
-  const bannerCount = banners.length;
+  const bannerIds = banners.map(b => b.id).join(',');
+  const prevBannerIdsRef = useRef(bannerIds);
+  const stableBannersRef = useRef(banners);
+  if (bannerIds !== prevBannerIdsRef.current) {
+    prevBannerIdsRef.current = bannerIds;
+    stableBannersRef.current = banners;
+  }
+  const activeBanners = bannerIds === prevBannerIdsRef.current ? stableBannersRef.current : banners;
+
+  const bannerCount = activeBanners.length;
   // 3:1 aspect ratio sizing: height is exactly containerWidth / 3
   const bannerHeight = Math.round(containerWidth / 3);
   const step = containerWidth + GAP;
@@ -230,7 +239,7 @@ export default function BannerCarousel({
 
   // Case 1 banner: static
   if (bannerCount === 1) {
-    const banner = banners[0];
+    const banner = activeBanners[0];
     const safeClick = toHttpsUrl(banner.click_url);
     const isPressable = Boolean(safeClick);
 
@@ -273,9 +282,9 @@ export default function BannerCarousel({
 
   // Case 2+ banners: carousel with leading and trailing clones
   const slides = [
-    { banner: banners[bannerCount - 1], isClone: true, key: 'clone-leading' },
-    ...banners.map((b, i) => ({ banner: b, isClone: false, key: b.id || `banner-${i}` })),
-    { banner: banners[0], isClone: true, key: 'clone-trailing' },
+    { banner: activeBanners[bannerCount - 1], isClone: true, key: 'clone-leading' },
+    ...activeBanners.map((b, i) => ({ banner: b, isClone: false, key: b.id || `banner-${i}` })),
+    { banner: activeBanners[0], isClone: true, key: 'clone-trailing' },
   ];
 
   const realIndex = ((currentIndex - 1) % bannerCount + bannerCount) % bannerCount;
@@ -375,7 +384,7 @@ export default function BannerCarousel({
 
       {/* Dots */}
       <View style={styles.dotsRow} testID="banner-dots">
-        {banners.map((banner, index) => {
+        {activeBanners.map((banner, index) => {
           const isActive = index === realIndex;
           return (
             <View
