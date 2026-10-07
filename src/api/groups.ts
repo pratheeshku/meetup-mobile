@@ -84,6 +84,9 @@ interface GroupApiItem {
     photo_url?: string | null;
     photoUrl?: string | null;
   }>;
+  current_user_role?: GroupRole;
+  currentUserRole?: GroupRole;
+  role?: GroupRole;
 }
 
 /**
@@ -139,6 +142,8 @@ function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
       ? raw.memberCount
       : null;
 
+  const role = (raw.current_user_role ?? raw.currentUserRole ?? raw.role ?? currentUserRole) as GroupRole;
+
   return {
     id: raw.id,
     name: raw.name,
@@ -150,7 +155,7 @@ function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
     member_count: memberCount,
     members_preview: membersPreview,
     created_at: raw.created_at ?? raw.createdAt ?? '',
-    current_user_role: currentUserRole,
+    current_user_role: role,
   };
 }
 
@@ -182,8 +187,14 @@ export async function getCachedHomeGroups(): Promise<Group[] | null> {
   }
 }
 
-export async function setCachedHomeGroups(data: Group[]): Promise<void> {
+export async function setCachedHomeGroups(data: Group[], isLimited = false): Promise<void> {
   try {
+    if (isLimited) {
+      const existing = await getCachedHomeGroups();
+      if (existing && existing.length > data.length) {
+        return;
+      }
+    }
     const envelope = {
       savedAt: Date.now(),
       data,
@@ -212,7 +223,7 @@ export async function getGroups(
       : (data as { items?: GroupApiItem[] })?.items ?? [];
     const items = rawList.map(raw => mapGroupApiItem(raw, params?.mine ? 'member' : 'none'));
     if (items.length > 0 && params?.mine) {
-      await setCachedHomeGroups(items);
+      await setCachedHomeGroups(items, params?.limit !== undefined);
     }
     return {
       items,
