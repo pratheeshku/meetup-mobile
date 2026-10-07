@@ -3753,6 +3753,13 @@
       "screen": "Notifications (Android channel)",
       "placeholders": [],
       "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "mob.brand.name",
+      "defaultText": "Shuttlr",
+      "screen": "Global",
+      "placeholders": [],
+      "status": "new-label (was hardcoded)"
     }
   ]
 }

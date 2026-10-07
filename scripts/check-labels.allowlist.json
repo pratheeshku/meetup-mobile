@@ -1,0 +1,29 @@
+{
+  "doc": "Exclusions for scripts/check-labels.js. The ONLY place exclusions live. Every entry needs a reason.",
+  "testFiles": [
+    {
+      "regex": "(^|/)__tests__/|\\.test\\.tsx?$|^src/test-utils/",
+      "reason": "Test code and test helpers are never shown to customers."
+    }
+  ],
+  "patterns": [
+    {
+      "regex": "^[a-z][a-z0-9+.-]*://",
+      "reason": "URLs and deep-link URIs are not customer-facing copy."
+    }
+  ],
+  "entries": [
+    {
+      "kind": "hardcoded-string",
+      "file": "src/components/EventCard.tsx",
+      "match": "RS",
+      "reason": "Decorative placeholder initials inside the second avatar circle of the participant stack; not copy, not translatable."
+    },
+    {
+      "kind": "hardcoded-string",
+      "file": "src/theme/dashboardTheme.ts",
+      "match": "Shuttlr",
+      "reason": "Brand name (the app name, identity not copy) used as the wordmark accessibility label; same brand exclusion as docs/label-inventory-mobile.json."
+    }
+  ]
+}

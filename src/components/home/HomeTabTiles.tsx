@@ -46,7 +46,7 @@ export default function HomeTabTiles({
       {/* Upcoming games tab tile */}
       <Pressable
         accessibilityRole="tab"
-        accessibilityLabel={`${t('mob.home.tab_upcoming')}, ${upcomingCount ?? 0} games, ${t('mob.home.tile_upcoming_sub')}`}
+        accessibilityLabel={`${t('mob.home.tab_upcoming')}, ${upcomingCount ?? 0}, ${t('mob.home.tile_upcoming_sub')}`}
         accessibilityState={{ selected: isUpcoming }}
         onPress={() => onSelectTab('upcoming')}
         style={({ pressed }) => [
@@ -75,7 +75,7 @@ export default function HomeTabTiles({
       {/* Your groups tab tile */}
       <Pressable
         accessibilityRole="tab"
-        accessibilityLabel={`${t('mob.home.tab_groups')}, ${groupsCount ?? 0} groups, ${t('mob.home.tile_groups_sub')}`}
+        accessibilityLabel={`${t('mob.home.tab_groups')}, ${groupsCount ?? 0}, ${t('mob.home.tile_groups_sub')}`}
         accessibilityState={{ selected: isGroups }}
         onPress={() => onSelectTab('groups')}
         style={({ pressed }) => [

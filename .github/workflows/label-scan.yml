@@ -1,0 +1,28 @@
+# Label scan (DES-MEETUP-FEEDBACK-001 R-03 / C2.7): fails on hardcoded customer
+# text, label keys with no bundled default, and banned glossary terms.
+name: Label scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: label-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  label-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check:labels
