@@ -29,7 +29,7 @@
  * 2. MENU (hamburger drawer):
  *    - Drawer with Home, Groups, Tournament teams, Games, Tournaments, About links.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useScrollToTop } from '@react-navigation/native';
@@ -38,7 +38,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
 import { getEvents } from '../api/events';
-import { getCachedHomeGroups, getGroups, getMyGroups } from '../api/groups';
+import { getCachedHomeGroups, getGroups } from '../api/groups';
 import {
   BUNDLED_FALLBACK_BANNER,
   getCachedBanners,
@@ -109,15 +109,11 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   useScrollToTop(scrollRef);
   const unreadCount = useUnreadBadgeCount();
 
-  // Resources (fallback sources for network failures)
-  const events = useResource(options => getEvents(undefined, options));
-  const groups = useResource(options => getMyGroups(options));
+  // Resources (bootstrap data & banners)
   const sports = useResource(options => getSports(options));
   const profile = useResource(options => getProfile(options));
   const banners = useResource(options => getHomeBanners(options));
 
-  const { load: loadEvents } = events;
-  const { load: loadGroups } = groups;
   const { load: loadSports } = sports;
   const { load: loadProfile } = profile;
   const { load: loadBanners } = banners;
@@ -268,16 +264,14 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     [loadBanners, loadMenu, loadLiveUpcoming, loadLiveGroups, loadSummary],
   );
 
-  // Bootstrap shared endpoints loader (sports, profile, events, groups)
+  // Bootstrap shared endpoints loader (sports, profile)
   const loadBootstrapData = useCallback(
     (correlationId: string) =>
       Promise.all([
-        loadEvents(correlationId),
-        loadGroups(correlationId),
         loadSports(correlationId),
         loadProfile(correlationId),
       ]).then(() => undefined),
-    [loadEvents, loadGroups, loadSports, loadProfile],
+    [loadSports, loadProfile],
   );
 
   const executeHomeLoad = useCallback(
@@ -392,60 +386,22 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     }
   }, [executeHomeLoad]);
 
-  // Local calculation fallback for upcoming games
-  const upcomingGamesThisWeek = useMemo(() => {
-    const feed = events.data?.items;
-    if (!feed) {
-      return null;
-    }
-    const now = Date.now();
-    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    const sevenDaysLater = now + sevenDaysMs;
-
-    return feed
-      .filter(e => {
-        if (e.status === 'cancelled') {
-          return false;
-        }
-        const time = new Date(e.starts_at).getTime();
-        if (time < now || time > sevenDaysLater) {
-          return false;
-        }
-        if (filter.selected.length > 0 && !filter.selected.includes(e.sport)) {
-          return false;
-        }
-        return true;
-      })
-      .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
-  }, [events.data, filter.selected]);
-
-  // Next 2 upcoming games fallback
-  const nextTwoUpcoming = upcomingGamesThisWeek ? upcomingGamesThisWeek.slice(0, 2) : null;
-
-  // Local calculation fallback for groups
-  const activeGroups = groups.data?.items ?? null;
-  // Up to 3 groups fallback
-  const nextThreeGroups = activeGroups ? activeGroups.slice(0, 3) : null;
-
-  // Resolved counts: live summary data preferred, local calculation fallback on failure
+  // Resolved counts: live summary data preferred, live items length fallback on failure
   const upcomingCount =
     summaryData?.upcoming_games_this_week ??
-    (upcomingGamesThisWeek ? upcomingGamesThisWeek.length : null);
+    (liveUpcoming.items ? liveUpcoming.items.length : null);
   const groupsCount =
     summaryData?.active_groups ??
-    (liveGroups.items ? liveGroups.items.length : (activeGroups ? activeGroups.length : null));
+    (liveGroups.items ? liveGroups.items.length : null);
 
-  // Resolved list items: live endpoints preferred, local calculation fallback on failure
-  const displayedUpcoming =
-    liveUpcoming.items !== null
-      ? liveUpcoming.items
-      : nextTwoUpcoming;
+  // Resolved list items: live endpoints preferred
+  const displayedUpcoming = liveUpcoming.items;
 
   const isUpcomingLoading =
     liveUpcoming.status === 'loading' && displayedUpcoming === null;
 
   const upcomingError =
-    liveUpcoming.status === 'error' && events.status === 'error' && displayedUpcoming === null;
+    liveUpcoming.status === 'error' && displayedUpcoming === null;
 
   // Resolved list items: live endpoints preferred, cached fallback of same shape on failure
   const displayedGroups = liveGroups.items;
@@ -458,21 +414,15 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
   const retryUpcoming = useCallback(() => {
     withCorrelationId(correlationId =>
-      Promise.all([
-        loadLiveUpcoming(filter.selected, correlationId),
-        loadEvents(correlationId),
-      ]),
+      loadLiveUpcoming(filter.selected, correlationId),
     );
-  }, [loadLiveUpcoming, loadEvents, filter.selected]);
+  }, [loadLiveUpcoming, filter.selected]);
 
   const retryGroupsAction = useCallback(() => {
     withCorrelationId(correlationId =>
-      Promise.all([
-        loadLiveGroups(correlationId),
-        loadGroups(correlationId),
-      ]),
+      loadLiveGroups(correlationId),
     );
-  }, [loadLiveGroups, loadGroups]);
+  }, [loadLiveGroups]);
 
   const openEvent = useCallback(
     (event: Event) => navigation.navigate('EventDetail', { eventId: event.id }),
