@@ -1,10 +1,6 @@
-import { Platform } from 'react-native';
-
 /**
- * Google sign-in is offered on Android only (DES-MEETUP-ADDENDUM-IOS-App.md
- * §3, AD-iOS-M2). On iOS the button is not rendered and the native module is
- * never configured or called.
+ * Google sign-in is offered on both Android and iOS (DES-MEETUP-ADDENDUM-social-login AD-8).
  */
 export function isGoogleSignInAvailable(): boolean {
-  return Platform.OS !== 'ios';
+  return true;
 }

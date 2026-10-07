@@ -239,7 +239,7 @@ describe('RegisterScreen', () => {
       pressableWithText(root, 'Register').props.onPress();
     });
 
-    expect(texts(root)).toContain('Password must be at least 8 characters long');
+    expect(texts(root)).toContain('Password must be at least 8 characters long.');
   });
 
   it('[Execute] shows "Too many attempts. Try again in a minute." on 429 rate limit', async () => {

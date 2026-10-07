@@ -1,18 +1,18 @@
 /**
- * Google sign-in is Android-only (DES-MEETUP-ADDENDUM-IOS-App.md §3,
- * AD-iOS-M2): not rendered on Login, not initialised by `AuthContext`, and
- * never reaches the native module on iOS. Unchanged on Android. The Register
- * screen has no Google element on either platform.
+ * Google sign-in is enabled on both iOS and Android (AD-8).
+ * Configured on mount, rendered on Login, unchanged on Android.
+ * The Register screen has no Google element on either platform.
  */
 import React from 'react';
 import { Platform } from 'react-native';
 import { GoogleSignin, GoogleSigninButton } from '@react-native-google-signin/google-signin';
 
+import { apiClient } from '../../api/client';
 import { renderAsync } from '../../test-utils/render';
 import LoginScreen from '../../screens/LoginScreen';
 import RegisterScreen from '../../screens/RegisterScreen';
 import { AuthProvider } from '../AuthContext';
-import { signIn } from '../googleAuth';
+import { signIn, _resetGoogleSignInConfiguredForTesting } from '../googleAuth';
 
 jest.mock('../../api/client', () => ({
   apiClient: { get: jest.fn(), post: jest.fn() },
@@ -44,6 +44,7 @@ const mountLogin = () =>
 
 beforeEach(() => {
   jest.clearAllMocks();
+  _resetGoogleSignInConfiguredForTesting();
 });
 
 afterEach(() => {
@@ -53,19 +54,27 @@ afterEach(() => {
 describe('iOS', () => {
   beforeEach(() => jest.replaceProperty(Platform, 'OS', 'ios'));
 
-  it('does not render the Google button and does not configure the native module', async () => {
+  it('renders the Google button and configures the native module on start-up (AD-8)', async () => {
     const root = await mountLogin();
 
-    expect(root.findAllByType(GoogleSigninButton)).toHaveLength(0);
-    expect(mockConfigure).not.toHaveBeenCalled();
+    expect(root.findAllByType(GoogleSigninButton)).toHaveLength(1);
+    expect(mockConfigure).toHaveBeenCalledTimes(1);
   });
 
-  it('signIn() refuses before touching configure, hasPlayServices or the native sign-in', async () => {
-    await expect(signIn()).rejects.toThrow();
+  it('signIn() on iOS proceeds without calling hasPlayServices', async () => {
+    mockSignIn.mockResolvedValueOnce({
+      type: 'success',
+      data: { idToken: 'mock-id-token' },
+    });
+    (apiClient.post as jest.Mock).mockResolvedValueOnce({
+      data: { access_token: 'mock-access', token_type: 'bearer' },
+    });
 
-    expect(mockConfigure).not.toHaveBeenCalled();
+    await signIn();
+
+    expect(mockConfigure).toHaveBeenCalled();
     expect(mockHasPlayServices).not.toHaveBeenCalled();
-    expect(mockSignIn).not.toHaveBeenCalled();
+    expect(mockSignIn).toHaveBeenCalledTimes(1);
   });
 
   it('Register has no Google element', async () => {

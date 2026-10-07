@@ -191,3 +191,24 @@ export async function getHomeMenu(options?: RequestOptions): Promise<HomeMenuRes
     return await getCachedMenu();
   }
 }
+
+export interface LegalLinksResponse {
+  terms_url: string;
+  privacy_url: string;
+}
+
+/**
+ * Public legal links endpoint (DES-MEETUP-ADDENDUM-social-login AD-9).
+ * Returns terms_url and privacy_url ("" when unset). Fails quietly (returns null).
+ */
+export async function getLegalLinks(options?: RequestOptions): Promise<LegalLinksResponse | null> {
+  try {
+    const { data } = await apiClient.get<LegalLinksResponse>('/home/legal-links', {
+      correlationId: options?.correlationId,
+    });
+    return data;
+  } catch {
+    return null;
+  }
+}
+

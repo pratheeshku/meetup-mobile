@@ -12,13 +12,17 @@
  * - Network error: "Unable to connect to server." with Retry button
  * - 400 errors: inline mappings for duplicate email/nickname and password length.
  */
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useContext, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppleButton } from '@invertase/react-native-apple-authentication';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AxiosError } from 'axios';
 
 import appConfig from '../../config/appConfig.json';
+import { AuthContext } from '../auth/AuthContext';
+import { AppleSignInCancelledError } from '../auth/appleAuth';
 import { signup } from '../auth/emailAuth';
+import SocialTermsNotice from '../components/auth/SocialTermsNotice';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
@@ -43,6 +47,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export default function RegisterScreen({ navigation }: Props): React.JSX.Element {
   const t = useT();
+  const auth = useContext(AuthContext);
   const [nickname, setNickname] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -53,6 +58,25 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   const [isEmailRegistered, setIsEmailRegistered] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
+
+  const handleAppleSignIn = async (): Promise<void> => {
+    if (!auth?.signInWithApple) {
+      return;
+    }
+    setError(null);
+    setRetryError(null);
+    setRetryAction(null);
+    setIsSubmitting(true);
+    try {
+      await auth.signInWithApple();
+    } catch (err) {
+      if (!(err instanceof AppleSignInCancelledError)) {
+        setError(t('mob.auth.apple_failed'));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
   // Terms agreement (email registration only): required only when a valid
@@ -152,6 +176,18 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Text style={styles.title}>{t('mob.register.title')}</Text>
+
+      {Platform.OS === 'ios' ? (
+        <>
+          <AppleButton
+            buttonStyle={AppleButton.Style.BLACK}
+            buttonType={AppleButton.Type.CONTINUE}
+            style={styles.appleButton}
+            onPress={handleAppleSignIn}
+          />
+          <SocialTermsNotice />
+        </>
+      ) : null}
 
       <TextField
         style={styles.input}
@@ -365,5 +401,12 @@ const styles = StyleSheet.create({
   agreeText: { ...typography.body, color: colors.textPrimary, flex: 1, marginLeft: spacing.xs },
   agreeLink: { color: colors.primary, textDecorationLine: 'underline' },
   button: { marginBottom: spacing.md },
+  appleButton: {
+    width: '100%',
+    maxWidth: 312,
+    height: 48,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
   link: { alignSelf: 'center', minHeight: 44, justifyContent: 'center' },
 });

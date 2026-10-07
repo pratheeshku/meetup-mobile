@@ -45,6 +45,49 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
   isCancelledResponse: jest.fn(response => response.type === 'cancelled'),
 }));
 
+// @invertase/react-native-apple-authentication wraps native AuthenticationServices
+// APIs with no Jest-environment equivalent. Mocked centrally per convention.
+jest.mock('@invertase/react-native-apple-authentication', () => {
+  const React = require('react');
+  const { Pressable, Text } = require('react-native');
+  return {
+    appleAuth: {
+      isSupported: true,
+      performRequest: jest.fn(async () => ({
+        authorizationCode: 'mock-apple-auth-code',
+        fullName: { givenName: 'John', familyName: 'Doe' },
+      })),
+      Operation: { LOGIN: '1', REFRESH: '2', LOGOUT: '3', IMPLICIT: '4' },
+      Scope: { EMAIL: '0', FULL_NAME: '1' },
+      Error: {
+        UNKNOWN: '1000',
+        CANCELED: '1001',
+        INVALID_RESPONSE: '1002',
+        NOT_HANDLED: '1003',
+        FAILED: '1004',
+      },
+    },
+    AppleButton: Object.assign(
+      props =>
+        React.createElement(
+          Pressable,
+          {
+            accessibilityRole: 'button',
+            accessibilityLabel: 'Continue with Apple',
+            onPress: props.onPress,
+            style: props.style,
+            testID: 'apple-button',
+          },
+          React.createElement(Text, null, 'Continue with Apple'),
+        ),
+      {
+        Type: { SIGN_IN: '0', CONTINUE: '1', SIGN_UP: '2' },
+        Style: { WHITE: '0', WHITE_OUTLINE: '1', BLACK: '2' },
+      },
+    ),
+  };
+});
+
 // @react-native-firebase/{app,messaging}: wiring the auth module pulls
 // src/notifications/fcm.ts (used by googleAuth.signOut's FCM
 // de-registration call) into the render tree for the first time. Its
@@ -221,6 +264,16 @@ jest.mock('@d11/react-native-fast-image', () => {
   return {
     __esModule: true,
     default: MockFastImage,
+  };
+});
+
+// Centralized mock for getLegalLinks (DES-MEETUP-ADDENDUM-social-login AD-9)
+// so tests rendering SocialTermsNotice don't make unhandled background HTTP calls.
+jest.mock('./src/api/home', () => {
+  const actual = jest.requireActual('./src/api/home');
+  return {
+    ...actual,
+    getLegalLinks: jest.fn(async () => null),
   };
 });
 /* eslint-enable no-undef */
