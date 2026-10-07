@@ -305,3 +305,29 @@ export function ChevronDownIcon({ size = 14, color = '#6B7280' }: DrawerIconProp
   );
 }
 
+/**
+ * 24px Gold bell icon for Home header.
+ */
+export function BellGoldIcon({ size = 24 }: HomeIconProps): React.JSX.Element {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Circle cx={12} cy={2.6} r={1.1} fill="#B7791F" />
+      <Path
+        d="M12 3.6a6 6 0 0 0-6 6v3.1c0 .6-.2 1.2-.6 1.7L4 16.1c-.4.5 0 1.2.7 1.2h14.6c.7 0 1.1-.7.7-1.2l-1.4-1.7c-.4-.5-.6-1.1-.6-1.7V9.6a6 6 0 0 0-6-6z"
+        fill="#FFC83D"
+        stroke="#B7791F"
+        strokeWidth={1.4}
+        strokeLinejoin="round"
+      />
+      <Path d="M9.6 18.4a2.4 2.4 0 0 0 4.8 0z" fill="#B7791F" />
+    </Svg>
+  );
+}
+
+

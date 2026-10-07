@@ -21,12 +21,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SportIcon, AllSportsIcon } from '../icons/DashboardIcons';
+import { BellGoldIcon } from '../icons/HomeV2Icons';
 import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import type { SportOption } from '../../utils/gameLists';
-import { sportTileColor } from './GameRow';
 
 const SHUTTLR_ICON = require('../../assets/shuttlr-icon.png');
 
@@ -110,10 +110,7 @@ export default function HomeTopBar({
             onPress={onBellPress}
             style={({ pressed }) => [styles.bellTouch, pressed ? styles.pressed : null]}
           >
-            <View style={styles.bellGlyph}>
-              <View style={styles.bellBody} />
-              <View style={styles.bellClapper} />
-            </View>
+            <BellGoldIcon size={24} />
             {hasUnread ? <View style={styles.unreadDot} testID="bell-unread-dot" /> : null}
           </Pressable>
 
@@ -137,18 +134,14 @@ export default function HomeTopBar({
           </Text>
         </View>
 
-        {/* Sport selector (reduced size) */}
+        {/* Sport selector (icon-only chips) */}
         <View style={styles.sportSelectorContainer}>
           {isLoadingSports ? (
             <View style={styles.sportLoading}>
               <Text style={styles.sportLoadingText}>{t('mob.dashboard.sports_loading')}...</Text>
             </View>
           ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.compactChipsScroll}
-            >
+            <View style={styles.chipsContainer}>
               {/* "All" chip */}
               <Pressable
                 accessibilityRole="button"
@@ -156,24 +149,16 @@ export default function HomeTopBar({
                 accessibilityState={{ selected: selectedSports.length === 0 }}
                 onPress={() => onToggleSport(null)}
                 style={({ pressed }) => [
-                  styles.compactChip,
-                  selectedSports.length === 0 ? styles.compactChipSelected : styles.compactChipIdle,
+                  styles.chip,
+                  selectedSports.length === 0 ? styles.chipSelected : styles.chipIdle,
                   pressed ? styles.pressed : null,
                 ]}
               >
-                <AllSportsIcon size={14} />
-                <Text
-                  style={[
-                    styles.compactChipLabel,
-                    selectedSports.length === 0 ? styles.compactChipLabelSelected : null,
-                  ]}
-                >
-                  {t('mob.dashboard.sports_all')}
-                </Text>
+                <AllSportsIcon size={20} />
               </Pressable>
 
-              {/* Individual sports */}
-              {sportOptions.map(option => {
+              {/* Individual sports (up to 4) */}
+              {sportOptions.slice(0, 4).map(option => {
                 const isSelected = selectedSports.includes(option.key);
                 return (
                   <Pressable
@@ -183,32 +168,16 @@ export default function HomeTopBar({
                     accessibilityState={{ selected: isSelected }}
                     onPress={() => onToggleSport(option.key)}
                     style={({ pressed }) => [
-                      styles.compactChip,
-                      isSelected ? styles.compactChipSelected : styles.compactChipIdle,
+                      styles.chip,
+                      isSelected ? styles.chipSelected : styles.chipIdle,
                       pressed ? styles.pressed : null,
                     ]}
                   >
-                    <View
-                      style={[
-                        styles.compactSportIconWrap,
-                        { backgroundColor: sportTileColor(option.slug) },
-                      ]}
-                    >
-                      <SportIcon slug={option.slug} size={12} />
-                    </View>
-                    <Text
-                      style={[
-                        styles.compactChipLabel,
-                        isSelected ? styles.compactChipLabelSelected : null,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {option.label}
-                    </Text>
+                    <SportIcon slug={option.slug} size={20} />
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
           )}
         </View>
       </View>
@@ -274,41 +243,21 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   bellTouch: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  bellGlyph: {
-    alignItems: 'center',
-  },
-  bellBody: {
-    width: 16,
-    height: 16,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderBottomLeftRadius: 2,
-    borderBottomRightRadius: 2,
-    backgroundColor: colors.textPrimary,
-  },
-  bellClapper: {
-    width: 6,
-    height: 3,
-    borderBottomLeftRadius: 3,
-    borderBottomRightRadius: 3,
-    backgroundColor: colors.textPrimary,
-    marginTop: 1,
-  },
   unreadDot: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#ef4444',
-    borderWidth: 1.5,
+    top: 8,
+    right: 8,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: '#E24B4A',
+    borderWidth: 2,
     borderColor: '#ffffff',
   },
   avatarTouch: {
@@ -337,50 +286,35 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   sportSelectorContainer: {
-    maxWidth: '55%',
     alignItems: 'flex-end',
   },
-  compactChipsScroll: {
+  chipsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  compactChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 28,
-    paddingHorizontal: 8,
-    borderRadius: radius.full,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
+    borderColor: '#DCE3F0',
+    borderRadius: 18,
+    padding: 3,
+    gap: 2,
   },
-  compactChipIdle: {
-    backgroundColor: '#f8fafc',
-    borderColor: '#e2e8f0',
-  },
-  compactChipSelected: {
-    backgroundColor: '#eff6ff',
-    borderColor: dash.brand,
-  },
-  compactSportIconWrap: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  chip: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
   },
-  compactChipLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginLeft: 4,
-    fontWeight: '500',
+  chipIdle: {
+    backgroundColor: 'transparent',
   },
-  compactChipLabelSelected: {
-    color: dash.brand,
-    fontWeight: '700',
+  chipSelected: {
+    backgroundColor: '#EEF3FF',
+    borderWidth: 2,
+    borderColor: '#1D4ED8',
   },
   sportLoading: {
-    height: 28,
+    height: 36,
     justifyContent: 'center',
   },
   sportLoadingText: {
