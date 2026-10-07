@@ -21,11 +21,11 @@ export default function TournamentTeamsScreen({}: Props): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <WipStrip labelKey="admin.teams.wip_banner" />
+      <WipStrip labelKey="mob.wip.banner_text" />
       <View style={styles.content}>
         <EmptyState
           title={t('mob.menu.tournament_teams')}
-          subtitle={t('admin.teams.wip_banner')}
+          subtitle={t('mob.wip.banner_text')}
         />
       </View>
     </View>

@@ -508,36 +508,30 @@ export const DEFAULT_LABELS = {
 
   // Home v2
   'mob.home.greeting_prefix': 'Good to see you',
-  'mob.home.greeting_line': 'Ready to play, {name}?',
+  'mob.home.greeting_line': 'Ready to play, {name}!',
   'mob.home.tab_upcoming': 'Upcoming games',
   'mob.home.tab_groups': 'Your groups',
-  'mob.home.tile_upcoming_sub': 'Next 7 days',
+  'mob.home.tile_upcoming_sub': 'This week',
   'mob.home.tile_groups_sub': 'Active groups',
-  'mob.home.upcoming_empty': 'No upcoming games in the next 7 days — create or join a game!',
-  'mob.home.groups_empty': 'You haven\'t joined any groups yet — create or join a group!',
+  'mob.home.upcoming_empty': 'No upcoming games yet. Join one or create your own.',
+  'mob.home.groups_empty': 'You haven\'t joined any groups yet.',
   'mob.home.ad_tag': 'Ad',
   'mob.home.banner_fallback_alt': 'Welcome to Shuttlr — Play sports together',
   'mob.home.banner_fallback_tagline': 'Find your next game. Play together.',
-  'mob.home.create_game_card_title': 'Create a Game',
-  'mob.home.create_game_card_desc': 'Host a match, set the venue, and invite players.',
+  'mob.home.create_game_card_title': 'Create a game in seconds',
+  'mob.home.create_game_card_desc': 'Invite your friends, manage players and enjoy your game hassle-free.',
   'mob.home.create_game_button': 'Create Game',
   'mob.home.view_game': 'View game',
   'mob.home.view_group': 'View group',
   'mob.home.view_all': 'View all',
-  'mob.home.owner_label': 'Owner: {name}',
-  'mob.home.members_one': '{count} member',
-  'mob.home.members_other': '{count} members',
-  'mob.home.players_more': '+{count}',
   'mob.home.more_avatars': '{count} more',
   'mob.home.card.location_tbc': 'Location TBC',
   'mob.home.card.owner': 'Owner',
   'mob.home.card.you': 'you',
-  'mob.home.card.players': 'players',
   'mob.home.card.members': 'group members',
 
-  // WIP banners (admin labels)
-  'admin.tournaments.wip_banner': 'Tournaments are currently in development. Full scheduling and brackets are coming soon!',
-  'admin.teams.wip_banner': 'Tournament teams are currently in development. Team creation and rosters are coming soon!',
+  // WIP banners
+  'mob.wip.banner_text': 'Work in progress: this section is still being built and may change.',
   'mob.wip.pill': 'WIP',
 
   // Menu / Hamburger Drawer
@@ -557,8 +551,4 @@ export const DEFAULT_LABELS = {
   'mob.menu.help': 'Help',
   'mob.menu.view_profile': 'View profile',
   'mob.menu.play_together': 'Play together',
-  'mob.menu.about_url': 'https://pratheeshku.github.io/gameshell-policy/shuttlr/',
-  'mob.menu.privacy_url': 'https://pratheeshku.github.io/gameshell-policy/shuttlr/',
-  'mob.menu.terms_url': 'https://pratheeshku.github.io/gameshell-policy/shuttlr/terms/',
-  'mob.menu.help_url': '',
 } as const;

@@ -18,7 +18,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GroupsIcon } from '../icons/DashboardIcons';
 import { CalendarIcon } from '../icons/HomeV2Icons';
 import { useT } from '../../labels/LabelsContext';
-import { dash, dashRadius } from '../../theme/dashboardTheme';
+import { dashRadius } from '../../theme/dashboardTheme';
 import { colors, spacing, typography } from '../../theme/tokens';
 
 export type HomeTab = 'upcoming' | 'groups';
@@ -121,12 +121,12 @@ const styles = StyleSheet.create({
   tileIdle: {
     backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#DCE3F0',
   },
   tileSelected: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#EEF3FF',
     borderWidth: 2,
-    borderColor: dash.brand,
+    borderColor: '#1D4ED8',
   },
   tileHeader: {
     flexDirection: 'row',
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   countSelected: {
-    color: dash.brand,
+    color: '#0B1B3F',
   },
   textContainer: {
     marginTop: spacing.xs + 2,
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   titleSelected: {
-    color: dash.brand,
+    color: '#0B1B3F',
   },
   subtitle: {
     ...typography.caption,

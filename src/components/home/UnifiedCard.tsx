@@ -134,19 +134,19 @@ export function UnifiedCard({
 function DateBlock({ dateString }: { dateString: string }): React.JSX.Element {
   const date = new Date(dateString);
   const isValid = !isNaN(date.getTime());
+  const weekday = isValid
+    ? date.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
+    : '—';
+  const day = isValid ? String(date.getDate()) : '—';
   const month = isValid
     ? date.toLocaleDateString(undefined, { month: 'short' }).toUpperCase()
     : '—';
-  const day = isValid ? date.getDate() : '—';
 
   return (
     <View style={styles.dateBlock} testID="date-block">
-      <View style={styles.dateMonthHeader}>
-        <Text style={styles.dateMonthText}>{month}</Text>
-      </View>
-      <View style={styles.dateDayBody}>
-        <Text style={styles.dateDayText}>{day}</Text>
-      </View>
+      <Text style={styles.dateWeekdayText}>{weekday}</Text>
+      <Text style={styles.dateDayText}>{day}</Text>
+      <Text style={styles.dateMonthText}>{month}</Text>
     </View>
   );
 }
@@ -248,9 +248,7 @@ export function UnifiedGroupCard({
   const memberCount = group.member_count;
   const countLabel =
     memberCount !== null && memberCount !== undefined
-      ? t(memberCount === 1 ? 'mob.home.members_one' : 'mob.home.members_other', {
-          count: memberCount,
-        })
+      ? `${memberCount} ${t('mob.home.card.members')}`
       : null;
 
   const preview = group.members_preview ?? [];
@@ -403,9 +401,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   actionBtn: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#bfdbfe',
-    borderWidth: 1,
+    backgroundColor: '#E3ECFF',
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: 5,
@@ -413,38 +409,37 @@ const styles = StyleSheet.create({
   actionBtnText: {
     ...typography.caption,
     fontWeight: '700',
-    color: dash.brand,
+    color: '#1741B8',
     fontSize: 12,
   },
   dateBlock: {
     width: 48,
     height: 52,
     borderRadius: radius.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    backgroundColor: '#ffffff',
-  },
-  dateMonthHeader: {
-    backgroundColor: dash.brand,
-    alignItems: 'center',
-    paddingVertical: 1,
-  },
-  dateMonthText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  dateDayBody: {
-    flex: 1,
+    backgroundColor: '#DDF3E8',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  dateWeekdayText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#0A5A36',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   dateDayText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
-    color: colors.textPrimary,
+    color: '#0A5A36',
+    lineHeight: 19,
+  },
+  dateMonthText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#0A5A36',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   groupLogoContainer: {
     width: 48,

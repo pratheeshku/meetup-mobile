@@ -731,9 +731,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   itemRowActive: {
-    backgroundColor: '#eff6ff',
+    backgroundColor: '#EEF3FF',
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: '#1D4ED8',
   },
   itemRowInactive: {
     backgroundColor: 'transparent',
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   itemTextActive: {
-    color: dash.brand,
+    color: '#1741B8',
   },
   sectionHeaderRow: {
     flexDirection: 'row',

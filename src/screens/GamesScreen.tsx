@@ -300,7 +300,7 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
       </View>
       {tournamentsVisited ? (
         <View style={[styles.flex, segment === 'tournaments' ? null : styles.hidden]}>
-          <WipStrip labelKey="admin.tournaments.wip_banner" />
+          <WipStrip labelKey="mob.wip.banner_text" />
           <TournamentsListContent
             refreshKey={refreshKey}
             onOpenTournament={tournamentId =>

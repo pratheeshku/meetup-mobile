@@ -10,8 +10,8 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useT } from '../../labels/LabelsContext';
-import { dash, dashRadius } from '../../theme/dashboardTheme';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { dashRadius } from '../../theme/dashboardTheme';
+import { radius, spacing, typography } from '../../theme/tokens';
 
 interface CreateGameCardProps {
   onPress: () => void;
@@ -48,11 +48,10 @@ export default function CreateGameCard({ onPress }: CreateGameCardProps): React.
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#E8F6EF',
     borderRadius: dashRadius.card,
-    borderWidth: 1.5,
-    borderColor: '#cbd5e1',
-    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#BFE3D0',
     padding: spacing.md,
     marginHorizontal: spacing.md,
     marginTop: spacing.md,
@@ -70,7 +69,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: dash.brand,
+    backgroundColor: '#0F7B4F',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -86,17 +85,17 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: '#0A5A36',
     fontSize: 14,
   },
   description: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: '#2C5E46',
     fontSize: 12,
     marginTop: 2,
   },
   actionBtn: {
-    backgroundColor: dash.brand,
+    backgroundColor: '#0F7B4F',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
     borderRadius: radius.md,
