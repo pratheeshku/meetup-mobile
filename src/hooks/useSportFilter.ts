@@ -11,7 +11,7 @@
  *   changed by the user — re-renders and data reloads never touch it.
  * - Not persisted between visits (state lives and dies with the screen).
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { Resource } from './useResource';
 import type { Sport } from '../types/sport';
@@ -56,10 +56,18 @@ export function useSportFilter(
     setStored(previous => toggleSportSelection(previous ?? [], key));
   }, []);
 
-  const selected = useMemo(
-    () => effectiveSportSelection(selection ?? [], options),
-    [selection, options],
-  );
+  const selectedRef = useRef<string[]>([]);
+  const selected = useMemo(() => {
+    const next = effectiveSportSelection(selection ?? [], options);
+    if (
+      selectedRef.current.length === next.length &&
+      selectedRef.current.every((v, i) => v === next[i])
+    ) {
+      return selectedRef.current;
+    }
+    selectedRef.current = next;
+    return next;
+  }, [selection, options]);
 
   return { options, isLoading: sports.status === 'loading', selected, toggle };
 }
