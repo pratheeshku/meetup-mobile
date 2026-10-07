@@ -62,6 +62,10 @@ export function configureGoogleSignIn(): void {
   if (isConfigured) {
     return;
   }
+  if (!ENV.GOOGLE_WEB_CLIENT_ID) {
+    console.error('[auth] Google sign-in configuration skipped: GOOGLE_WEB_CLIENT_ID is not configured');
+    return;
+  }
   GoogleSignin.configure({
     webClientId: ENV.GOOGLE_WEB_CLIENT_ID,
     iosClientId: ENV.GOOGLE_IOS_CLIENT_ID || undefined,
@@ -93,6 +97,10 @@ export class GoogleSignInCancelledError extends Error {
 export async function signIn(): Promise<UserProfile> {
   if (!isGoogleSignInAvailable()) {
     throw new Error('Google sign-in is not available on this platform');
+  }
+  if (!ENV.GOOGLE_WEB_CLIENT_ID) {
+    console.error('[auth] Google sign-in aborted: GOOGLE_WEB_CLIENT_ID is not configured');
+    throw new Error('Google sign-in failed. Please try again.');
   }
   configureGoogleSignIn();
 

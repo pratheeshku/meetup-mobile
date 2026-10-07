@@ -19,7 +19,9 @@ export const ENV = {
   // OAuth client ID for Google Sign-In (R-010, R-018). Never a secret in
   // the OAuth-client sense (it's not a client *secret*), but still kept
   // config-driven rather than hardcoded per P1/§3.11.
-  GOOGLE_WEB_CLIENT_ID: Config.GOOGLE_WEB_CLIENT_ID ?? '',
+  GOOGLE_WEB_CLIENT_ID:
+    Config.GOOGLE_WEB_CLIENT_ID ||
+    '716110883386-504n10sm8npuuo2gfeku7epst0j353kl.apps.googleusercontent.com',
   GOOGLE_IOS_CLIENT_ID:
     Config.GOOGLE_IOS_CLIENT_ID ??
     '716110883386-r4vaffejschrqg9c5qqo0u0esuds4p4d.apps.googleusercontent.com',
