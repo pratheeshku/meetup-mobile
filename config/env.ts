@@ -22,7 +22,7 @@ export const ENV = {
   GOOGLE_WEB_CLIENT_ID: Config.GOOGLE_WEB_CLIENT_ID ?? '',
   GOOGLE_IOS_CLIENT_ID:
     Config.GOOGLE_IOS_CLIENT_ID ??
-    '716110883386-dc4rc3st4favjss1tvnnm5j23b7sfh06.apps.googleusercontent.com',
+    '550742520731-suf3bmm21e2ifuf0lmfhedg5j8pn8rpl.apps.googleusercontent.com',
   // Hetzner Object Storage bucket base URL for avatar images
   // (DES-MEETUP-ADDENDUM-profile-photo §5, §10.1; P1 — config-driven,
   // never hardcoded). `avatar_storage_key` from the backend is appended
