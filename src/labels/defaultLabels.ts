@@ -96,6 +96,7 @@ export const DEFAULT_LABELS = {
   'mob.force_update.title': 'Update required',
   'mob.force_update.message': 'Please update Shuttlr to continue.',
   'mob.force_update.action': 'Update',
+  'mob.brand.name': 'Shuttlr',
   'mob.brand.tagline': 'PLAY TOGETHER',
   'mob.tabs.home': 'Home',
   'mob.tabs.groups': 'Groups',

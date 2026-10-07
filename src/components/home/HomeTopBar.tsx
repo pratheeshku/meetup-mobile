@@ -95,7 +95,7 @@ export default function HomeTopBar({
             style={styles.brandIcon}
             resizeMode="contain"
           />
-          <Text style={styles.brandTitle}>Shuttlr</Text>
+          <Text style={styles.brandTitle}>{t('mob.brand.name')}</Text>
         </View>
 
         {/* Right: Bell & Profile */}

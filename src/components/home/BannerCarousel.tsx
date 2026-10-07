@@ -149,7 +149,7 @@ export default function BannerCarousel({
               style={styles.fallbackLogo}
               resizeMode="contain"
             />
-            <Text style={styles.fallbackText}>Shuttlr</Text>
+            <Text style={styles.fallbackText}>{t('mob.brand.name')}</Text>
             <Text style={styles.fallbackTagline}>
               {t('mob.home.banner_fallback_tagline')}
             </Text>
