@@ -324,11 +324,12 @@ describe('LoginScreen Apple sign-in and iOS elements (AD-6, AD-8, AD-9)', () => 
     expect(texts(root)).toContain('Apple sign-in failed. Please try again.');
   });
 
-  it('[Execute] does not render Apple button on Android', async () => {
+  it('[Execute] does not render Apple button on Android, but renders terms notice', async () => {
     jest.replaceProperty(Platform, 'OS', 'android');
     const root = await mount();
 
     expect(texts(root)).not.toContain('Continue with Apple');
+    expect(texts(root)).toContain('Terms and Conditions');
   });
 });
 

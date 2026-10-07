@@ -193,7 +193,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
         />
       ) : null}
 
-      {Platform.OS === 'ios' ? <SocialTermsNotice /> : null}
+      <SocialTermsNotice />
 
       <TextField
         style={styles.input}
