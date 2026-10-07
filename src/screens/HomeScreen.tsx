@@ -38,7 +38,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
 import { getEvents } from '../api/events';
-import { getGroups, getMyGroups } from '../api/groups';
+import { getCachedHomeGroups, getGroups, getMyGroups } from '../api/groups';
 import {
   BUNDLED_FALLBACK_BANNER,
   getCachedBanners,
@@ -142,6 +142,15 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     });
   }, []);
 
+  // Load cached groups on mount so groups display immediately if cached
+  useEffect(() => {
+    getCachedHomeGroups().then(cached => {
+      if (cached && cached.length > 0) {
+        setLiveGroups(prev => (prev.items !== null ? prev : { items: cached, status: 'success' }));
+      }
+    });
+  }, []);
+
   // Update persisted banners when banners resource arrives, keeping last real data
   useEffect(() => {
     if (banners.data) {
@@ -211,10 +220,15 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       const res = await getGroups({ mine: true, limit: 3 }, { correlationId });
       setLiveGroups({ items: res.items, status: 'success' });
     } catch {
-      setLiveGroups(prev => ({
-        items: prev.items,
-        status: prev.items !== null ? 'success' : 'error',
-      }));
+      const cached = await getCachedHomeGroups();
+      if (cached && cached.length > 0) {
+        setLiveGroups({ items: cached, status: 'success' });
+      } else {
+        setLiveGroups(prev => ({
+          items: prev.items,
+          status: prev.items !== null ? 'success' : 'error',
+        }));
+      }
     }
   }, []);
 
@@ -418,7 +432,8 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     summaryData?.upcoming_games_this_week ??
     (upcomingGamesThisWeek ? upcomingGamesThisWeek.length : null);
   const groupsCount =
-    summaryData?.active_groups ?? (activeGroups ? activeGroups.length : null);
+    summaryData?.active_groups ??
+    (liveGroups.items ? liveGroups.items.length : (activeGroups ? activeGroups.length : null));
 
   // Resolved list items: live endpoints preferred, local calculation fallback on failure
   const displayedUpcoming =
@@ -432,16 +447,14 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const upcomingError =
     liveUpcoming.status === 'error' && events.status === 'error' && displayedUpcoming === null;
 
-  const displayedGroups =
-    liveGroups.items !== null
-      ? liveGroups.items
-      : nextThreeGroups;
+  // Resolved list items: live endpoints preferred, cached fallback of same shape on failure
+  const displayedGroups = liveGroups.items;
 
   const isGroupsLoading =
     liveGroups.status === 'loading' && displayedGroups === null;
 
   const groupsError =
-    liveGroups.status === 'error' && groups.status === 'error' && displayedGroups === null;
+    liveGroups.status === 'error' && displayedGroups === null;
 
   const retryUpcoming = useCallback(() => {
     withCorrelationId(correlationId =>
@@ -570,6 +583,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
                 <UnifiedGroupCard
                   key={group.id}
                   group={group}
+                  currentUserId={user?.id}
                   onPress={() =>
                     navigation.navigate('Groups', {
                       screen: 'GroupDetail',

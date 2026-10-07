@@ -25,6 +25,7 @@
  * the endpoints that actually exist. See the Implementation Report for
  * the full discrepancy write-up.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from './client';
 import type {
   CreateGroupInput,
@@ -57,13 +58,32 @@ interface RequestOptions {
 interface GroupApiItem {
   id: string;
   name: string;
-  description: string | null;
-  owner_id: string;
-  created_at: string;
+  description?: string | null;
+  owner_id?: string;
+  ownerId?: string;
+  created_at?: string;
+  createdAt?: string;
   logo_url?: string | null;
-  owner?: { display_name: string; nickname?: string } | null;
+  logoUrl?: string | null;
+  owner?: {
+    display_name?: string;
+    displayName?: string;
+    nickname?: string;
+  } | null;
   member_count?: number | null;
-  members_preview?: Array<{ display_name: string; photo_url: string | null }>;
+  memberCount?: number | null;
+  members_preview?: Array<{
+    display_name?: string;
+    displayName?: string;
+    photo_url?: string | null;
+    photoUrl?: string | null;
+  }>;
+  membersPreview?: Array<{
+    display_name?: string;
+    displayName?: string;
+    photo_url?: string | null;
+    photoUrl?: string | null;
+  }>;
 }
 
 /**
@@ -101,17 +121,35 @@ function mapGroupMember(raw: GroupMembershipApiItem): GroupMember {
  * not implemented.
  */
 function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
+  const ownerObj = raw.owner
+    ? {
+        display_name: raw.owner.display_name ?? raw.owner.displayName ?? raw.owner.nickname ?? '',
+        nickname: raw.owner.nickname,
+      }
+    : null;
+  const rawPreviews = raw.members_preview ?? raw.membersPreview ?? [];
+  const membersPreview = rawPreviews.map(m => ({
+    display_name: m.display_name ?? m.displayName ?? '',
+    photo_url: m.photo_url ?? m.photoUrl ?? null,
+  }));
+  const memberCount =
+    raw.member_count !== undefined
+      ? raw.member_count
+      : raw.memberCount !== undefined
+      ? raw.memberCount
+      : null;
+
   return {
     id: raw.id,
     name: raw.name,
     description: raw.description ?? '',
-    owner_id: raw.owner_id,
-    owner_nickname: raw.owner?.nickname ?? raw.owner?.display_name,
-    owner: raw.owner ?? null,
-    logo_url: raw.logo_url ?? null,
-    member_count: raw.member_count !== undefined ? raw.member_count : null,
-    members_preview: raw.members_preview ?? [],
-    created_at: raw.created_at,
+    owner_id: raw.owner_id ?? raw.ownerId ?? '',
+    owner_nickname: ownerObj?.nickname ?? ownerObj?.display_name,
+    owner: ownerObj,
+    logo_url: raw.logo_url ?? raw.logoUrl ?? null,
+    member_count: memberCount,
+    members_preview: membersPreview,
+    created_at: raw.created_at ?? raw.createdAt ?? '',
     current_user_role: currentUserRole,
   };
 }
@@ -119,6 +157,41 @@ function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
 export interface GetGroupsParams {
   mine?: boolean;
   limit?: number;
+}
+
+export const HOME_GROUPS_CACHE_KEY = '@meetup/home_groups_cache';
+export const HOME_GROUPS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+export async function getCachedHomeGroups(): Promise<Group[] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(HOME_GROUPS_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.savedAt !== 'number' || !Array.isArray(parsed.data)) {
+      return null;
+    }
+    const age = Date.now() - parsed.savedAt;
+    if (age > HOME_GROUPS_CACHE_TTL_MS || age < 0) {
+      return null;
+    }
+    return parsed.data as Group[];
+  } catch {
+    return null;
+  }
+}
+
+export async function setCachedHomeGroups(data: Group[]): Promise<void> {
+  try {
+    const envelope = {
+      savedAt: Date.now(),
+      data,
+    };
+    await AsyncStorage.setItem(HOME_GROUPS_CACHE_KEY, JSON.stringify(envelope));
+  } catch {
+    // Non-blocking cache write failure
+  }
 }
 
 /**
@@ -129,17 +202,38 @@ export async function getGroups(
   params?: GetGroupsParams,
   options?: RequestOptions,
 ): Promise<GroupsListResponse> {
-  const { data } = await apiClient.get<GroupApiItem[]>('/groups', {
-    params,
-    correlationId: options?.correlationId,
-  });
-  const items = data.map(raw => mapGroupApiItem(raw, params?.mine ? 'member' : 'none'));
-  return {
-    items,
-    total: items.length,
-    page: 1,
-    page_size: items.length,
-  };
+  try {
+    const { data } = await apiClient.get<GroupApiItem[] | { items: GroupApiItem[] }>('/groups', {
+      params,
+      correlationId: options?.correlationId,
+    });
+    const rawList = Array.isArray(data)
+      ? data
+      : (data as { items?: GroupApiItem[] })?.items ?? [];
+    const items = rawList.map(raw => mapGroupApiItem(raw, params?.mine ? 'member' : 'none'));
+    if (items.length > 0 && params?.mine) {
+      await setCachedHomeGroups(items);
+    }
+    return {
+      items,
+      total: items.length,
+      page: 1,
+      page_size: items.length,
+    };
+  } catch (error) {
+    if (params?.mine) {
+      const cached = await getCachedHomeGroups();
+      if (cached) {
+        return {
+          items: cached,
+          total: cached.length,
+          page: 1,
+          page_size: cached.length,
+        };
+      }
+    }
+    throw error;
+  }
 }
 
 export interface GetMyGroupsOptions extends RequestOptions {

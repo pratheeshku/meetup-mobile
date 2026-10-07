@@ -236,18 +236,24 @@ export function UnifiedGameCard({
 export function UnifiedGroupCard({
   group,
   onPress,
+  currentUserId,
 }: {
   group: Group;
   onPress: () => void;
+  currentUserId?: string;
 }): React.JSX.Element {
   const t = useT();
+
+  const isMine =
+    group.current_user_role === 'owner' ||
+    (Boolean(currentUserId) && Boolean(group.owner_id) && group.owner_id === currentUserId);
 
   const ownerName =
     group.owner?.display_name ||
     group.owner?.nickname ||
     group.owner_nickname ||
-    (group.current_user_role === 'owner' ? t('mob.group_card.owner_self') : t('mob.group_card.owner_fallback'));
-  const isMine = group.current_user_role === 'owner';
+    (isMine ? t('mob.group_card.owner_self') : t('mob.group_card.owner_fallback'));
+
   const ownerLine = `${t('mob.home.card.owner')}: ${ownerName}${isMine ? ` (${t('mob.home.card.you')})` : ''}`;
 
   const memberCount = group.member_count;
