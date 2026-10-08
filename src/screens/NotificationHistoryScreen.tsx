@@ -41,7 +41,11 @@ function openNotification(item: NotificationHistoryItem): void {
     return;
   }
   const entityId = item.entity_id?.trim() ?? '';
-  if (entityId === '' && item.notification_type !== 'global') {
+  if (
+    entityId === '' &&
+    item.notification_type !== 'global' &&
+    item.notification_type !== 'group_deleted'
+  ) {
     return;
   }
   navigateToNotificationTarget(resolveNotificationTarget(item.notification_type, entityId));

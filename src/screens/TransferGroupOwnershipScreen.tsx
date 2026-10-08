@@ -20,7 +20,7 @@ import { getApiErrorMessage } from '../utils/apiError';
 type Props = NativeStackScreenProps<ProfileStackParamList, 'TransferGroupOwnership'>;
 
 export default function TransferGroupOwnershipScreen({ navigation, route }: Props): React.JSX.Element {
-  const { groupId, groupName, onTransferred } = route.params;
+  const { groupId, groupName } = route.params;
   const { user } = useAuth();
   const t = useT();
 
@@ -69,9 +69,6 @@ export default function TransferGroupOwnershipScreen({ navigation, route }: Prop
       await withCorrelationId(async correlationId => {
         await transferGroupOwnership(groupId, targetMember.user_id, { correlationId });
       });
-      if (onTransferred) {
-        onTransferred(groupId);
-      }
       navigation.goBack();
     } catch (e) {
       setTransferError(getApiErrorMessage(e, t('mob.group_transfer.error')));

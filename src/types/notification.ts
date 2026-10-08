@@ -39,9 +39,11 @@ export type NotificationType =
   | 'tournament_cancelled'
   | 'tournament_schedule_published'
   | 'tournament_standings_published'
-  | 'team_invite';
+  | 'team_invite'
+  | 'group_deleted'
+  | 'group_ownership_transferred';
 
-/** All 16 known notification types (the 12 from the task brief, the two participant types, group_event_created, plus event_reminder). */
+/** All 18 known notification types. */
 export const NOTIFICATION_TYPES: NotificationType[] = [
   'global',
   'event_invite',
@@ -59,6 +61,8 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   'tournament_schedule_published',
   'tournament_standings_published',
   'team_invite',
+  'group_deleted',
+  'group_ownership_transferred',
 ];
 
 /**

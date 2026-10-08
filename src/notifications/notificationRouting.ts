@@ -46,6 +46,7 @@ import type { AppTabParamList } from '../navigation/types';
 export type NotificationTarget =
   | { tab: 'Home'; screen: 'EventsList' }
   | { tab: 'Home'; screen: 'EventDetail'; params: { eventId: string } }
+  | { tab: 'Groups'; screen: 'GroupsList' }
   | { tab: 'Groups'; screen: 'GroupDetail'; params: { groupId: string } }
   | {
       tab: 'Tournaments';
@@ -126,8 +127,21 @@ export function resolveNotificationTarget(
 
     // Deviation — see file header: routed to Group Detail per the task
     // brief's literal instruction; design §4.8 names a Team Detail screen
-    // that does not exist in this codebase.
+    // tags that does not exist in this codebase.
     case 'team_invite':
+      return {
+        tab: 'Groups',
+        screen: 'GroupDetail',
+        params: { groupId: entityId },
+      };
+
+    case 'group_deleted':
+      return {
+        tab: 'Groups',
+        screen: 'GroupsList',
+      };
+
+    case 'group_ownership_transferred':
       return {
         tab: 'Groups',
         screen: 'GroupDetail',
@@ -188,7 +202,9 @@ export function navigateToNotificationTarget(target: NotificationTarget): void {
       screen: 'EventDetail',
       params: target.params,
     });
-  } else if (target.tab === 'Groups') {
+  } else if (target.tab === 'Groups' && target.screen === 'GroupsList') {
+    navigationRef.navigate('Groups', { screen: 'GroupsList' });
+  } else if (target.tab === 'Groups' && target.screen === 'GroupDetail') {
     navigationRef.navigate('Groups', {
       screen: 'GroupDetail',
       params: target.params,

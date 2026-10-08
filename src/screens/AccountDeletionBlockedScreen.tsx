@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
-import { deleteGroup } from '../api/groups';
+import { deleteGroup, getMyGroups } from '../api/groups';
 import { requestDeletion, type OwnedGroupInfo } from '../api/profile';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -21,10 +22,35 @@ export default function AccountDeletionBlockedScreen({ navigation, route }: Prop
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const isInitialMount = useRef(true);
 
-  const handleGroupTransferred = (transferredGroupId: string): void => {
-    setGroups(prev => prev.filter(g => g.id !== transferredGroupId));
-  };
+  const refreshOwnedGroups = useCallback(async () => {
+    try {
+      const res = await withCorrelationId(async correlationId => {
+        return await getMyGroups({ enrich: true, correlationId });
+      });
+      const owned = res.items
+        .filter(g => g.current_user_role === 'owner')
+        .map(g => ({
+          id: g.id,
+          name: g.name,
+          member_count: g.member_count ?? 1,
+        }));
+      setGroups(owned);
+    } catch {
+      // Retain current groups on network error
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isInitialMount.current) {
+        isInitialMount.current = false;
+        return;
+      }
+      refreshOwnedGroups();
+    }, [refreshOwnedGroups]),
+  );
 
   const handleDeleteGroup = async (group: OwnedGroupInfo): Promise<void> => {
     setErrorMessage(null);
@@ -61,7 +87,6 @@ export default function AccountDeletionBlockedScreen({ navigation, route }: Prop
     navigation.navigate('TransferGroupOwnership', {
       groupId: group.id,
       groupName: group.name,
-      onTransferred: handleGroupTransferred,
     });
   };
 

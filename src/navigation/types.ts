@@ -85,7 +85,6 @@ export type ProfileStackParamList = {
   TransferGroupOwnership: {
     groupId: string;
     groupName: string;
-    onTransferred?: (groupId: string) => void;
   };
   AccountDeletionCode: undefined;
 };

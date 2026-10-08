@@ -40,7 +40,12 @@ export default function AccountDeletionCodeScreen({ navigation }: Props): React.
         await requestDeletion({ correlationId });
       });
       setInfoMessage(t('mob.account_delete.resend_success'));
-    } catch (e) {
+    } catch (e: any) {
+      const status = e?.response?.status;
+      if (status === 429) {
+        setErrorMessage(getApiErrorMessage(e, t('mob.account_delete.rate_limited')));
+        return;
+      }
       const ownedGroups = parseOwnsGroupsError(e);
       if (ownedGroups && ownedGroups.length > 0) {
         navigation.replace('AccountDeletionBlocked', { groups: ownedGroups });
@@ -69,14 +74,22 @@ export default function AccountDeletionCodeScreen({ navigation }: Props): React.
       // 200 -> done: log out
       await signOut();
     } catch (e: any) {
+      setIsConfirming(false);
+      const status = e?.response?.status;
+      if (status === 400) {
+        setErrorMessage(t('mob.account_delete.code_invalid'));
+        return;
+      }
+      if (status === 429) {
+        setErrorMessage(getApiErrorMessage(e, t('mob.account_delete.rate_limited')));
+        return;
+      }
       const ownedGroups = parseOwnsGroupsError(e);
       if (ownedGroups && ownedGroups.length > 0) {
         navigation.replace('AccountDeletionBlocked', { groups: ownedGroups });
         return;
       }
-      // Invalid code -> 400: generic message
-      setErrorMessage(t('mob.account_delete.code_invalid'));
-      setIsConfirming(false);
+      setErrorMessage(getApiErrorMessage(e, t('mob.profile.delete_start_error')));
     }
   };
 
