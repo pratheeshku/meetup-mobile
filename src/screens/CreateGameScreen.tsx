@@ -324,7 +324,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           title: gTitle.trim(),
           sport: gSport,
           visibility: gVisibility,
-          ...(gVisibility === 'group' && selectedGroupId ? { group_id: selectedGroupId } : {}),
+          ...(gVisibility === 'group' && selectedGroupId ? { group_ids: [selectedGroupId] } : {}),
           ...(gVisibility === 'invite_only'
             ? { invite_user_ids: invitedPlayers.map(p => p.id) }
             : {}),

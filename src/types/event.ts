@@ -83,6 +83,7 @@ export interface UpdateEventInput {
   starts_at?: string;
   ends_at?: string | null;
   visibility?: EventVisibility | string;
+  group_ids?: string[];
   sport?: string;
   allow_waitlist?: boolean;
   estimated_cost_cents?: number | null;
@@ -143,7 +144,7 @@ export interface CreateEventInput {
   title: string;
   sport?: string;
   visibility: EventVisibility;
-  group_id?: string;
+  group_ids?: string[];
   invite_user_ids?: string[];
   skill_level_requirement: EventSkillLevel;
   /** Integer, schema `gt=0` (i.e. at least 1); form enforces 2–200 to match web. */
