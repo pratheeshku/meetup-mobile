@@ -1,5 +1,6 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
 
+import type { OwnedGroupInfo } from '../api/profile';
 import type { GamesScope } from '../utils/gameLists';
 
 export type { GamesScope };
@@ -42,6 +43,7 @@ export type HomeStackParamList = {
 export type GroupsStackParamList = {
   GroupsList: { refreshKey?: number } | undefined;
   GroupDetail: { groupId: string };
+  EditGroup: { groupId: string };
   CreateGroup: undefined;
   /** Group creation step 2 (DES-MEETUP-FEEDBACK-001 C4). */
   InviteMembers: { groupId: string };
@@ -74,16 +76,18 @@ export type TournamentsStackParamList = {
 
 /**
  * Profile tab's nested stack route params (§4.8 — Profile,
- * Notification Preferences). Added by the push-notifications task: Profile
- * was previously a flat tab screen with no nested stack of its own (see
- * `RootNavigator`'s file header for the "why" of this change) — mirrors
- * the `HomeStack`/`GroupsStack`/`TournamentsStack` pattern above so
- * Notification Preferences can be pushed from Profile with correct back
- * navigation.
+ * Notification Preferences, Account Deletion).
  */
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   NotificationPreferences: undefined;
+  AccountDeletionBlocked: { groups: OwnedGroupInfo[] };
+  TransferGroupOwnership: {
+    groupId: string;
+    groupName: string;
+    onTransferred?: (groupId: string) => void;
+  };
+  AccountDeletionCode: undefined;
 };
 
 /**

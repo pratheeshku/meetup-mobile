@@ -119,6 +119,10 @@ import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
 import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
+import EditGroupScreen from '../screens/EditGroupScreen';
+import AccountDeletionBlockedScreen from '../screens/AccountDeletionBlockedScreen';
+import TransferGroupOwnershipScreen from '../screens/TransferGroupOwnershipScreen';
+import AccountDeletionCodeScreen from '../screens/AccountDeletionCodeScreen';
 import NotificationBanner from '../components/NotificationBanner';
 import OnboardingOverlay from './OnboardingOverlay';
 import { useT } from '../labels/LabelsContext';
@@ -219,6 +223,11 @@ function GroupsStack(): React.JSX.Element {
         options={{ title: t('mob.nav.title_group') }}
       />
       <GroupsStackNav.Screen
+        name="EditGroup"
+        component={EditGroupScreen}
+        options={{ title: t('mob.edit_group.title') }}
+      />
+      <GroupsStackNav.Screen
         name="InviteMembers"
         component={InviteMembersScreen}
         options={{ title: t('mob.nav.title_invite_members') }}
@@ -264,6 +273,21 @@ function ProfileStack(): React.JSX.Element {
         name="NotificationPreferences"
         component={NotificationPreferencesScreen}
         options={{ title: t('mob.nav.title_notification_prefs') }}
+      />
+      <ProfileStackNav.Screen
+        name="AccountDeletionBlocked"
+        component={AccountDeletionBlockedScreen}
+        options={{ title: t('mob.account_delete.title') }}
+      />
+      <ProfileStackNav.Screen
+        name="TransferGroupOwnership"
+        component={TransferGroupOwnershipScreen}
+        options={{ title: t('mob.group_transfer.title') }}
+      />
+      <ProfileStackNav.Screen
+        name="AccountDeletionCode"
+        component={AccountDeletionCodeScreen}
+        options={{ title: t('mob.account_delete.confirm_title') }}
       />
     </ProfileStackNav.Navigator>
   );

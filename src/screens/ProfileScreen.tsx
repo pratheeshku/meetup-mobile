@@ -44,10 +44,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../auth/AuthContext';
 import { withCorrelationId } from '../api/correlationId';
 import {
-  confirmDeletion,
   deleteAvatar,
   deleteSkillLevel,
   getProfile,
+  parseOwnsGroupsError,
   requestDeletion,
   updateProfile,
   updateSkillLevel,
@@ -123,9 +123,6 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
   const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
-  const [isAwaitingConfirmationCode, setIsAwaitingConfirmationCode] = useState(false);
-  const [confirmationCodeDraft, setConfirmationCodeDraft] = useState('');
-  const [isConfirmingDeletion, setIsConfirmingDeletion] = useState(false);
   const [deletionError, setDeletionError] = useState<string | null>(null);
 
   // Avatar upload/remove state (DES-MEETUP-ADDENDUM-profile-photo §10.4).
@@ -301,7 +298,6 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   };
 
   const nameChain = useFieldChain(['displayName']);
-  const deletionChain = useFieldChain(['confirmationCode']);
 
   const handleSaveDisplayName = async (): Promise<void> => {
     if (!displayNameDraft.trim()) {
@@ -415,13 +411,17 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
     setDeletionError(null);
     setIsRequestingDeletion(true);
     try {
-      await requestDeletion();
-      setIsAwaitingConfirmationCode(true);
-    } catch {
-      // §4.13: admin self-deletion is rejected server-side with an
-      // explicit error — surfaced generically here since the backend
-      // owns the actual reason (server is the sole authority, §5.3).
-      setDeletionError(t('mob.profile.delete_start_error'));
+      await withCorrelationId(async correlationId => {
+        await requestDeletion({ correlationId });
+      });
+      navigation.navigate('AccountDeletionCode');
+    } catch (e: any) {
+      const ownedGroups = parseOwnsGroupsError(e);
+      if (ownedGroups && ownedGroups.length > 0) {
+        navigation.navigate('AccountDeletionBlocked', { groups: ownedGroups });
+        return;
+      }
+      setDeletionError(getApiErrorMessage(e, t('mob.profile.delete_start_error')));
     } finally {
       setIsRequestingDeletion(false);
     }
@@ -444,31 +444,6 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         { text: t('mob.common.delete'), style: 'destructive', onPress: handleRequestDeletion },
       ],
     );
-  };
-
-  const handleCancelDeletionCode = (): void => {
-    setIsAwaitingConfirmationCode(false);
-    setConfirmationCodeDraft('');
-    setDeletionError(null);
-  };
-
-  const handleConfirmDeletion = async (): Promise<void> => {
-    if (!confirmationCodeDraft.trim()) {
-      setDeletionError(t('mob.profile.code_required'));
-      deletionChain.focus('confirmationCode');
-      return;
-    }
-    setDeletionError(null);
-    setIsConfirmingDeletion(true);
-    try {
-      await confirmDeletion(confirmationCodeDraft.trim());
-      await signOut();
-    } catch {
-      // Enumeration-safe per §4.13 ("expired/consumed confirmation
-      // token") — never distinguish "wrong code" from "expired code".
-      setDeletionError(t('mob.profile.code_invalid'));
-      setIsConfirmingDeletion(false);
-    }
   };
 
   if (isLoading) {
@@ -706,47 +681,12 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
       <View style={styles.dangerZone}>
         {deletionError ? <Text style={styles.errorText}>{deletionError}</Text> : null}
-
-        {isAwaitingConfirmationCode ? (
-          <View style={styles.editRow}>
-            <Text style={styles.dangerZoneText}>
-              {t('mob.profile.code_prompt')}
-            </Text>
-            <TextField
-              style={styles.input}
-              placeholder={t('mob.profile.code_placeholder')}
-              {...deletionChain.props('confirmationCode')}
-              value={confirmationCodeDraft}
-              onChangeText={setConfirmationCodeDraft}
-              editable={!isConfirmingDeletion}
-              autoCapitalize="none"
-            />
-            <View style={styles.editActionsRow}>
-              <Button
-                label={t('mob.profile.confirm_delete')}
-                size="sm"
-                variant="destructive"
-                onPress={handleConfirmDeletion}
-                loading={isConfirmingDeletion}
-                style={styles.actionSpacing}
-              />
-              <Button
-                label={t('mob.common.cancel')}
-                size="sm"
-                variant="secondary"
-                onPress={handleCancelDeletionCode}
-                disabled={isConfirmingDeletion}
-              />
-            </View>
-          </View>
-        ) : (
-          <Button
-            label={t('mob.profile.delete_account')}
-            variant="destructive"
-            onPress={handleDeleteAccountPress}
-            loading={isRequestingDeletion}
-          />
-        )}
+        <Button
+          label={t('mob.profile.delete_account')}
+          variant="destructive"
+          onPress={handleDeleteAccountPress}
+          loading={isRequestingDeletion}
+        />
       </View>
     </KeyboardAwareScreen>
   );

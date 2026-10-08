@@ -200,35 +200,45 @@ export async function deleteAvatar(options?: RequestOptions): Promise<void> {
   });
 }
 
-/**
- * BLOCKED — CRITICAL, needs an architect/product decision, not fixed
- * here (do not guess or invent a replacement endpoint): confirmed
- * against the live OpenAPI schema that neither `/users/me/deletion-request`
- * nor `/users/me/deletion-confirm` (below) exists on the real backend at
- * all — not a field mismatch, the paths themselves 404. The entire
- * "Delete Account" flow in `ProfileScreen` is calling endpoints that do
- * not exist. Nothing in the live schema suggests an alternative
- * account-deletion mechanism (no `/users/me` DELETE, no other
- * deletion-shaped path anywhere in the 123 real paths audited). This may
- * mean the feature was never built server-side yet — needs the architect
- * to confirm with the backend team before any client-side fix is
- * attempted. See docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md.
- *
- * Triggers the backend to send a confirmation code to the user's email
- * (§4.13). The code itself is never returned in this response — it is
- * delivered out-of-band, matching an email-based confirmation flow and
- * never exposing the token to a channel where R-111/§5.4-style logging
- * hygiene would need to guard it client-side.
- */
-export async function requestDeletion(): Promise<void> {
-  await apiClient.post('/users/me/deletion-request');
+export interface OwnedGroupInfo {
+  id: string;
+  name: string;
+  member_count: number;
+}
+
+export interface OwnsGroupsErrorData {
+  code: 'owns_groups';
+  groups: OwnedGroupInfo[];
+}
+
+export function parseOwnsGroupsError(error: unknown): OwnedGroupInfo[] | null {
+  const data = (error as { response?: { status?: number; data?: { code?: string; groups?: OwnedGroupInfo[] } } })
+    ?.response?.data;
+  if (data?.code === 'owns_groups' && Array.isArray(data.groups)) {
+    return data.groups;
+  }
+  return null;
 }
 
 /**
- * BLOCKED — see `requestDeletion()`'s comment above: this endpoint also
- * does not exist on the real backend (confirmed via the live OpenAPI
- * schema). Left unchanged pending the architect/backend-team decision.
+ * `POST /users/me/deletion-request` -> 202 (confirmation code is emailed).
+ * Returns 409 `{"code":"owns_groups","groups":[{"id","name","member_count"}]}` when the user owns groups.
+ * Resend is allowed (rate-limited).
  */
-export async function confirmDeletion(confirmationToken: string): Promise<void> {
-  await apiClient.post('/users/me/deletion-confirm', { confirmation_token: confirmationToken });
+export async function requestDeletion(options?: RequestOptions): Promise<void> {
+  await apiClient.post('/users/me/deletion-request', undefined, {
+    correlationId: options?.correlationId,
+  });
+}
+
+/**
+ * `POST /users/me/deletion-confirm` with `{"code": "<6 digits>"}` -> 200.
+ * Invalid code -> 400 (generic message). 409 owns_groups when the user owns groups.
+ */
+export async function confirmDeletion(code: string, options?: RequestOptions): Promise<void> {
+  await apiClient.post(
+    '/users/me/deletion-confirm',
+    { code },
+    { correlationId: options?.correlationId },
+  );
 }

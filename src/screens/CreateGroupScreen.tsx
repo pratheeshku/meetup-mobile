@@ -18,11 +18,11 @@
  * No member-invite step on this screen.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
-import { createGroup } from '../api/groups';
+import { createGroup, uploadGroupLogo } from '../api/groups';
 import { getSports } from '../api/sports';
 import { createTeam } from '../api/teams';
 import Button from '../components/Button';
@@ -35,11 +35,12 @@ import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
 import { getLabel, useLabels } from '../labels/LabelsContext';
 import { useFieldChain } from '../hooks/useFieldChain';
-import { colors, spacing, typography } from '../theme/tokens';
+import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { Sport } from '../types/sport';
 import type { TeamVisibility } from '../types/team';
 import { goToDashboard } from '../navigation/goToDashboard';
 import { getApiErrorMessage } from '../utils/apiError';
+import { isPickerCancelled, pickImage, type PickedImage } from '../utils/imagePicker';
 import type { GroupsStackParamList } from '../navigation/types';
 import { useT } from '../labels/LabelsContext';
 
@@ -73,6 +74,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
   // Players Group fields (GroupCreate).
   const [gName, setGName] = useState('');
   const [gDescription, setGDescription] = useState('');
+  const [gLogo, setGLogo] = useState<PickedImage | null>(null);
 
   // Tournament Team fields (TeamCreate).
   const [tName, setTName] = useState('');
@@ -98,6 +100,43 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
   const groupChain = useFieldChain(['gName', 'gDescription']);
   const teamChain = useFieldChain(['tName']);
 
+  const handlePickLogoSource = async (source: 'camera' | 'library'): Promise<void> => {
+    try {
+      const result = await pickImage(source, t('mob.group_detail.crop_title'));
+      if (result) {
+        setGLogo(result);
+      }
+    } catch (e) {
+      if (!isPickerCancelled(e)) {
+        setError(getApiErrorMessage(e, t('mob.profile.photo_upload_error')));
+      }
+    }
+  };
+
+  const handleLogoPress = (): void => {
+    const buttons: Array<{ text: string; style?: 'cancel' | 'destructive' | 'default'; onPress?: () => void }> = [
+      { text: t('mob.common.cancel'), style: 'cancel' },
+      {
+        text: t('mob.create_group.take_photo'),
+        onPress: () => handlePickLogoSource('camera'),
+      },
+      {
+        text: t('mob.create_group.choose_photo'),
+        onPress: () => handlePickLogoSource('library'),
+      },
+    ];
+
+    if (gLogo) {
+      buttons.push({
+        text: t('mob.create_group.remove_logo'),
+        style: 'destructive',
+        onPress: () => setGLogo(null),
+      });
+    }
+
+    Alert.alert(t('mob.create_group.photo_title'), undefined, buttons);
+  };
+
   // --- Players Group submit ---
   const handleSubmitGroup = async (): Promise<void> => {
     setError(null);
@@ -112,10 +151,22 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
     setIsSubmitting(true);
     try {
       const created = await withCorrelationId(async correlationId => {
-        return await createGroup(
+        const group = await createGroup(
           { name: trimmedName, description: gDescription.trim() },
           { correlationId },
         );
+
+        if (gLogo) {
+          await uploadGroupLogo(
+            group.id,
+            gLogo.path,
+            gLogo.filename,
+            gLogo.mime,
+            { correlationId },
+          );
+        }
+
+        return group;
       });
       // Step 1 done: open step 2 (invite members). `replace` so Back from
       // step 2 never returns to this form and re-submits the group.
@@ -189,6 +240,46 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
 
       {mode === 'group' ? (
         <>
+          <Text style={[styles.label, styles.section]}>{t('mob.create_group.logo_label')}</Text>
+          <View style={styles.logoRow}>
+            <Pressable
+              onPress={handleLogoPress}
+              style={styles.logoPickerContainer}
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.create_group.logo_label')}
+              disabled={isSubmitting}
+            >
+              {gLogo ? (
+                <Image source={{ uri: gLogo.path }} style={styles.logoImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.logoPlaceholder}>
+                  <GroupsIcon size={28} />
+                </View>
+              )}
+            </Pressable>
+
+            <View style={styles.logoActions}>
+              <Button
+                label={gLogo ? t('mob.create_group.change_logo') : t('mob.create_group.add_logo')}
+                variant="secondary"
+                size="sm"
+                onPress={handleLogoPress}
+                disabled={isSubmitting}
+                style={styles.logoButton}
+              />
+              {gLogo ? (
+                <Button
+                  label={t('mob.create_group.remove_logo')}
+                  variant="destructive"
+                  size="sm"
+                  onPress={() => setGLogo(null)}
+                  disabled={isSubmitting}
+                  style={styles.logoButton}
+                />
+              ) : null}
+            </View>
+          </View>
+
           <Text style={[styles.label, styles.section]}>{t('mob.create_group.name')}</Text>
           <TextField
             style={styles.input}
@@ -269,4 +360,36 @@ const styles = StyleSheet.create({
   multiline: { minHeight: spacing.xxl * 2 },
   hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.md },
   error: { ...typography.body, color: colors.error, marginBottom: spacing.md },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  logoPickerContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    marginRight: spacing.md,
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  logoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoActions: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  logoButton: {
+    alignSelf: 'flex-start',
+  },
 });
