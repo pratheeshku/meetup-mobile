@@ -664,4 +664,13 @@ export const DEFAULT_LABELS = {
   'mob.create_group.choose_photo': 'Choose from library',
 
   'mob.success.group_deleted': 'Group deleted successfully.',
+
+  // Phase 2/3 - Wizard building blocks (Package M1)
+  'mob.wizard.step': 'Step {current} of {total}',
+  'mob.wizard.next': 'Next',
+  'mob.wizard.back': 'Back',
+  'mob.number_field.range_helper': 'Enter a number from {min} to {max}',
+  'mob.number_field.min_error': 'Minimum {min} players',
+  'mob.number_field.max_error': 'Maximum {max} players',
+  'mob.number_field.required_error': 'Please enter a number',
 } as const;

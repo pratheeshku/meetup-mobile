@@ -206,3 +206,20 @@ export const skillSizes = {
   chevron: 18,
   segmentMinHeight: 64,
 };
+
+/**
+ * Gradient badge palettes (IconBadge, design-ref-p23 Icons.png).
+ * Two-stop linear gradients mapped to semantic roles.
+ */
+export const gradientTokens = {
+  blue: { start: '#3B82F6', end: '#1D4ED8' },
+  green: { start: '#10B981', end: '#047857' },
+  amber: { start: '#F59E0B', end: '#D97706' },
+  orange: { start: '#F97316', end: '#C2410C' },
+  red: { start: '#EF4444', end: '#B91C1C' },
+  purple: { start: '#8B5CF6', end: '#6D28D9' },
+  teal: { start: '#14B8A6', end: '#0F766E' },
+  gray: { start: '#64748B', end: '#475569' },
+} as const;
+
+export type GradientTokenKey = keyof typeof gradientTokens;
