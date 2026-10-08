@@ -28,7 +28,7 @@ import { withCorrelationId } from '../api/correlationId';
 import { getProfile } from '../api/profile';
 import { getSports } from '../api/sports';
 import { useAuth } from '../auth/AuthContext';
-import GameRow from '../components/home/GameRow';
+import { UnifiedGameCard } from '../components/home/UnifiedCard';
 import {
   COPY,
   EmptyText,
@@ -200,7 +200,7 @@ function GamesSegment({
         }
         ListEmptyComponent={<EmptyText>{emptyCopy}</EmptyText>}
         renderItem={({ item }) => (
-          <GameRow
+          <UnifiedGameCard
             event={item}
             badge={getGameBadge(item, userId)}
             onPress={() => onOpenEvent(item)}

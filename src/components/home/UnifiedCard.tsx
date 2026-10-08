@@ -35,6 +35,8 @@ import { colors, radius, spacing, typography } from '../../theme/tokens';
 import type { Event } from '../../types/event';
 import type { Group, GroupRole } from '../../types/group';
 import { formatRowDate } from '../../utils/formatGameTime';
+import type { GameBadge } from '../../utils/gameLists';
+import type { LabelKey } from '../../labels/fallbackLabels';
 
 interface AvatarItem {
   display_name: string;
@@ -107,7 +109,7 @@ export function UnifiedCard({
               ))}
               {moreCount > 0 ? (
                 <View
-                  style={[styles.moreBadge, { zIndex: 5 }]}
+                  style={styles.moreBadge}
                   accessible
                   accessibilityLabel={t('mob.home.more_avatars', { count: moreCount })}
                 >
@@ -183,15 +185,35 @@ function GroupLogoBlock({ logoUrl }: { logoUrl: string | null | undefined }): Re
   );
 }
 
+const GAME_BADGE_LABEL_KEY: Record<GameBadge, LabelKey> = {
+  Hosting: 'mob.game_badge.hosting',
+  Going: 'mob.game_badge.going',
+  Waitlisted: 'mob.game_badge.waitlisted',
+  Open: 'mob.game_badge.open',
+};
+
+export function GameStatusBadge({ badge }: { badge: GameBadge }): React.JSX.Element {
+  const t = useT();
+  const isOpen = badge === 'Open';
+  return (
+    <View style={[styles.statusPill, isOpen ? styles.statusOpen : null]}>
+      <Text style={[styles.statusText, isOpen ? styles.statusOpenText : null]}>
+        {t(GAME_BADGE_LABEL_KEY[badge])}
+      </Text>
+    </View>
+  );
+}
+
 /** Game Card implementation using UnifiedCard */
 export function UnifiedGameCard({
   event,
   onPress,
+  badge,
 }: {
   event: Event;
   onPress: () => void;
-  }
-): React.JSX.Element {
+  badge?: GameBadge | null | React.ReactNode;
+}): React.JSX.Element {
   const t = useT();
 
   const venue = event.venue_name || event.location || t('mob.home.card.location_tbc');
@@ -200,7 +222,7 @@ export function UnifiedGameCard({
 
   const countLabel =
     event.capacity != null
-      ? t('mob.home.card.players_count', {
+      ? t('mob.game_row.going', {
           count: event.participant_count,
           capacity: event.capacity,
         })
@@ -210,6 +232,13 @@ export function UnifiedGameCard({
 
   const preview = event.players_preview ?? [];
   const more = Math.max(0, event.participant_count - preview.length);
+
+  const badgeNode =
+    typeof badge === 'string' ? (
+      <GameStatusBadge badge={badge as GameBadge} />
+    ) : (
+      badge
+    );
 
   return (
     <UnifiedCard
@@ -237,6 +266,7 @@ export function UnifiedGameCard({
       actionButtonLabel={t('mob.home.view_game')}
       onPress={onPress}
       accessibilityLabel={`${event.title}, ${timeLine}, ${venue}, ${countLabel}`}
+      badge={badgeNode}
     />
   );
 }
@@ -444,6 +474,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: -8,
+    zIndex: 5,
   },
   moreText: {
     ...typography.caption,
@@ -514,5 +545,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#e2e8f0',
+  },
+  statusPill: {
+    borderRadius: dashRadius.chip,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    backgroundColor: dash.page,
+    borderWidth: 1,
+    borderColor: dash.cardBorder,
+    alignSelf: 'flex-start',
+  },
+  statusOpen: {
+    backgroundColor: dash.white,
+    borderColor: dash.brand,
+  },
+  statusText: {
+    ...typography.label,
+    color: dash.text,
+  },
+  statusOpenText: {
+    color: dash.brand,
   },
 });

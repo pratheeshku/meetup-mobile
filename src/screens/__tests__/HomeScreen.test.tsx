@@ -368,8 +368,8 @@ describe('sport chips (AD-9)', () => {
     mockGetProfile.mockResolvedValue(
       profileOf({
         skill_levels: [
-          { sport: 'tennis', skill_level: 'Expert' },
-          { sport: 'rugby', skill_level: 'Expert' },
+          { sport: 'tennis', skill_level: 'expert' },
+          { sport: 'rugby', skill_level: 'expert' },
         ],
       }),
     );
@@ -385,7 +385,7 @@ describe('sport chips (AD-9)', () => {
   });
 
   it('multi-select: tapping toggles a chip; the lists change with it (asserting the lists, not just the chip)', async () => {
-    mockGetProfile.mockResolvedValue(profileOf({ skill_levels: [{ sport: 'tennis', skill_level: 'Expert' }] }));
+    mockGetProfile.mockResolvedValue(profileOf({ skill_levels: [{ sport: 'tennis', skill_level: 'expert' }] }));
     const root = await mount();
     await tap(root, 'Badminton');
     expect(chipSelected(root, 'Tennis')).toBe(true);
@@ -413,7 +413,7 @@ describe('sport chips (AD-9)', () => {
   });
 
   it('clicking All then a sport selects that sport', async () => {
-    mockGetProfile.mockResolvedValue(profileOf({ skill_levels: [{ sport: 'tennis', skill_level: 'Expert' }] }));
+    mockGetProfile.mockResolvedValue(profileOf({ skill_levels: [{ sport: 'tennis', skill_level: 'expert' }] }));
     const root = await mount();
     await tap(root, 'All');
     await tap(root, 'Football');
@@ -422,13 +422,13 @@ describe('sport chips (AD-9)', () => {
     expect(chipSelected(root, 'Tennis')).toBe(false);
   });
 
-  it('keeps the user\'s selection across a re-render and a data reload (pull to refresh)', async () => {
-    mockGetProfile.mockResolvedValue(profileOf({ skill_levels: [{ sport: 'tennis', skill_level: 'Expert' }] }));
+  it("keeps the user's selection across a re-render and a data reload (pull to refresh)", async () => {
+    mockGetProfile.mockResolvedValue(profileOf({ skill_levels: [{ sport: 'tennis', skill_level: 'expert' }] }));
     const root = await mount();
     await tap(root, 'All');
     await tap(root, 'Football');
     // A reload now returns different skill levels; the choice must survive it.
-    mockGetProfile.mockResolvedValue(profileOf({ skill_levels: [{ sport: 'badminton', skill_level: 'Beginner' }] }));
+    mockGetProfile.mockResolvedValue(profileOf({ skill_levels: [{ sport: 'badminton', skill_level: 'beginner' }] }));
     await act(async () => {
       await root.findByType(RefreshControl).props.onRefresh();
     });

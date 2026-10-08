@@ -70,7 +70,7 @@ describe('LevelPerSportCard', () => {
     expect(texts(root)).not.toContain('Pick a level to continue');
 
     tap(root, 'radio', 'Badminton, Expert');
-    expect(onChange).toHaveBeenLastCalledWith('Expert');
+    expect(onChange).toHaveBeenLastCalledWith('expert');
     expect(selectedLabels(root)).toEqual(['Badminton, Expert']);
     expect(texts(root)).toContain('Competitive, strong technique and match experience');
     expect(texts(root)).not.toContain('New to the sport or still learning the rules');
@@ -78,8 +78,9 @@ describe('LevelPerSportCard', () => {
 
   it('derives dots from the level order: 1, 2 and 3 filled out of 3', () => {
     const root = render(<Harness />);
+    const displayLabels = ['Beginner', 'Intermediate', 'Expert'];
     SKILL_LEVEL_ORDER.forEach((level, index) => {
-      const segment = control(root, 'radio', `Badminton, ${level}`);
+      const segment = control(root, 'radio', `Badminton, ${displayLabels[index]}`);
       const filled = hostViews(segment, 'level-dot-filled').length;
       const empty = hostViews(segment, 'level-dot-empty').length;
       expect(filled).toBe(index + 1);
@@ -89,18 +90,18 @@ describe('LevelPerSportCard', () => {
   });
 
   it('tints the selected segment and outlines it in the level colour, with the label still shown', () => {
-    const root = render(<Harness initial="Intermediate" />);
+    const root = render(<Harness initial="intermediate" />);
     const style = styleOf(control(root, 'radio', 'Badminton, Intermediate'));
-    expect(style.backgroundColor).toBe(levelColors.Intermediate.bg);
-    expect(style.borderColor).toBe(levelColors.Intermediate.border);
+    expect(style.backgroundColor).toBe(levelColors.intermediate.bg);
+    expect(style.borderColor).toBe(levelColors.intermediate.border);
     expect(texts(control(root, 'radio', 'Badminton, Intermediate'))).toEqual(['Intermediate']);
     expect(styleOf(control(root, 'radio', 'Badminton, Expert')).borderColor).not.toBe(
-      levelColors.Expert.border,
+      levelColors.expert.border,
     );
   });
 
   it('exposes the selected state to accessibility and keeps touch targets >= 44pt', () => {
-    const root = render(<Harness initial="Beginner" />);
+    const root = render(<Harness initial="beginner" />);
     expect(control(root, 'radio', 'Badminton, Beginner').props.accessibilityState).toMatchObject({
       selected: true,
       checked: true,
@@ -125,7 +126,7 @@ describe('LevelPerSportCard', () => {
     });
     const root = await renderAsync(
       <LabelsProvider>
-        <Harness initial="Expert" />
+        <Harness initial="expert" />
       </LabelsProvider>,
     );
     await act(async () => {});

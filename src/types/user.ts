@@ -18,7 +18,7 @@
  * been verified to always include the other shape's fields. Correct
  * against the actual backend contract on conformance review.
  */
-export type SkillLevelValue = 'Beginner' | 'Intermediate' | 'Expert';
+export type SkillLevelValue = 'beginner' | 'intermediate' | 'expert';
 
 /**
  * `updated_at` (ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001 §3): the
@@ -95,6 +95,11 @@ export interface UserProfile {
    * pass it through navigation params or analytics.
    */
   mobile_number?: string | null;
+  /**
+   * User profile cover photo URL (DES-MEETUP-FEEDBACK-001 / Phase 2 profile revamp).
+   * Null when the user has not uploaded a custom cover.
+   */
+  cover_url?: string | null;
 }
 
 /**

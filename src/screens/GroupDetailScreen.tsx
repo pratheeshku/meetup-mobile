@@ -24,7 +24,8 @@
  * rejected server-side regardless.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -36,6 +37,15 @@ import {
   removeMember,
   updateMemberRole,
 } from '../api/groups';
+import { getCachedBanners, type BannerFallback } from '../api/home';
+import { BannerBackground } from '../components/icons/DashboardIcons';
+import {
+  BackArrowIcon,
+  EditIcon,
+  LockIcon,
+  TrashIcon,
+} from '../components/icons/ActionIcons';
+import DeleteGroupSheet from '../components/groups/DeleteGroupSheet';
 import Badge from '../components/Badge';
 import type { BadgeVariant } from '../components/Badge';
 import Button from '../components/Button';
@@ -49,6 +59,7 @@ import Toast from '../components/Toast';
 import UserSearchPicker from '../components/UserSearchPicker';
 import { useAppShare } from '../hooks/useAppShare';
 import { goToDashboard } from '../navigation/goToDashboard';
+import { dash } from '../theme/dashboardTheme';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { GroupDetail, GroupMember, GroupMemberRole } from '../types/group';
 import type { UserSearchResult } from '../types/user';
@@ -72,7 +83,14 @@ const ROLE_BADGE_VARIANT: Record<GroupMemberRole, BadgeVariant> = {
   member: 'neutral',
 };
 
-export default function GroupDetailScreen({ route }: Props): React.JSX.Element {
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+export default function GroupDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const { groupId } = route.params;
   const { user } = useAuth();
   const t = useT();
@@ -83,6 +101,8 @@ export default function GroupDetailScreen({ route }: Props): React.JSX.Element {
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [bannerFallback, setBannerFallback] = useState<BannerFallback | null>(null);
+  const [isDeleteSheetVisible, setIsDeleteSheetVisible] = useState(false);
 
   const [isInviteFormOpen, setIsInviteFormOpen] = useState(false);
   const [selectedInviteUsers, setSelectedInviteUsers] = useState<UserSearchResult[]>([]);
@@ -116,9 +136,19 @@ export default function GroupDetailScreen({ route }: Props): React.JSX.Element {
     }
   }, [groupId]);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadGroup();
+    }, [loadGroup]),
+  );
+
   useEffect(() => {
-    loadGroup();
-  }, [loadGroup]);
+    getCachedBanners().then(cached => {
+      if (cached?.fallback) {
+        setBannerFallback(cached.fallback);
+      }
+    });
+  }, []);
 
   const handleOpenInviteForm = (): void => {
     setInviteError(null);
@@ -287,27 +317,114 @@ export default function GroupDetailScreen({ route }: Props): React.JSX.Element {
   // `useAuth()`) — the same data this screen already uses for `isSelf`
   // below.
   const currentUserRole = group.members.find(m => m.user_id === currentUserId)?.role ?? 'none';
+  const isOwner = currentUserRole === 'owner' || group.owner_id === currentUserId;
 
   const canInvite = currentUserRole === 'owner' || currentUserRole === 'admin';
   // §4.4: "Role management — owner/admin only" (design overrides the
   // brief's narrower "owner only" wording — see the file-level comment).
   const canChangeRoles = currentUserRole === 'owner' || currentUserRole === 'admin';
   const canRemoveMembers = currentUserRole === 'owner' || currentUserRole === 'admin';
-  const canLeave = currentUserRole !== 'owner' && currentUserRole !== 'none';
+  const canLeave = !isOwner && currentUserRole !== 'none';
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
+      <View style={styles.headerCard}>
+        {bannerFallback?.image_url ? (
+          <Image
+            source={{ uri: bannerFallback.image_url }}
+            style={styles.headerBackground}
+            resizeMode="cover"
+            accessibilityLabel={t('mob.group_detail.banner_bg_alt')}
+          />
+        ) : (
+          <View style={styles.headerBackgroundFallback}>
+            <BannerBackground width="100%" height="100%" />
+          </View>
+        )}
+        <View style={styles.headerScrim} />
+
+        <View style={styles.headerContent}>
+          <View style={styles.headerTopBar}>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={styles.headerCircularButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.common.back')}
+            >
+              <BackArrowIcon size={18} color={colors.white} />
+            </Pressable>
+
+            {isOwner ? (
+              <View style={styles.headerActionRow}>
+                <Pressable
+                  onPress={() => navigation.navigate('EditGroup', { groupId })}
+                  style={styles.headerCircularButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mob.group_detail.edit_group_a11y')}
+                >
+                  <EditIcon size={18} color={colors.white} />
+                </Pressable>
+                <Pressable
+                  onPress={() => setIsDeleteSheetVisible(true)}
+                  style={styles.headerCircularButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mob.group_detail.delete_group_a11y')}
+                >
+                  <TrashIcon size={18} color={colors.white} />
+                </Pressable>
+              </View>
+            ) : <View style={styles.headerActionSpacer} />}
+          </View>
+
+          <View style={styles.headerIdentityCentered}>
+            {group.logo_url ? (
+              <Image source={{ uri: group.logo_url }} style={styles.groupLogo} resizeMode="cover" />
+            ) : (
+              <View style={styles.groupLogoInitials}>
+                <Text style={styles.groupInitialsText}>
+                  {getInitials(group.name)}
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.groupName}>{group.name}</Text>
+
+            <View style={styles.groupMetaRow}>
+              <Text style={styles.groupCounts}>
+                {t('mob.group_detail.counts_line', {
+                  group_members: t(
+                    (group.member_count ?? group.members.length) === 1
+                      ? 'mob.group_card.members_one'
+                      : 'mob.group_card.members_other',
+                    { count: group.member_count ?? group.members.length },
+                  ),
+                  games: t(
+                    (group.upcoming_game_count ?? 0) === 1
+                      ? 'mob.group_detail.upcoming_games_one'
+                      : 'mob.group_detail.upcoming_games_other',
+                    { count: group.upcoming_game_count ?? 0 },
+                  ),
+                })}
+              </Text>
+              <Text style={styles.metaDot}> · </Text>
+              {isOwner ? (
+                <View style={styles.ownerChip}>
+                  <Text style={styles.ownerChipText}>{t('mob.group_detail.owner_chip')}</Text>
+                </View>
+              ) : (
+                <View style={styles.memberChip}>
+                  <Text style={styles.memberChipText}>{t('mob.group_detail.member_chip')}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      </View>
+
       <Card style={styles.infoCard}>
-        <Text style={styles.title}>{group.name}</Text>
-        <Text style={styles.description}>{group.description}</Text>
+        {group.description ? <Text style={styles.description}>{group.description}</Text> : null}
         <Text style={styles.meta}>
           {t('mob.group_detail.owned_by', { name: group.owner_nickname ?? '' })}
-        </Text>
-        <Text style={styles.meta}>
-          {t(
-            group.member_count === 1 ? 'mob.group_card.members_one' : 'mob.group_card.members_other',
-            { count: group.member_count ?? 0 },
-          )}
         </Text>
         {canInvite ? (
           <Button
@@ -483,6 +600,13 @@ export default function GroupDetailScreen({ route }: Props): React.JSX.Element {
         })}
       </Card>
 
+      {!isOwner ? (
+        <View style={styles.memberNoticeBanner}>
+          <LockIcon size={16} color={colors.primary} />
+          <Text style={styles.memberNoticeText}>{t('mob.group_detail.owner_only_note')}</Text>
+        </View>
+      ) : null}
+
       {canLeave ? (
         <View style={styles.leaveSection}>
           {leaveError ? <Text style={styles.errorText}>{leaveError}</Text> : null}
@@ -494,6 +618,16 @@ export default function GroupDetailScreen({ route }: Props): React.JSX.Element {
           />
         </View>
       ) : null}
+      <DeleteGroupSheet
+        groupId={group.id}
+        groupName={group.name}
+        memberCount={group.member_count ?? group.members.length}
+        visible={isDeleteSheetVisible}
+        onClose={() => setIsDeleteSheetVisible(false)}
+        onDeleted={() => {
+          goToDashboard(t('mob.success.group_deleted'));
+        }}
+      />
       <ShareActionSheet
         visible={share.sheetVisible}
         title={t('mob.group_detail.share_title')}
@@ -510,6 +644,139 @@ export default function GroupDetailScreen({ route }: Props): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { padding: spacing.md },
+  headerCard: {
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: spacing.md,
+  },
+  headerBackground: {
+    ...StyleSheet.absoluteFill,
+    width: '100%',
+    height: '100%',
+  },
+  headerBackgroundFallback: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: dash.brand,
+    overflow: 'hidden',
+  },
+  headerScrim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: colors.scrim,
+  },
+  headerContent: {
+    padding: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+  },
+  headerTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  headerCircularButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.overlayWhite25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerActionSpacer: {
+    width: 36,
+    height: 36,
+  },
+  headerActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  headerIdentityCentered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupLogo: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    borderWidth: 3,
+    borderColor: colors.white,
+  },
+  groupLogoInitials: {
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    backgroundColor: colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.white,
+  },
+  groupInitialsText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  groupName: {
+    ...typography.h2,
+    color: colors.white,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    marginBottom: 4,
+  },
+  groupMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  groupCounts: {
+    ...typography.caption,
+    color: colors.white,
+  },
+  metaDot: {
+    ...typography.caption,
+    color: colors.white,
+  },
+  ownerChip: {
+    backgroundColor: colors.ownerChipBg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    alignSelf: 'center',
+  },
+  ownerChipText: {
+    ...typography.label,
+    color: colors.ownerChipText,
+    fontWeight: '700',
+  },
+  memberChip: {
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    alignSelf: 'center',
+  },
+  memberChipText: {
+    ...typography.label,
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  memberNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  memberNoticeText: {
+    ...typography.caption,
+    color: colors.textPrimary,
+    marginLeft: spacing.sm,
+    flex: 1,
+  },
   infoCard: { marginBottom: spacing.md },
   shareGroupBtn: {
     marginTop: spacing.md,

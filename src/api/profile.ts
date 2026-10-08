@@ -46,6 +46,7 @@ interface PrivateUserProfileApiItem {
   email: string;
   is_admin: boolean;
   mobile_number?: string | null;
+  cover_url?: string | null;
 }
 
 function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: SkillLevel[]): UserProfile {
@@ -66,6 +67,7 @@ function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: Skil
     role: undefined,
     skill_levels: skillLevels,
     mobile_number: raw.mobile_number ?? null,
+    cover_url: raw.cover_url ?? null,
   };
 }
 
@@ -87,12 +89,33 @@ function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: Skil
  * rest of `getProfile()`'s response, so it calls this endpoint on its own
  * rather than fetching the whole profile just for `skill_levels`.
  */
+export function normalizeSkillLevel(level?: string | null): SkillLevelValue | null {
+  if (!level) return null;
+  const normalized = level.trim().toLowerCase();
+  if (normalized === 'beginner') return 'beginner';
+  if (normalized === 'intermediate') return 'intermediate';
+  if (normalized === 'expert') return 'expert';
+  return null;
+}
+
 export async function getSkillLevels(options?: RequestOptions): Promise<SkillLevel[]> {
   try {
-    const { data } = await apiClient.get<SkillLevel[]>('/users/me/skill-levels', {
+    const { data } = await apiClient.get<Array<{ sport: string; skill_level: string; updated_at?: string }>>('/users/me/skill-levels', {
       correlationId: options?.correlationId,
     });
-    return Array.isArray(data) ? data : [];
+    if (!Array.isArray(data)) return [];
+    const result: SkillLevel[] = [];
+    for (const item of data) {
+      const canonical = normalizeSkillLevel(item.skill_level);
+      if (canonical) {
+        result.push({
+          sport: item.sport,
+          skill_level: canonical,
+          ...(item.updated_at ? { updated_at: item.updated_at } : {}),
+        });
+      }
+    }
+    return result;
   } catch {
     return [];
   }
@@ -129,9 +152,10 @@ export async function updateSkillLevel(
   skill_level: SkillLevelValue,
   options?: RequestOptions,
 ): Promise<void> {
+  const canonical = normalizeSkillLevel(skill_level) ?? skill_level;
   await apiClient.put(
     '/users/me/skill-level',
-    { sport, skill_level },
+    { sport, skill_level: canonical },
     { correlationId: options?.correlationId },
   );
 }
@@ -200,35 +224,140 @@ export async function deleteAvatar(options?: RequestOptions): Promise<void> {
   });
 }
 
-/**
- * BLOCKED — CRITICAL, needs an architect/product decision, not fixed
- * here (do not guess or invent a replacement endpoint): confirmed
- * against the live OpenAPI schema that neither `/users/me/deletion-request`
- * nor `/users/me/deletion-confirm` (below) exists on the real backend at
- * all — not a field mismatch, the paths themselves 404. The entire
- * "Delete Account" flow in `ProfileScreen` is calling endpoints that do
- * not exist. Nothing in the live schema suggests an alternative
- * account-deletion mechanism (no `/users/me` DELETE, no other
- * deletion-shaped path anywhere in the 123 real paths audited). This may
- * mean the feature was never built server-side yet — needs the architect
- * to confirm with the backend team before any client-side fix is
- * attempted. See docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md.
- *
- * Triggers the backend to send a confirmation code to the user's email
- * (§4.13). The code itself is never returned in this response — it is
- * delivered out-of-band, matching an email-based confirmation flow and
- * never exposing the token to a channel where R-111/§5.4-style logging
- * hygiene would need to guard it client-side.
- */
-export async function requestDeletion(): Promise<void> {
-  await apiClient.post('/users/me/deletion-request');
+export interface OwnedGroupInfo {
+  id: string;
+  name: string;
+  member_count: number;
+}
+
+export interface OwnsGroupsErrorData {
+  code: 'owns_groups';
+  groups: OwnedGroupInfo[];
+}
+
+export function parseOwnsGroupsError(error: unknown): OwnedGroupInfo[] | null {
+  const data = (error as { response?: { status?: number; data?: { code?: string; groups?: OwnedGroupInfo[] } } })
+    ?.response?.data;
+  if (data?.code === 'owns_groups' && Array.isArray(data.groups)) {
+    return data.groups;
+  }
+  return null;
 }
 
 /**
- * BLOCKED — see `requestDeletion()`'s comment above: this endpoint also
- * does not exist on the real backend (confirmed via the live OpenAPI
- * schema). Left unchanged pending the architect/backend-team decision.
+ * `POST /users/me/deletion-request` -> 202 (confirmation code is emailed).
+ * Returns 409 `{"code":"owns_groups","groups":[{"id","name","member_count"}]}` when the user owns groups.
+ * Resend is allowed (rate-limited).
  */
-export async function confirmDeletion(confirmationToken: string): Promise<void> {
-  await apiClient.post('/users/me/deletion-confirm', { confirmation_token: confirmationToken });
+export async function requestDeletion(options?: RequestOptions): Promise<void> {
+  await apiClient.post('/users/me/deletion-request', undefined, {
+    correlationId: options?.correlationId,
+  });
 }
+
+/**
+ * `POST /users/me/deletion-confirm` with `{"code": "<6 digits>"}` -> 200.
+ * Invalid code -> 400 (generic message). 409 owns_groups when the user owns groups.
+ */
+export async function confirmDeletion(code: string, options?: RequestOptions): Promise<void> {
+  await apiClient.post(
+    '/users/me/deletion-confirm',
+    { code },
+    { correlationId: options?.correlationId },
+  );
+}
+
+/**
+ * `POST /users/me/cover` — multipart file upload (Phase 2 revamp, 3:1 aspect ratio).
+ * Returns `{ cover_url: string }`.
+ */
+export async function uploadCover(
+  fileUri: string,
+  fileName: string,
+  fileType: string,
+  options?: RequestOptions,
+): Promise<{ cover_url: string }> {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: fileUri,
+    name: fileName,
+    type: fileType,
+  } as unknown as Blob);
+
+  const { data } = await apiClient.post<{ cover_url: string }>('/users/me/cover', formData, {
+    correlationId: options?.correlationId,
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data;
+}
+
+/**
+ * `DELETE /users/me/cover` — remove custom cover image, reverting to default banner.
+ */
+export async function deleteCover(options?: RequestOptions): Promise<void> {
+  await apiClient.delete('/users/me/cover', {
+    correlationId: options?.correlationId,
+  });
+}
+
+export interface RecentGameItem {
+  id: string;
+  title: string;
+  sport: string;
+  starts_at: string;
+  venue_name: string;
+}
+
+export interface ProfileSummary {
+  games_played: number;
+  games_hosted: number;
+  groups_count: number;
+  recent_games: RecentGameItem[];
+}
+
+/**
+ * `GET /users/me/profile-summary` — summary metrics and recent games for profile home.
+ */
+export async function getProfileSummary(options?: RequestOptions): Promise<ProfileSummary> {
+  const { data } = await apiClient.get<ProfileSummary>('/users/me/profile-summary', {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
+export interface NotificationSettings {
+  push_enabled: boolean;
+  email_enabled: boolean;
+}
+
+/**
+ * `GET /users/me/notification-settings` — read push and email notification master toggles.
+ */
+export async function getNotificationSettings(
+  options?: RequestOptions,
+): Promise<NotificationSettings> {
+  const { data } = await apiClient.get<NotificationSettings>(
+    '/users/me/notification-settings',
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+/**
+ * `PUT /users/me/notification-settings` — update push and email notification master toggles.
+ */
+export async function updateNotificationSettings(
+  settings: Partial<NotificationSettings>,
+  options?: RequestOptions,
+): Promise<NotificationSettings> {
+  const { data } = await apiClient.put<NotificationSettings>(
+    '/users/me/notification-settings',
+    settings,
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+

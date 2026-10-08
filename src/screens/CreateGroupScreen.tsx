@@ -18,14 +18,15 @@
  * No member-invite step on this screen.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
-import { createGroup } from '../api/groups';
+import { createGroup, uploadGroupLogo } from '../api/groups';
 import { getSports } from '../api/sports';
 import { createTeam } from '../api/teams';
 import Button from '../components/Button';
+import { CameraIcon } from '../components/icons/ActionIcons';
 import { GroupsIcon, ShieldIcon } from '../components/icons/SharedIcons';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
@@ -40,6 +41,7 @@ import type { Sport } from '../types/sport';
 import type { TeamVisibility } from '../types/team';
 import { goToDashboard } from '../navigation/goToDashboard';
 import { getApiErrorMessage } from '../utils/apiError';
+import { isPickerCancelled, pickImage, type PickedImage } from '../utils/imagePicker';
 import type { GroupsStackParamList } from '../navigation/types';
 import { useT } from '../labels/LabelsContext';
 
@@ -73,6 +75,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
   // Players Group fields (GroupCreate).
   const [gName, setGName] = useState('');
   const [gDescription, setGDescription] = useState('');
+  const [gLogo, setGLogo] = useState<PickedImage | null>(null);
 
   // Tournament Team fields (TeamCreate).
   const [tName, setTName] = useState('');
@@ -98,6 +101,43 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
   const groupChain = useFieldChain(['gName', 'gDescription']);
   const teamChain = useFieldChain(['tName']);
 
+  const handlePickLogoSource = async (source: 'camera' | 'library'): Promise<void> => {
+    try {
+      const result = await pickImage(source, t('mob.group_detail.crop_title'));
+      if (result) {
+        setGLogo(result);
+      }
+    } catch (e) {
+      if (!isPickerCancelled(e)) {
+        setError(getApiErrorMessage(e, t('mob.profile.photo_upload_error')));
+      }
+    }
+  };
+
+  const handleLogoPress = (): void => {
+    const buttons: Array<{ text: string; style?: 'cancel' | 'destructive' | 'default'; onPress?: () => void }> = [
+      { text: t('mob.common.cancel'), style: 'cancel' },
+      {
+        text: t('mob.create_group.take_photo'),
+        onPress: () => handlePickLogoSource('camera'),
+      },
+      {
+        text: t('mob.create_group.choose_photo'),
+        onPress: () => handlePickLogoSource('library'),
+      },
+    ];
+
+    if (gLogo) {
+      buttons.push({
+        text: t('mob.create_group.remove_logo'),
+        style: 'destructive',
+        onPress: () => setGLogo(null),
+      });
+    }
+
+    Alert.alert(t('mob.create_group.photo_title'), undefined, buttons);
+  };
+
   // --- Players Group submit ---
   const handleSubmitGroup = async (): Promise<void> => {
     setError(null);
@@ -112,10 +152,22 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
     setIsSubmitting(true);
     try {
       const created = await withCorrelationId(async correlationId => {
-        return await createGroup(
+        const group = await createGroup(
           { name: trimmedName, description: gDescription.trim() },
           { correlationId },
         );
+
+        if (gLogo) {
+          await uploadGroupLogo(
+            group.id,
+            gLogo.path,
+            gLogo.filename,
+            gLogo.mime,
+            { correlationId },
+          );
+        }
+
+        return group;
       });
       // Step 1 done: open step 2 (invite members). `replace` so Back from
       // step 2 never returns to this form and re-submits the group.
@@ -189,6 +241,28 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
 
       {mode === 'group' ? (
         <>
+          <View style={styles.logoPickerSection}>
+            <Pressable
+              onPress={handleLogoPress}
+              style={styles.logoDashedContainer}
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.create_group.logo_label')}
+              disabled={isSubmitting}
+            >
+              {gLogo ? (
+                <Image source={{ uri: gLogo.path }} style={styles.logoSelectedImage} resizeMode="cover" />
+              ) : (
+                <View style={styles.logoInnerContent}>
+                  <View style={styles.cameraIconBadge}>
+                    <CameraIcon size={20} color={colors.white} />
+                  </View>
+                  <Text style={styles.addLogoLabel}>{t('mob.create_group.add_logo')}</Text>
+                </View>
+              )}
+            </Pressable>
+            <Text style={styles.logoHintText}>{t('mob.create_group.logo_hint')}</Text>
+          </View>
+
           <Text style={[styles.label, styles.section]}>{t('mob.create_group.name')}</Text>
           <TextField
             style={styles.input}
@@ -269,4 +343,49 @@ const styles = StyleSheet.create({
   multiline: { minHeight: spacing.xxl * 2 },
   hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.md },
   error: { ...typography.body, color: colors.error, marginBottom: spacing.md },
+  logoPickerSection: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    marginTop: spacing.xs,
+  },
+  logoDashedContainer: {
+    width: 104,
+    height: 104,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  logoSelectedImage: {
+    width: '100%',
+    height: '100%',
+  },
+  logoInnerContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: colors.accentPurple,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  addLogoLabel: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  logoHintText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+  },
 });

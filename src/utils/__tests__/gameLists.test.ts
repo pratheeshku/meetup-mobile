@@ -223,17 +223,17 @@ describe('sport chip selection (AD-9)', () => {
 
   it('defaults to the skill sports that exist in the admin list', () => {
     const skills: SkillLevel[] = [
-      { sport: 'Tennis', skill_level: 'Beginner' },
-      { sport: 'badminton', skill_level: 'Expert' },
-      { sport: 'rugby', skill_level: 'Expert' },
-      { sport: 'tennis', skill_level: 'Intermediate' },
+      { sport: 'Tennis', skill_level: 'beginner' },
+      { sport: 'badminton', skill_level: 'expert' },
+      { sport: 'rugby', skill_level: 'expert' },
+      { sport: 'tennis', skill_level: 'intermediate' },
     ];
     expect(getDefaultSportSelection(skills, options)).toEqual(['tennis', 'badminton']);
   });
 
   it('defaults to All when the user has no skill sports or none match the admin list', () => {
     expect(getDefaultSportSelection([], options)).toEqual([]);
-    expect(getDefaultSportSelection([{ sport: 'rugby', skill_level: 'Expert' }], options)).toEqual([]);
+    expect(getDefaultSportSelection([{ sport: 'rugby', skill_level: 'expert' }], options)).toEqual([]);
   });
 
   it('ignores selected keys that left the admin list, without rewriting them', () => {
