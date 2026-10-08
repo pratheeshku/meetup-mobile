@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -37,6 +37,12 @@ export default function AccountDeletionBlockedScreen({ navigation, route }: Prop
   const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (route.params?.groups) {
+      setGroups(route.params.groups);
+    }
+  }, [route.params?.groups]);
 
   const refreshOwnedGroups = useCallback(async () => {
     try {

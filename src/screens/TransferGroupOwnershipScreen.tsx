@@ -11,6 +11,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
 import { getGroup, transferGroupOwnership } from '../api/groups';
+import { parseOwnsGroupsError, requestDeletion } from '../api/profile';
 import { useAuth } from '../auth/AuthContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
@@ -99,9 +100,24 @@ export default function TransferGroupOwnershipScreen({ navigation, route }: Prop
       await withCorrelationId(async correlationId => {
         await transferGroupOwnership(groupId, targetMember.user_id, { correlationId });
       });
-      navigation.goBack();
     } catch (e) {
       setTransferError(getApiErrorMessage(e, t('mob.group_transfer.error')));
+      setIsTransferring(false);
+      return;
+    }
+
+    try {
+      await withCorrelationId(async deletionCorrelationId => {
+        await requestDeletion({ correlationId: deletionCorrelationId });
+      });
+      navigation.navigate('AccountDeletionCode');
+    } catch (err: unknown) {
+      const remainingGroups = parseOwnsGroupsError(err);
+      if (remainingGroups && remainingGroups.length > 0) {
+        navigation.navigate('AccountDeletionBlocked', { groups: remainingGroups });
+        return;
+      }
+      navigation.navigate('AccountDeletionBlocked', { groups: [] });
     } finally {
       setIsTransferring(false);
     }
