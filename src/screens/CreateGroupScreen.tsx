@@ -26,6 +26,7 @@ import { createGroup } from '../api/groups';
 import { getSports } from '../api/sports';
 import { createTeam } from '../api/teams';
 import Button from '../components/Button';
+import { GroupsIcon, ShieldIcon } from '../components/icons/SharedIcons';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
@@ -54,8 +55,8 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
   const tRef = useRef(t);
   tRef.current = t;
   const MODE_OPTIONS: ChipOption<GroupKind>[] = [
-    { value: 'group', label: t('mob.create_group.mode_group') },
-    { value: 'team', label: t('mob.create_group.mode_team') },
+    { value: 'group', label: t('mob.create_group.mode_group'), icon: <GroupsIcon size={18} /> },
+    { value: 'team', label: t('mob.create_group.mode_team'), icon: <ShieldIcon size={18} /> },
   ];
   const [mode, setMode] = useState<GroupKind>('group');
 

@@ -30,7 +30,7 @@ export default function CreateGameCard({ onPress }: CreateGameCardProps): React.
     >
       <View style={styles.leftCol}>
         <View style={styles.plusCircle}>
-          <Text style={styles.plusIcon}>+</Text>
+          <Text style={styles.plusIcon} accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true}>+</Text>
         </View>
       </View>
 

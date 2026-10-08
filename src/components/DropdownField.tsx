@@ -93,7 +93,7 @@ export default function DropdownField({
         <Text style={selected ? styles.valueText : styles.placeholderText}>
           {selected ? selected.label : placeholder}
         </Text>
-        <Text style={styles.chevron}>▾</Text>
+        <Text style={styles.chevron} accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true}>▾</Text>
       </Pressable>
 
       <Modal

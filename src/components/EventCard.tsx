@@ -17,7 +17,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { borderWidth, colors, getSportColor, radius, spacing, typography } from '../theme/tokens';
 import type { Event } from '../types/event';
-import { useSportDisplayName } from '../utils/labels';
+import { useSportDisplayName, stripIconGlyphs } from '../utils/labels';
+import { ArrowRightIcon } from './icons/SharedIcons';
 import Card from './Card';
 import { bundledT, useT } from '../labels/LabelsContext';
 import type { TranslateFn } from '../labels/LabelsContext';
@@ -187,7 +188,17 @@ export default function EventCard({
           </Text>
         </View>
 
-        <Text style={styles.actionLink}>{actionLabel}</Text>
+        <View style={styles.actionLinkWrap}>
+          <Text style={styles.actionLink}>{stripIconGlyphs(actionLabel)}</Text>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden={true}
+            style={styles.actionArrow}
+          >
+            <ArrowRightIcon size={14} />
+          </View>
+        </View>
       </View>
 
       {/* Row 5: Colored progress bar */}
@@ -304,6 +315,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     color: colors.textSecondary,
+  },
+  actionLinkWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionArrow: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   actionLink: {
     fontSize: 13,

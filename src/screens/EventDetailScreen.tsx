@@ -35,7 +35,19 @@ import { getMyGroups } from '../api/groups';
 import { getSports } from '../api/sports';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
-import { getEventVisibilityLabel } from '../utils/labels';
+import {
+  CalendarIcon,
+  CloseIcon,
+  GroupsIcon,
+  LinkIcon,
+  PersonIcon,
+  PinIcon,
+} from '../components/icons/SharedIcons';
+import {
+  EventVisibilityBadge,
+  getEventVisibilityLabel,
+  stripIconGlyphs,
+} from '../utils/labels';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import DateTimePickerField from '../components/DateTimePickerField';
@@ -588,7 +600,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
         {/* Date and time */}
         <View style={styles.metaRow}>
-          <Text style={styles.metaIcon}>📅</Text>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden={true}
+            style={styles.metaIconWrap}
+          >
+            <CalendarIcon size={16} />
+          </View>
           <Text style={styles.metaText}>
             {formatEventDate(event.starts_at)}, {formatEventTimeRange(event.starts_at, event.ends_at)}
           </Text>
@@ -597,7 +616,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         {/* Venue */}
         {venueText ? (
           <View style={styles.metaRow}>
-            <Text style={styles.metaIcon}>📍</Text>
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden={true}
+              style={styles.metaIconWrap}
+            >
+              <PinIcon size={16} />
+            </View>
             <Text style={styles.metaText}>{venueText}</Text>
           </View>
         ) : null}
@@ -649,8 +675,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             style={[styles.actionBtn, styles.editGameBtn]}
           >
             <View style={styles.actionBtnContent}>
-              <Text style={styles.editGameBtnText}>✎ </Text>
-              <Text style={styles.editGameBtnText}>{t('mob.game_detail.edit_game')}</Text>
+              <Text style={styles.editGameBtnText} accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true}>✎ </Text>
+              <Text style={styles.editGameBtnText}>{stripIconGlyphs(t('mob.game_detail.edit_game'))}</Text>
             </View>
           </Pressable>
 
@@ -661,8 +687,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             style={[styles.actionBtn, styles.whiteActionBtn]}
           >
             <View style={styles.actionBtnContent}>
-              <Text style={styles.whiteActionBtnText}>👥 </Text>
-              <Text style={styles.whiteActionBtnText}>{t('mob.game_detail.invite_group')}</Text>
+              <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true} style={styles.actionBtnIcon}>
+                <GroupsIcon size={18} />
+              </View>
+              <Text style={styles.whiteActionBtnText}>{stripIconGlyphs(t('mob.game_detail.invite_group'))}</Text>
             </View>
           </Pressable>
 
@@ -673,8 +701,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             style={[styles.actionBtn, styles.whiteActionBtn]}
           >
             <View style={styles.actionBtnContent}>
-              <Text style={styles.whiteActionBtnText}>👤+ </Text>
-              <Text style={styles.whiteActionBtnText}>{t('mob.game_detail.invite_player')}</Text>
+              <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true} style={styles.actionBtnIcon}>
+                <PersonIcon size={18} />
+              </View>
+              <Text style={styles.whiteActionBtnText}>{stripIconGlyphs(t('mob.game_detail.invite_player'))}</Text>
             </View>
           </Pressable>
 
@@ -685,8 +715,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             style={[styles.actionBtn, styles.whiteActionBtn]}
           >
             <View style={styles.actionBtnContent}>
-              <Text style={styles.whiteActionBtnText}>🔗 </Text>
-              <Text style={styles.whiteActionBtnText}>{t('mob.game_detail.share')}</Text>
+              <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true} style={styles.actionBtnIcon}>
+                <LinkIcon size={18} />
+              </View>
+              <Text style={styles.whiteActionBtnText}>{stripIconGlyphs(t('mob.game_detail.share'))}</Text>
             </View>
           </Pressable>
 
@@ -697,8 +729,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             style={[styles.actionBtn, styles.cancelBtn]}
           >
             <View style={styles.actionBtnContent}>
-              <Text style={styles.cancelBtnText}>⊘ </Text>
-              <Text style={styles.cancelBtnText}>{t('mob.game_detail.cancel_game')}</Text>
+              <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true} style={styles.actionBtnIcon}>
+                <CloseIcon size={18} />
+              </View>
+              <Text style={styles.cancelBtnText}>{stripIconGlyphs(t('mob.game_detail.cancel_game'))}</Text>
             </View>
           </Pressable>
         </Card>
@@ -1015,7 +1049,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         <Text style={styles.cardHeading}>{t('mob.game_detail.details')}</Text>
         <View style={styles.metaKeyValRow}>
           <Text style={styles.metaKey}>{t('mob.create_game.visibility')}</Text>
-          <Text style={styles.metaVal}>{getEventVisibilityLabel(event.visibility, labels)}</Text>
+          <EventVisibilityBadge visibility={event.visibility} labels={labels} textStyle={styles.metaVal} />
         </View>
         <View style={styles.metaKeyValRow}>
           <Text style={styles.metaKey}>{t('mob.game_detail.skill_level')}</Text>
@@ -1164,6 +1198,12 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginBottom: spacing.xs,
   },
+  metaIconWrap: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   metaIcon: {
     fontSize: 14,
   },
@@ -1227,6 +1267,11 @@ const styles = StyleSheet.create({
   },
   actionBtnContent: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnIcon: {
+    marginRight: spacing.xs,
     alignItems: 'center',
     justifyContent: 'center',
   },

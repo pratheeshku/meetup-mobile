@@ -10,6 +10,7 @@
  * (`@meetup/home_banners_cache`), or bundled fallback banner data if no cache exists.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import appConfig from '../../config/appConfig.json';
 import { apiClient } from './client';
 
 export interface BannerItem {
@@ -57,9 +58,11 @@ interface RequestOptions {
 
 export const BANNERS_CACHE_KEY = '@meetup/home_banners_cache';
 export const MENU_CACHE_KEY = '@meetup/home_menu_cache';
+export const LEGAL_LINKS_CACHE_KEY = '@meetup/legal_links_cache';
 
 export const BANNERS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const MENU_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+export const LEGAL_LINKS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export interface CacheEnvelope<T> {
   savedAt: number;
@@ -195,20 +198,76 @@ export async function getHomeMenu(options?: RequestOptions): Promise<HomeMenuRes
 export interface LegalLinksResponse {
   terms_url: string;
   privacy_url: string;
+  terms_version?: string;
+}
+
+export async function getCachedLegalLinks(): Promise<LegalLinksResponse | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LEGAL_LINKS_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.savedAt !== 'number' || !parsed.data) {
+      // Old format without savedAt counts as expired
+      return null;
+    }
+    const age = Date.now() - parsed.savedAt;
+    if (age > LEGAL_LINKS_CACHE_TTL_MS || age < 0) {
+      return null;
+    }
+    return parsed.data as LegalLinksResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function setCachedLegalLinks(data: LegalLinksResponse): Promise<void> {
+  try {
+    const envelope: CacheEnvelope<LegalLinksResponse> = {
+      savedAt: Date.now(),
+      data,
+    };
+    await AsyncStorage.setItem(LEGAL_LINKS_CACHE_KEY, JSON.stringify(envelope));
+  } catch {
+    // Non-blocking cache write failure
+  }
 }
 
 /**
  * Public legal links endpoint (DES-MEETUP-ADDENDUM-social-login AD-9).
- * Returns terms_url and privacy_url ("" when unset). Fails quietly (returns null).
+ * Returns terms_url, privacy_url, and terms_version.
+ * Caches in AsyncStorage with a 7-day maximum age; uses the cache only when the live call fails.
  */
 export async function getLegalLinks(options?: RequestOptions): Promise<LegalLinksResponse | null> {
   try {
     const { data } = await apiClient.get<LegalLinksResponse>('/home/legal-links', {
       correlationId: options?.correlationId,
     });
-    return data;
+    if (data && (typeof data.terms_url === 'string' || typeof data.privacy_url === 'string')) {
+      await setCachedLegalLinks(data);
+      return data;
+    }
+    throw new Error('Invalid legal links response');
   } catch {
-    return null;
+    return await getCachedLegalLinks();
   }
+}
+
+/**
+ * Helper to get the active terms version:
+ * Returns the version from the live or cached legal-links response;
+ * if none is available or it is empty, returns appConfig.json terms_version as the offline default.
+ */
+export async function getTermsVersion(options?: RequestOptions): Promise<string> {
+  try {
+    const links = await getLegalLinks(options);
+    if (links?.terms_version && links.terms_version.trim().length > 0) {
+      return links.terms_version.trim();
+    }
+  } catch {
+    // Non-blocking fallback
+  }
+  return (appConfig as { terms_version?: string }).terms_version || '';
 }
 

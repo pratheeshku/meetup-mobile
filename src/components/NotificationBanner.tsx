@@ -19,8 +19,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { CloseIcon } from './icons/SharedIcons';
 
 import {
   dismissBanner,
@@ -133,7 +136,9 @@ export default function NotificationBanner(): React.JSX.Element | null {
         accessibilityLabel={t('mob.notification_banner.dismiss_a11y')}
         hitSlop={spacing.md}
       >
-        <Text style={styles.dismissText}>✕</Text>
+        <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true}>
+          <CloseIcon size={18} />
+        </View>
       </Pressable>
     </Animated.View>
   );
