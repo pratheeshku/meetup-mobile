@@ -226,25 +226,6 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
             <BannerBackground width="100%" height="100%" />
           </View>
         )}
-
-        <View style={styles.bannerActions}>
-          <Pressable
-            style={styles.bannerActionButton}
-            onPress={() => navigation.navigate('EditProfile')}
-            accessibilityRole="button"
-            accessibilityLabel={t('mob.profile.edit_profile')}
-          >
-            <EditIcon size={18} color={colors.white} />
-          </Pressable>
-          <Pressable
-            style={styles.bannerActionButton}
-            onPress={() => navigation.navigate('Settings')}
-            accessibilityRole="button"
-            accessibilityLabel={t('mob.profile.settings')}
-          >
-            <GearIcon size={18} />
-          </Pressable>
-        </View>
       </View>
 
       {/* Identity */}
@@ -432,6 +413,28 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           )}
         </View>
 
+        {/* Action buttons (Edit Profile and Settings) */}
+        <View style={styles.actionRow}>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('EditProfile')}
+            accessibilityRole="button"
+            accessibilityLabel={t('mob.profile.edit_profile')}
+          >
+            <EditIcon size={18} color={colors.textPrimary} />
+            <Text style={styles.actionButtonText}>{t('mob.profile.edit_profile')}</Text>
+          </Pressable>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Settings')}
+            accessibilityRole="button"
+            accessibilityLabel={t('mob.profile.settings')}
+          >
+            <GearIcon size={18} />
+            <Text style={styles.actionButtonText}>{t('mob.profile.settings')}</Text>
+          </Pressable>
+        </View>
+
         {/* Log out button */}
         <Pressable
           style={styles.logoutButton}
@@ -460,7 +463,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   scrollContent: {
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.xxl + spacing.lg,
   },
   bannerContainer: {
     height: 160,
@@ -477,20 +480,26 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: colors.primary,
   },
-  bannerActions: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
+  actionRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.md,
+    marginTop: spacing.md,
   },
-  bannerActionButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.overlayWhite25,
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: 14,
+    backgroundColor: colors.surface,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+  },
+  actionButtonText: {
+    ...typography.button,
+    color: colors.textPrimary,
   },
   identityContainer: {
     alignItems: 'center',
