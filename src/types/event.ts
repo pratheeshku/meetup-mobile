@@ -138,6 +138,7 @@ export interface CreateEventInput {
   sport?: string;
   visibility: EventVisibility;
   group_id?: string;
+  invite_user_ids?: string[];
   skill_level_requirement: EventSkillLevel;
   /** Integer, schema `gt=0` (i.e. at least 1); form enforces 2–200 to match web. */
   capacity: number;

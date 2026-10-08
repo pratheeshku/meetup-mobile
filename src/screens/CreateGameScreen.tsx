@@ -282,11 +282,20 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         : selectedVenue.name;
 
       if (mode === 'game') {
+        if (gVisibility === 'invite_only' && invitedPlayers.length < 1) {
+          setError(t('mob.create_game.step_invite_required'));
+          setIsSubmitting(false);
+          return;
+        }
+
         const input: CreateEventInput = {
           title: gTitle.trim(),
           sport: gSport,
           visibility: gVisibility,
           ...(gVisibility === 'group' && selectedGroupId ? { group_id: selectedGroupId } : {}),
+          ...(gVisibility === 'invite_only'
+            ? { invite_user_ids: invitedPlayers.map(p => p.id) }
+            : {}),
           skill_level_requirement: skillLevel,
           capacity: capacity,
           starts_at: startsAtIso,
