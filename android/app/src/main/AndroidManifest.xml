@@ -5,6 +5,9 @@
          (DES-MEETUP-MOBILE.md §3.6, R-072). Without this declaration the
          runtime permission request is a silent no-op. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Required for current location detection during game/event venue selection
+         (DES-MEETUP-MOBILE.md; Game3When board "Use my current location"). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <application
       android:name=".MainApplication"

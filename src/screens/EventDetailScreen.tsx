@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Modal,
+  PermissionsAndroid,
   Platform,
   Pressable,
   ScrollView,
@@ -28,6 +29,7 @@ import {
 import {
   fetchPlaceDetails,
   fetchPlacePredictions,
+  reverseGeocodeCoordinates,
   type PlacePrediction,
 } from '../api/places';
 import { getClientConfig } from '../api/config';
@@ -221,6 +223,68 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         }));
       }
     }
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setEditError(null);
+    if (!mapsApiKey) {
+      setEditError(t('mob.create_game.err_location_failed'));
+      return;
+    }
+
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: t('mob.create_game.permission_rationale_title'),
+            message: t('mob.create_game.permission_rationale_msg'),
+            buttonPositive: t('mob.notification_action.ok'),
+            buttonNegative: t('mob.common.cancel'),
+          },
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setEditError(t('mob.create_game.err_location_permission'));
+          return;
+        }
+      } catch {
+        setEditError(t('mob.create_game.err_location_permission'));
+        return;
+      }
+    }
+
+    const geo = (globalThis as unknown as { navigator?: { geolocation?: { getCurrentPosition: (success: (pos: { coords: { latitude: number; longitude: number } }) => void, error: (err: unknown) => void) => void } } }).navigator?.geolocation;
+
+    if (!geo) {
+      setEditError(t('mob.create_game.err_location_failed'));
+      return;
+    }
+
+    geo.getCurrentPosition(
+      async pos => {
+        const details = await reverseGeocodeCoordinates(
+          pos.coords.latitude,
+          pos.coords.longitude,
+          mapsApiKey,
+        );
+        if (details) {
+          setEditSelectedVenue({
+            name: details.name,
+            address: details.formatted_address,
+            place_id: details.place_id,
+            lat: details.lat,
+            lng: details.lng,
+          });
+          setEditVenueQuery(details.name);
+          setVenuePredictions([]);
+        } else {
+          setEditError(t('mob.create_game.err_location_failed'));
+        }
+      },
+      () => {
+        setEditError(t('mob.create_game.err_location_failed'));
+      },
+    );
   };
 
   const handleDateChange = (_e: DateTimePickerEvent, selected?: Date) => {
@@ -529,10 +593,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
                 <TouchableOpacity
                   style={styles.currentLocationRow}
-                  onPress={() => {
-                    setEditSelectedVenue({ name: 'Current Location', address: 'Near you' });
-                    setEditVenueQuery('Current Location');
-                  }}
+                  onPress={handleUseCurrentLocation}
                 >
                   <TargetIcon size={18} />
                   <Text style={styles.currentLocationText}>

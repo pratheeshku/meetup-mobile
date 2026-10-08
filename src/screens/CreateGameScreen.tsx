@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
+  PermissionsAndroid,
   Platform,
   ScrollView,
   StyleSheet,
@@ -24,6 +25,7 @@ import { getMyGroups } from '../api/groups';
 import {
   fetchPlaceDetails,
   fetchPlacePredictions,
+  reverseGeocodeCoordinates,
   type PlacePrediction,
 } from '../api/places';
 import { getSports } from '../api/sports';
@@ -227,6 +229,70 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         }));
       }
     }
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setError(null);
+    if (!mapsApiKey) {
+      setError(t('mob.create_game.err_location_failed'));
+      return;
+    }
+
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: t('mob.create_game.permission_rationale_title'),
+            message: t('mob.create_game.permission_rationale_msg'),
+            buttonPositive: t('mob.notification_action.ok'),
+            buttonNegative: t('mob.common.cancel'),
+          },
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          setError(t('mob.create_game.err_location_permission'));
+          return;
+        }
+      } catch {
+        setError(t('mob.create_game.err_location_permission'));
+        return;
+      }
+    }
+
+    const geo = (globalThis as unknown as { navigator?: { geolocation?: { getCurrentPosition: (success: (pos: { coords: { latitude: number; longitude: number } }) => void, error: (err: unknown) => void) => void } } }).navigator?.geolocation;
+
+    if (!geo) {
+      // In bare React Native without @react-native-community/geolocation,
+      // navigator.geolocation is not polyfilled.
+      setError(t('mob.create_game.err_location_failed'));
+      return;
+    }
+
+    geo.getCurrentPosition(
+      async pos => {
+        const details = await reverseGeocodeCoordinates(
+          pos.coords.latitude,
+          pos.coords.longitude,
+          mapsApiKey,
+        );
+        if (details) {
+          setSelectedVenue({
+            name: details.name,
+            address: details.formatted_address,
+            place_id: details.place_id,
+            lat: details.lat,
+            lng: details.lng,
+          });
+          setVenueQuery(details.name);
+          setVenuePredictions([]);
+        } else {
+          setError(t('mob.create_game.err_location_failed'));
+        }
+      },
+      () => {
+        setError(t('mob.create_game.err_location_failed'));
+      },
+    );
   };
 
   const handlePlayerSearch = async (text: string) => {
@@ -545,13 +611,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           <TouchableOpacity
             style={styles.currentLocationRow}
-            onPress={() => {
-              setSelectedVenue({
-                name: 'Current Location',
-                address: 'Near you',
-              });
-              setVenueQuery('Current Location');
-            }}
+            onPress={handleUseCurrentLocation}
           >
             <TargetIcon size={18} />
             <Text style={styles.currentLocationText}>

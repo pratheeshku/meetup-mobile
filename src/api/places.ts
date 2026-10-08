@@ -79,3 +79,34 @@ export async function fetchPlaceDetails(
     return null;
   }
 }
+
+export async function reverseGeocodeCoordinates(
+  lat: number,
+  lng: number,
+  apiKey: string | null | undefined,
+): Promise<PlaceDetails | null> {
+  if (!apiKey) {
+    return null;
+  }
+  try {
+    const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
+    url.searchParams.append('latlng', `${lat},${lng}`);
+    url.searchParams.append('key', apiKey);
+
+    const response = await fetch(url.toString());
+    const data = await response.json();
+    if (data.status === 'OK' && data.results && data.results.length > 0) {
+      const top = data.results[0];
+      return {
+        place_id: top.place_id ?? '',
+        name: top.formatted_address?.split(',')[0] ?? top.formatted_address ?? '',
+        formatted_address: top.formatted_address ?? '',
+        lat: top.geometry?.location?.lat ?? lat,
+        lng: top.geometry?.location?.lng ?? lng,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

@@ -763,6 +763,10 @@ export const DEFAULT_LABELS = {
   'mob.create_game.optional_parentheses': '(optional)',
   'mob.create_game.wizard_title_create': 'Create',
   'mob.create_game.wizard_title_create_game': 'Create game',
+  'mob.create_game.permission_rationale_title': 'Location Permission',
+  'mob.create_game.permission_rationale_msg': 'Meetup needs access to your location to set the game venue.',
+  'mob.create_game.err_location_permission': 'Location permission is required to detect your location.',
+  'mob.create_game.err_location_failed': 'Could not detect your current location.',
 
   // Phase 2/3 - Create Group Step 2 (Package M5)
   'mob.invite.step_title': 'Invite group members',
