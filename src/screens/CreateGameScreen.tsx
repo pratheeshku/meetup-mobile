@@ -1,58 +1,62 @@
 /**
- * Create Game (DES-MEETUP-MOBILE.md §4.3 Create Flow Amendment,
- * architect-approved 2026-09-22; R-021, R-040).
- *
- * Single screen with a Casual Game/Tournament toggle at the top
- * (`MODE_OPTIONS`, default Casual Game), replacing the former placeholder
- * and, for the Tournament side, the retired standalone
- * `CreateTournamentScreen`/`TournamentsStackParamList.CreateTournament`.
- * Both forms' state is declared unconditionally at this component's top
- * level (not in child components mounted/unmounted per mode), so toggling
- * back and forth never loses whatever the user already typed into either
- * one — the same intent as the web reference's "both forms stay mounted"
- * comment (`frontend/app.js`, `renderCreateEventPage`), achieved here by
- * never destroying the state instead of literally keeping both subtrees
- * mounted.
- *
- * Field sets, enum values and endpoints are sourced directly from
- * `pratheeshku/meetup` (fetched via `gh api` during this task): backend
- * `events/schemas.py` (`EventCreate`) / `tournaments/schemas.py`
- * (`TournamentCreate`) for the authoritative payload contract, and
- * `frontend/app.js` (`eventCreateFormHtml`/`submitCreateEvent`,
- * `tournamentCreateFormHtml`/`submitCreateTournament`) for which subset of
- * each schema the web UI actually exposes, in what order, with what
- * defaults. See the Implementation Report for the full source-by-source
- * breakdown and every Proposed Assumption below.
+ * Create Game Wizard (DES-MEETUP-MOBILE.md §4.3 Create Flow Amendment;
+ * design-ref-p23/Game1Type.png .. Game6InviteOnly.png, Game5Error.png).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
+import { getClientConfig, getGameLimits, type GameLimits } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
 import { createEvent } from '../api/events';
 import { getMyGroups } from '../api/groups';
+import { fetchPlacePredictions, type PlacePrediction } from '../api/places';
 import { getSports } from '../api/sports';
 import { createTournament } from '../api/tournaments';
+import { searchUsers } from '../api/users';
 import Button from '../components/Button';
+import IconBadge from '../components/IconBadge';
 import {
-  GameIcon,
+  CheckIcon,
+  CrossIcon,
+  SearchIcon,
+} from '../components/icons/ActionIcons';
+import { SportIcon } from '../components/icons/DashboardIcons';
+import {
+  CalendarIcon,
+  ClockIcon,
   GlobeIcon,
-  GroupsIcon,
   LockIcon,
+  PeopleIcon,
+  PinIcon,
+  TargetIcon,
   TrophyIcon,
 } from '../components/icons/SharedIcons';
-import DateTimePickerField from '../components/DateTimePickerField';
-import DropdownField from '../components/DropdownField';
-import ErrorView from '../components/ErrorView';
-import LoadingView from '../components/LoadingView';
-import OptionChips from '../components/OptionChips';
-import type { ChipOption } from '../components/OptionChips';
-import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
-import TextField from '../components/TextField';
-import { useFieldChain } from '../hooks/useFieldChain';
-import { colors, getSportColor, spacing, typography } from '../theme/tokens';
+import NumberField from '../components/NumberField';
+import SelectableCard from '../components/SelectableCard';
+import WizardFooter from '../components/WizardFooter';
+import WizardHeader from '../components/WizardHeader';
+import { useT } from '../labels/LabelsContext';
+import { goToDashboard } from '../navigation/goToDashboard';
+import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
+import {
+  borderWidth,
+  colors,
+  radius,
+  spacing,
+  typography,
+} from '../theme/tokens';
 import type { CreateEventInput, EventSkillLevel, EventVisibility } from '../types/event';
 import type { Group } from '../types/group';
 import type { Sport } from '../types/sport';
@@ -62,20 +66,8 @@ import type {
   TournamentParticipationMode,
   TournamentVisibility,
 } from '../types/tournament';
-import { getLabel, useLabels } from '../labels/LabelsContext';
-import { goToDashboard } from '../navigation/goToDashboard';
+import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
-import { getEventVisibilityLabel } from '../utils/labels';
-import {
-  applyQuickDate,
-  LOCAL_DATE_PLACEHOLDER,
-  LOCAL_DATE_TIME_PLACEHOLDER,
-  parseLocalDate,
-  parseLocalDateTime,
-  quickDate,
-} from '../utils/localDateTime';
-import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
-import { useT } from '../labels/LabelsContext';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'CreateGame'>,
@@ -84,598 +76,1205 @@ type Props = CompositeScreenProps<
 
 type GameKind = 'game' | 'tournament';
 
-const TITLE_MAX_LENGTH = 150;
-const DEFAULT_TOURNAMENT_CAPACITY = '8';
+const DEFAULT_SPORTS: { name: string; display_name: string }[] = [
+  { name: 'badminton', display_name: 'Badminton' },
+  { name: 'pickleball', display_name: 'Pickleball' },
+  { name: 'tennis', display_name: 'Tennis' },
+  { name: 'football', display_name: 'Football' },
+  { name: 'cricket', display_name: 'Cricket' },
+  { name: 'padel', display_name: 'Padel' },
+];
 
-export default function CreateGameScreen(_props: Props): React.JSX.Element {
-  const labels = useLabels();
+const AVATAR_TINTS = [
+  { bg: colors.avatarTint1, text: colors.avatarTintText1 },
+  { bg: colors.avatarTint2, text: colors.avatarTintText2 },
+  { bg: colors.avatarTint3, text: colors.avatarTintText3 },
+  { bg: colors.avatarTint4, text: colors.avatarTintText4 },
+  { bg: colors.avatarTint5, text: colors.avatarTintText5 },
+];
+
+function getAvatarTint(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
+  return AVATAR_TINTS[Math.abs(hash) % AVATAR_TINTS.length];
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+  }
+  return (name.trim().slice(0, 2) || '?').toUpperCase();
+}
+
+export default function CreateGameScreen({ navigation }: Props): React.JSX.Element {
   const t = useT();
-  const tRef = useRef(t);
-  tRef.current = t;
 
-  const MODE_OPTIONS: ChipOption<GameKind>[] = [
-    { value: 'game', label: t('mob.create_game.mode_game'), icon: <GameIcon size={18} /> },
-    { value: 'tournament', label: t('mob.create_game.mode_tournament'), icon: <TrophyIcon size={18} /> },
-  ];
-
-  const PARTICIPATION_OPTIONS: ChipOption<TournamentParticipationMode>[] = [
-    { value: 'individual', label: t('mob.create_game.participation_individual') },
-    { value: 'team', label: t('mob.create_game.participation_team') },
-  ];
-
-  /** Group Stage intentionally excluded — see `TournamentFormat`'s type comment. */
-  const FORMAT_OPTIONS: ChipOption<TournamentFormat>[] = [
-    { value: 'knockout', label: t('mob.create_game.format_knockout') },
-    { value: 'round_robin', label: t('mob.create_game.format_round_robin') },
-  ];
+  // Wizard state
+  const [step, setStep] = useState<number>(1);
   const [mode, setMode] = useState<GameKind>('game');
 
+  // Config and limits
+  const [gameLimits, setGameLimits] = useState<GameLimits>({ players_min: 2, players_max: 100 });
+  const [mapsApiKey, setMapsApiKey] = useState<string | null>(null);
+
+  // Sports and groups
   const [sports, setSports] = useState<Sport[]>([]);
-  const [isLoadingSports, setIsLoadingSports] = useState(true);
-  const [sportsError, setSportsError] = useState<string | null>(null);
-  // Secondary, non-blocking (only needed for the conditional Group picker,
-  // shown when Visibility = Group): a failure degrades to an empty list —
-  // same pattern as HomeScreen's groups tile — rather than blocking the
-  // whole Create Game form over a field most creates never touch.
   const [groups, setGroups] = useState<Group[]>([]);
 
+  // Step 2: Sport & Title
+  const [gSport, setGSport] = useState<string>('badminton');
+  const [gTitle, setGTitle] = useState<string>('Sunday Doubles');
+
+  // Step 3: When & Where
+  const [dateValue, setDateValue] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(19, 30, 0, 0);
+    return d;
+  });
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [venueQuery, setVenueQuery] = useState('Community Hall');
+  const [venuePredictions, setVenuePredictions] = useState<PlacePrediction[]>([]);
+  const [selectedVenue, setSelectedVenue] = useState({
+    name: 'Community Hall',
+    address: 'Punggol, Singapore',
+  });
+  const [courtDetails, setCourtDetails] = useState('Court 2');
+
+  // Step 4: Who can play
+  const [gVisibility, setGVisibility] = useState<EventVisibility>('group');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
+  // Step 5: Capacity & Skill
+  const [capacity, setCapacity] = useState<number>(4);
+  const [isCapacityValid, setIsCapacityValid] = useState<boolean>(true);
+  const [skillLevel, setSkillLevel] = useState<EventSkillLevel>('intermediate');
+
+  // Step 6: Invites & Review
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
+  const [playerSuggestions, setPlayerSuggestions] = useState<UserSearchResult[]>([]);
+  const [invitedPlayers, setInvitedPlayers] = useState<UserSearchResult[]>([]);
+
+  // Submission & errors
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Casual Game fields (EventCreate).
-  const [gTitle, setGTitle] = useState('');
-  const [gSport, setGSport] = useState<string | null>(null);
-  const [gVisibility, setGVisibility] = useState<EventVisibility>('public');
-  const [gGroupId, setGGroupId] = useState<string | null>(null);
-  const [gSkill, setGSkill] = useState<EventSkillLevel>('all_levels');
-  const [gCapacity, setGCapacity] = useState('');
-  const [gStart, setGStart] = useState('');
-  const [gVenueName, setGVenueName] = useState('');
-  const [gVenueAddress, setGVenueAddress] = useState('');
-  const [gDescription, setGDescription] = useState('');
-  // Cost/currency (EventCreate.estimated_cost_cents/estimated_cost_currency
-  // — verified against the live backend schema, see CreateEventInput's
-  // type comment). Both optional and independent, matching the pre-BUILD-B
-  // edit-form validation pattern this restyles from.
-  const [gCost, setGCost] = useState('');
-  const [gCurrency, setGCurrency] = useState('');
-
-  // Tournament fields (TournamentCreate).
-  const [tTitle, setTTitle] = useState('');
-  const [tSport, setTSport] = useState<string | null>(null);
-  const [tVisibility, setTVisibility] = useState<TournamentVisibility>('public');
-  const [tGroupId, setTGroupId] = useState<string | null>(null);
-  const [tDescription, setTDescription] = useState('');
-  const [tParticipationMode, setTParticipationMode] =
-    useState<TournamentParticipationMode | null>(null);
-  const [tRegClose, setTRegClose] = useState('');
-  const [tFormat, setTFormat] = useState<TournamentFormat>('knockout');
-  const [tCapacity, setTCapacity] = useState(DEFAULT_TOURNAMENT_CAPACITY);
-  const [tStart, setTStart] = useState('');
-  const [tVenueName, setTVenueName] = useState('');
-
-  const loadSports = useCallback(async () => {
-    setIsLoadingSports(true);
-    setSportsError(null);
-    try {
-      setSports(await getSports());
-    } catch {
-      setSportsError(tRef.current('mob.common.sports_load_error'));
-    } finally {
-      setIsLoadingSports(false);
-    }
-  }, []);
+  // Tournament specific state
+  const tFormat: TournamentFormat = 'knockout';
+  const tParticipation: TournamentParticipationMode = 'individual';
 
   useEffect(() => {
-    loadSports();
-    getMyGroups().then(
-      response => setGroups(response.items),
-      () => setGroups([]),
-    );
-  }, [loadSports]);
+    getGameLimits().then(setGameLimits).catch(() => {});
+    getClientConfig().then(cfg => setMapsApiKey(cfg.google_maps_api_key)).catch(() => {});
+    getSports().then(setSports).catch(() => {});
+    getMyGroups().then(res => {
+      setGroups(res.items);
+      if (res.items.length > 0) {
+        setSelectedGroupId(res.items[0].id);
+      }
+    }).catch(() => {});
+    searchUsers({ q: '' }).then(setPlayerSuggestions).catch(() => {});
+  }, []);
 
-  const chain = useFieldChain([
-    'gTitle',
-    'gCapacity',
-    'gVenueName',
-    'gVenueAddress',
-    'gCost',
-    'gCurrency',
-    'gDescription',
-    'tTitle',
-    'tDescription',
-    'tCapacity',
-    'tVenueName',
-  ]);
+  const handleVenueSearch = async (text: string) => {
+    setVenueQuery(text);
+    if (!text.trim()) {
+      setVenuePredictions([]);
+      return;
+    }
+    const preds = await fetchPlacePredictions(text, mapsApiKey);
+    setVenuePredictions(preds);
+  };
 
-  const handleSubmitCasual = async (): Promise<void> => {
+  const handleSelectPrediction = (p: PlacePrediction) => {
+    setSelectedVenue({
+      name: p.main_text ?? p.description,
+      address: p.secondary_text ?? p.description,
+    });
+    setVenueQuery(p.main_text ?? p.description);
+    setVenuePredictions([]);
+  };
+
+  const handlePlayerSearch = async (text: string) => {
+    setPlayerSearchQuery(text);
+    try {
+      const results = await searchUsers({ q: text });
+      setPlayerSuggestions(results);
+    } catch {}
+  };
+
+  const toggleInvitePlayer = (user: UserSearchResult) => {
+    setInvitedPlayers(prev => {
+      if (prev.some(u => u.id === user.id)) {
+        return prev.filter(u => u.id !== user.id);
+      }
+      return [...prev, user];
+    });
+  };
+
+  const handleDateChange = (_e: DateTimePickerEvent, selected?: Date) => {
+    setShowDatePicker(false);
+    if (selected) {
+      const newD = new Date(dateValue);
+      newD.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+      setDateValue(newD);
+    }
+  };
+
+  const handleTimeChange = (_e: DateTimePickerEvent, selected?: Date) => {
+    setShowTimePicker(false);
+    if (selected) {
+      const newD = new Date(dateValue);
+      newD.setHours(selected.getHours(), selected.getMinutes());
+      setDateValue(newD);
+    }
+  };
+
+  const handleNext = () => {
     setError(null);
-
-    const trimmedTitle = gTitle.trim();
-    if (!trimmedTitle) {
-      setError(t('mob.create_game.err_game_title'));
-      chain.focus('gTitle');
+    if (step === 1) {
+      setStep(2);
       return;
     }
-    const capacityNumber = Number(gCapacity.trim());
-    if (!/^\d+$/.test(gCapacity.trim()) || capacityNumber < 2 || capacityNumber > 200) {
-      setError(t('mob.create_game.err_game_capacity'));
-      chain.focus('gCapacity');
-      return;
-    }
-    const startsAtIso = parseLocalDateTime(gStart);
-    if (!startsAtIso) {
-      setError(t('mob.create_game.err_game_start', { format: LOCAL_DATE_TIME_PLACEHOLDER }));
-      return;
-    }
-    if (gVisibility === 'group' && !gGroupId) {
-      setError(t('mob.create_game.err_group'));
-      return;
-    }
-
-    let costCents: number | undefined;
-    if (gCost.trim()) {
-      const parsedCost = parseFloat(gCost.trim());
-      if (isNaN(parsedCost) || parsedCost < 0) {
-        setError(t('mob.create_game.err_cost'));
-        chain.focus('gCost');
+    if (step === 2) {
+      if (!gTitle.trim()) {
+        setError(t('mob.create_game.err_game_title'));
         return;
       }
-      costCents = Math.round(parsedCost * 100);
+      setStep(3);
+      return;
     }
-    let currencyCode: string | undefined;
-    if (gCurrency.trim()) {
-      const trimmedCurrency = gCurrency.trim().toUpperCase();
-      if (trimmedCurrency.length !== 3) {
-        setError(t('mob.create_game.err_currency'));
-        chain.focus('gCurrency');
+    if (step === 3) {
+      setStep(4);
+      return;
+    }
+    if (step === 4) {
+      setStep(5);
+      return;
+    }
+    if (step === 5) {
+      if (!isCapacityValid || capacity < gameLimits.players_min) {
         return;
       }
-      currencyCode = trimmedCurrency;
+      setStep(6);
+      return;
     }
+  };
 
-    const input: CreateEventInput = {
-      title: trimmedTitle,
-      ...(gSport ? { sport: gSport } : {}),
-      visibility: gVisibility,
-      ...(gVisibility === 'group' && gGroupId ? { group_id: gGroupId } : {}),
-      skill_level_requirement: gSkill,
-      capacity: capacityNumber,
-      starts_at: startsAtIso,
-      ends_at: null,
-      ...(gVenueName.trim() ? { venue_name: gVenueName.trim() } : {}),
-      ...(gVenueAddress.trim() ? { venue_address: gVenueAddress.trim() } : {}),
-      ...(gDescription.trim() ? { description: gDescription.trim() } : {}),
-      ...(costCents !== undefined ? { estimated_cost_cents: costCents } : {}),
-      ...(currencyCode !== undefined ? { estimated_cost_currency: currencyCode } : {}),
-    };
+  const handleBack = () => {
+    setError(null);
+    if (step > 1) {
+      setStep(step - 1);
+    } else {
+      navigation.goBack();
+    }
+  };
 
+  const handleSubmit = async () => {
+    setError(null);
     setIsSubmitting(true);
     try {
-      await withCorrelationId(async correlationId => {
-        await createEvent(input, { correlationId });
-      });
-      goToDashboard(t('mob.success.game_created'));
+      const startsAtIso = dateValue.toISOString();
+      const fullVenueName = courtDetails.trim()
+        ? `${selectedVenue.name}, ${courtDetails.trim()}`
+        : selectedVenue.name;
+
+      if (mode === 'game') {
+        const input: CreateEventInput = {
+          title: gTitle.trim(),
+          sport: gSport,
+          visibility: gVisibility,
+          ...(gVisibility === 'group' && selectedGroupId ? { group_id: selectedGroupId } : {}),
+          skill_level_requirement: skillLevel,
+          capacity: capacity,
+          starts_at: startsAtIso,
+          ends_at: null,
+          venue_name: fullVenueName,
+          venue_address: selectedVenue.address,
+        };
+
+        await withCorrelationId(async correlationId => {
+          await createEvent(input, { correlationId });
+        });
+        goToDashboard(t('mob.success.game_created'));
+      } else {
+        const input: CreateTournamentInput = {
+          title: gTitle.trim(),
+          sport: gSport,
+          visibility: (gVisibility === 'invite_only' ? 'invite' : gVisibility) as TournamentVisibility,
+          ...(gVisibility === 'group' && selectedGroupId ? { group_id: selectedGroupId } : {}),
+          participation_mode: tParticipation,
+          format: tFormat,
+          capacity: capacity,
+          starts_at: dateValue.toISOString().slice(0, 10),
+          venue_name: fullVenueName,
+        };
+
+        await withCorrelationId(async correlationId => {
+          await createTournament(input, { correlationId });
+        });
+        goToDashboard(t('mob.success.tournament_created'));
+      }
     } catch (e) {
       setError(getApiErrorMessage(e, t('mob.create_game.err_game_create')));
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleSubmitTournament = async (): Promise<void> => {
-    setError(null);
+  // Step 1: What are you creating?
+  const renderStep1 = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepHeading}>{t('mob.create_game.step_what')}</Text>
 
-    const trimmedTitle = tTitle.trim();
-    if (!trimmedTitle) {
-      setError(t('mob.create_game.err_tournament_title'));
-      chain.focus('tTitle');
-      return;
-    }
-    if (!tSport) {
-      setError(t('mob.create_game.err_sport'));
-      return;
-    }
-    if (!tParticipationMode) {
-      setError(t('mob.create_game.err_participation'));
-      return;
-    }
-    const capacityNumber = Number(tCapacity.trim());
-    if (!/^\d+$/.test(tCapacity.trim()) || capacityNumber < 2) {
-      setError(t('mob.create_game.err_tournament_capacity'));
-      chain.focus('tCapacity');
-      return;
-    }
-    const startsAtIso = parseLocalDate(tStart);
-    if (!startsAtIso) {
-      setError(t('mob.create_game.err_tournament_start', { format: LOCAL_DATE_PLACEHOLDER }));
-      return;
-    }
-    if (tVisibility === 'group' && !tGroupId) {
-      setError(t('mob.create_game.err_group'));
-      return;
-    }
-    let closesAtIso: string | undefined;
-    if (tRegClose.trim()) {
-      const parsed = parseLocalDateTime(tRegClose);
-      if (!parsed) {
-        setError(t('mob.create_game.err_reg_close', { format: LOCAL_DATE_TIME_PLACEHOLDER }));
-        return;
-      }
-      closesAtIso = parsed;
-    }
+      <SelectableCard
+        selected={mode === 'game'}
+        onPress={() => setMode('game')}
+        title={t('mob.create_game.step_type_game_title')}
+        subtitle={t('mob.create_game.step_type_game_desc')}
+        leading={
+          <IconBadge color="green" size={48}>
+            <PeopleIcon size={24} />
+          </IconBadge>
+        }
+      />
 
-    const input: CreateTournamentInput = {
-      title: trimmedTitle,
-      sport: tSport,
-      ...(tDescription.trim() ? { description: tDescription.trim() } : {}),
-      visibility: tVisibility,
-      ...(tVisibility === 'group' && tGroupId ? { group_id: tGroupId } : {}),
-      participation_mode: tParticipationMode,
-      format: tFormat,
-      capacity: capacityNumber,
-      starts_at: startsAtIso,
-      ...(closesAtIso ? { registration_closes_at: closesAtIso } : {}),
-      ...(tVenueName.trim() ? { venue_name: tVenueName.trim() } : {}),
-    };
-
-    setIsSubmitting(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        await createTournament(input, { correlationId });
-      });
-      // Creation happened outside the Tournaments stack (this screen lives
-      // in the Home stack), so there is no local route to `popTo` back to
-      // — land on the Tournaments tab's list instead, refreshed, the
-      // closest equivalent to the retired CreateTournamentScreen's
-      // `popTo('TournamentsList', ...)`.
-      goToDashboard(t('mob.success.tournament_created'));
-    } catch (e) {
-      setError(getApiErrorMessage(e, t('mob.create_game.err_tournament_create')));
-      setIsSubmitting(false);
-    }
-  };
-
-  if (isLoadingSports) {
-    return <LoadingView />;
-  }
-
-  if (sportsError) {
-    return <ErrorView message={sportsError} onRetry={loadSports} />;
-  }
-
-  const sportOptions: ChipOption<string>[] = sports.map(item => ({
-    value: item.name,
-    label: item.display_name,
-    // Sport chip pickers: selected = that sport's own colour (matches web).
-    color: getSportColor(item.name),
-  }));
-  const groupOptions: ChipOption<string>[] = groups.map(item => ({
-    value: item.id,
-    label: item.name,
-  }));
-
-  /**
-   * `EventCreate.visibility` (`events/schemas.py`, `validate_visibility`):
-   * enforced enum. Labels match web's `event-visibility` `<select>`; words
-   * sourced from `GET /api/labels` (`event_visibility.*`, replacing
-   * BUG-M02's hardcoded map) so this picker and every read-only display
-   * (e.g. `EventCard`) stay in sync with the backend's own source of truth.
-   */
-  const CASUAL_VISIBILITY_OPTIONS: ChipOption<EventVisibility>[] = [
-    { value: 'public', label: getEventVisibilityLabel('public', labels), icon: <GlobeIcon size={16} /> },
-    { value: 'invite_only', label: getEventVisibilityLabel('invite_only', labels), icon: <LockIcon size={16} /> },
-    { value: 'group', label: getEventVisibilityLabel('group', labels), icon: <GroupsIcon size={16} /> },
-  ];
-
-  /** `EventCreate.skill_level_requirement` (`validate_skill`): enforced enum. */
-  const SKILL_LEVEL_OPTIONS: ChipOption<EventSkillLevel>[] = [
-    { value: 'all_levels', label: getLabel(labels, 'skill_level.all_levels') },
-    { value: 'beginner', label: getLabel(labels, 'skill_level.beginner') },
-    { value: 'intermediate', label: getLabel(labels, 'skill_level.intermediate') },
-    { value: 'expert', label: getLabel(labels, 'skill_level.expert') },
-  ];
-
-  /**
-   * `TournamentCreate.visibility` — documented values, distinct literal
-   * (`invite`, not Event's `invite_only`) — see `types/tournament.ts`. Words
-   * sourced from `GET /api/labels` (`tournament_visibility.*`), a distinct
-   * key prefix from Event's `event_visibility.*` since the two enums'
-   * literals (and this one's "Group Only" vs Event's "Group") genuinely
-   * differ — never cross-wired.
-   */
-  const TOURNAMENT_VISIBILITY_OPTIONS: ChipOption<TournamentVisibility>[] = [
-    { value: 'public', label: getLabel(labels, 'tournament_visibility.public'), icon: <GlobeIcon size={16} /> },
-    { value: 'invite', label: getLabel(labels, 'tournament_visibility.invite'), icon: <LockIcon size={16} /> },
-    { value: 'group', label: getLabel(labels, 'tournament_visibility.group'), icon: <GroupsIcon size={16} /> },
-  ];
-
-  const renderGroupPicker = (
-    value: string | null,
-    onChange: (value: string) => void,
-  ): React.JSX.Element => (
-    <>
-      <Text style={[styles.label, styles.section]}>{t('mob.create_game.group')}</Text>
-      {groupOptions.length === 0 ? (
-        <Text style={styles.hint}>{t('mob.create_game.no_groups')}</Text>
-      ) : (
-        <DropdownField
-          options={groupOptions}
-          value={value}
-          onChange={onChange}
-          placeholder={t('mob.create_game.group_placeholder')}
-          accessibilityLabel={t('mob.create_game.group')}
-          disabled={isSubmitting}
-        />
-      )}
-    </>
+      <SelectableCard
+        selected={mode === 'tournament'}
+        onPress={() => setMode('tournament')}
+        title={t('mob.create_game.step_type_tournament_title')}
+        subtitle={t('mob.create_game.step_type_tournament_desc')}
+        leading={
+          <IconBadge color="amber" size={48}>
+            <TrophyIcon size={24} />
+          </IconBadge>
+        }
+      />
+    </View>
   );
 
-  return (
-    <KeyboardAwareScreen contentContainerStyle={styles.container}>
-        <OptionChips options={MODE_OPTIONS} value={mode} onChange={setMode} disabled={isSubmitting} />
+  // Step 2: Pick a sport
+  const renderStep2 = () => {
+    const displayedSports = sports.length > 0 ? sports : DEFAULT_SPORTS;
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepHeading}>{t('mob.create_game.step_sport')}</Text>
 
-      {mode === 'game' ? (
-        <>
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.title')}</Text>
-          <TextField
-            {...chain.props('gTitle')}
-            style={styles.input}
-            placeholder={t('mob.create_game.title_placeholder')}
+        <View style={styles.sportsGrid}>
+          {displayedSports.slice(0, 6).map(item => {
+            const isSelected = gSport === item.name;
+            return (
+              <TouchableOpacity
+                key={item.name}
+                style={[styles.sportTile, isSelected && styles.sportTileSelected]}
+                onPress={() => {
+                  setGSport(item.name);
+                  if (gTitle === 'Sunday Doubles' || gTitle.includes('Game')) {
+                    setGTitle(`${item.display_name} Game`);
+                  }
+                }}
+              >
+                <View style={styles.sportIconCircle}>
+                  <SportIcon slug={item.name} size={36} />
+                </View>
+                <Text style={styles.sportTileText}>{item.display_name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.cardContainer}>
+          <Text style={styles.inputCardLabel}>{t('mob.create_game.game_title_label')}</Text>
+          <TextInput
+            style={styles.cardTextInput}
             value={gTitle}
             onChangeText={setGTitle}
-            maxLength={TITLE_MAX_LENGTH}
-            editable={!isSubmitting}
+            placeholder={t('mob.create_game.title_placeholder')}
+            placeholderTextColor={colors.textMuted}
           />
+        </View>
+      </View>
+    );
+  };
 
-          <Text style={styles.label}>{t('mob.create_game.sport')}</Text>
-          {sportOptions.length === 0 ? (
-            <Text style={styles.hint}>{t('mob.common.no_sports')}</Text>
-          ) : (
-            <OptionChips options={sportOptions} value={gSport} onChange={setGSport} disabled={isSubmitting} />
-          )}
+  // Step 3: When and where?
+  const renderStep3 = () => {
+    const formattedDate = dateValue.toLocaleDateString('en-US', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    const formattedTime = dateValue.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
 
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.visibility')}</Text>
-          <OptionChips
-            options={CASUAL_VISIBILITY_OPTIONS}
-            value={gVisibility}
-            onChange={setGVisibility}
-            disabled={isSubmitting}
-            selectedColor={colors.textPrimary}
-          />
-          {gVisibility === 'group' ? renderGroupPicker(gGroupId, setGGroupId) : null}
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepHeading}>{t('mob.create_game.step_when_where')}</Text>
 
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.skill_level')}</Text>
-          <OptionChips
-            options={SKILL_LEVEL_OPTIONS}
-            value={gSkill}
-            onChange={setGSkill}
-            disabled={isSubmitting}
-            selectedColor={colors.textPrimary}
-          />
+        <View style={styles.cardContainer}>
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={styles.halfField}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.fieldLabel}>{t('mob.create_game.date_label')}</Text>
+              <View style={styles.pickerBox}>
+                <CalendarIcon size={18} />
+                <Text style={styles.pickerBoxText}>{formattedDate}</Text>
+              </View>
+            </TouchableOpacity>
 
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.capacity')}</Text>
-          <TextField
-            {...chain.props('gCapacity')}
-            style={styles.input}
-            keyboardType="number-pad"
-            placeholder={t('mob.create_game.capacity_placeholder')}
-            value={gCapacity}
-            onChangeText={setGCapacity}
-            editable={!isSubmitting}
-          />
-
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.start')}</Text>
-          <OptionChips
-            options={[
-              { value: 'today', label: t('mob.time.today') },
-              { value: 'tomorrow', label: t('mob.time.tomorrow') },
-              { value: 'sat', label: t('mob.create_game.quick_sat') },
-              { value: 'sun', label: t('mob.create_game.quick_sun') },
-            ]}
-            value={null}
-            onChange={which => setGStart(current => applyQuickDate(current, quickDate(which)))}
-            disabled={isSubmitting}
-          />
-          <DateTimePickerField
-            accessibilityLabel={t('mob.create_game.start')}
-            testID="casual-start-date-time"
-            mode="datetime"
-            value={gStart}
-            onChange={setGStart}
-            disabled={isSubmitting}
-          />
-
-          <Text style={styles.label}>{t('mob.create_game.venue_name')}</Text>
-          <TextField
-            {...chain.props('gVenueName')}
-            style={styles.input}
-            placeholder={t('mob.create_game.venue_name_placeholder')}
-            value={gVenueName}
-            onChangeText={setGVenueName}
-            editable={!isSubmitting}
-          />
-
-          <Text style={styles.label}>{t('mob.create_game.venue_address')}</Text>
-          <TextField
-            {...chain.props('gVenueAddress')}
-            style={styles.input}
-            placeholder={t('mob.create_game.venue_address_placeholder')}
-            value={gVenueAddress}
-            onChangeText={setGVenueAddress}
-            editable={!isSubmitting}
-          />
-
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.cost')}</Text>
-          <View style={styles.costCurrencyRow}>
-            <TextField
-              {...chain.props('gCost')}
-              style={[styles.input, styles.costField]}
-              placeholder={t('mob.create_game.cost_placeholder')}
-              accessibilityLabel={t('mob.create_game.cost_a11y')}
-              value={gCost}
-              onChangeText={setGCost}
-              keyboardType="decimal-pad"
-              editable={!isSubmitting}
-            />
-            <TextField
-              {...chain.props('gCurrency')}
-              style={[styles.input, styles.currencyField]}
-              placeholder={t('mob.create_game.currency_placeholder')}
-              accessibilityLabel={t('mob.create_game.currency_a11y')}
-              value={gCurrency}
-              onChangeText={text => setGCurrency(text.toUpperCase())}
-              maxLength={3}
-              autoCapitalize="characters"
-              editable={!isSubmitting}
-            />
+            <TouchableOpacity
+              style={styles.halfField}
+              onPress={() => setShowTimePicker(true)}
+            >
+              <Text style={styles.fieldLabel}>{t('mob.create_game.start_time_label')}</Text>
+              <View style={styles.pickerBox}>
+                <ClockIcon size={18} />
+                <Text style={styles.pickerBoxText}>{formattedTime}</Text>
+              </View>
+            </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>{t('mob.create_game.description')}</Text>
-          <TextField
-            ref={chain.ref('gDescription')}
-            style={[styles.input, styles.multiline]}
-            placeholder={t('mob.create_game.description_placeholder')}
-            value={gDescription}
-            onChangeText={setGDescription}
-            multiline
-            textAlignVertical="top"
-            editable={!isSubmitting}
-          />
+          {showDatePicker && (
+            <DateTimePicker
+              value={dateValue}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleDateChange}
+            />
+          )}
 
-          {error ? (
-            <Text style={styles.error} accessibilityRole="alert">
-              {error}
-            </Text>
+          {showTimePicker && (
+            <DateTimePicker
+              value={dateValue}
+              mode="time"
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handleTimeChange}
+            />
+          )}
+
+          <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
+            {t('mob.create_game.venue_label')}
+          </Text>
+          <View style={styles.searchBox}>
+            <SearchIcon size={18} color={colors.textMuted} />
+            <TextInput
+              style={styles.searchInput}
+              value={venueQuery}
+              onChangeText={handleVenueSearch}
+              placeholder={t('mob.create_game.venue_search_placeholder')}
+              placeholderTextColor={colors.textMuted}
+            />
+            {venueQuery ? (
+              <TouchableOpacity onPress={() => handleVenueSearch('')}>
+                <CrossIcon size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {venuePredictions.length > 0 ? (
+            <View style={styles.predictionsList}>
+              {venuePredictions.map(p => (
+                <TouchableOpacity
+                  key={p.place_id}
+                  style={styles.predictionRow}
+                  onPress={() => handleSelectPrediction(p)}
+                >
+                  <Text style={styles.predictionMain}>{p.main_text}</Text>
+                  {p.secondary_text ? (
+                    <Text style={styles.predictionSecondary}>{p.secondary_text}</Text>
+                  ) : null}
+                </TouchableOpacity>
+              ))}
+            </View>
           ) : null}
 
+          <TouchableOpacity
+            style={styles.currentLocationRow}
+            onPress={() => {
+              setSelectedVenue({
+                name: 'Current Location',
+                address: 'Near you',
+              });
+              setVenueQuery('Current Location');
+            }}
+          >
+            <TargetIcon size={18} />
+            <Text style={styles.currentLocationText}>
+              {t('mob.create_game.use_current_location')}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Map Preview Box */}
+          <View style={styles.mapPreviewBox}>
+            <View style={styles.mapRoad1} />
+            <View style={styles.mapRoad2} />
+            <View style={styles.mapPinContainer}>
+              <PinIcon size={32} />
+            </View>
+            <View style={styles.mapBadge}>
+              <Text style={styles.mapBadgeText}>{t('mob.create_game.drag_map_hint')}</Text>
+            </View>
+          </View>
+
+          {/* Selected Location Row */}
+          <View style={styles.selectedLocationRow}>
+            <View style={styles.pinBadge}>
+              <PinIcon size={20} />
+            </View>
+            <View style={styles.locationTextContainer}>
+              <Text style={styles.locationName}>{selectedVenue.name}</Text>
+              <Text style={styles.locationAddress}>{selectedVenue.address}</Text>
+            </View>
+          </View>
+
+          <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
+            {t('mob.create_game.court_details_label')}
+          </Text>
+          <TextInput
+            style={styles.courtInput}
+            value={courtDetails}
+            onChangeText={setCourtDetails}
+            placeholder={t('mob.create_game.court_details_placeholder')}
+            placeholderTextColor={colors.textMuted}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  // Step 4: Who can play?
+  const renderStep4 = () => (
+    <View style={styles.stepContent}>
+      <Text style={styles.stepHeading}>{t('mob.create_game.step_who')}</Text>
+
+      <SelectableCard
+        selected={gVisibility === 'public'}
+        onPress={() => setGVisibility('public')}
+        title={t('mob.create_game.public_title')}
+        subtitle={t('mob.create_game.public_desc')}
+        leading={
+          <IconBadge color="green" size={48}>
+            <GlobeIcon size={24} />
+          </IconBadge>
+        }
+      />
+
+      <SelectableCard
+        selected={gVisibility === 'invite_only'}
+        onPress={() => setGVisibility('invite_only')}
+        title={t('mob.create_game.invite_only_title')}
+        subtitle={t('mob.create_game.invite_only_desc')}
+        leading={
+          <IconBadge color="orange" size={48}>
+            <LockIcon size={24} />
+          </IconBadge>
+        }
+      />
+
+      <Text style={styles.sectionHeading}>{t('mob.create_game.share_group_section')}</Text>
+
+      {groups.map(grp => {
+        const isSelected = gVisibility === 'group' && selectedGroupId === grp.id;
+        const tint = getAvatarTint(grp.name);
+        return (
+          <TouchableOpacity
+            key={grp.id}
+            style={[styles.groupCard, isSelected && styles.groupCardSelected]}
+            onPress={() => {
+              setGVisibility('group');
+              setSelectedGroupId(grp.id);
+            }}
+          >
+            <View style={[styles.groupAvatar, { backgroundColor: tint.bg }]}>
+              <Text style={[styles.groupAvatarText, { color: tint.text }]}>
+                {getInitials(grp.name)}
+              </Text>
+            </View>
+
+            <View style={styles.groupInfo}>
+              <Text style={styles.groupName}>{grp.name}</Text>
+              <Text style={styles.groupMembers}>
+                {t('mob.create_game.group_members_count', { count: grp.member_count ?? 0 })}
+              </Text>
+            </View>
+
+            <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+              {isSelected ? <CheckIcon size={14} color={colors.white} /> : null}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  // Step 5: Players and skill level
+  const renderStep5 = () => {
+    return (
+      <View style={styles.stepContent}>
+        <Text style={styles.stepHeading}>{t('mob.create_game.step_players_skill')}</Text>
+
+        <View style={styles.cardContainer}>
+          <Text style={styles.inputCardLabel}>{t('mob.create_game.players_needed')}</Text>
+          <NumberField
+            value={capacity}
+            onChangeValue={(val, valid) => {
+              if (val !== null) setCapacity(val);
+              setIsCapacityValid(valid);
+            }}
+            min={gameLimits.players_min}
+            max={gameLimits.players_max}
+            showStepper
+          />
+        </View>
+
+        <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
+          <Text style={styles.inputCardLabel}>{t('mob.create_game.skill_level_label')}</Text>
+          <View style={styles.skillPillRow}>
+            {(['beginner', 'intermediate', 'expert'] as EventSkillLevel[]).map(lvl => {
+              const isSelected = skillLevel === lvl;
+              const label =
+                lvl === 'beginner'
+                  ? 'Beginner'
+                  : lvl === 'intermediate'
+                  ? 'Intermediate'
+                  : 'Advanced';
+              return (
+                <TouchableOpacity
+                  key={lvl}
+                  style={[styles.skillPill, isSelected && styles.skillPillSelected]}
+                  onPress={() => setSkillLevel(lvl)}
+                >
+                  <Text
+                    style={[styles.skillPillText, isSelected && styles.skillPillTextSelected]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  // Step 6: Review & Invite
+  const renderStep6 = () => {
+    const isInviteOnly = gVisibility === 'invite_only';
+    const formattedDate = dateValue.toLocaleDateString('en-US', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    const formattedTime = dateValue.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const selectedGroup = groups.find(g => g.id === selectedGroupId);
+
+    return (
+      <View style={styles.stepContent}>
+        <View style={styles.stepHeaderRow}>
+          <Text style={styles.stepHeading}>
+            {isInviteOnly ? (
+              <>
+                {t('mob.create_game.who_invited')}{' '}
+                <Text style={styles.requiredSubtitle}>{t('mob.create_game.at_least_one')}</Text>
+              </>
+            ) : (
+              <>
+                {t('mob.create_game.invite_players')}{' '}
+                <Text style={styles.optionalSubtitle}>{t('mob.create_game.optional_parentheses')}</Text>
+              </>
+            )}
+          </Text>
+        </View>
+
+        <View style={styles.searchBox}>
+          <SearchIcon size={18} color={colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            value={playerSearchQuery}
+            onChangeText={handlePlayerSearch}
+            placeholder={t('mob.create_game.search_players_placeholder')}
+            placeholderTextColor={colors.textMuted}
+          />
+        </View>
+
+        {playerSuggestions.length > 0 ? (
+          <View style={[styles.cardContainer, styles.playerSuggestionsCard]}>
+            {playerSuggestions.slice(0, 4).map((user, idx) => {
+              const isInvited = invitedPlayers.some(u => u.id === user.id);
+              const tint = getAvatarTint(user.display_name);
+              const isLast = idx === Math.min(playerSuggestions.length, 4) - 1;
+              return (
+                <View
+                  key={user.id}
+                  style={[styles.playerRow, !isLast && styles.playerRowBorder]}
+                >
+                  <View style={[styles.avatarCircle, { backgroundColor: tint.bg }]}>
+                    <Text style={[styles.avatarText, { color: tint.text }]}>
+                      {getInitials(user.display_name)}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.playerName}>{user.display_name}</Text>
+
+                  <TouchableOpacity
+                    style={[styles.inviteToggleBtn, isInvited && styles.inviteToggleBtnActive]}
+                    onPress={() => toggleInvitePlayer(user)}
+                  >
+                    {isInvited ? (
+                      <CheckIcon size={16} color={colors.white} />
+                    ) : (
+                      <Text style={styles.inviteTogglePlus}>+</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {/* Review Card */}
+        <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
+          <Text style={styles.reviewHeaderTitle}>{t('mob.create_game.review_header')}</Text>
+
+          <View style={styles.reviewMainRow}>
+            <View style={styles.reviewSportBadge}>
+              <SportIcon slug={gSport} size={28} />
+            </View>
+            <View style={styles.reviewMainText}>
+              <Text style={styles.reviewGameTitle}>{gTitle}</Text>
+              <Text style={styles.reviewGameSubtitle}>
+                {gSport.charAt(0).toUpperCase() + gSport.slice(1)} ·{' '}
+                {skillLevel.charAt(0).toUpperCase() + skillLevel.slice(1)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.reviewDetailRow}>
+            <View style={[styles.reviewIconCircle, { backgroundColor: colors.primary }]}>
+              <ClockIcon size={16} />
+            </View>
+            <Text style={styles.reviewDetailText}>
+              {formattedDate}, {formattedTime}
+            </Text>
+          </View>
+
+          <View style={styles.reviewDetailRow}>
+            <View style={[styles.reviewIconCircle, { backgroundColor: colors.accent }]}>
+              <PinIcon size={16} />
+            </View>
+            <Text style={styles.reviewDetailText}>
+              {selectedVenue.name}
+              {courtDetails.trim() ? `, ${courtDetails.trim()}` : ''}
+            </Text>
+          </View>
+
+          <View style={styles.reviewDetailRow}>
+            <View style={[styles.reviewIconCircle, { backgroundColor: colors.success }]}>
+              <PeopleIcon size={16} />
+            </View>
+            <Text style={styles.reviewDetailText}>
+              {gVisibility === 'group' && selectedGroup
+                ? t('mob.create_game.review_players_group', { count: capacity, group: selectedGroup.name })
+                : isInviteOnly
+                ? t('mob.create_game.review_players_invite', { count: capacity, invited: invitedPlayers.length })
+                : t('mob.create_game.review_players_public', { count: capacity })}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const isStep5Disabled = step === 5 && (!isCapacityValid || capacity < gameLimits.players_min);
+  const isStep6Disabled = step === 6 && gVisibility === 'invite_only' && invitedPlayers.length < 1;
+
+  return (
+    <View style={styles.screen}>
+      <WizardHeader
+        title={step === 1 ? t('mob.create_game.wizard_title_create') : t('mob.create_game.wizard_title_create_game')}
+        currentStep={step}
+        totalSteps={6}
+        onBack={step > 1 ? handleBack : undefined}
+        onClose={step === 1 ? handleBack : undefined}
+      />
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {step === 1 && renderStep1()}
+        {step === 2 && renderStep2()}
+        {step === 3 && renderStep3()}
+        {step === 4 && renderStep4()}
+        {step === 5 && renderStep5()}
+        {step === 6 && renderStep6()}
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      </ScrollView>
+
+      {step === 6 ? (
+        <View style={styles.footerContainer}>
           <Button
             label={t('mob.create_game.submit_game')}
             variant="cta"
-            onPress={handleSubmitCasual}
+            onPress={handleSubmit}
             loading={isSubmitting}
+            disabled={isStep6Disabled || isSubmitting}
           />
-        </>
+        </View>
       ) : (
-        <>
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.tournament_title')}</Text>
-          <TextField
-            {...chain.props('tTitle')}
-            style={styles.input}
-            placeholder={t('mob.create_game.tournament_title_placeholder')}
-            value={tTitle}
-            onChangeText={setTTitle}
-            maxLength={TITLE_MAX_LENGTH}
-            editable={!isSubmitting}
-          />
-
-          <Text style={styles.label}>{t('mob.create_game.tournament_start')}</Text>
-          <DateTimePickerField
-            accessibilityLabel={t('mob.create_game.tournament_start')}
-            testID="tournament-start-date"
-            mode="date"
-            value={tStart}
-            onChange={setTStart}
-            disabled={isSubmitting}
-          />
-
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.sport')}</Text>
-          {sportOptions.length === 0 ? (
-            <Text style={styles.hint}>{t('mob.common.no_sports')}</Text>
-          ) : (
-            <OptionChips options={sportOptions} value={tSport} onChange={setTSport} disabled={isSubmitting} />
-          )}
-
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.visibility')}</Text>
-          <OptionChips
-            options={TOURNAMENT_VISIBILITY_OPTIONS}
-            value={tVisibility}
-            onChange={setTVisibility}
-            disabled={isSubmitting}
-            selectedColor={colors.textPrimary}
-          />
-          {tVisibility === 'group' ? renderGroupPicker(tGroupId, setTGroupId) : null}
-
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.description_optional')}</Text>
-          <TextField
-            ref={chain.ref('tDescription')}
-            style={[styles.input, styles.multiline]}
-            placeholder={t('mob.create_game.tournament_description_placeholder')}
-            value={tDescription}
-            onChangeText={setTDescription}
-            multiline
-            textAlignVertical="top"
-            editable={!isSubmitting}
-          />
-
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.participation')}</Text>
-          <OptionChips
-            options={PARTICIPATION_OPTIONS}
-            value={tParticipationMode}
-            onChange={setTParticipationMode}
-            disabled={isSubmitting}
-          />
-
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.reg_close')}</Text>
-          <DateTimePickerField
-            accessibilityLabel={t('mob.create_game.reg_close')}
-            testID="tournament-reg-close"
-            mode="datetime"
-            value={tRegClose}
-            onChange={setTRegClose}
-            disabled={isSubmitting}
-          />
-
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.format')}</Text>
-          <OptionChips options={FORMAT_OPTIONS} value={tFormat} onChange={setTFormat} disabled={isSubmitting} />
-
-          <Text style={[styles.label, styles.section]}>{t('mob.create_game.capacity')}</Text>
-          <TextField
-            {...chain.props('tCapacity')}
-            style={styles.input}
-            keyboardType="number-pad"
-            value={tCapacity}
-            onChangeText={setTCapacity}
-            editable={!isSubmitting}
-          />
-
-          <Text style={styles.label}>{t('mob.create_game.venue_name')}</Text>
-          <TextField
-            {...chain.props('tVenueName')}
-            style={styles.input}
-            placeholder={t('mob.create_game.tournament_venue_placeholder')}
-            value={tVenueName}
-            onChangeText={setTVenueName}
-            editable={!isSubmitting}
-          />
-          <Text style={styles.hint}>{t('mob.create_game.timezone_hint')}</Text>
-
-          {error ? (
-            <Text style={styles.error} accessibilityRole="alert">
-              {error}
-            </Text>
-          ) : null}
-
-          <Button
-            label={t('mob.create_game.submit_tournament')}
-            variant="cta"
-            onPress={handleSubmitTournament}
-            loading={isSubmitting}
-          />
-        </>
+        <WizardFooter
+          nextLabel={t('mob.wizard.next')}
+          onNext={handleNext}
+          nextDisabled={isStep5Disabled}
+        />
       )}
-    </KeyboardAwareScreen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg },
-  label: { ...typography.bodyBold, color: colors.textPrimary, marginBottom: spacing.xs },
-  section: { marginTop: spacing.md },
-  input: { marginBottom: spacing.md },
-  multiline: { minHeight: spacing.xxl * 2 },
-  costCurrencyRow: { flexDirection: 'row', gap: spacing.sm },
-  costField: { flex: 2 },
-  currencyField: { flex: 1 },
-  hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.md },
-  error: { ...typography.body, color: colors.error, marginBottom: spacing.md },
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  scrollContent: {
+    padding: spacing.md,
+    paddingBottom: spacing.xxl,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepHeading: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
+  },
+  stepHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: spacing.lg,
+  },
+  optionalSubtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+  },
+  requiredSubtitle: {
+    ...typography.body,
+    color: colors.accent,
+  },
+  sectionHeading: {
+    ...typography.label,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    letterSpacing: 0.5,
+  },
+  sportsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  sportTile: {
+    width: '30%',
+    aspectRatio: 0.95,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.sm,
+  },
+  sportTileSelected: {
+    borderColor: colors.primary,
+    borderWidth: borderWidth.thick,
+  },
+  sportIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  sportTileText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  cardContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  inputCardLabel: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  cardTextInput: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  halfField: {
+    flex: 1,
+  },
+  fieldLabel: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  pickerBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    minHeight: 44,
+  },
+  pickerBoxText: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: borderWidth.thick,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    height: 48,
+    backgroundColor: colors.surface,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  predictionsList: {
+    marginTop: spacing.xs,
+    backgroundColor: colors.surface,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  predictionRow: {
+    padding: spacing.sm,
+    borderBottomWidth: borderWidth.thin,
+    borderBottomColor: colors.border,
+  },
+  predictionMain: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  predictionSecondary: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  currentLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.md,
+  },
+  currentLocationText: {
+    ...typography.bodyBold,
+    color: colors.primary,
+  },
+  mapPreviewBox: {
+    height: 140,
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  mapRoad1: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    height: 24,
+    backgroundColor: colors.surface,
+  },
+  mapRoad2: {
+    position: 'absolute',
+    left: 140,
+    top: 0,
+    bottom: 0,
+    width: 24,
+    backgroundColor: colors.surface,
+  },
+  mapPinContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapBadge: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    left: spacing.sm,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  mapBadgeText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+  },
+  selectedLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  pinBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  locationTextContainer: {
+    flex: 1,
+  },
+  locationName: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  locationAddress: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  courtInput: {
+    ...typography.body,
+    color: colors.textPrimary,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  groupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  groupCardSelected: {
+    borderColor: colors.primary,
+    borderWidth: borderWidth.thick,
+  },
+  groupAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupAvatarText: {
+    ...typography.bodyBold,
+  },
+  groupInfo: {
+    flex: 1,
+    marginLeft: spacing.md,
+  },
+  groupName: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  groupMembers: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  radioCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: radius.full,
+    borderWidth: borderWidth.thick,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioCircleSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  skillPillRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  skillPill: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skillPillSelected: {
+    backgroundColor: colors.primary,
+  },
+  skillPillText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.primaryDark,
+  },
+  skillPillTextSelected: {
+    color: colors.white,
+  },
+  playerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  playerRowBorder: {
+    borderBottomWidth: borderWidth.thin,
+    borderBottomColor: colors.border,
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    ...typography.bodyBold,
+  },
+  playerName: {
+    flex: 1,
+    marginLeft: spacing.md,
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  inviteToggleBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteToggleBtnActive: {
+    backgroundColor: colors.primary,
+  },
+  inviteTogglePlus: {
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  reviewHeaderTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.md,
+  },
+  reviewMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  reviewSportBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  reviewMainText: {
+    flex: 1,
+  },
+  reviewGameTitle: {
+    ...typography.bodyBold,
+    fontSize: 17,
+    color: colors.textPrimary,
+  },
+  reviewGameSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  reviewDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  reviewIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewDetailText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  footerContainer: {
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: borderWidth.thin,
+    borderTopColor: colors.border,
+  },
+  playerSuggestionsCard: {
+    marginTop: spacing.md,
+    padding: 0,
+  },
+  errorText: {
+    ...typography.caption,
+    color: colors.error,
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
 });

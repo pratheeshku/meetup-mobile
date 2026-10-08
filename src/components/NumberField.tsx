@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View, type ViewStyle } from 'react-native';
 
 import { WarningIcon } from './icons/ActionIcons';
 import { useT } from '../labels/LabelsContext';
@@ -16,6 +16,7 @@ export interface NumberFieldProps {
   helperText?: string;
   disabled?: boolean;
   autoFocus?: boolean;
+  showStepper?: boolean;
   style?: ViewStyle;
   testID?: string;
 }
@@ -31,6 +32,7 @@ export default function NumberField({
   helperText,
   disabled = false,
   autoFocus = false,
+  showStepper = false,
   style,
   testID,
 }: NumberFieldProps): React.JSX.Element {
@@ -71,6 +73,17 @@ export default function NumberField({
     onChangeValue(parsed, valid);
   };
 
+  const handleStep = (delta: number): void => {
+    const current = num ?? (min ?? 0);
+    const next = current + delta;
+    if (min !== undefined && next < min) return;
+    if (max !== undefined && next > max) return;
+    let valid = true;
+    if (min !== undefined && next < min) valid = false;
+    if (max !== undefined && next > max) valid = false;
+    onChangeValue(next, valid);
+  };
+
   const defaultHelper =
     min !== undefined && max !== undefined
       ? t('mob.number_field.range_helper', { min, max })
@@ -80,30 +93,94 @@ export default function NumberField({
     <View style={[styles.container, style]}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
 
-      <View style={styles.inputWrapper}>
-        <TextInput
-          testID={testID}
-          style={[
-            styles.input,
-            isFocused && styles.inputFocused,
-            isInvalid && styles.inputError,
-            disabled && styles.disabled,
-          ]}
-          value={stringValue}
-          onChangeText={handleChangeText}
-          keyboardType="number-pad"
-          placeholder={placeholder}
-          placeholderTextColor={colors.textMuted}
-          editable={!disabled}
-          autoFocus={autoFocus}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          maxLength={4}
-          textAlign="center"
-          accessibilityRole="none"
-          accessibilityLabel={label}
-        />
-      </View>
+      {showStepper ? (
+        <View style={styles.stepperRow}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('mob.number_field.decrease')}
+            disabled={disabled || (min !== undefined && num !== null && num <= min)}
+            onPress={() => handleStep(-1)}
+            style={[
+              styles.stepperButton,
+              styles.stepperButtonMinus,
+              (disabled || (min !== undefined && num !== null && num <= min)) && styles.stepperButtonDisabled,
+            ]}
+          >
+            <Text
+              style={[
+                styles.stepperButtonText,
+                styles.stepperButtonMinusText,
+                (disabled || (min !== undefined && num !== null && num <= min)) && styles.stepperButtonDisabledText,
+              ]}
+            >
+              −
+            </Text>
+          </TouchableOpacity>
+
+          <TextInput
+            testID={testID}
+            style={[
+              styles.input,
+              styles.stepperInput,
+              isFocused && styles.inputFocused,
+              isInvalid && styles.inputError,
+              disabled && styles.disabled,
+            ]}
+            value={stringValue}
+            onChangeText={handleChangeText}
+            keyboardType="number-pad"
+            placeholder={placeholder}
+            placeholderTextColor={colors.textMuted}
+            editable={!disabled}
+            autoFocus={autoFocus}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            maxLength={4}
+            textAlign="center"
+            accessibilityRole="none"
+            accessibilityLabel={label}
+          />
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={t('mob.number_field.increase')}
+            disabled={disabled || (max !== undefined && num !== null && num >= max)}
+            onPress={() => handleStep(1)}
+            style={[
+              styles.stepperButton,
+              styles.stepperButtonPlus,
+              (disabled || (max !== undefined && num !== null && num >= max)) && styles.stepperButtonDisabled,
+            ]}
+          >
+            <Text style={[styles.stepperButtonText, styles.stepperButtonPlusText]}>+</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.inputWrapper}>
+          <TextInput
+            testID={testID}
+            style={[
+              styles.input,
+              isFocused && styles.inputFocused,
+              isInvalid && styles.inputError,
+              disabled && styles.disabled,
+            ]}
+            value={stringValue}
+            onChangeText={handleChangeText}
+            keyboardType="number-pad"
+            placeholder={placeholder}
+            placeholderTextColor={colors.textMuted}
+            editable={!disabled}
+            autoFocus={autoFocus}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            maxLength={4}
+            textAlign="center"
+            accessibilityRole="none"
+            accessibilityLabel={label}
+          />
+        </View>
+      )}
 
       {effectiveError ? (
         <View style={styles.errorRow}>
@@ -134,6 +211,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  stepperButton: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperButtonMinus: {
+    backgroundColor: colors.primaryLight,
+  },
+  stepperButtonPlus: {
+    backgroundColor: colors.primary,
+  },
+  stepperButtonDisabled: {
+    opacity: opacity.disabled,
+  },
+  stepperButtonText: {
+    fontSize: 24,
+    fontWeight: '600',
+    lineHeight: 28,
+  },
+  stepperButtonMinusText: {
+    color: colors.primary,
+  },
+  stepperButtonPlusText: {
+    color: colors.white,
+  },
+  stepperButtonDisabledText: {
+    color: colors.textMuted,
+  },
   input: {
     width: 110,
     height: 70,
@@ -146,6 +260,9 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     textAlign: 'center',
     paddingHorizontal: spacing.sm,
+  },
+  stepperInput: {
+    borderColor: colors.primary,
   },
   inputFocused: {
     borderColor: colors.primary,
