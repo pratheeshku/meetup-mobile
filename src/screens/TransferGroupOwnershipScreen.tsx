@@ -117,7 +117,9 @@ export default function TransferGroupOwnershipScreen({ navigation, route }: Prop
         navigation.navigate('AccountDeletionBlocked', { groups: remainingGroups });
         return;
       }
-      navigation.navigate('AccountDeletionBlocked', { groups: [] });
+      navigation.navigate('AccountDeletionBlocked', {
+        notice: getApiErrorMessage(err, t('mob.account_delete.error')),
+      });
     } finally {
       setIsTransferring(false);
     }

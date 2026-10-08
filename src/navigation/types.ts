@@ -81,7 +81,10 @@ export type TournamentsStackParamList = {
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   NotificationPreferences: undefined;
-  AccountDeletionBlocked: { groups: OwnedGroupInfo[] };
+  AccountDeletionBlocked: {
+    groups?: OwnedGroupInfo[];
+    notice?: string;
+  };
   TransferGroupOwnership: {
     groupId: string;
     groupName: string;

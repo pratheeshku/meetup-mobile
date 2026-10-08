@@ -32,17 +32,20 @@ function getInitials(name: string): string {
 
 export default function AccountDeletionBlockedScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
-  const [groups, setGroups] = useState<OwnedGroupInfo[]>(route.params.groups ?? []);
+  const [groups, setGroups] = useState<OwnedGroupInfo[]>(route.params?.groups ?? []);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(route.params?.notice ?? null);
   const isInitialMount = useRef(true);
 
   useEffect(() => {
     if (route.params?.groups) {
       setGroups(route.params.groups);
     }
-  }, [route.params?.groups]);
+    if (route.params?.notice) {
+      setErrorMessage(route.params.notice);
+    }
+  }, [route.params?.groups, route.params?.notice]);
 
   const refreshOwnedGroups = useCallback(async () => {
     try {

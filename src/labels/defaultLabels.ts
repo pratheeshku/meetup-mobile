@@ -603,6 +603,7 @@ export const DEFAULT_LABELS = {
   'mob.account_delete.resend_success': 'A new confirmation code has been sent to your email.',
   'mob.account_delete.resend_error': 'Failed to resend confirmation code.',
   'mob.account_delete.final_delete_button': 'Delete account',
+  'mob.account_delete.error': 'Failed to request account deletion. Please try again.',
 
   'mob.group_transfer.title': 'Transfer ownership',
   'mob.group_transfer.subtitle': 'Transfer ownership of {name}',
