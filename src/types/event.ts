@@ -60,6 +60,9 @@ export interface Event {
   is_organiser: boolean;
   venue_name?: string | null;
   venue_address?: string | null;
+  venue_place_id?: string | null;
+  venue_lat?: number | null;
+  venue_lng?: number | null;
   skill_level_requirement?: EventSkillLevel | null;
   allow_waitlist?: boolean;
   estimated_cost_cents?: number | null;
@@ -84,6 +87,9 @@ export interface UpdateEventInput {
   allow_waitlist?: boolean;
   estimated_cost_cents?: number | null;
   estimated_cost_currency?: string | null;
+  venue_place_id?: string | null;
+  venue_lat?: number | null;
+  venue_lng?: number | null;
 }
 
 export interface EventInvitation {
@@ -147,6 +153,9 @@ export interface CreateEventInput {
   ends_at: null;
   venue_name?: string;
   venue_address?: string;
+  venue_place_id?: string | null;
+  venue_lat?: number | null;
+  venue_lng?: number | null;
   description?: string;
   /**
    * Contract-verification finding (Create Game screen rebuild task):

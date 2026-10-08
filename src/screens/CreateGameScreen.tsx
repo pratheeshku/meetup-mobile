@@ -21,7 +21,11 @@ import { getClientConfig, getGameLimits, type GameLimits } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
 import { createEvent } from '../api/events';
 import { getMyGroups } from '../api/groups';
-import { fetchPlacePredictions, type PlacePrediction } from '../api/places';
+import {
+  fetchPlaceDetails,
+  fetchPlacePredictions,
+  type PlacePrediction,
+} from '../api/places';
 import { getSports } from '../api/sports';
 import { createTournament } from '../api/tournaments';
 import { searchUsers } from '../api/users';
@@ -137,9 +141,18 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [venueQuery, setVenueQuery] = useState('Community Hall');
   const [venuePredictions, setVenuePredictions] = useState<PlacePrediction[]>([]);
-  const [selectedVenue, setSelectedVenue] = useState({
+  const [selectedVenue, setSelectedVenue] = useState<{
+    name: string;
+    address: string;
+    place_id?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+  }>({
     name: 'Community Hall',
     address: 'Punggol, Singapore',
+    place_id: null,
+    lat: null,
+    lng: null,
   });
   const [courtDetails, setCourtDetails] = useState('Court 2');
 
@@ -188,13 +201,32 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     setVenuePredictions(preds);
   };
 
-  const handleSelectPrediction = (p: PlacePrediction) => {
+  const handleSelectPrediction = async (p: PlacePrediction) => {
+    const venueName = p.main_text ?? p.description;
+    const venueAddress = p.secondary_text ?? p.description;
     setSelectedVenue({
-      name: p.main_text ?? p.description,
-      address: p.secondary_text ?? p.description,
+      name: venueName,
+      address: venueAddress,
+      place_id: p.place_id,
+      lat: null,
+      lng: null,
     });
-    setVenueQuery(p.main_text ?? p.description);
+    setVenueQuery(venueName);
     setVenuePredictions([]);
+
+    if (p.place_id && mapsApiKey) {
+      const details = await fetchPlaceDetails(p.place_id, mapsApiKey);
+      if (details) {
+        setSelectedVenue(prev => ({
+          ...prev,
+          name: details.name || venueName,
+          address: details.formatted_address || venueAddress,
+          place_id: details.place_id,
+          lat: details.lat,
+          lng: details.lng,
+        }));
+      }
+    }
   };
 
   const handlePlayerSearch = async (text: string) => {
@@ -302,6 +334,13 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           ends_at: null,
           venue_name: fullVenueName,
           venue_address: selectedVenue.address,
+          ...(mapsApiKey && selectedVenue.place_id
+            ? {
+                venue_place_id: selectedVenue.place_id,
+                venue_lat: selectedVenue.lat,
+                venue_lng: selectedVenue.lng,
+              }
+            : {}),
         };
 
         await withCorrelationId(async correlationId => {

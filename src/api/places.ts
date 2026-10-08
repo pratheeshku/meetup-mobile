@@ -36,3 +36,46 @@ export async function fetchPlacePredictions(
     return [];
   }
 }
+
+export interface PlaceDetails {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+  lat: number;
+  lng: number;
+}
+
+export async function fetchPlaceDetails(
+  placeId: string,
+  apiKey: string | null | undefined,
+  sessionToken?: string,
+): Promise<PlaceDetails | null> {
+  if (!placeId || !apiKey) {
+    return null;
+  }
+  try {
+    const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
+    url.searchParams.append('place_id', placeId);
+    url.searchParams.append('fields', 'geometry,formatted_address,name');
+    url.searchParams.append('key', apiKey);
+    if (sessionToken) {
+      url.searchParams.append('sessiontoken', sessionToken);
+    }
+
+    const response = await fetch(url.toString());
+    const data = await response.json();
+    if (data.status === 'OK' && data.result) {
+      const { result } = data;
+      return {
+        place_id: placeId,
+        name: result.name ?? '',
+        formatted_address: result.formatted_address ?? '',
+        lat: result.geometry?.location?.lat ?? 0,
+        lng: result.geometry?.location?.lng ?? 0,
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

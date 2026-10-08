@@ -25,7 +25,11 @@ import {
   updateEvent,
   withdrawEvent,
 } from '../api/events';
-import { fetchPlacePredictions, type PlacePrediction } from '../api/places';
+import {
+  fetchPlaceDetails,
+  fetchPlacePredictions,
+  type PlacePrediction,
+} from '../api/places';
 import { getClientConfig } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
@@ -117,7 +121,13 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [editVenueQuery, setEditVenueQuery] = useState('');
   const [venuePredictions, setVenuePredictions] = useState<PlacePrediction[]>([]);
-  const [editSelectedVenue, setEditSelectedVenue] = useState({ name: '', address: '' });
+  const [editSelectedVenue, setEditSelectedVenue] = useState<{
+    name: string;
+    address: string;
+    place_id?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+  }>({ name: '', address: '', place_id: null, lat: null, lng: null });
   const [editCourtDetails, setEditCourtDetails] = useState('');
   const [editCapacity, setEditCapacity] = useState(4);
   const [isCapacityValid, setIsCapacityValid] = useState(true);
@@ -162,6 +172,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     setEditSelectedVenue({
       name: venueName,
       address: event.venue_address || '',
+      place_id: event.venue_place_id ?? null,
+      lat: event.venue_lat ?? null,
+      lng: event.venue_lng ?? null,
     });
     setEditCourtDetails('');
     setEditCapacity(event.capacity || 4);
@@ -182,13 +195,32 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     setVenuePredictions(preds);
   };
 
-  const handleSelectPrediction = (p: PlacePrediction) => {
+  const handleSelectPrediction = async (p: PlacePrediction) => {
+    const venueName = p.main_text ?? p.description;
+    const venueAddress = p.secondary_text ?? p.description;
     setEditSelectedVenue({
-      name: p.main_text ?? p.description,
-      address: p.secondary_text ?? p.description,
+      name: venueName,
+      address: venueAddress,
+      place_id: p.place_id,
+      lat: null,
+      lng: null,
     });
-    setEditVenueQuery(p.main_text ?? p.description);
+    setEditVenueQuery(venueName);
     setVenuePredictions([]);
+
+    if (p.place_id && mapsApiKey) {
+      const details = await fetchPlaceDetails(p.place_id, mapsApiKey);
+      if (details) {
+        setEditSelectedVenue(prev => ({
+          ...prev,
+          name: details.name || venueName,
+          address: details.formatted_address || venueAddress,
+          place_id: details.place_id,
+          lat: details.lat,
+          lng: details.lng,
+        }));
+      }
+    }
   };
 
   const handleDateChange = (_e: DateTimePickerEvent, selected?: Date) => {
@@ -250,6 +282,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         ? `${editSelectedVenue.name}, ${editCourtDetails.trim()}`
         : editSelectedVenue.name;
 
+      const venueChanged =
+        fullVenueName !== (event.venue_name || event.location || '') ||
+        editSelectedVenue.address !== (event.venue_address || '');
+
       const payload: UpdateEventInput = {
         title: editTitle.trim(),
         venue_name: fullVenueName || null,
@@ -257,6 +293,13 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         skill_level_requirement: editSkillLevel,
         capacity: editCapacity,
         starts_at: editDateValue.toISOString(),
+        ...(venueChanged && mapsApiKey && editSelectedVenue.place_id
+          ? {
+              venue_place_id: editSelectedVenue.place_id,
+              venue_lat: editSelectedVenue.lat,
+              venue_lng: editSelectedVenue.lng,
+            }
+          : {}),
       };
 
       await withCorrelationId(async correlationId => {
