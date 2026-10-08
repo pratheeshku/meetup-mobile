@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import Geolocation from '@react-native-community/geolocation';
 
 import {
   cancelEvent,
@@ -253,14 +254,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       }
     }
 
-    const geo = (globalThis as unknown as { navigator?: { geolocation?: { getCurrentPosition: (success: (pos: { coords: { latitude: number; longitude: number } }) => void, error: (err: unknown) => void) => void } } }).navigator?.geolocation;
-
-    if (!geo) {
-      setEditError(t('mob.create_game.err_location_failed'));
-      return;
-    }
-
-    geo.getCurrentPosition(
+    Geolocation.getCurrentPosition(
       async pos => {
         const details = await reverseGeocodeCoordinates(
           pos.coords.latitude,
@@ -283,6 +277,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       },
       () => {
         setEditError(t('mob.create_game.err_location_failed'));
+      },
+      {
+        timeout: 10000,
+        enableHighAccuracy: false,
       },
     );
   };

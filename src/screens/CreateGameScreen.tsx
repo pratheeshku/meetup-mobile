@@ -17,6 +17,7 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import Geolocation from '@react-native-community/geolocation';
 
 import { getClientConfig, getGameLimits, type GameLimits } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
@@ -259,16 +260,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       }
     }
 
-    const geo = (globalThis as unknown as { navigator?: { geolocation?: { getCurrentPosition: (success: (pos: { coords: { latitude: number; longitude: number } }) => void, error: (err: unknown) => void) => void } } }).navigator?.geolocation;
-
-    if (!geo) {
-      // In bare React Native without @react-native-community/geolocation,
-      // navigator.geolocation is not polyfilled.
-      setError(t('mob.create_game.err_location_failed'));
-      return;
-    }
-
-    geo.getCurrentPosition(
+    Geolocation.getCurrentPosition(
       async pos => {
         const details = await reverseGeocodeCoordinates(
           pos.coords.latitude,
@@ -291,6 +283,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       },
       () => {
         setError(t('mob.create_game.err_location_failed'));
+      },
+      {
+        timeout: 10000,
+        enableHighAccuracy: false,
       },
     );
   };
