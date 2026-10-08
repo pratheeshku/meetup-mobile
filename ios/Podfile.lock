@@ -1588,28 +1588,6 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - react-native-geolocation (3.4.0):
-    - hermes-engine
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-Core-prebuilt
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - ReactNativeDependencies
-    - Yoga
   - react-native-safe-area-context (5.9.1):
     - hermes-engine
     - RCTRequired
@@ -2474,7 +2452,6 @@ DEPENDENCIES:
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - React-mutationobservernativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/mutationobserver`)
   - react-native-config (from `../node_modules/react-native-config`)
-  - "react-native-geolocation (from `../node_modules/@react-native-community/geolocation`)"
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-networking (from `../node_modules/react-native/ReactCommon/react/networking`)
@@ -2639,8 +2616,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/mutationobserver"
   react-native-config:
     :path: "../node_modules/react-native-config"
-  react-native-geolocation:
-    :path: "../node_modules/@react-native-community/geolocation"
   react-native-safe-area-context:
     :path: "../node_modules/react-native-safe-area-context"
   React-NativeModulesApple:
@@ -2803,7 +2778,6 @@ SPEC CHECKSUMS:
   React-microtasksnativemodule: 97a771dbbb4315c71579995b53e4e3e351a99d89
   React-mutationobservernativemodule: 530bff1bba9511a5133e3cf8170e3b2c0df49e89
   react-native-config: e89a04d172d648811fc67a07b61434e35441b227
-  react-native-geolocation: c41d1ad8e832fa800b4e457c721e348bcc5aa147
   react-native-safe-area-context: 8368d1052ccc8fe8725adfb6a83498c8bdb48250
   React-NativeModulesApple: 2b658272ca69df0694cf5d54f9510aa7c33977bc
   React-networking: 6be0b80e18e710dd30e77b04838ec46666a7bb78
