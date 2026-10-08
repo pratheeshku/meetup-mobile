@@ -9,6 +9,7 @@ import { Platform, StyleSheet, TextInput } from 'react-native';
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
 
 import { GoogleSignInCancelledError } from '../../auth/googleAuth';
+import { AppleSignInCancelledError } from '../../auth/appleAuth';
 import { act, pressables, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import LoginScreen from '../LoginScreen';
@@ -18,11 +19,15 @@ type Props = React.ComponentProps<typeof LoginScreen>;
 const mockAuth = {
   sessionExpired: false,
   signInWithGoogle: jest.fn(),
+  signInWithApple: jest.fn(),
   signInWithEmail: jest.fn(),
 };
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => mockAuth }));
 jest.mock('../../auth/googleAuth', () => ({
   GoogleSignInCancelledError: class CancelledStub extends Error {},
+}));
+jest.mock('../../auth/appleAuth', () => ({
+  AppleSignInCancelledError: class AppleCancelledStub extends Error {},
 }));
 
 const mockNavigate = jest.fn();
@@ -68,6 +73,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockAuth.sessionExpired = false;
   mockAuth.signInWithGoogle.mockReset();
+  mockAuth.signInWithApple.mockReset();
   mockAuth.signInWithEmail.mockReset();
 });
 
@@ -282,3 +288,48 @@ describe('LoginScreen email auth and routing (AD-5)', () => {
     }
   });
 });
+
+describe('LoginScreen Apple sign-in and iOS elements (AD-6, AD-8, AD-9)', () => {
+  beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+  });
+
+  const pressApple = async (root: Instance): Promise<void> => {
+    await act(async () => {
+      pressableWithText(root, 'Continue with Apple').props.onPress();
+    });
+  };
+
+  it('[Execute] renders the Apple button and terms notice on iOS', async () => {
+    const root = await mount();
+    expect(texts(root)).toContain('Continue with Apple');
+    expect(texts(root)).toContain('Terms and Conditions');
+  });
+
+  it('[Execute] stays silent when the user cancels Apple sign-in', async () => {
+    mockAuth.signInWithApple.mockRejectedValueOnce(new AppleSignInCancelledError());
+    const root = await mount();
+
+    await pressApple(root);
+
+    expect(texts(root)).not.toContain('Apple sign-in failed. Please try again.');
+  });
+
+  it('[Execute] shows generic failure message when Apple sign-in fails', async () => {
+    mockAuth.signInWithApple.mockRejectedValueOnce(new Error('Backend 500 error'));
+    const root = await mount();
+
+    await pressApple(root);
+
+    expect(texts(root)).toContain('Apple sign-in failed. Please try again.');
+  });
+
+  it('[Execute] does not render Apple button on Android, but renders terms notice', async () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    const root = await mount();
+
+    expect(texts(root)).not.toContain('Continue with Apple');
+    expect(texts(root)).toContain('Terms and Conditions');
+  });
+});
+

@@ -34,6 +34,7 @@ import {
   signOut as sharedSignOut,
 } from './googleAuth';
 import { isGoogleSignInAvailable } from './googleSupport';
+import { signIn as appleSignIn } from './appleAuth';
 import { login as emailLogin } from './emailAuth';
 import { startPushRegistration } from '../notifications/pushRegistration';
 import type { UserProfile } from '../types/user';
@@ -48,6 +49,7 @@ interface AuthContextValue {
    */
   sessionExpired: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   /**
@@ -59,7 +61,7 @@ interface AuthContextValue {
   updateUser: (patch: Partial<UserProfile>) => void;
 }
 
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -175,6 +177,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     establishSession(await googleSignIn());
   }, [establishSession]);
 
+  const signInWithApple = useCallback(async () => {
+    setSessionExpired(false);
+    establishSession(await appleSignIn());
+  }, [establishSession]);
+
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
       setSessionExpired(false);
@@ -209,6 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       isLoading,
       sessionExpired,
       signInWithGoogle,
+      signInWithApple,
       signInWithEmail,
       signOut,
       updateUser,
@@ -218,6 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       isLoading,
       sessionExpired,
       signInWithGoogle,
+      signInWithApple,
       signInWithEmail,
       signOut,
       updateUser,

@@ -14,15 +14,18 @@
  * - 401 or other 4xx: "Invalid email or password."
  */
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import { AppleButton } from '@invertase/react-native-apple-authentication';
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AxiosError } from 'axios';
 
 import { useAuth } from '../auth/AuthContext';
+import { AppleSignInCancelledError } from '../auth/appleAuth';
 import { GoogleSignInCancelledError } from '../auth/googleAuth';
 import { isGoogleSignInAvailable } from '../auth/googleSupport';
 import { SESSION_EXPIRED_MESSAGE } from '../auth/messages';
+import SocialTermsNotice from '../components/auth/SocialTermsNotice';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
@@ -44,7 +47,7 @@ import { useT } from '../labels/LabelsContext';
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation, route }: Props): React.JSX.Element {
-  const { signInWithGoogle, signInWithEmail, sessionExpired } = useAuth();
+  const { signInWithGoogle, signInWithApple, signInWithEmail, sessionExpired } = useAuth();
   const t = useT();
 
   const [email, setEmail] = useState(route?.params?.email ?? '');
@@ -53,6 +56,22 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
   const [error, setError] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
+
+  const handleAppleSignIn = async (): Promise<void> => {
+    setError(null);
+    setRetryError(null);
+    setRetryAction(null);
+    setIsSubmitting(true);
+    try {
+      await signInWithApple();
+    } catch (err) {
+      if (!(err instanceof AppleSignInCancelledError)) {
+        setError(t('mob.auth.apple_failed'));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (route?.params?.email) {
@@ -155,6 +174,15 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
       {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
       {sessionExpired ? <Text style={styles.notice}>{t(SESSION_EXPIRED_MESSAGE)}</Text> : null}
 
+      {Platform.OS === 'ios' ? (
+        <AppleButton
+          buttonStyle={AppleButton.Style.BLACK}
+          buttonType={AppleButton.Type.CONTINUE}
+          style={styles.appleButton}
+          onPress={handleAppleSignIn}
+        />
+      ) : null}
+
       {isGoogleSignInAvailable() ? (
         <GoogleSigninButton
           size={GoogleSigninButton.Size.Wide}
@@ -164,6 +192,8 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
           onPress={handleGoogleSignIn}
         />
       ) : null}
+
+      <SocialTermsNotice />
 
       <TextField
         style={styles.input}
@@ -248,6 +278,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   googleButton: { alignSelf: 'center', marginBottom: spacing.lg },
+  appleButton: {
+    width: '100%',
+    maxWidth: 312,
+    height: 48,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
   input: { marginBottom: spacing.md },
   forgotPasswordRow: {
     alignItems: 'flex-end',

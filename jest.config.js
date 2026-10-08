@@ -16,6 +16,7 @@ module.exports = {
         'react-native-uuid',
         'react-native-image-crop-picker',
         '@d11/react-native-fast-image',
+        '@invertase/react-native-apple-authentication',
       ].join('|') +
       ')/)',
   ],

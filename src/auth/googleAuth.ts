@@ -37,6 +37,9 @@ import {
   isCancelledResponse,
 } from '@react-native-google-signin/google-signin';
 
+import { Platform } from 'react-native';
+
+import appConfig from '../../config/appConfig.json';
 import { ENV } from '../../config/env';
 import { apiClient } from '../api/client';
 import { clearCookieJar } from '../api/cookies';
@@ -59,10 +62,19 @@ export function configureGoogleSignIn(): void {
   if (isConfigured) {
     return;
   }
+  if (!ENV.GOOGLE_WEB_CLIENT_ID) {
+    console.error('[auth] Google sign-in configuration skipped: GOOGLE_WEB_CLIENT_ID is not configured');
+    return;
+  }
   GoogleSignin.configure({
     webClientId: ENV.GOOGLE_WEB_CLIENT_ID,
+    iosClientId: ENV.GOOGLE_IOS_CLIENT_ID || undefined,
   });
   isConfigured = true;
+}
+
+export function _resetGoogleSignInConfiguredForTesting(): void {
+  isConfigured = false;
 }
 
 /**
@@ -86,11 +98,17 @@ export async function signIn(): Promise<UserProfile> {
   if (!isGoogleSignInAvailable()) {
     throw new Error('Google sign-in is not available on this platform');
   }
+  if (!ENV.GOOGLE_WEB_CLIENT_ID) {
+    console.error('[auth] Google sign-in aborted: GOOGLE_WEB_CLIENT_ID is not configured');
+    throw new Error('Google sign-in failed. Please try again.');
+  }
   configureGoogleSignIn();
 
   // Recommended precondition for the classic GoogleSignInClient flow on
   // Android — without Google Play Services, `signIn()` fails opaquely.
-  await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  if (Platform.OS === 'android') {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+  }
 
   const response = await GoogleSignin.signIn();
 
@@ -103,8 +121,12 @@ export async function signIn(): Promise<UserProfile> {
     throw new Error('Google sign-in did not return a usable credential');
   }
 
+  const termsVersion =
+    (appConfig as { terms_version?: string }).terms_version ?? '2026-10-02';
+
   const { data } = await apiClient.post<AuthResponse>('/auth/oauth/google/callback', {
     id_token: response.data.idToken,
+    terms_version: termsVersion,
   });
 
   await saveTokens(data.access_token, data.refresh_token);
