@@ -5,13 +5,19 @@ import { withCorrelationId } from '../../api/correlationId';
 import { deleteGroup } from '../../api/groups';
 import Button from '../Button';
 import BottomSheet from '../skills/BottomSheet';
+import {
+  CheckIcon,
+  CrossIcon,
+  TrashIcon,
+} from '../icons/ActionIcons';
 import { useT } from '../../labels/LabelsContext';
-import { colors, spacing, typography } from '../../theme/tokens';
+import { colors, radius, spacing, typography } from '../../theme/tokens';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 interface DeleteGroupSheetProps {
   groupId: string;
   groupName: string;
+  memberCount?: number;
   visible: boolean;
   onClose: () => void;
   onDeleted: () => void;
@@ -20,6 +26,7 @@ interface DeleteGroupSheetProps {
 export default function DeleteGroupSheet({
   groupId,
   groupName,
+  memberCount,
   visible,
   onClose,
   onDeleted,
@@ -50,29 +57,54 @@ export default function DeleteGroupSheet({
   return (
     <BottomSheet onClose={onClose} closeLabel={t('mob.group_delete.keep_btn')}>
       <View style={styles.content}>
-        <Text style={styles.title}>
-          {t('mob.group_delete.sheet_title', { name: groupName })}
-        </Text>
+        <View style={styles.headerRow}>
+          <View style={styles.trashBadge}>
+            <TrashIcon size={24} color={colors.error} />
+          </View>
+          <View style={styles.headerTextGroup}>
+            <Text style={styles.title} numberOfLines={2}>
+              {t('mob.group_delete.sheet_title', { name: groupName })}
+            </Text>
+            {memberCount !== undefined ? (
+              <Text style={styles.subtitle}>
+                {t(
+                  memberCount === 1
+                    ? 'mob.group_card.members_one'
+                    : 'mob.group_card.members_other',
+                  { count: memberCount },
+                )}
+              </Text>
+            ) : null}
+          </View>
+        </View>
 
         {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
 
         <View style={styles.consequencesList}>
           <View style={styles.consequenceRow}>
-            <Text style={styles.bullet}>•</Text>
+            <View style={styles.iconContainer}>
+              <CheckIcon size={18} color={colors.success} />
+            </View>
             <Text style={styles.consequenceText}>
               {t('mob.group_delete.consequence_upcoming')}
             </Text>
           </View>
           <View style={styles.consequenceRow}>
-            <Text style={styles.bullet}>•</Text>
+            <View style={styles.iconContainer}>
+              <CheckIcon size={18} color={colors.success} />
+            </View>
             <Text style={styles.consequenceText}>
               {t('mob.group_delete.consequence_past')}
             </Text>
           </View>
           <View style={styles.consequenceRow}>
-            <Text style={styles.bullet}>•</Text>
+            <View style={styles.iconContainer}>
+              <CrossIcon size={18} color={colors.error} />
+            </View>
             <Text style={styles.consequenceText}>
-              {t('mob.group_delete.consequence_disappear')}
+              {memberCount !== undefined
+                ? t('mob.group_delete.consequence_disappear', { count: memberCount })
+                : t('mob.group_delete.consequence_disappear_generic')}
             </Text>
           </View>
         </View>
@@ -103,11 +135,31 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: spacing.md,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  trashBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.errorLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  headerTextGroup: {
+    flex: 1,
+  },
   title: {
     ...typography.h2,
     color: colors.textPrimary,
-    marginBottom: spacing.md,
-    textAlign: 'center',
+  },
+  subtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   errorText: {
     ...typography.body,
@@ -116,18 +168,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   consequencesList: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.xl,
   },
   consequenceRow: {
     flexDirection: 'row',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
     alignItems: 'flex-start',
   },
-  bullet: {
-    ...typography.bodyBold,
-    color: colors.textPrimary,
+  iconContainer: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: spacing.sm,
-    lineHeight: 22,
+    marginTop: 1,
   },
   consequenceText: {
     ...typography.body,

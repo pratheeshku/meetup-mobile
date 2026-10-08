@@ -39,7 +39,12 @@ import {
 } from '../api/groups';
 import { getCachedBanners, type BannerFallback } from '../api/home';
 import { BannerBackground } from '../components/icons/DashboardIcons';
-import { EditIcon, TrashIcon } from '../components/icons/ActionIcons';
+import {
+  BackArrowIcon,
+  EditIcon,
+  LockIcon,
+  TrashIcon,
+} from '../components/icons/ActionIcons';
 import DeleteGroupSheet from '../components/groups/DeleteGroupSheet';
 import Badge from '../components/Badge';
 import type { BadgeVariant } from '../components/Badge';
@@ -77,6 +82,13 @@ const ROLE_BADGE_VARIANT: Record<GroupMemberRole, BadgeVariant> = {
   admin: 'primary',
   member: 'neutral',
 };
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 export default function GroupDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const { groupId } = route.params;
@@ -332,40 +344,52 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         <View style={styles.headerScrim} />
 
         <View style={styles.headerContent}>
-          {isOwner ? (
-            <View style={styles.headerActionRow}>
-              <Pressable
-                onPress={() => navigation.navigate('EditGroup', { groupId })}
-                style={styles.headerIconButton}
-                accessibilityRole="button"
-                accessibilityLabel={t('mob.group_detail.edit_group_a11y')}
-              >
-                <EditIcon size={18} color={colors.white} />
-              </Pressable>
-              <Pressable
-                onPress={() => setIsDeleteSheetVisible(true)}
-                style={styles.headerIconButton}
-                accessibilityRole="button"
-                accessibilityLabel={t('mob.group_detail.delete_group_a11y')}
-              >
-                <TrashIcon size={18} color={colors.white} />
-              </Pressable>
-            </View>
-          ) : null}
+          <View style={styles.headerTopBar}>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={styles.headerCircularButton}
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.common.back')}
+            >
+              <BackArrowIcon size={18} color={colors.white} />
+            </Pressable>
 
-          <View style={styles.headerIdentityRow}>
+            {isOwner ? (
+              <View style={styles.headerActionRow}>
+                <Pressable
+                  onPress={() => navigation.navigate('EditGroup', { groupId })}
+                  style={styles.headerCircularButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mob.group_detail.edit_group_a11y')}
+                >
+                  <EditIcon size={18} color={colors.white} />
+                </Pressable>
+                <Pressable
+                  onPress={() => setIsDeleteSheetVisible(true)}
+                  style={styles.headerCircularButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mob.group_detail.delete_group_a11y')}
+                >
+                  <TrashIcon size={18} color={colors.white} />
+                </Pressable>
+              </View>
+            ) : <View style={styles.headerActionSpacer} />}
+          </View>
+
+          <View style={styles.headerIdentityCentered}>
             {group.logo_url ? (
               <Image source={{ uri: group.logo_url }} style={styles.groupLogo} resizeMode="cover" />
             ) : (
               <View style={styles.groupLogoInitials}>
                 <Text style={styles.groupInitialsText}>
-                  {(group.name.trim().charAt(0) || '?').toUpperCase()}
+                  {getInitials(group.name)}
                 </Text>
               </View>
             )}
 
-            <View style={styles.headerTextContainer}>
-              <Text style={styles.groupName}>{group.name}</Text>
+            <Text style={styles.groupName}>{group.name}</Text>
+
+            <View style={styles.groupMetaRow}>
               <Text style={styles.groupCounts}>
                 {t('mob.group_detail.counts_line', {
                   group_members: t(
@@ -382,25 +406,18 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
                   ),
                 })}
               </Text>
-              <View style={styles.roleChipRow}>
-                {isOwner ? (
-                  <View style={styles.ownerChip}>
-                    <Text style={styles.ownerChipText}>{t('mob.group_detail.owner_chip')}</Text>
-                  </View>
-                ) : (
-                  <View style={styles.memberChip}>
-                    <Text style={styles.memberChipText}>{t('mob.group_detail.member_chip')}</Text>
-                  </View>
-                )}
-              </View>
+              <Text style={styles.metaDot}> · </Text>
+              {isOwner ? (
+                <View style={styles.ownerChip}>
+                  <Text style={styles.ownerChipText}>{t('mob.group_detail.owner_chip')}</Text>
+                </View>
+              ) : (
+                <View style={styles.memberChip}>
+                  <Text style={styles.memberChipText}>{t('mob.group_detail.member_chip')}</Text>
+                </View>
+              )}
             </View>
           </View>
-
-          {!isOwner ? (
-            <Text style={styles.ownerOnlyNote}>
-              {t('mob.group_detail.owner_only_note')}
-            </Text>
-          ) : null}
         </View>
       </View>
 
@@ -583,6 +600,13 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         })}
       </Card>
 
+      {!isOwner ? (
+        <View style={styles.memberNoticeBanner}>
+          <LockIcon size={16} color={colors.primary} />
+          <Text style={styles.memberNoticeText}>{t('mob.group_detail.owner_only_note')}</Text>
+        </View>
+      ) : null}
+
       {canLeave ? (
         <View style={styles.leaveSection}>
           {leaveError ? <Text style={styles.errorText}>{leaveError}</Text> : null}
@@ -597,6 +621,7 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
       <DeleteGroupSheet
         groupId={group.id}
         groupName={group.name}
+        memberCount={group.member_count ?? group.members.length}
         visible={isDeleteSheetVisible}
         onClose={() => setIsDeleteSheetVisible(false)}
         onDeleted={() => {
@@ -641,95 +666,116 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     padding: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+  },
+  headerTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  headerCircularButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerActionSpacer: {
+    width: 36,
+    height: 36,
   },
   headerActionRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.xs,
   },
-  headerIconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.scrim,
+  headerIdentityCentered: {
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerIdentityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
   },
   groupLogo: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.md,
-    borderWidth: borderWidth.thin,
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    borderWidth: 3,
     borderColor: colors.white,
   },
   groupLogoInitials: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    width: 88,
+    height: 88,
+    borderRadius: 24,
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: borderWidth.thin,
+    borderWidth: 3,
     borderColor: colors.white,
   },
   groupInitialsText: {
-    ...typography.h2,
+    fontSize: 32,
+    fontWeight: '700',
     color: colors.primary,
-  },
-  headerTextContainer: {
-    flex: 1,
   },
   groupName: {
     ...typography.h2,
     color: colors.white,
-    marginBottom: 2,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    marginBottom: 4,
+  },
+  groupMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
   },
   groupCounts: {
     ...typography.caption,
     color: colors.white,
-    opacity: 0.9,
-    marginBottom: spacing.xs,
   },
-  roleChipRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  metaDot: {
+    ...typography.caption,
+    color: colors.white,
   },
   ownerChip: {
-    backgroundColor: colors.warningLight,
+    backgroundColor: colors.warning,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.full,
-    borderWidth: borderWidth.thin,
-    borderColor: colors.warning,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
   ownerChipText: {
     ...typography.label,
-    color: colors.textPrimary,
+    color: '#78350F',
+    fontWeight: '700',
   },
   memberChip: {
     backgroundColor: colors.white,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.full,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
   memberChipText: {
     ...typography.label,
-    color: colors.textPrimary,
+    color: colors.primary,
+    fontWeight: '700',
   },
-  ownerOnlyNote: {
+  memberNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  memberNoticeText: {
     ...typography.caption,
-    color: colors.white,
-    opacity: 0.85,
-    marginTop: spacing.sm,
+    color: colors.textPrimary,
+    marginLeft: spacing.sm,
+    flex: 1,
   },
   infoCard: { marginBottom: spacing.md },
   shareGroupBtn: {

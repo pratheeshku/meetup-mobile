@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
@@ -10,7 +17,7 @@ import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import LoadingView from '../components/LoadingView';
-import TextField from '../components/TextField';
+import { CheckIcon, SearchIcon } from '../components/icons/ActionIcons';
 import { useT } from '../labels/LabelsContext';
 import type { ProfileStackParamList } from '../navigation/types';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
@@ -18,6 +25,29 @@ import type { GroupMember } from '../types/group';
 import { getApiErrorMessage } from '../utils/apiError';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'TransferGroupOwnership'>;
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+const AVATAR_COLORS = [
+  '#DBEAFE', // Light blue
+  '#FEF3C7', // Light yellow / peach
+  '#D1FAE5', // Light green / mint
+  '#FCE7F3', // Light pink
+  '#EDE9FE', // Light purple
+];
+
+const AVATAR_TEXT_COLORS = [
+  '#1E40AF',
+  '#92400E',
+  '#065F46',
+  '#9D174D',
+  '#5B21B6',
+];
 
 export default function TransferGroupOwnershipScreen({ navigation, route }: Props): React.JSX.Element {
   const { groupId, groupName } = route.params;
@@ -102,83 +132,102 @@ export default function TransferGroupOwnershipScreen({ navigation, route }: Prop
     return <ErrorView message={loadError} onRetry={loadMembers} />;
   }
 
+  const groupInitials = getInitials(groupName);
+
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <Card style={styles.card}>
-        <Text style={styles.heading}>{t('mob.group_transfer.title')}</Text>
-        <Text style={styles.subheading}>
-          {t('mob.group_transfer.subtitle', { name: groupName })}
-        </Text>
-        <Text style={styles.instructions}>{t('mob.group_transfer.select_member')}</Text>
+      <View style={styles.groupHeaderRow}>
+        <View style={styles.groupAvatar}>
+          <Text style={styles.groupAvatarText}>{groupInitials}</Text>
+        </View>
+        <View style={styles.groupHeaderInfo}>
+          <Text style={styles.groupHeaderName} numberOfLines={1}>
+            {groupName}
+          </Text>
+          <Text style={styles.groupHeaderSubtitle}>{t('mob.group_transfer.choose_owner')}</Text>
+        </View>
+      </View>
 
-        <TextField
+      <View style={styles.searchContainer}>
+        <SearchIcon size={18} color={colors.textMuted} />
+        <TextInput
           placeholder={t('mob.group_transfer.search_placeholder')}
+          placeholderTextColor={colors.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
           style={styles.searchInput}
           autoCapitalize="none"
           autoCorrect={false}
         />
+      </View>
 
-        {transferError ? <Text style={styles.errorText}>{transferError}</Text> : null}
+      {transferError ? <Text style={styles.errorText}>{transferError}</Text> : null}
 
-        {members.length === 0 ? (
+      {members.length === 0 ? (
+        <Card style={styles.emptyCard}>
           <Text style={styles.emptyText}>{t('mob.group_transfer.empty_members')}</Text>
-        ) : (
-          <View style={styles.memberList}>
-            {filteredMembers.map(member => {
-              const isSelected = member.user_id === selectedMemberId;
+        </Card>
+      ) : (
+        <Card style={styles.memberCard}>
+          {filteredMembers.map((member, index) => {
+            const isSelected = member.user_id === selectedMemberId;
+            const initials = getInitials(member.nickname);
+            const colorIndex = index % AVATAR_COLORS.length;
+            const avatarBg = AVATAR_COLORS[colorIndex];
+            const avatarTextColor = AVATAR_TEXT_COLORS[colorIndex];
 
-              return (
-                <Pressable
-                  key={member.user_id}
-                  style={[styles.memberRow, isSelected && styles.memberRowSelected]}
-                  onPress={() => setSelectedMemberId(member.user_id)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected }}
-                >
-                  <View style={styles.avatarTile}>
-                    <Text style={styles.avatarInitial}>
-                      {(member.nickname.charAt(0) || '?').toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.memberInfo}>
-                    <Text style={styles.memberNickname}>{member.nickname}</Text>
-                    <Text style={styles.memberRole}>
-                      {t(
-                        member.role === 'admin'
-                          ? 'mob.group_role.admin'
-                          : 'mob.group_role.member',
-                      )}
-                    </Text>
-                  </View>
-                  <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                    {isSelected ? <View style={styles.radioInner} /> : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
+            return (
+              <Pressable
+                key={member.user_id}
+                style={[
+                  styles.memberRow,
+                  isSelected && styles.memberRowSelected,
+                  index < filteredMembers.length - 1 && styles.memberRowDivider,
+                ]}
+                onPress={() => setSelectedMemberId(member.user_id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+              >
+                <View style={[styles.avatarTile, { backgroundColor: avatarBg }]}>
+                  <Text style={[styles.avatarInitial, { color: avatarTextColor }]}>{initials}</Text>
+                </View>
 
-        <View style={styles.actionsRow}>
-          <Button
-            label={t('mob.group_transfer.confirm_button')}
-            variant="primary"
-            onPress={handleConfirmPress}
-            disabled={!selectedMemberId || isTransferring}
-            loading={isTransferring}
-            style={styles.confirmButton}
-          />
-          <Button
-            label={t('mob.common.cancel')}
-            variant="secondary"
-            onPress={() => navigation.goBack()}
-            disabled={isTransferring}
-            style={styles.cancelButton}
-          />
-        </View>
-      </Card>
+                <View style={styles.memberInfo}>
+                  <Text style={styles.memberNickname}>{member.nickname}</Text>
+                  <Text style={styles.memberHandle}>@{member.nickname.toLowerCase()}</Text>
+                </View>
+
+                <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
+                  {isSelected ? <CheckIcon size={14} color={colors.white} /> : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </Card>
+      )}
+
+      <View style={styles.noticeBanner}>
+        <Text style={styles.noticeText}>
+          {selectedMember
+            ? t('mob.group_transfer.banner_info', { name: selectedMember.nickname })
+            : t('mob.group_transfer.banner_info_generic')}
+        </Text>
+      </View>
+
+      <View style={styles.footerSection}>
+        <Button
+          label={
+            selectedMember
+              ? t('mob.group_transfer.btn_transfer_to', { name: selectedMember.nickname })
+              : t('mob.group_transfer.confirm_button')
+          }
+          variant="primary"
+          onPress={handleConfirmPress}
+          disabled={!selectedMemberId || isTransferring}
+          loading={isTransferring}
+          style={styles.confirmButton}
+        />
+      </View>
     </KeyboardAwareScreen>
   );
 }
@@ -186,69 +235,101 @@ export default function TransferGroupOwnershipScreen({ navigation, route }: Prop
 const styles = StyleSheet.create({
   container: {
     padding: spacing.md,
+    flexGrow: 1,
   },
-  card: {
-    padding: spacing.md,
+  groupHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
-  heading: {
-    ...typography.h2,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
+  groupAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
   },
-  subheading: {
+  groupAvatarText: {
+    ...typography.bodyBold,
+    color: colors.white,
+    fontSize: 16,
+  },
+  groupHeaderInfo: {
+    flex: 1,
+  },
+  groupHeaderName: {
     ...typography.bodyBold,
     color: colors.textPrimary,
-    marginBottom: spacing.xs,
   },
-  instructions: {
-    ...typography.body,
+  groupHeaderSubtitle: {
+    ...typography.caption,
     color: colors.textSecondary,
+    marginTop: 2,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
     marginBottom: spacing.md,
+    minHeight: 44,
   },
   searchInput: {
-    marginBottom: spacing.md,
+    flex: 1,
+    marginLeft: spacing.sm,
+    ...typography.body,
+    color: colors.textPrimary,
+    paddingVertical: spacing.sm,
   },
   errorText: {
     ...typography.body,
     color: colors.error,
     marginBottom: spacing.sm,
   },
+  emptyCard: {
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
   emptyText: {
     ...typography.body,
     color: colors.textMuted,
     textAlign: 'center',
-    paddingVertical: spacing.lg,
   },
-  memberList: {
-    marginBottom: spacing.lg,
+  memberCard: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
   },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: borderWidth.thin,
-    borderColor: colors.border,
-    marginBottom: spacing.xs,
-    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
   },
   memberRowSelected: {
-    borderColor: colors.primary,
     backgroundColor: colors.primaryLight,
   },
+  memberRowDivider: {
+    borderBottomWidth: borderWidth.thin,
+    borderBottomColor: colors.border,
+  },
   avatarTile: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: radius.full,
-    backgroundColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.sm,
+    marginRight: spacing.md,
   },
   avatarInitial: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    fontSize: 14,
   },
   memberInfo: {
     flex: 1,
@@ -257,36 +338,41 @@ const styles = StyleSheet.create({
     ...typography.bodyBold,
     color: colors.textPrimary,
   },
-  memberRole: {
+  memberHandle: {
     ...typography.caption,
     color: colors.textSecondary,
+    marginTop: 2,
   },
-  radioCircle: {
-    width: 20,
-    height: 20,
+  checkCircle: {
+    width: 22,
+    height: 22,
     borderRadius: radius.full,
     borderWidth: borderWidth.thick,
     borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  radioCircleSelected: {
+  checkCircleSelected: {
+    backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
+  noticeBanner: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
   },
-  actionsRow: {
-    marginTop: spacing.sm,
-    gap: spacing.sm,
+  noticeText: {
+    ...typography.body,
+    color: colors.primaryDark,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  footerSection: {
+    marginTop: 'auto',
+    paddingTop: spacing.md,
   },
   confirmButton: {
-    width: '100%',
-  },
-  cancelButton: {
     width: '100%',
   },
 });

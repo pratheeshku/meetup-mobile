@@ -1,5 +1,11 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -9,12 +15,20 @@ import { requestDeletion, type OwnedGroupInfo } from '../api/profile';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
+import { WarningIcon } from '../components/icons/ActionIcons';
 import { useT } from '../labels/LabelsContext';
 import type { ProfileStackParamList } from '../navigation/types';
-import { borderWidth, colors, spacing, typography } from '../theme/tokens';
+import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import { getApiErrorMessage } from '../utils/apiError';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'AccountDeletionBlocked'>;
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 export default function AccountDeletionBlockedScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
@@ -113,68 +127,93 @@ export default function AccountDeletionBlockedScreen({ navigation, route }: Prop
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <Card style={styles.card}>
+      <View style={styles.topSection}>
+        <View style={styles.warningBadge}>
+          <WarningIcon size={32} color={colors.white} />
+        </View>
         <Text style={styles.heading}>{countTitle}</Text>
         <Text style={styles.description}>{t('mob.account_delete.blocked_description')}</Text>
+      </View>
 
-        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
-        <View style={styles.groupList}>
-          {groups.map(group => {
+      {groups.length > 0 ? (
+        <Card style={styles.card}>
+          {groups.map((group, index) => {
             const isOnlyMember = (group.member_count ?? 1) <= 1;
             const isDeleting = deletingGroupId === group.id;
+            const initials = getInitials(group.name);
+            const avatarBg = index % 2 === 0 ? colors.primary : colors.success;
 
             return (
-              <View key={group.id} style={styles.groupItem}>
+              <View
+                key={group.id}
+                style={[styles.groupItem, index < groups.length - 1 && styles.groupItemDivider]}
+              >
+                <View style={[styles.avatarTile, { backgroundColor: avatarBg }]}>
+                  <Text style={styles.avatarInitials}>{initials}</Text>
+                </View>
+
                 <View style={styles.groupInfo}>
-                  <Text style={styles.groupName}>{group.name}</Text>
+                  <Text style={styles.groupName} numberOfLines={1}>
+                    {group.name}
+                  </Text>
                   <Text style={styles.memberCount}>
-                    {t(
-                      (group.member_count ?? 1) === 1
-                        ? 'mob.group_card.members_one'
-                        : 'mob.group_card.members_other',
-                      { count: group.member_count ?? 1 },
-                    )}
+                    {isOnlyMember
+                      ? t('mob.account_delete.only_you')
+                      : t(
+                          (group.member_count ?? 1) === 1
+                            ? 'mob.group_card.members_one'
+                            : 'mob.group_card.members_other',
+                          { count: group.member_count ?? 1 },
+                        )}
                   </Text>
                 </View>
 
                 {isOnlyMember ? (
-                  <Button
-                    label={t('mob.account_delete.delete_btn')}
-                    variant="destructive"
-                    size="sm"
+                  <Pressable
+                    style={styles.deleteButton}
                     onPress={() => handleDeletePress(group)}
-                    loading={isDeleting}
                     disabled={isDeleting || isRequestingDeletion}
-                  />
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.account_delete.delete_btn')}
+                  >
+                    <Text style={styles.deleteButtonText}>{t('mob.account_delete.delete_btn')}</Text>
+                  </Pressable>
                 ) : (
-                  <Button
-                    label={t('mob.account_delete.transfer_btn')}
-                    variant="secondary"
-                    size="sm"
+                  <Pressable
+                    style={styles.transferButton}
                     onPress={() => handleTransferPress(group)}
                     disabled={isDeleting || isRequestingDeletion}
-                  />
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.account_delete.transfer_btn')}
+                  >
+                    <Text style={styles.transferButtonText}>{t('mob.account_delete.transfer_btn')}</Text>
+                  </Pressable>
                 )}
               </View>
             );
           })}
-        </View>
+        </Card>
+      ) : null}
 
-        <View style={styles.footerSection}>
-          <Button
-            label={t('mob.account_delete.continue_btn')}
-            variant="primary"
-            onPress={handleContinuePress}
-            disabled={remainingCount > 0 || isRequestingDeletion}
-            loading={isRequestingDeletion}
-            style={styles.continueButton}
-          />
-          {remainingCount > 0 ? (
-            <Text style={styles.helperText}>{t('mob.account_delete.continue_helper')}</Text>
-          ) : null}
-        </View>
-      </Card>
+      <View style={styles.noticeBanner}>
+        <Text style={styles.noticeText}>{t('mob.account_delete.notice_banner')}</Text>
+      </View>
+
+      <View style={styles.footerSection}>
+        <Button
+          label={t('mob.account_delete.continue_btn')}
+          variant="primary"
+          onPress={handleContinuePress}
+          disabled={remainingCount > 0 || isRequestingDeletion}
+          loading={isRequestingDeletion}
+          style={remainingCount > 0 ? styles.disabledContinueButton : styles.continueButton}
+        />
+        {remainingCount > 0 ? (
+          <Text style={styles.helperText}>{t('mob.account_delete.continue_helper')}</Text>
+        ) : null}
+      </View>
     </KeyboardAwareScreen>
   );
 }
@@ -182,35 +221,67 @@ export default function AccountDeletionBlockedScreen({ navigation, route }: Prop
 const styles = StyleSheet.create({
   container: {
     padding: spacing.md,
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
-  card: {
-    padding: spacing.md,
+  topSection: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+  },
+  warningBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: colors.warning,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
   },
   heading: {
     ...typography.h2,
     color: colors.textPrimary,
+    textAlign: 'center',
     marginBottom: spacing.xs,
   },
   description: {
     ...typography.body,
     color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  card: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
     marginBottom: spacing.md,
   },
   errorText: {
     ...typography.body,
     color: colors.error,
     marginBottom: spacing.md,
-  },
-  groupList: {
-    marginBottom: spacing.lg,
+    textAlign: 'center',
   },
   groupItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  groupItemDivider: {
     borderBottomWidth: borderWidth.thin,
     borderBottomColor: colors.border,
+  },
+  avatarTile: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  avatarInitials: {
+    ...typography.bodyBold,
+    color: colors.white,
+    fontSize: 16,
   },
   groupInfo: {
     flex: 1,
@@ -225,16 +296,61 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  transferButton: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  transferButtonText: {
+    ...typography.bodyBold,
+    color: colors.primary,
+    fontSize: 14,
+  },
+  deleteButton: {
+    backgroundColor: colors.errorLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    ...typography.bodyBold,
+    color: colors.error,
+    fontSize: 14,
+  },
+  noticeBanner: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  noticeText: {
+    ...typography.body,
+    color: colors.primaryDark,
+    fontSize: 13,
+    lineHeight: 18,
+  },
   footerSection: {
-    marginTop: spacing.sm,
+    marginTop: 'auto',
+    paddingTop: spacing.md,
   },
   continueButton: {
     width: '100%',
+  },
+  disabledContinueButton: {
+    width: '100%',
+    backgroundColor: colors.border,
   },
   helperText: {
     ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
   },
 });

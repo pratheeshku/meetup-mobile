@@ -26,6 +26,7 @@ import { createGroup, uploadGroupLogo } from '../api/groups';
 import { getSports } from '../api/sports';
 import { createTeam } from '../api/teams';
 import Button from '../components/Button';
+import { CameraIcon } from '../components/icons/ActionIcons';
 import { GroupsIcon, ShieldIcon } from '../components/icons/SharedIcons';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
@@ -35,7 +36,7 @@ import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
 import { getLabel, useLabels } from '../labels/LabelsContext';
 import { useFieldChain } from '../hooks/useFieldChain';
-import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, spacing, typography } from '../theme/tokens';
 import type { Sport } from '../types/sport';
 import type { TeamVisibility } from '../types/team';
 import { goToDashboard } from '../navigation/goToDashboard';
@@ -240,44 +241,26 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
 
       {mode === 'group' ? (
         <>
-          <Text style={[styles.label, styles.section]}>{t('mob.create_group.logo_label')}</Text>
-          <View style={styles.logoRow}>
+          <View style={styles.logoPickerSection}>
             <Pressable
               onPress={handleLogoPress}
-              style={styles.logoPickerContainer}
+              style={styles.logoDashedContainer}
               accessibilityRole="button"
               accessibilityLabel={t('mob.create_group.logo_label')}
               disabled={isSubmitting}
             >
               {gLogo ? (
-                <Image source={{ uri: gLogo.path }} style={styles.logoImage} resizeMode="cover" />
+                <Image source={{ uri: gLogo.path }} style={styles.logoSelectedImage} resizeMode="cover" />
               ) : (
-                <View style={styles.logoPlaceholder}>
-                  <GroupsIcon size={28} />
+                <View style={styles.logoInnerContent}>
+                  <View style={styles.cameraIconBadge}>
+                    <CameraIcon size={20} color={colors.white} />
+                  </View>
+                  <Text style={styles.addLogoLabel}>{t('mob.create_group.add_logo')}</Text>
                 </View>
               )}
             </Pressable>
-
-            <View style={styles.logoActions}>
-              <Button
-                label={gLogo ? t('mob.create_group.change_logo') : t('mob.create_group.add_logo')}
-                variant="secondary"
-                size="sm"
-                onPress={handleLogoPress}
-                disabled={isSubmitting}
-                style={styles.logoButton}
-              />
-              {gLogo ? (
-                <Button
-                  label={t('mob.create_group.remove_logo')}
-                  variant="destructive"
-                  size="sm"
-                  onPress={() => setGLogo(null)}
-                  disabled={isSubmitting}
-                  style={styles.logoButton}
-                />
-              ) : null}
-            </View>
+            <Text style={styles.logoHintText}>{t('mob.create_group.logo_hint')}</Text>
           </View>
 
           <Text style={[styles.label, styles.section]}>{t('mob.create_group.name')}</Text>
@@ -360,36 +343,49 @@ const styles = StyleSheet.create({
   multiline: { minHeight: spacing.xxl * 2 },
   hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.md },
   error: { ...typography.body, color: colors.error, marginBottom: spacing.md },
-  logoRow: {
-    flexDirection: 'row',
+  logoPickerSection: {
     alignItems: 'center',
     marginBottom: spacing.md,
+    marginTop: spacing.xs,
   },
-  logoPickerContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    borderWidth: borderWidth.thin,
-    borderColor: colors.border,
-    marginRight: spacing.md,
-  },
-  logoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  logoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
+  logoDashedContainer: {
+    width: 104,
+    height: 104,
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
   },
-  logoActions: {
-    flex: 1,
-    gap: spacing.xs,
+  logoSelectedImage: {
+    width: '100%',
+    height: '100%',
   },
-  logoButton: {
-    alignSelf: 'flex-start',
+  logoInnerContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#8B5CF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  addLogoLabel: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  logoHintText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
 });

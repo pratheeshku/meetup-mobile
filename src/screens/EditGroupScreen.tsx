@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
@@ -15,15 +22,23 @@ import ErrorView from '../components/ErrorView';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import LoadingView from '../components/LoadingView';
 import TextField from '../components/TextField';
+import { CameraIcon } from '../components/icons/ActionIcons';
 import { useT } from '../labels/LabelsContext';
 import type { GroupsStackParamList } from '../navigation/types';
-import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
+import { colors, radius, spacing, typography } from '../theme/tokens';
 import { getApiErrorMessage } from '../utils/apiError';
 import { isPickerCancelled, pickImage, type PickedImage } from '../utils/imagePicker';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'EditGroup'>;
 
 const NAME_MAX_LENGTH = 100;
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 export default function EditGroupScreen({ navigation, route }: Props): React.JSX.Element {
   const { groupId } = route.params;
@@ -151,55 +166,41 @@ export default function EditGroupScreen({ navigation, route }: Props): React.JSX
   }
 
   const effectiveLogoUri = newLogo?.path ?? (!isLogoRemoved ? currentLogoUrl : null);
-  const initials = (name.trim().charAt(0) || '?').toUpperCase();
+  const initials = getInitials(name);
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <Card style={styles.card}>
-        <Text style={styles.sectionTitle}>{t('mob.edit_group.logo_label')}</Text>
-
-        <View style={styles.logoRow}>
-          <Pressable
-            onPress={handleLogoPress}
-            style={styles.logoPickerContainer}
-            accessibilityRole="button"
-            accessibilityLabel={t('mob.edit_group.logo_label')}
-            disabled={isSaving}
-          >
-            {effectiveLogoUri ? (
-              <Image source={{ uri: effectiveLogoUri }} style={styles.logoImage} resizeMode="cover" />
-            ) : (
-              <View style={styles.logoPlaceholder}>
-                <Text style={styles.logoPlaceholderText}>{initials}</Text>
-              </View>
-            )}
-          </Pressable>
-
-          <View style={styles.logoActions}>
-            <Button
-              label={t('mob.edit_group.change_logo')}
-              variant="secondary"
-              size="sm"
-              onPress={handleLogoPress}
-              disabled={isSaving}
-              style={styles.logoButton}
-            />
-            {effectiveLogoUri ? (
-              <Button
-                label={t('mob.edit_group.remove_logo')}
-                variant="destructive"
-                size="sm"
-                onPress={() => {
-                  setNewLogo(null);
-                  setIsLogoRemoved(true);
-                }}
-                disabled={isSaving}
-                style={styles.logoButton}
-              />
-            ) : null}
+      <View style={styles.topLogoSection}>
+        <Pressable
+          onPress={handleLogoPress}
+          style={styles.logoPickerContainer}
+          accessibilityRole="button"
+          accessibilityLabel={t('mob.edit_group.logo_label')}
+          disabled={isSaving}
+        >
+          {effectiveLogoUri ? (
+            <Image source={{ uri: effectiveLogoUri }} style={styles.logoImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.logoPlaceholder}>
+              <Text style={styles.logoPlaceholderText}>{initials}</Text>
+            </View>
+          )}
+          <View style={styles.cameraBadge}>
+            <CameraIcon size={14} color={colors.white} />
           </View>
-        </View>
+        </Pressable>
 
+        <Pressable
+          onPress={handleLogoPress}
+          disabled={isSaving}
+          accessibilityRole="button"
+          accessibilityLabel={t('mob.edit_group.change_logo')}
+        >
+          <Text style={styles.changeLogoText}>{t('mob.edit_group.change_logo')}</Text>
+        </Pressable>
+      </View>
+
+      <Card style={styles.card}>
         <Text style={styles.label}>{t('mob.edit_group.name')}</Text>
         <TextField
           value={name}
@@ -210,7 +211,7 @@ export default function EditGroupScreen({ navigation, route }: Props): React.JSX
           style={styles.input}
         />
 
-        <Text style={styles.label}>{t('mob.edit_group.description')}</Text>
+        <Text style={[styles.label, styles.descriptionLabel]}>{t('mob.edit_group.description')}</Text>
         <TextField
           value={description}
           onChangeText={setDescription}
@@ -220,27 +221,31 @@ export default function EditGroupScreen({ navigation, route }: Props): React.JSX
           editable={!isSaving}
           style={[styles.input, styles.multilineInput]}
         />
-
-        {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
-
-        <View style={styles.footerButtons}>
-          <Button
-            label={t('mob.edit_group.save_btn')}
-            variant="primary"
-            onPress={handleSave}
-            loading={isSaving}
-            disabled={isSaving}
-            style={styles.saveButton}
-          />
-          <Button
-            label={t('mob.common.cancel')}
-            variant="secondary"
-            onPress={() => navigation.goBack()}
-            disabled={isSaving}
-            style={styles.cancelButton}
-          />
-        </View>
       </Card>
+
+      <View style={styles.noticeBanner}>
+        <Text style={styles.noticeText}>{t('mob.edit_group.notice_banner')}</Text>
+      </View>
+
+      {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
+
+      <View style={styles.footerButtons}>
+        <Button
+          label={t('mob.common.cancel')}
+          variant="secondary"
+          onPress={() => navigation.goBack()}
+          disabled={isSaving}
+          style={styles.cancelButton}
+        />
+        <Button
+          label={t('mob.edit_group.save_btn')}
+          variant="primary"
+          onPress={handleSave}
+          loading={isSaving}
+          disabled={isSaving}
+          style={styles.saveButton}
+        />
+      </View>
     </KeyboardAwareScreen>
   );
 }
@@ -248,76 +253,99 @@ export default function EditGroupScreen({ navigation, route }: Props): React.JSX
 const styles = StyleSheet.create({
   container: {
     padding: spacing.md,
+    flexGrow: 1,
+  },
+  topLogoSection: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+    marginTop: spacing.sm,
+  },
+  logoPickerContainer: {
+    position: 'relative',
+    marginBottom: spacing.xs,
+  },
+  logoImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+  },
+  logoPlaceholder: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoPlaceholderText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  changeLogoText: {
+    ...typography.bodyBold,
+    color: colors.primary,
+    marginTop: 4,
   },
   card: {
     padding: spacing.md,
-  },
-  sectionTitle: {
-    ...typography.bodyBold,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  logoPickerContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    borderWidth: borderWidth.thin,
-    borderColor: colors.border,
-    marginRight: spacing.md,
-  },
-  logoImage: {
-    width: '100%',
-    height: '100%',
-  },
-  logoPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoPlaceholderText: {
-    ...typography.h2,
-    color: colors.primary,
-  },
-  logoActions: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  logoButton: {
-    alignSelf: 'flex-start',
+    marginBottom: spacing.md,
   },
   label: {
-    ...typography.bodyBold,
-    color: colors.textPrimary,
+    ...typography.caption,
+    color: colors.textSecondary,
     marginBottom: spacing.xs,
-    marginTop: spacing.sm,
+  },
+  descriptionLabel: {
+    marginTop: spacing.md,
   },
   input: {
-    marginBottom: spacing.sm,
+    backgroundColor: colors.surface,
   },
   multilineInput: {
     minHeight: 100,
+  },
+  noticeBanner: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  noticeText: {
+    ...typography.body,
+    color: colors.primaryDark,
+    fontSize: 13,
+    lineHeight: 18,
   },
   errorText: {
     ...typography.body,
     color: colors.error,
     marginBottom: spacing.md,
+    textAlign: 'center',
   },
   footerButtons: {
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  saveButton: {
-    width: '100%',
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: 'auto',
+    paddingTop: spacing.md,
   },
   cancelButton: {
-    width: '100%',
+    flex: 1,
+  },
+  saveButton: {
+    flex: 1,
   },
 });
