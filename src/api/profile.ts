@@ -305,3 +305,37 @@ export async function getProfileSummary(options?: RequestOptions): Promise<Profi
   return data;
 }
 
+export interface NotificationSettings {
+  push_enabled: boolean;
+  email_enabled: boolean;
+}
+
+/**
+ * `GET /users/me/notification-settings` — read push and email notification master toggles.
+ */
+export async function getNotificationSettings(
+  options?: RequestOptions,
+): Promise<NotificationSettings> {
+  const { data } = await apiClient.get<NotificationSettings>(
+    '/users/me/notification-settings',
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+/**
+ * `PUT /users/me/notification-settings` — update push and email notification master toggles.
+ */
+export async function updateNotificationSettings(
+  settings: Partial<NotificationSettings>,
+  options?: RequestOptions,
+): Promise<NotificationSettings> {
+  const { data } = await apiClient.put<NotificationSettings>(
+    '/users/me/notification-settings',
+    settings,
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+
