@@ -1,117 +1,101 @@
 /**
- * Event Detail screen rebuilt to match the mobile artboards from
- * https://claude.ai/artifact/S7V1xJ3912GC78up1v4Nms
- *
- * Fully stacked sections for mobile:
- *   1. Header: Back link < My Games, Sport tag pill + status ("You're hosting"),
- *      bold title, date/time with calendar icon, venue with location pin icon
- *   2. Card 1: Capacity Card (large "7 / 8" count, "players going", sport-colored
- *      progress bar, remaining spots subtext)
- *   3. Card 2: Action Buttons Card (Edit Game, Invite Group, Invite Individual,
- *      Cancel Event for organiser; Join / Leave for non-organiser)
- *   4. Card 3: About this game Card (description)
- *   5. Card 4: Event Details Card (Visibility, Skill level, Waitlist status, Cost)
- *   6. Card 5: Participants Card (list with avatar circles, names, roles, count)
- *
- * Organiser forms (Cancel, Invite Group, Invite Individual, Edit) render
- * seamlessly when active.
+ * Event Detail screen (DES-MEETUP-MOBILE.md §4.3; design-ref-p23/GameDetail.png,
+ * EditGame.png..EditGame4.png, DeleteGame.png).
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import {
   cancelEvent,
   getEvent,
   getEventParticipants,
-  inviteGroupToEvent,
-  inviteUserToEvent,
-  inviteEmailToEvent,
   rsvpEvent,
   updateEvent,
   withdrawEvent,
 } from '../api/events';
-import { getMyGroups } from '../api/groups';
-import { getSports } from '../api/sports';
+import { fetchPlacePredictions, type PlacePrediction } from '../api/places';
+import { getClientConfig } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
-import {
-  CalendarIcon,
-  CloseIcon,
-  GroupsIcon,
-  LinkIcon,
-  PersonIcon,
-  PinIcon,
-} from '../components/icons/SharedIcons';
-import {
-  EventVisibilityBadge,
-  getEventVisibilityLabel,
-  stripIconGlyphs,
-} from '../utils/labels';
 import Button from '../components/Button';
 import Card from '../components/Card';
-import DateTimePickerField from '../components/DateTimePickerField';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
-import OptionChips, { ChipOption } from '../components/OptionChips';
-import ShareActionSheet from '../components/ShareActionSheet';
-import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
-import TextField from '../components/TextField';
-import TextLink from '../components/TextLink';
-import Toast from '../components/Toast';
-import UserSearchPicker from '../components/UserSearchPicker';
-import { useAppShare } from '../hooks/useAppShare';
+import NumberField from '../components/NumberField';
+import WizardFooter from '../components/WizardFooter';
+import WizardHeader from '../components/WizardHeader';
+import {
+  BackArrowIcon,
+  CrossIcon,
+  EditIcon,
+  LockIcon,
+  SearchIcon,
+  TrashIcon,
+} from '../components/icons/ActionIcons';
+import { SportIcon } from '../components/icons/DashboardIcons';
+import {
+  CalendarIcon,
+  ClockIcon,
+  PeopleIcon,
+  PinIcon,
+  TargetIcon,
+} from '../components/icons/SharedIcons';
+import { useT } from '../labels/LabelsContext';
 import { goToDashboard } from '../navigation/goToDashboard';
-import { useFieldChain } from '../hooks/useFieldChain';
+import type { HomeStackParamList } from '../navigation/types';
 import {
   borderWidth,
   colors,
-  getSportColor,
   radius,
-  sizes,
   spacing,
   typography,
 } from '../theme/tokens';
 import type { Event, EventParticipant, EventSkillLevel, UpdateEventInput } from '../types/event';
-import type { Group } from '../types/group';
-import type { Sport } from '../types/sport';
-import type { UserSearchResult } from '../types/user';
-import type { HomeStackParamList } from '../navigation/types';
+import { getApiErrorMessage } from '../utils/apiError';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
-import {
-  formatLocalDateTime,
-  parseLocalDateTime,
-} from '../utils/localDateTime';
 import { isOrganiserOf } from '../utils/gameLists';
 import { useSportDisplayName } from '../utils/labels';
-import { getApiErrorMessage } from '../utils/apiError';
-import { useT, useLabels } from '../labels/LabelsContext';
-import type { TranslateFn } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 
-const SKILL_LEVEL_VALUES = ['all_levels', 'beginner', 'intermediate', 'expert'] as const;
+const AVATAR_TINTS = [
+  { bg: colors.avatarTint1, text: colors.avatarTintText1 },
+  { bg: colors.avatarTint2, text: colors.avatarTintText2 },
+  { bg: colors.avatarTint3, text: colors.avatarTintText3 },
+  { bg: colors.avatarTint4, text: colors.avatarTintText4 },
+  { bg: colors.avatarTint5, text: colors.avatarTintText5 },
+];
 
-function formatSkillLevel(level: string | null | undefined, t: TranslateFn): string {
-  if (!level || level === 'all_levels') return t('mob.game_detail.skill_all_display');
-  if (level === 'beginner') return t('skill_level.beginner');
-  if (level === 'intermediate') return t('skill_level.intermediate');
-  if (level === 'expert') return t('skill_level.expert');
-  return level;
+function getAvatarTint(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
+  return AVATAR_TINTS[Math.abs(hash) % AVATAR_TINTS.length];
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+  }
+  return (name.trim().slice(0, 2) || '?').toUpperCase();
 }
 
 export default function EventDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const { eventId } = route.params;
   const { user } = useAuth();
-  const labels = useLabels();
   const t = useT();
-  const tRef = useRef(t);
-  tRef.current = t;
-
-  const SKILL_LEVEL_OPTIONS: ChipOption<string>[] = SKILL_LEVEL_VALUES.map(value => ({
-    value,
-    label: t(`skill_level.${value}`),
-  }));
 
   const [event, setEvent] = useState<Event | null>(null);
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
@@ -120,59 +104,27 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Organiser form toggle states
-  const [isCancelFormOpen, setIsCancelFormOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
-  const [isCancelSubmitting, setIsCancelSubmitting] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
+  // Delete modal state
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const [isInviteGroupOpen, setIsInviteGroupOpen] = useState(false);
-  const [myGroups, setMyGroups] = useState<Group[]>([]);
-  const [isGroupsLoading, setIsGroupsLoading] = useState(false);
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
-  const [isInviteGroupSubmitting, setIsInviteGroupSubmitting] = useState(false);
-  const [inviteGroupError, setInviteGroupError] = useState<string | null>(null);
-  const [inviteGroupSuccess, setInviteGroupSuccess] = useState<string | null>(null);
-
-  const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
-  const [selectedInviteUser, setSelectedInviteUser] = useState<UserSearchResult | null>(null);
-  const [selectedInviteEmail, setSelectedInviteEmail] = useState<string | null>(null);
-  const [isInviteUserSubmitting, setIsInviteUserSubmitting] = useState(false);
-  const [inviteUserError, setInviteUserError] = useState<string | null>(null);
-  const [inviteUserSuccess, setInviteUserSuccess] = useState<string | null>(null);
-
+  // Edit wizard state
   const [isEditing, setIsEditing] = useState(false);
+  const [editStep, setEditStep] = useState(1);
   const [editTitle, setEditTitle] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editVenueName, setEditVenueName] = useState('');
-  const [editVenueAddress, setEditVenueAddress] = useState('');
-  const [editSkillLevel, setEditSkillLevel] = useState<string>('all_levels');
-  const [editCapacity, setEditCapacity] = useState('10');
-  const [editStartsAt, setEditStartsAt] = useState('');
-  const [editEndsAt, setEditEndsAt] = useState('');
-  const [editSport, setEditSport] = useState('');
-  const [editAllowWaitlist, setEditAllowWaitlist] = useState(true);
+  const [editDateValue, setEditDateValue] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [editVenueQuery, setEditVenueQuery] = useState('');
+  const [venuePredictions, setVenuePredictions] = useState<PlacePrediction[]>([]);
+  const [editSelectedVenue, setEditSelectedVenue] = useState({ name: '', address: '' });
+  const [editCourtDetails, setEditCourtDetails] = useState('');
+  const [editCapacity, setEditCapacity] = useState(4);
+  const [isCapacityValid, setIsCapacityValid] = useState(true);
+  const [editSkillLevel, setEditSkillLevel] = useState<EventSkillLevel>('intermediate');
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-
-  const share = useAppShare();
-
-  const [sports, setSports] = useState<Sport[]>([]);
-
-  useEffect(() => {
-    getSports().then(setSports).catch(() => {});
-  }, []);
-
-  const sportOptions: ChipOption<string>[] = useMemo(() => {
-    const opts = sports.map(s => ({ value: s.name, label: s.display_name }));
-    if (editSport && !opts.some(o => o.value === editSport)) {
-      opts.unshift({ value: editSport, label: editSport });
-    }
-    return opts;
-  }, [sports, editSport]);
-
-  const sportLabel = useSportDisplayName(event?.sport ?? '');
-  const sportColor = getSportColor(event?.sport);
+  const [mapsApiKey, setMapsApiKey] = useState<string | null>(null);
 
   const loadEvent = useCallback(async () => {
     setIsLoading(true);
@@ -185,29 +137,163 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       setEvent(data);
       setParticipants(parts);
     } catch {
-      setLoadError(tRef.current('mob.game_detail.load_error'));
+      setLoadError(t('mob.game_detail.load_error'));
     } finally {
       setIsLoading(false);
     }
-  }, [eventId]);
+  }, [eventId, t]);
 
   useEffect(() => {
     loadEvent();
+    getClientConfig().then(cfg => setMapsApiKey(cfg.google_maps_api_key)).catch(() => {});
   }, [loadEvent]);
 
-  // Non-organiser RSVP actions
-  const handleRsvp = async (): Promise<void> => {
+  const sportLabel = useSportDisplayName(event?.sport ?? '');
+  const isOrganiser = event ? isOrganiserOf(event, user?.id) : false;
+
+  // Start Edit Wizard
+  const handleStartEdit = () => {
+    if (!event) return;
+    setEditTitle(event.title);
+    const startDate = event.starts_at ? new Date(event.starts_at) : new Date();
+    setEditDateValue(startDate);
+    const venueName = event.venue_name || event.location || '';
+    setEditVenueQuery(venueName);
+    setEditSelectedVenue({
+      name: venueName,
+      address: event.venue_address || '',
+    });
+    setEditCourtDetails('');
+    setEditCapacity(event.capacity || 4);
+    setIsCapacityValid(true);
+    setEditSkillLevel((event.skill_level_requirement as EventSkillLevel) || 'intermediate');
+    setEditStep(1);
+    setEditError(null);
+    setIsEditing(true);
+  };
+
+  const handleVenueSearch = async (text: string) => {
+    setEditVenueQuery(text);
+    if (!text.trim()) {
+      setVenuePredictions([]);
+      return;
+    }
+    const preds = await fetchPlacePredictions(text, mapsApiKey);
+    setVenuePredictions(preds);
+  };
+
+  const handleSelectPrediction = (p: PlacePrediction) => {
+    setEditSelectedVenue({
+      name: p.main_text ?? p.description,
+      address: p.secondary_text ?? p.description,
+    });
+    setEditVenueQuery(p.main_text ?? p.description);
+    setVenuePredictions([]);
+  };
+
+  const handleDateChange = (_e: DateTimePickerEvent, selected?: Date) => {
+    setShowDatePicker(false);
+    if (selected) {
+      const newD = new Date(editDateValue);
+      newD.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+      setEditDateValue(newD);
+    }
+  };
+
+  const handleTimeChange = (_e: DateTimePickerEvent, selected?: Date) => {
+    setShowTimePicker(false);
+    if (selected) {
+      const newD = new Date(editDateValue);
+      newD.setHours(selected.getHours(), selected.getMinutes());
+      setEditDateValue(newD);
+    }
+  };
+
+  const handleNextEditStep = () => {
+    setEditError(null);
+    if (editStep === 1) {
+      if (!editTitle.trim()) {
+        setEditError(t('mob.game_detail.edit_err_title'));
+        return;
+      }
+      setEditStep(2);
+      return;
+    }
+    if (editStep === 2) {
+      setEditStep(3);
+      return;
+    }
+    if (editStep === 3) {
+      if (!isCapacityValid || editCapacity < Math.max(2, participants.length)) {
+        return;
+      }
+      setEditStep(4);
+      return;
+    }
+  };
+
+  const handleBackEditStep = () => {
+    setEditError(null);
+    if (editStep > 1) {
+      setEditStep(editStep - 1);
+    } else {
+      setIsEditing(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!event) return;
+    setEditError(null);
+    setIsEditSubmitting(true);
+    try {
+      const fullVenueName = editCourtDetails.trim()
+        ? `${editSelectedVenue.name}, ${editCourtDetails.trim()}`
+        : editSelectedVenue.name;
+
+      const payload: UpdateEventInput = {
+        title: editTitle.trim(),
+        venue_name: fullVenueName || null,
+        venue_address: editSelectedVenue.address || null,
+        skill_level_requirement: editSkillLevel,
+        capacity: editCapacity,
+        starts_at: editDateValue.toISOString(),
+      };
+
+      await withCorrelationId(async correlationId => {
+        const updated = await updateEvent(eventId, payload, { correlationId });
+        setEvent(updated);
+      });
+      setIsEditing(false);
+      loadEvent();
+    } catch (e) {
+      setEditError(getApiErrorMessage(e, t('mob.game_detail.edit_error')));
+    } finally {
+      setIsEditSubmitting(false);
+    }
+  };
+
+  const handleDeleteGame = async () => {
+    setIsDeleting(true);
+    try {
+      await withCorrelationId(async correlationId => {
+        await cancelEvent(eventId, 'Deleted by host', { correlationId });
+      });
+      setIsDeleteModalOpen(false);
+      goToDashboard(t('mob.success.game_cancelled'));
+    } catch (e) {
+      setActionError(getApiErrorMessage(e, t('mob.game_detail.cancel_error')));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleRsvp = async () => {
     setActionError(null);
     setIsActionLoading(true);
     try {
       await withCorrelationId(async correlationId => {
         await rsvpEvent(eventId, { correlationId });
-        const [refreshed, refreshedParts] = await Promise.all([
-          getEvent(eventId, { correlationId }),
-          getEventParticipants(eventId, { correlationId }).catch(() => []),
-        ]);
-        setEvent(refreshed);
-        setParticipants(refreshedParts);
+        await loadEvent();
       });
     } catch {
       setActionError(t('mob.game_detail.join_error'));
@@ -216,18 +302,13 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     }
   };
 
-  const handleWithdraw = async (): Promise<void> => {
+  const handleWithdraw = async () => {
     setActionError(null);
     setIsActionLoading(true);
     try {
       await withCorrelationId(async correlationId => {
         await withdrawEvent(eventId, { correlationId });
-        const [refreshed, refreshedParts] = await Promise.all([
-          getEvent(eventId, { correlationId }),
-          getEventParticipants(eventId, { correlationId }).catch(() => []),
-        ]);
-        setEvent(refreshed);
-        setParticipants(refreshedParts);
+        await loadEvent();
       });
     } catch {
       setActionError(t('mob.game_detail.leave_error'));
@@ -236,1229 +317,1120 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     }
   };
 
-  // Organiser action: Cancel
-  const handleOpenCancel = (): void => {
-    setCancelError(null);
-    setCancelReason('');
-    setIsEditing(false);
-    setIsInviteGroupOpen(false);
-    setIsInviteUserOpen(false);
-    setIsCancelFormOpen(true);
-  };
-
-  const handleCloseCancel = (): void => {
-    setIsCancelFormOpen(false);
-    setCancelError(null);
-    setCancelReason('');
-  };
-
-  const editChain = useFieldChain([
-    'editTitle',
-    'editSport',
-    'editDescription',
-    'editVenueName',
-    'editVenueAddress',
-    'editCapacity',
-  ]);
-  const cancelChain = useFieldChain(['cancelReason']);
-
-  const handleConfirmCancel = async (): Promise<void> => {
-    const trimmed = cancelReason.trim();
-    if (!trimmed) {
-      setCancelError(t('mob.game_detail.cancel_reason_required'));
-      cancelChain.focus('cancelReason');
-      return;
-    }
-    setCancelError(null);
-    setIsCancelSubmitting(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        await cancelEvent(eventId, trimmed, { correlationId });
-        const refreshed = await getEvent(eventId, { correlationId });
-        setEvent(refreshed);
-      });
-      setIsCancelFormOpen(false);
-      setCancelReason('');
-      goToDashboard(t('mob.success.game_cancelled'));
-    } catch (e) {
-      setCancelError(getApiErrorMessage(e, t('mob.game_detail.cancel_error')));
-    } finally {
-      setIsCancelSubmitting(false);
-    }
-  };
-
-  // Organiser action: Invite Group
-  const handleOpenInviteGroup = async (): Promise<void> => {
-    setInviteGroupError(null);
-    setInviteGroupSuccess(null);
-    setSelectedGroupIds([]);
-    setIsEditing(false);
-    setIsCancelFormOpen(false);
-    setIsInviteUserOpen(false);
-    setIsInviteGroupOpen(true);
-    if (myGroups.length === 0) {
-      setIsGroupsLoading(true);
-      try {
-        const res = await getMyGroups();
-        setMyGroups(res.items);
-      } catch {
-        setMyGroups([]);
-      } finally {
-        setIsGroupsLoading(false);
-      }
-    }
-  };
-
-  const handleCloseInviteGroup = (): void => {
-    setIsInviteGroupOpen(false);
-    setInviteGroupError(null);
-    setInviteGroupSuccess(null);
-    setSelectedGroupIds([]);
-  };
-
-  const handleToggleGroup = (groupId: string): void => {
-    setSelectedGroupIds(prev =>
-      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId],
-    );
-  };
-
-  const handleSendGroupInvite = async (): Promise<void> => {
-    if (selectedGroupIds.length === 0) {
-      setInviteGroupError(t('mob.game_detail.invite_group_select'));
-      return;
-    }
-    setInviteGroupError(null);
-    setInviteGroupSuccess(null);
-    setIsInviteGroupSubmitting(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        let totalInvites = 0;
-        for (const groupId of selectedGroupIds) {
-          const invites = await inviteGroupToEvent(eventId, groupId, { correlationId });
-          totalInvites += invites.length;
-        }
-        setInviteGroupSuccess(
-          totalInvites > 0
-            ? t(
-                totalInvites === 1
-                  ? 'mob.game_detail.invite_group_sent_one'
-                  : 'mob.game_detail.invite_group_sent_other',
-                { count: totalInvites },
-              )
-            : t('mob.game_detail.invite_group_done'),
-        );
-      });
-      setSelectedGroupIds([]);
-    } catch (e) {
-      setInviteGroupError(getApiErrorMessage(e, t('mob.game_detail.invite_group_error')));
-    } finally {
-      setIsInviteGroupSubmitting(false);
-    }
-  };
-
-  // Organiser action: Invite User / Individual
-  const handleOpenInviteUser = (): void => {
-    setInviteUserError(null);
-    setInviteUserSuccess(null);
-    setSelectedInviteUser(null);
-    setSelectedInviteEmail(null);
-    setIsEditing(false);
-    setIsCancelFormOpen(false);
-    setIsInviteGroupOpen(false);
-    setIsInviteUserOpen(true);
-  };
-
-  const handleCloseInviteUser = (): void => {
-    setIsInviteUserOpen(false);
-    setInviteUserError(null);
-    setInviteUserSuccess(null);
-    setSelectedInviteUser(null);
-    setSelectedInviteEmail(null);
-  };
-
-  const handleSendUserInvite = async (): Promise<void> => {
-    if (!selectedInviteUser && !selectedInviteEmail) {
-      setInviteUserError(t('mob.game_detail.invite_choose'));
-      return;
-    }
-    setInviteUserError(null);
-    setInviteUserSuccess(null);
-    setIsInviteUserSubmitting(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        if (selectedInviteEmail) {
-          await inviteEmailToEvent(eventId, selectedInviteEmail, { correlationId });
-          setInviteUserSuccess(t('mob.game_detail.invite_sent', { name: selectedInviteEmail }));
-          setSelectedInviteEmail(null);
-        } else if (selectedInviteUser) {
-          await inviteUserToEvent(eventId, selectedInviteUser.id, { correlationId });
-          setInviteUserSuccess(t('mob.game_detail.invite_sent', { name: selectedInviteUser.nickname }));
-          setSelectedInviteUser(null);
-        }
-      });
-    } catch (e) {
-      setInviteUserError(getApiErrorMessage(e, t('mob.game_detail.invite_error')));
-    } finally {
-      setIsInviteUserSubmitting(false);
-    }
-  };
-
-  // Organiser action: Edit
-  const handleStartEdit = (): void => {
-    if (!event) return;
-    setEditTitle(event.title);
-    setEditDescription(event.description ?? '');
-    setEditVenueName(event.venue_name ?? event.location ?? '');
-    setEditVenueAddress(event.venue_address ?? '');
-    setEditSkillLevel(event.skill_level_requirement ?? 'all_levels');
-    setEditCapacity(String(event.capacity));
-    setEditStartsAt(event.starts_at ? formatLocalDateTime(new Date(event.starts_at)) : '');
-    setEditEndsAt(event.ends_at ? formatLocalDateTime(new Date(event.ends_at)) : '');
-    setEditSport(event.sport ?? '');
-    setEditAllowWaitlist(event.allow_waitlist !== false);
-    setEditError(null);
-    setIsCancelFormOpen(false);
-    setIsInviteGroupOpen(false);
-    setIsInviteUserOpen(false);
-    setIsEditing(true);
-  };
-
-  const handleCancelEdit = (): void => {
-    setIsEditing(false);
-    setEditError(null);
-  };
-
-  const handleSaveEdit = async (): Promise<void> => {
-    const trimmedTitle = editTitle.trim();
-    if (!trimmedTitle) {
-      setEditError(t('mob.game_detail.edit_err_title'));
-      editChain.focus('editTitle');
-      return;
-    }
-    const trimmedSport = editSport.trim();
-    if (!trimmedSport) {
-      setEditError(t('mob.game_detail.edit_err_sport'));
-      editChain.focus('editSport');
-      return;
-    }
-    const cap = parseInt(editCapacity, 10);
-    if (isNaN(cap) || cap <= 0) {
-      setEditError(t('mob.game_detail.edit_err_capacity'));
-      editChain.focus('editCapacity');
-      return;
-    }
-    const startIso = parseLocalDateTime(editStartsAt);
-    if (!startIso) {
-      setEditError(t('mob.game_detail.edit_err_start'));
-      return;
-    }
-    let endIso: string | null = null;
-    if (editEndsAt.trim()) {
-      endIso = parseLocalDateTime(editEndsAt);
-      if (!endIso) {
-        setEditError(t('mob.game_detail.edit_err_end'));
-        return;
-      }
-    }
-
-    setEditError(null);
-    setIsEditSubmitting(true);
-    try {
-      const payload: UpdateEventInput = {
-        title: trimmedTitle,
-        description: editDescription.trim() || null,
-        venue_name: editVenueName.trim() || null,
-        venue_address: editVenueAddress.trim() || null,
-        skill_level_requirement: editSkillLevel as EventSkillLevel,
-        capacity: cap,
-        starts_at: startIso,
-        ends_at: endIso,
-        sport: trimmedSport,
-        allow_waitlist: editAllowWaitlist,
-      };
-      await withCorrelationId(async correlationId => {
-        const updated = await updateEvent(eventId, payload, { correlationId });
-        setEvent(updated);
-      });
-      setIsEditing(false);
-      goToDashboard(t('mob.success.game_updated'));
-    } catch (e) {
-      setEditError(getApiErrorMessage(e, t('mob.game_detail.edit_error')));
-    } finally {
-      setIsEditSubmitting(false);
-    }
-  };
-
-  if (isLoading) {
-    return <LoadingView />;
-  }
-
+  if (isLoading) return <LoadingView />;
   if (loadError || !event) {
     return <ErrorView message={loadError ?? t('mob.game_detail.not_found')} onRetry={loadEvent} />;
   }
 
-  const isOrganiser = isOrganiserOf(event, user?.id);
-  const isRsvpVisible =
-    !isOrganiser && event.status !== 'cancelled' && event.status !== 'completed';
-  const isOrganiserActionsVisible =
-    isOrganiser && event.status !== 'cancelled' && event.status !== 'completed';
-  const isGoingOrWaitlisted =
-    event.current_user_rsvp_status === 'going' || event.current_user_rsvp_status === 'waitlisted';
-  const spotsLeft = Math.max(0, event.capacity - event.participant_count);
+  // -------------------------------------------------------------
+  // EDIT WIZARD (Steps 1 to 4)
+  // -------------------------------------------------------------
+  if (isEditing) {
+    const formattedEditDate = editDateValue.toLocaleDateString('en-US', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    const formattedEditTime = editDateValue.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const minCap = Math.max(2, participants.length);
 
-  const progressPercent = Math.min(
-    100,
-    Math.max(0, event.capacity > 0 ? (event.participant_count / event.capacity) * 100 : 0),
-  );
+    const originalTime = event.starts_at
+      ? new Date(event.starts_at).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        })
+      : '';
+    const hasTimeChanged = originalTime !== formattedEditTime;
+    const hasCapacityChanged = event.capacity !== editCapacity;
 
+    return (
+      <View style={styles.screen}>
+        <WizardHeader
+          title={t('mob.edit_game.wizard_title')}
+          currentStep={editStep}
+          totalSteps={4}
+          onBack={handleBackEditStep}
+        />
+
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          {editStep === 1 && (
+            <View style={styles.stepContent}>
+              <Text style={styles.stepHeading}>{t('mob.edit_game.step_details')}</Text>
+
+              <View style={styles.cardContainer}>
+                <Text style={styles.inputCardLabel}>{t('mob.create_game.game_title_label')}</Text>
+                <TextInput
+                  style={styles.cardTextInput}
+                  value={editTitle}
+                  onChangeText={setEditTitle}
+                  placeholder={t('mob.create_game.title_placeholder')}
+                  placeholderTextColor={colors.textMuted}
+                />
+
+                <Text style={[styles.inputCardLabel, { marginTop: spacing.md }]}>
+                  {t('mob.create_game.sport')}
+                </Text>
+                <View style={styles.lockedRow}>
+                  <View style={styles.lockedIconCircle}>
+                    <SportIcon slug={event.sport} size={28} />
+                  </View>
+                  <View style={styles.lockedInfo}>
+                    <Text style={styles.lockedTitle}>{sportLabel}</Text>
+                    <Text style={styles.lockedSubtitle}>{t('mob.edit_game.locked_hint')}</Text>
+                  </View>
+                  <LockIcon size={18} color={colors.warning} />
+                </View>
+
+                <Text style={[styles.inputCardLabel, { marginTop: spacing.md }]}>
+                  {t('mob.edit_game.who_can_play')}
+                </Text>
+                <View style={styles.lockedRow}>
+                  <View style={[styles.lockedIconCircle, { backgroundColor: colors.avatarTint1 }]}>
+                    <Text style={[styles.lockedInitials, { color: colors.avatarTintText1 }]}>
+                      {getInitials(event.title)}
+                    </Text>
+                  </View>
+                  <View style={styles.lockedInfo}>
+                    <Text style={styles.lockedTitle}>
+                      {event.visibility === 'group' ? t('mob.create_game.group') : t('mob.create_game.public_title')}
+                    </Text>
+                    <Text style={styles.lockedSubtitle}>{t('mob.edit_game.locked_hint')}</Text>
+                  </View>
+                  <LockIcon size={18} color={colors.warning} />
+                </View>
+              </View>
+            </View>
+          )}
+
+          {editStep === 2 && (
+            <View style={styles.stepContent}>
+              <Text style={styles.stepHeading}>{t('mob.create_game.step_when_where')}</Text>
+
+              <View style={styles.cardContainer}>
+                <View style={styles.row}>
+                  <TouchableOpacity style={styles.halfField} onPress={() => setShowDatePicker(true)}>
+                    <Text style={styles.fieldLabel}>{t('mob.create_game.date_label')}</Text>
+                    <View style={styles.pickerBox}>
+                      <CalendarIcon size={18} />
+                      <Text style={styles.pickerBoxText}>{formattedEditDate}</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.halfField} onPress={() => setShowTimePicker(true)}>
+                    <Text style={styles.fieldLabel}>{t('mob.create_game.start_time_label')}</Text>
+                    <View style={styles.pickerBox}>
+                      <ClockIcon size={18} />
+                      <Text style={styles.pickerBoxText}>{formattedEditTime}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={editDateValue}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleDateChange}
+                  />
+                )}
+
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={editDateValue}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handleTimeChange}
+                  />
+                )}
+
+                <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
+                  {t('mob.create_game.venue_label')}
+                </Text>
+                <View style={styles.searchBox}>
+                  <SearchIcon size={18} color={colors.textMuted} />
+                  <TextInput
+                    style={styles.searchInput}
+                    value={editVenueQuery}
+                    onChangeText={handleVenueSearch}
+                    placeholder={t('mob.create_game.venue_search_placeholder')}
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  {editVenueQuery ? (
+                    <TouchableOpacity onPress={() => handleVenueSearch('')}>
+                      <CrossIcon size={16} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {venuePredictions.length > 0 ? (
+                  <View style={styles.predictionsList}>
+                    {venuePredictions.map(p => (
+                      <TouchableOpacity
+                        key={p.place_id}
+                        style={styles.predictionRow}
+                        onPress={() => handleSelectPrediction(p)}
+                      >
+                        <Text style={styles.predictionMain}>{p.main_text}</Text>
+                        {p.secondary_text ? (
+                          <Text style={styles.predictionSecondary}>{p.secondary_text}</Text>
+                        ) : null}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
+
+                <TouchableOpacity
+                  style={styles.currentLocationRow}
+                  onPress={() => {
+                    setEditSelectedVenue({ name: 'Current Location', address: 'Near you' });
+                    setEditVenueQuery('Current Location');
+                  }}
+                >
+                  <TargetIcon size={18} />
+                  <Text style={styles.currentLocationText}>
+                    {t('mob.create_game.use_current_location')}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Map Preview Box */}
+                <View style={styles.mapPreviewBox}>
+                  <View style={styles.mapRoad1} />
+                  <View style={styles.mapRoad2} />
+                  <View style={styles.mapPinContainer}>
+                    <PinIcon size={32} />
+                  </View>
+                  <View style={styles.mapBadge}>
+                    <Text style={styles.mapBadgeText}>{t('mob.create_game.drag_map_hint')}</Text>
+                  </View>
+                </View>
+
+                {/* Selected Location Row */}
+                <View style={styles.selectedLocationRow}>
+                  <View style={styles.pinBadge}>
+                    <PinIcon size={20} />
+                  </View>
+                  <View style={styles.locationTextContainer}>
+                    <Text style={styles.locationName}>{editSelectedVenue.name}</Text>
+                    <Text style={styles.locationAddress}>{editSelectedVenue.address}</Text>
+                  </View>
+                </View>
+
+                <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
+                  {t('mob.create_game.court_details_label')}
+                </Text>
+                <TextInput
+                  style={styles.courtInput}
+                  value={editCourtDetails}
+                  onChangeText={setEditCourtDetails}
+                  placeholder={t('mob.create_game.court_details_placeholder')}
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+            </View>
+          )}
+
+          {editStep === 3 && (
+            <View style={styles.stepContent}>
+              <Text style={styles.stepHeading}>{t('mob.create_game.step_players_skill')}</Text>
+
+              <View style={styles.cardContainer}>
+                <Text style={styles.inputCardLabel}>{t('mob.create_game.players_needed')}</Text>
+                <NumberField
+                  value={editCapacity}
+                  onChangeValue={(val, valid) => {
+                    if (val !== null) setEditCapacity(val);
+                    setIsCapacityValid(valid);
+                  }}
+                  min={minCap}
+                  max={100}
+                  showStepper
+                />
+              </View>
+
+              <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
+                <Text style={styles.inputCardLabel}>{t('mob.create_game.skill_level_label')}</Text>
+                <View style={styles.skillPillRow}>
+                  {(['beginner', 'intermediate', 'expert'] as EventSkillLevel[]).map(lvl => {
+                    const isSelected = editSkillLevel === lvl;
+                    const label =
+                      lvl === 'beginner'
+                        ? 'Beginner'
+                        : lvl === 'intermediate'
+                        ? 'Intermediate'
+                        : 'Advanced';
+                    return (
+                      <TouchableOpacity
+                        key={lvl}
+                        style={[styles.skillPill, isSelected && styles.skillPillSelected]}
+                        onPress={() => setEditSkillLevel(lvl)}
+                      >
+                        <Text
+                          style={[styles.skillPillText, isSelected && styles.skillPillTextSelected]}
+                        >
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          )}
+
+          {editStep === 4 && (
+            <View style={styles.stepContent}>
+              <Text style={styles.stepHeading}>{t('mob.edit_game.step_review')}</Text>
+
+              <View style={styles.cardContainer}>
+                <View style={styles.reviewMainRow}>
+                  <View style={styles.reviewSportBadge}>
+                    <SportIcon slug={event.sport} size={28} />
+                  </View>
+                  <View style={styles.reviewMainText}>
+                    <Text style={styles.reviewGameTitle}>{editTitle}</Text>
+                    <Text style={styles.reviewGameSubtitle}>
+                      {sportLabel} · {event.visibility === 'group' ? t('mob.create_game.group') : t('mob.create_game.public_title')}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.divider} />
+
+                {hasTimeChanged && (
+                  <View style={styles.changeRow}>
+                    <Text style={styles.changeLabel}>{t('mob.edit_game.start_time')}</Text>
+                    <View style={styles.changeValueRow}>
+                      <Text style={styles.changeOldValue}>{originalTime}</Text>
+                      <Text style={styles.changeArrow}> → </Text>
+                      <Text style={styles.changeNewValue}>{formattedEditTime}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {hasCapacityChanged && (
+                  <View style={styles.changeRow}>
+                    <Text style={styles.changeLabel}>{t('mob.edit_game.players_needed')}</Text>
+                    <View style={styles.changeValueRow}>
+                      <Text style={styles.changeOldValue}>{event.capacity}</Text>
+                      <Text style={styles.changeArrow}> → </Text>
+                      <Text style={styles.changeNewValue}>{editCapacity}</Text>
+                    </View>
+                  </View>
+                )}
+
+                <Text style={styles.changeHelper}>{t('mob.edit_game.changed_fields_hint')}</Text>
+              </View>
+
+              <View style={styles.notifyCard}>
+                <Text style={styles.notifyText}>
+                  {t('mob.edit_game.notify_joined', { count: participants.length })}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
+        </ScrollView>
+
+        {editStep === 4 ? (
+          <View style={styles.footerContainer}>
+            <Button
+              label={t('mob.edit_game.save_changes')}
+              variant="cta"
+              onPress={handleSaveEdit}
+              loading={isEditSubmitting}
+              disabled={isEditSubmitting}
+            />
+          </View>
+        ) : (
+          <WizardFooter
+            nextLabel={t('mob.wizard.next')}
+            onNext={handleNextEditStep}
+            nextDisabled={editStep === 3 && (!isCapacityValid || editCapacity < minCap)}
+          />
+        )}
+      </View>
+    );
+  }
+
+  // -------------------------------------------------------------
+  // GAME DETAIL VIEW (GameDetail.png)
+  // -------------------------------------------------------------
+  const formattedDate = formatEventDate(event.starts_at);
+  const formattedTime = formatEventTimeRange(event.starts_at, event.ends_at);
   const venueText = [event.venue_name || event.location, event.venue_address]
     .filter(Boolean)
     .join(', ');
 
-  // Participants display list
-  const displayParticipants: Array<{
-    id: string;
-    name: string;
-    isOrganiser: boolean;
-    initials: string;
-  }> = [];
-
-  if (participants.length > 0) {
-    participants.slice(0, 3).forEach(p => {
-      const name = p.user_display_name || p.user_nickname || t('mob.game_detail.player_fallback');
-      const inits = name.slice(0, 2).toUpperCase();
-      displayParticipants.push({
-        id: p.id || p.user_id,
-        name,
-        isOrganiser: p.user_id === event.organiser_id,
-        initials: inits,
-      });
-    });
-  } else {
-    // Fallback: organizer entry
-    const orgName = event.organiser_nickname || t('mob.game_detail.organizer');
-    displayParticipants.push({
-      id: event.organiser_id,
-      name: orgName,
-      isOrganiser: true,
-      initials: orgName.slice(0, 2).toUpperCase(),
-    });
-    if (event.participant_count > 1) {
-      displayParticipants.push({
-        id: 'p-2',
-        name: t('mob.game_detail.player_fallback'),
-        isOrganiser: false,
-        initials: t('mob.game_detail.player_fallback').slice(0, 2).toUpperCase(),
-      });
-    }
-  }
-
-  const overflowParticipantsCount = Math.max(0, event.participant_count - displayParticipants.length);
+  const totalCapacity = event.capacity || 4;
+  const joinedCount = participants.length > 0 ? participants.length : event.participant_count;
+  const emptySpotsCount = Math.max(0, totalCapacity - joinedCount);
 
   return (
-    <View style={styles.keyboardAvoid}>
-    <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      {/* Back button */}
-      {navigation?.goBack ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('mob.game_detail.back')}
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backButtonText}>{t('mob.game_detail.back_arrow')}</Text>
-        </Pressable>
-      ) : null}
-
-      {/* Header Block */}
-      <View style={styles.headerBlock}>
-        <View style={styles.headerTagRow}>
-          {event.sport ? (
-            <View style={[styles.sportPill, { backgroundColor: sportColor }]}>
-              <View style={styles.sportDot} />
-              <Text style={styles.sportPillText}>{sportLabel}</Text>
-            </View>
-          ) : (
-            <View />
-          )}
-          {isOrganiser ? (
-            <Text style={styles.hostingTag}>{t('mob.game_detail.tag_hosting')}</Text>
-          ) : isGoingOrWaitlisted ? (
-            <Text style={styles.participantTag}>
-              {event.current_user_rsvp_status === 'going'
-                ? t('mob.game_detail.tag_going')
-                : t('mob.game_detail.tag_waitlisted')}
-            </Text>
-          ) : null}
-        </View>
-
-        <Text style={styles.title}>{event.title}</Text>
-
-        {event.status === 'cancelled' ? (
-          <Text style={styles.cancelledBanner}>{t('mob.game_detail.cancelled_banner')}</Text>
-        ) : null}
-
-        {/* Date and time */}
-        <View style={styles.metaRow}>
-          <View
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-            aria-hidden={true}
-            style={styles.metaIconWrap}
-          >
-            <CalendarIcon size={16} />
-          </View>
-          <Text style={styles.metaText}>
-            {formatEventDate(event.starts_at)}, {formatEventTimeRange(event.starts_at, event.ends_at)}
-          </Text>
-        </View>
-
-        {/* Venue */}
-        {venueText ? (
-          <View style={styles.metaRow}>
-            <View
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-              aria-hidden={true}
-              style={styles.metaIconWrap}
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.detailScroll} keyboardShouldPersistTaps="handled">
+        {/* Blue Header Banner */}
+        <View style={styles.detailHeaderBanner}>
+          <View style={styles.bannerTopNav}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.game_detail.back')}
+              onPress={() => navigation.goBack()}
+              style={styles.bannerNavBtn}
             >
-              <PinIcon size={16} />
-            </View>
-            <Text style={styles.metaText}>{venueText}</Text>
+              <BackArrowIcon size={20} color={colors.white} />
+            </Pressable>
+
+            {isOrganiser ? (
+              <View style={styles.bannerActions}>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mob.game_detail.edit_game')}
+                  onPress={handleStartEdit}
+                  style={styles.bannerNavBtn}
+                >
+                  <EditIcon size={20} color={colors.white} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mob.game_detail.cancel_game')}
+                  onPress={() => setIsDeleteModalOpen(true)}
+                  style={styles.bannerNavBtn}
+                >
+                  <TrashIcon size={20} color={colors.white} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
-        ) : null}
 
-        {/* Sports display name match label for tests */}
-        <Text style={styles.hiddenMetaText}>
-          {sportLabel} · {event.location}
-        </Text>
-      </View>
+          {/* Centered Sport Circle */}
+          <View style={styles.sportBadgeCenter}>
+            <SportIcon slug={event.sport} size={36} />
+          </View>
 
-      {/* CARD 1: Capacity Card */}
-      <Card style={styles.card}>
-        <View style={styles.capacityHeader}>
-          <Text style={styles.capacityNumber}>
-            {event.participant_count} / {event.capacity}
-          </Text>
-          <Text style={styles.capacityLabel}>{t('mob.game_detail.players_going')}</Text>
+          <Text style={styles.detailTitle}>{event.title}</Text>
+
+          <View style={styles.detailSubtitleRow}>
+            <Text style={styles.detailSubtitle}>
+              {sportLabel} ·{' '}
+              {event.skill_level_requirement
+                ? event.skill_level_requirement.charAt(0).toUpperCase() +
+                  event.skill_level_requirement.slice(1)
+                : t('skill_level.intermediate')}{' '}
+              •
+            </Text>
+            {isOrganiser ? (
+              <View style={styles.hostPill}>
+                <Text style={styles.hostPillText}>{t('mob.game_detail.host_badge')}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${progressPercent}%`, backgroundColor: sportColor },
-            ]}
-          />
-        </View>
-        <Text style={[styles.spotsLeftText, { color: sportColor }]}>
-          {spotsLeft > 0
-            ? t(spotsLeft === 1 ? 'mob.game_detail.spots_one' : 'mob.game_detail.spots_other', {
-                count: spotsLeft,
-              })
-            : event.allow_waitlist
-              ? t('mob.game_detail.full_waitlist')
-              : t('mob.game_detail.full')}
-        </Text>
-      </Card>
 
-      {/* CARD 2: Action Buttons Card */}
-      {isOrganiserActionsVisible &&
-      !isEditing &&
-      !isCancelFormOpen &&
-      !isInviteGroupOpen &&
-      !isInviteUserOpen ? (
-        <Card style={styles.card}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mob.game_detail.edit_game')}
-            onPress={handleStartEdit}
-            style={[styles.actionBtn, styles.editGameBtn]}
-          >
-            <View style={styles.actionBtnContent}>
-              <Text style={styles.editGameBtnText} accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true}>✎ </Text>
-              <Text style={styles.editGameBtnText}>{stripIconGlyphs(t('mob.game_detail.edit_game'))}</Text>
-            </View>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mob.game_detail.invite_group')}
-            onPress={handleOpenInviteGroup}
-            style={[styles.actionBtn, styles.whiteActionBtn]}
-          >
-            <View style={styles.actionBtnContent}>
-              <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true} style={styles.actionBtnIcon}>
-                <GroupsIcon size={18} />
+        {/* Content Cards */}
+        <View style={styles.detailContent}>
+          {/* Card 1: Details */}
+          <Card style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <View style={[styles.infoIconBox, { backgroundColor: colors.primary }]}>
+                <ClockIcon size={18} />
               </View>
-              <Text style={styles.whiteActionBtnText}>{stripIconGlyphs(t('mob.game_detail.invite_group'))}</Text>
+              <Text style={styles.infoText}>
+                {formattedDate}, {formattedTime}
+              </Text>
             </View>
-          </Pressable>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mob.game_detail.invite_player')}
-            onPress={handleOpenInviteUser}
-            style={[styles.actionBtn, styles.whiteActionBtn]}
-          >
-            <View style={styles.actionBtnContent}>
-              <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true} style={styles.actionBtnIcon}>
-                <PersonIcon size={18} />
+            <View style={styles.infoRow}>
+              <View style={[styles.infoIconBox, { backgroundColor: colors.accent }]}>
+                <PinIcon size={18} />
               </View>
-              <Text style={styles.whiteActionBtnText}>{stripIconGlyphs(t('mob.game_detail.invite_player'))}</Text>
+              <Text style={styles.infoText}>{venueText || t('mob.create_game.venue_label')}</Text>
             </View>
-          </Pressable>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mob.game_detail.share')}
-            onPress={share.open}
-            style={[styles.actionBtn, styles.whiteActionBtn]}
-          >
-            <View style={styles.actionBtnContent}>
-              <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true} style={styles.actionBtnIcon}>
-                <LinkIcon size={18} />
+            <View style={styles.infoRow}>
+              <View style={[styles.infoIconBox, { backgroundColor: colors.success }]}>
+                <PeopleIcon size={18} />
               </View>
-              <Text style={styles.whiteActionBtnText}>{stripIconGlyphs(t('mob.game_detail.share'))}</Text>
+              <Text style={styles.infoText}>
+                {event.visibility === 'group' ? t('mob.create_game.group') : t('mob.create_game.public_title')}
+              </Text>
             </View>
-          </Pressable>
+          </Card>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('mob.game_detail.cancel_game')}
-            onPress={handleOpenCancel}
-            style={[styles.actionBtn, styles.cancelBtn]}
-          >
-            <View style={styles.actionBtnContent}>
-              <View accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true} style={styles.actionBtnIcon}>
-                <CloseIcon size={18} />
-              </View>
-              <Text style={styles.cancelBtnText}>{stripIconGlyphs(t('mob.game_detail.cancel_game'))}</Text>
-            </View>
-          </Pressable>
-        </Card>
-      ) : null}
-
-      {/* Non-organiser RSVP controls */}
-      {isRsvpVisible ? (
-        <Button
-          label={isGoingOrWaitlisted ? t('mob.game_detail.leave') : t('mob.game_detail.join')}
-          variant={isGoingOrWaitlisted ? 'secondary' : 'primary'}
-          onPress={isGoingOrWaitlisted ? handleWithdraw : handleRsvp}
-          loading={isActionLoading}
-          style={styles.button}
-        />
-      ) : null}
-
-      {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
-
-      {/* Cancel Event Form */}
-      {isCancelFormOpen ? (
-        <Card style={styles.card}>
-          <Text style={styles.formTitle}>{t('mob.game_detail.cancel_game')}</Text>
-          <Text style={styles.formHint}>
-            {t('mob.game_detail.cancel_hint')}
-          </Text>
-          <TextField
-            {...cancelChain.props('cancelReason')}
-            placeholder={t('mob.game_detail.cancel_reason_placeholder')}
-            accessibilityLabel={t('mob.game_detail.cancel_reason_a11y')}
-            value={cancelReason}
-            onChangeText={setCancelReason}
-            editable={!isCancelSubmitting}
-            maxLength={500}
-            style={styles.formInput}
-          />
-          {cancelError ? <Text style={styles.errorText}>{cancelError}</Text> : null}
-          <View style={styles.formButtonsRow}>
-            <Button
-              label={t('mob.game_detail.cancel_confirm')}
-              variant="destructive"
-              onPress={handleConfirmCancel}
-              loading={isCancelSubmitting}
-              style={styles.rowButton}
-            />
-            <Button
-              label={t('mob.common.close')}
-              variant="secondary"
-              onPress={handleCloseCancel}
-              disabled={isCancelSubmitting}
-              style={styles.rowButton}
-            />
-          </View>
-        </Card>
-      ) : null}
-
-      {/* Invite Group Form */}
-      {isInviteGroupOpen ? (
-        <Card style={styles.card}>
-          <Text style={styles.formTitle}>{t('mob.game_detail.invite_group')}</Text>
-          <Text style={styles.formHint}>
-            {t('mob.game_detail.invite_group_hint')}
-          </Text>
-          {isGroupsLoading ? (
-            <Text style={styles.formHint}>{t('mob.game_detail.groups_loading')}</Text>
-          ) : myGroups.length === 0 ? (
-            <Text style={styles.formHint}>{t('mob.create_game.no_groups')}</Text>
-          ) : (
-            <OptionChips
-              options={myGroups.map(g => ({ value: g.id, label: g.name }))}
-              value={selectedGroupIds}
-              onChange={handleToggleGroup}
-              disabled={isInviteGroupSubmitting}
-            />
-          )}
-          {inviteGroupError ? <Text style={styles.errorText}>{inviteGroupError}</Text> : null}
-          {inviteGroupSuccess ? <Text style={styles.successText}>{inviteGroupSuccess}</Text> : null}
-          <View style={styles.formButtonsRow}>
-            <Button
-              label={t('mob.game_detail.send_group_invite')}
-              variant="primary"
-              onPress={handleSendGroupInvite}
-              loading={isInviteGroupSubmitting}
-              disabled={selectedGroupIds.length === 0 || isInviteGroupSubmitting}
-              style={styles.rowButton}
-            />
-            <Button
-              label={t('mob.common.close')}
-              variant="secondary"
-              onPress={handleCloseInviteGroup}
-              disabled={isInviteGroupSubmitting}
-              style={styles.rowButton}
-            />
-          </View>
-        </Card>
-      ) : null}
-
-      {/* Individual Invite User Form */}
-      {isInviteUserOpen ? (
-        <Card style={styles.card}>
-          <Text style={styles.formTitle}>{t('mob.game_detail.invite_player')}</Text>
-          <Text style={styles.formHint}>
-            {t('mob.game_detail.invite_player_hint')}
-          </Text>
-          {selectedInviteUser ? (
-            <View style={styles.selectedInviteRow}>
-              <Text style={styles.selectedInviteText}>
-                {t('mob.group_detail.invitee_line', {
-                  nickname: selectedInviteUser.nickname,
-                  name: selectedInviteUser.display_name,
+          {/* Card 2: Players */}
+          <Card style={styles.infoCard}>
+            <View style={styles.playersCardHeader}>
+              <Text style={styles.playersCardTitle}>{t('mob.game_detail.players')}</Text>
+              <Text style={styles.playersJoinedCount}>
+                {t('mob.game_detail.players_joined', {
+                  joined: joinedCount,
+                  capacity: totalCapacity,
                 })}
               </Text>
-              <TextLink
-                label={t('mob.common.change')}
-                onPress={() => setSelectedInviteUser(null)}
-                disabled={isInviteUserSubmitting}
-              />
             </View>
-          ) : selectedInviteEmail ? (
-            <View style={styles.selectedInviteRow}>
-              <Text style={styles.selectedInviteText}>
-                {t('mob.group_detail.invite_by_email', { email: selectedInviteEmail })}
-              </Text>
-              <TextLink
-                label={t('mob.common.change')}
-                onPress={() => setSelectedInviteEmail(null)}
-                disabled={isInviteUserSubmitting}
-              />
+
+            <View style={styles.playerAvatarsRow}>
+              {participants.map(p => {
+                const name = p.user_display_name || p.user_nickname || 'Player';
+                const tint = getAvatarTint(name);
+                return (
+                  <View
+                    key={p.id || p.user_id}
+                    style={[styles.playerAvatarCircle, { backgroundColor: tint.bg }]}
+                  >
+                    <Text style={[styles.playerAvatarText, { color: tint.text }]}>
+                      {getInitials(name)}
+                    </Text>
+                  </View>
+                );
+              })}
+
+              {Array.from({ length: emptySpotsCount }).map((_, idx) => (
+                <View key={`empty-${idx}`} style={styles.emptyAvatarCircle}>
+                  <Text style={styles.emptyAvatarText}>?</Text>
+                </View>
+              ))}
             </View>
-          ) : (
-            <UserSearchPicker
-              onSelect={setSelectedInviteUser}
-              onSelectEmail={setSelectedInviteEmail}
-              entityLabel={t('mob.user_search.entity_player')}
-              excludeEventId={eventId}
-              disabled={isInviteUserSubmitting}
-            />
-          )}
-          {inviteUserError ? <Text style={styles.errorText}>{inviteUserError}</Text> : null}
-          {inviteUserSuccess ? <Text style={styles.successText}>{inviteUserSuccess}</Text> : null}
-          <View style={styles.formButtonsRow}>
-            <Button
-              label={t('mob.group_detail.send_invite')}
-              variant="primary"
-              onPress={handleSendUserInvite}
-              loading={isInviteUserSubmitting}
-              disabled={(!selectedInviteUser && !selectedInviteEmail) || isInviteUserSubmitting}
-              style={styles.rowButton}
-            />
-            <Button
-              label={t('mob.common.close')}
-              variant="secondary"
-              onPress={handleCloseInviteUser}
-              disabled={isInviteUserSubmitting}
-              style={styles.rowButton}
-            />
-          </View>
-        </Card>
-      ) : null}
+          </Card>
 
-      {/* Edit Event Form */}
-      {isEditing ? (
-        <Card style={styles.card}>
-          <Text style={styles.formTitle}>{t('mob.game_detail.edit_game')}</Text>
-
-          <Text style={styles.fieldLabel}>{t('mob.create_game.title')}</Text>
-          <TextField
-            {...editChain.props('editTitle')}
-            placeholder={t('mob.game_detail.edit_title_placeholder')}
-            accessibilityLabel={t('mob.game_detail.edit_title_a11y')}
-            value={editTitle}
-            onChangeText={setEditTitle}
-            editable={!isEditSubmitting}
-            maxLength={150}
-            style={styles.formInput}
-          />
-
-          <Text style={styles.fieldLabel}>{t('mob.create_game.sport')}</Text>
-          <TextField
-            {...editChain.props('editSport')}
-            placeholder={t('mob.game_detail.edit_sport_placeholder')}
-            accessibilityLabel={t('mob.create_game.sport')}
-            value={editSport}
-            onChangeText={setEditSport}
-            editable={!isEditSubmitting}
-            maxLength={30}
-            style={styles.formInput}
-          />
-          {sportOptions.length > 0 ? (
-            <View style={styles.chipRow}>
-              <OptionChips
-                options={sportOptions}
-                value={editSport}
-                onChange={setEditSport}
-                disabled={isEditSubmitting}
-              />
+          {/* Non-organiser RSVP Actions */}
+          {!isOrganiser ? (
+            <View style={styles.rsvpActionContainer}>
+              {event.current_user_rsvp_status === 'going' ? (
+                <Button
+                  label={t('mob.game_detail.leave')}
+                  variant="secondary"
+                  onPress={handleWithdraw}
+                  loading={isActionLoading}
+                />
+              ) : (
+                <Button
+                  label={t('mob.game_detail.join')}
+                  variant="cta"
+                  onPress={handleRsvp}
+                  loading={isActionLoading}
+                />
+              )}
             </View>
           ) : null}
 
-          <Text style={styles.fieldLabel}>{t('mob.create_game.description')}</Text>
-          <TextField
-            ref={editChain.ref('editDescription')}
-            placeholder={t('mob.game_detail.edit_description_placeholder')}
-            accessibilityLabel={t('mob.game_detail.edit_description_a11y')}
-            value={editDescription}
-            onChangeText={setEditDescription}
-            editable={!isEditSubmitting}
-            multiline
-            style={[styles.formInput, styles.multilineInput]}
-          />
-
-          <Text style={styles.fieldLabel}>{t('mob.create_game.venue_name')}</Text>
-          <TextField
-            {...editChain.props('editVenueName')}
-            placeholder={t('mob.game_detail.edit_venue_name_placeholder')}
-            accessibilityLabel={t('mob.create_game.venue_name')}
-            value={editVenueName}
-            onChangeText={setEditVenueName}
-            editable={!isEditSubmitting}
-            style={styles.formInput}
-          />
-
-          <Text style={styles.fieldLabel}>{t('mob.create_game.venue_address')}</Text>
-          <TextField
-            {...editChain.props('editVenueAddress')}
-            placeholder={t('mob.game_detail.edit_venue_address_placeholder')}
-            accessibilityLabel={t('mob.create_game.venue_address')}
-            value={editVenueAddress}
-            onChangeText={setEditVenueAddress}
-            editable={!isEditSubmitting}
-            style={styles.formInput}
-          />
-
-          <Text style={styles.fieldLabel}>{t('mob.create_game.skill_level')}</Text>
-          <OptionChips
-            options={SKILL_LEVEL_OPTIONS}
-            value={editSkillLevel}
-            onChange={setEditSkillLevel}
-            disabled={isEditSubmitting}
-          />
-
-          <Text style={styles.fieldLabel}>{t('mob.create_game.capacity')}</Text>
-          <TextField
-            {...editChain.props('editCapacity')}
-            placeholder={t('mob.create_game.capacity')}
-            accessibilityLabel={t('mob.create_game.capacity')}
-            value={editCapacity}
-            onChangeText={setEditCapacity}
-            editable={!isEditSubmitting}
-            keyboardType="number-pad"
-            style={styles.formInput}
-          />
-
-          <View style={styles.switchRow}>
-            <Text style={styles.fieldLabel}>{t('mob.game_detail.allow_waitlist')}</Text>
-            <Switch
-              accessibilityLabel={t('mob.game_detail.allow_waitlist')}
-              value={editAllowWaitlist}
-              onValueChange={setEditAllowWaitlist}
-              disabled={isEditSubmitting}
-              trackColor={{ false: colors.border, true: colors.primaryLight }}
-              thumbColor={editAllowWaitlist ? colors.accent : colors.textMuted}
-            />
-          </View>
-
-          <Text style={styles.fieldLabel}>{t('mob.create_game.start')}</Text>
-          <DateTimePickerField
-            accessibilityLabel={t('mob.create_game.start')}
-            mode="datetime"
-            value={editStartsAt}
-            onChange={setEditStartsAt}
-            disabled={isEditSubmitting}
-          />
-
-          <Text style={styles.fieldLabel}>{t('mob.game_detail.end')}</Text>
-          <DateTimePickerField
-            accessibilityLabel={t('mob.game_detail.end')}
-            mode="datetime"
-            value={editEndsAt}
-            onChange={setEditEndsAt}
-            disabled={isEditSubmitting}
-          />
-
-          {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
-
-          <View style={styles.formButtonsRow}>
-            <Button
-              label={t('mob.game_detail.save_changes')}
-              variant="primary"
-              onPress={handleSaveEdit}
-              loading={isEditSubmitting}
-              style={styles.rowButton}
-            />
-            <Button
-              label={t('mob.common.cancel')}
-              variant="secondary"
-              onPress={handleCancelEdit}
-              disabled={isEditSubmitting}
-              style={styles.rowButton}
-            />
-          </View>
-        </Card>
-      ) : null}
-
-      {/* CARD 3: About this game Card */}
-      <Card style={styles.card}>
-        <Text style={styles.cardHeading}>{t('mob.game_detail.about')}</Text>
-        <Text style={styles.descriptionText}>
-          {event.description || t('mob.game_detail.description_fallback')}
-        </Text>
-      </Card>
-
-      {/* CARD 4: Event Details Card */}
-      <Card style={styles.card}>
-        <Text style={styles.cardHeading}>{t('mob.game_detail.details')}</Text>
-        <View style={styles.metaKeyValRow}>
-          <Text style={styles.metaKey}>{t('mob.create_game.visibility')}</Text>
-          <EventVisibilityBadge visibility={event.visibility} labels={labels} textStyle={styles.metaVal} />
+          {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
         </View>
-        <View style={styles.metaKeyValRow}>
-          <Text style={styles.metaKey}>{t('mob.game_detail.skill_level')}</Text>
-          <Text style={styles.metaVal}>{formatSkillLevel(event.skill_level_requirement, t)}</Text>
-        </View>
-        <View style={styles.metaKeyValRow}>
-          <Text style={styles.metaKey}>{t('mob.game_detail.waitlist')}</Text>
-          <Text style={styles.metaVal}>{event.allow_waitlist !== false ? t('mob.game_detail.waitlist_open') : t('mob.game_detail.waitlist_closed')}</Text>
-        </View>
-        {event.estimated_cost_cents != null ? (
-          <View style={styles.metaKeyValRow}>
-            <Text style={styles.metaKey}>{t('mob.game_detail.cost')}</Text>
-            <Text style={styles.metaVal}>
-              ${(event.estimated_cost_cents / 100).toFixed(2)}
-              {event.estimated_cost_currency ? ` ${event.estimated_cost_currency}` : ''}
+      </ScrollView>
+
+      {/* Delete Game Bottom Sheet (DeleteGame.png) */}
+      <Modal visible={isDeleteModalOpen} transparent animationType="slide">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.bottomSheet}>
+            <View style={styles.dragHandle} />
+
+            <View style={styles.deleteTrashBadge}>
+              <TrashIcon size={24} color={colors.error} />
+            </View>
+
+            <Text style={styles.deleteSheetTitle}>
+              {t('mob.game_detail.delete_game_title', { title: event.title })}
             </Text>
-          </View>
-        ) : event.cost != null ? (
-          <View style={styles.metaKeyValRow}>
-            <Text style={styles.metaKey}>{t('mob.game_detail.cost')}</Text>
-            <Text style={styles.metaVal}>{event.cost}</Text>
-          </View>
-        ) : null}
-      </Card>
+            <Text style={styles.deleteSheetSubtitle}>
+              {t('mob.game_detail.delete_subtitle', {
+                when: `${formattedDate}, ${formattedTime}`,
+                count: joinedCount,
+              })}
+            </Text>
 
-      {/* CARD 5: Participants Card */}
-      <Card style={styles.card}>
-        <Text style={styles.cardHeading}>{t('mob.game_detail.players')}</Text>
-        <View style={styles.participantsList}>
-          {displayParticipants.map(p => (
-            <View key={p.id} style={styles.participantRow}>
-              <View style={styles.participantAvatar}>
-                <Text style={styles.participantAvatarText}>{p.initials}</Text>
-              </View>
-              <Text style={styles.participantName}>{p.name}</Text>
-              <Text
-                style={[
-                  styles.participantRole,
-                  p.isOrganiser ? styles.roleOrganizer : styles.roleGoing,
-                ]}
-              >
-                {p.isOrganiser ? t('mob.game_detail.organizer') : t('mob.game_detail.going')}
+            <View style={styles.bulletRow}>
+              <CrossIcon size={16} color={colors.error} />
+              <Text style={styles.bulletText}>
+                {t('mob.game_detail.delete_bullet_1', { count: joinedCount })}
               </Text>
             </View>
-          ))}
-          {overflowParticipantsCount > 0 ? (
-            <View style={styles.overflowRow}>
-              <View style={styles.overflowAvatar}>
-                <Text style={styles.overflowAvatarText}>+{overflowParticipantsCount}</Text>
-              </View>
-              <Text style={styles.overflowText}>
-                {t('mob.game_detail.more_going', { count: overflowParticipantsCount })}
-              </Text>
+
+            <View style={styles.bulletRow}>
+              <CrossIcon size={16} color={colors.error} />
+              <Text style={styles.bulletText}>{t('mob.game_detail.delete_bullet_2')}</Text>
             </View>
-          ) : null}
+
+            <TouchableOpacity
+              style={styles.deleteConfirmBtn}
+              onPress={handleDeleteGame}
+              disabled={isDeleting}
+            >
+              <Text style={styles.deleteConfirmBtnText}>
+                {t('mob.game_detail.delete_confirm_button')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.deleteKeepBtn}
+              onPress={() => setIsDeleteModalOpen(false)}
+              disabled={isDeleting}
+            >
+              <Text style={styles.deleteKeepBtnText}>{t('mob.game_detail.keep_game_button')}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </Card>
-    </KeyboardAwareScreen>
-
-      <ShareActionSheet
-        visible={share.sheetVisible}
-        title={t('mob.game_detail.share_title')}
-        onShareGeneric={share.shareViaSystem}
-        onShareWhatsApp={share.shareViaWhatsApp}
-        onCopyLink={share.copyLink}
-        onClose={share.close}
-      />
-
-      <Toast message={share.toastMessage} onDismiss={share.clearToast} />
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboardAvoid: { flex: 1 },
-  container: {
+  screen: {
+    flex: 1,
     backgroundColor: colors.background,
+  },
+  scrollContent: {
     padding: spacing.md,
     paddingBottom: spacing.xxl,
   },
-  backButton: {
-    marginBottom: spacing.md,
-    alignSelf: 'flex-start',
+  detailScroll: {
+    paddingBottom: spacing.xxl,
   },
-  backButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  headerBlock: {
-    marginBottom: spacing.md,
-  },
-  headerTagRow: {
-    flexDirection: 'row',
+  detailHeaderBanner: {
+    backgroundColor: colors.primary,
+    paddingTop: Platform.OS === 'ios' ? spacing.xxl : spacing.lg,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
     alignItems: 'center',
+    borderBottomLeftRadius: radius.lg * 2,
+    borderBottomRightRadius: radius.lg * 2,
+  },
+  bannerTopNav: {
+    width: '100%',
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  sportPill: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    marginBottom: spacing.md,
+  },
+  bannerNavBtn: {
+    width: 40,
+    height: 40,
     borderRadius: radius.full,
-    gap: 6,
+    backgroundColor: colors.overlayWhite25,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sportDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    borderWidth: 1.5,
-    borderColor: colors.white,
+  bannerActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
-  sportPillText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: '600',
+  sportBadgeCenter: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
-  hostingTag: {
-    color: colors.accent,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  participantTag: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  title: {
+  detailTitle: {
     ...typography.h2,
-    color: colors.textPrimary,
-    fontWeight: '700',
-    marginBottom: spacing.sm,
+    color: colors.white,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
   },
-  cancelledBanner: {
-    ...typography.bodyBold,
-    color: colors.error,
-    backgroundColor: colors.errorLight,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  metaRow: {
+  detailSubtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginBottom: spacing.xs,
   },
-  metaIconWrap: {
-    width: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+  detailSubtitle: {
+    ...typography.bodyBold,
+    color: colors.white,
   },
-  metaIcon: {
-    fontSize: 14,
+  hostPill: {
+    backgroundColor: colors.ownerChipBg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
   },
-  metaText: {
-    ...typography.body,
-    color: colors.textSecondary,
+  hostPillText: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.ownerChipText,
   },
-  hiddenMetaText: {
-    height: 0,
-    opacity: 0,
+  detailContent: {
+    padding: spacing.md,
+    gap: spacing.md,
   },
-  card: {
+  infoCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.md,
-    marginBottom: spacing.md,
     borderWidth: borderWidth.thin,
     borderColor: colors.border,
-    shadowColor: '#1B1918',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
   },
-  capacityHeader: {
-    marginBottom: spacing.sm,
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
   },
-  capacityNumber: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  capacityLabel: {
-    fontSize: 13,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  progressTrack: {
-    height: 6,
-    backgroundColor: colors.track,
-    borderRadius: 3,
-    overflow: 'hidden',
-    width: '100%',
-    marginBottom: spacing.sm,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  spotsLeftText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  actionBtn: {
-    minHeight: sizes.touchTarget,
+  infoIconBox: {
+    width: 32,
+    height: 32,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
-    borderWidth: borderWidth.thin,
   },
-  actionBtnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBtnIcon: {
-    marginRight: spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editGameBtn: {
-    // Blue is exclusively for primary action buttons (same standing rule
-    // as web) — was `colors.accent`, corrected per direct instruction.
-    backgroundColor: colors.ctaBlue,
-    borderColor: colors.ctaBlue,
-  },
-  editGameBtnText: {
-    color: colors.white,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  whiteActionBtn: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-  },
-  whiteActionBtnText: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  cancelBtn: {
-    backgroundColor: colors.surface,
-    borderColor: '#F0C0C0',
-    marginBottom: 0,
-  },
-  cancelBtnText: {
-    color: colors.error,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  cardHeading: {
-    ...typography.h3,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  descriptionText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    lineHeight: 22,
-  },
-  metaKeyValRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
-  },
-  metaKey: {
-    ...typography.body,
-    color: colors.textMuted,
-  },
-  metaVal: {
-    ...typography.bodyBold,
-    color: colors.textPrimary,
-  },
-  participantsList: {
-    gap: spacing.sm,
-  },
-  participantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  participantAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EBE7E0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  participantAvatarText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
-  participantName: {
+  infoText: {
     ...typography.bodyBold,
     color: colors.textPrimary,
     flex: 1,
   },
-  participantRole: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  roleOrganizer: {
-    color: colors.accent,
-  },
-  roleGoing: {
-    color: colors.textMuted,
-  },
-  overflowRow: {
+  playersCardHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
+    marginBottom: spacing.md,
   },
-  overflowAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EBE7E0',
+  playersCardTitle: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  playersJoinedCount: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.success,
+  },
+  playerAvatarsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  playerAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  overflowAvatarText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textSecondary,
+  playerAvatarText: {
+    ...typography.bodyBold,
   },
-  overflowText: {
+  emptyAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyAvatarText: {
+    ...typography.bodyBold,
+    color: colors.textMuted,
+  },
+  rsvpActionContainer: {
+    marginTop: spacing.md,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  stepHeading: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
+  },
+  cardContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  inputCardLabel: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  cardTextInput: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  lockedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+  },
+  lockedIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  lockedInitials: {
+    ...typography.bodyBold,
+  },
+  lockedInfo: {
+    flex: 1,
+  },
+  lockedTitle: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  lockedSubtitle: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontSize: 11,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  halfField: {
+    flex: 1,
+  },
+  fieldLabel: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  pickerBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    minHeight: 44,
+  },
+  pickerBoxText: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: borderWidth.thick,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    height: 48,
+    backgroundColor: colors.surface,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  predictionsList: {
+    marginTop: spacing.xs,
+    backgroundColor: colors.surface,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  predictionRow: {
+    padding: spacing.sm,
+    borderBottomWidth: borderWidth.thin,
+    borderBottomColor: colors.border,
+  },
+  predictionMain: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  predictionSecondary: {
     ...typography.caption,
     color: colors.textMuted,
   },
-  button: {
+  currentLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginVertical: spacing.md,
+  },
+  currentLocationText: {
+    ...typography.bodyBold,
+    color: colors.primary,
+  },
+  mapPreviewBox: {
+    height: 140,
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  mapRoad1: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    height: 24,
+    backgroundColor: colors.surface,
+  },
+  mapRoad2: {
+    position: 'absolute',
+    left: 140,
+    top: 0,
+    bottom: 0,
+    width: 24,
+    backgroundColor: colors.surface,
+  },
+  mapPinContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapBadge: {
+    position: 'absolute',
+    bottom: spacing.sm,
+    left: spacing.sm,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  mapBadgeText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontSize: 11,
+  },
+  selectedLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     marginBottom: spacing.sm,
   },
-  errorText: {
-    ...typography.body,
-    color: colors.error,
-    textAlign: 'center',
-    marginBottom: spacing.md,
+  pinBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  successText: {
-    ...typography.body,
-    color: colors.success,
-    textAlign: 'center',
-    marginBottom: spacing.md,
+  locationTextContainer: {
+    flex: 1,
   },
-  formTitle: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  formHint: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginBottom: spacing.md,
-  },
-  fieldLabel: {
+  locationName: {
     ...typography.bodyBold,
     color: colors.textPrimary,
+  },
+  locationAddress: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  courtInput: {
+    ...typography.body,
+    color: colors.textPrimary,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  skillPillRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  skillPill: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skillPillSelected: {
+    backgroundColor: colors.primary,
+  },
+  skillPillText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.primaryDark,
+  },
+  skillPillTextSelected: {
+    color: colors.white,
+  },
+  reviewMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  reviewSportBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  reviewMainText: {
+    flex: 1,
+  },
+  reviewGameTitle: {
+    ...typography.bodyBold,
+    fontSize: 17,
+    color: colors.textPrimary,
+  },
+  reviewGameSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  divider: {
+    height: borderWidth.thin,
+    backgroundColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  changeRow: {
+    marginBottom: spacing.sm,
+  },
+  changeLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  changeValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  changeOldValue: {
+    ...typography.body,
+    color: colors.textMuted,
+    textDecorationLine: 'line-through',
+  },
+  changeArrow: {
+    ...typography.bodyBold,
+    color: colors.primary,
+  },
+  changeNewValue: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  changeHelper: {
+    ...typography.caption,
+    color: colors.textMuted,
     marginTop: spacing.sm,
+  },
+  notifyCard: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  notifyText: {
+    ...typography.caption,
+    color: colors.primaryDark,
+    lineHeight: 18,
+  },
+  footerContainer: {
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: borderWidth.thin,
+    borderTopColor: colors.border,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: colors.scrim,
+    justifyContent: 'flex-end',
+  },
+  bottomSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.lg * 1.5,
+    borderTopRightRadius: radius.lg * 1.5,
+    padding: spacing.lg,
+    alignItems: 'center',
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  deleteTrashBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.lg,
+    backgroundColor: colors.errorLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  deleteSheetTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    textAlign: 'center',
     marginBottom: spacing.xs,
   },
-  formInput: {
+  deleteSheetSubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    width: '100%',
     marginBottom: spacing.sm,
   },
-  multilineInput: {
-    minHeight: 72,
+  bulletText: {
+    ...typography.body,
+    color: colors.textPrimary,
+    flex: 1,
   },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  deleteConfirmBtn: {
+    width: '100%',
+    height: 48,
+    borderRadius: radius.md,
+    backgroundColor: colors.error,
     alignItems: 'center',
-    marginBottom: spacing.sm,
-    marginTop: spacing.sm,
+    justifyContent: 'center',
+    marginTop: spacing.lg,
   },
-  selectedInviteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
+  deleteConfirmBtnText: {
+    ...typography.button,
+    color: colors.white,
+  },
+  deleteKeepBtn: {
+    width: '100%',
+    height: 48,
     borderRadius: radius.md,
     borderWidth: borderWidth.thin,
     borderColor: colors.border,
-    marginBottom: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.sm,
   },
-  selectedInviteText: {
-    ...typography.bodyBold,
+  deleteKeepBtnText: {
+    ...typography.button,
     color: colors.textPrimary,
   },
-  chipRow: {
-    marginBottom: spacing.sm,
-  },
-  formButtonsRow: {
-    flexDirection: 'row',
+  errorText: {
+    ...typography.caption,
+    color: colors.error,
+    textAlign: 'center',
     marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  rowButton: {
-    flex: 1,
-    marginBottom: 0,
   },
 });
