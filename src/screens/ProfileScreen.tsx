@@ -58,7 +58,8 @@ import {
   spacing,
   typography,
 } from '../theme/tokens';
-import type { UserProfile } from '../types/user';
+import type { SkillLevelValue, UserProfile } from '../types/user';
+import type { LabelKey } from '../labels/fallbackLabels';
 import type { ProfileStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
@@ -92,17 +93,25 @@ const GROUP_BADGE_COLORS = [
   colors.accentPurple,
 ];
 
+const LEVEL_LABEL_KEY: Record<SkillLevelValue, LabelKey> = {
+  beginner: 'mob.profile.level_beginner_full',
+  intermediate: 'mob.profile.level_intermediate_full',
+  expert: 'mob.profile.level_expert_full',
+};
+
 function getLevelTextColor(level?: string | null): string {
-  if (level === 'Beginner') return colors.warning;
-  if (level === 'Intermediate') return colors.primary;
-  if (level === 'Expert') return colors.accentPurple;
+  const normalized = level?.trim().toLowerCase();
+  if (normalized === 'beginner') return colors.warning;
+  if (normalized === 'intermediate') return colors.primary;
+  if (normalized === 'expert') return colors.accentPurple;
   return colors.textPrimary;
 }
 
 function getLevelBgColor(level?: string | null): string {
-  if (level === 'Beginner') return colors.warningLight;
-  if (level === 'Intermediate') return colors.primaryLight;
-  if (level === 'Expert') return colors.avatarTint5;
+  const normalized = level?.trim().toLowerCase();
+  if (normalized === 'beginner') return colors.warningLight;
+  if (normalized === 'intermediate') return colors.primaryLight;
+  if (normalized === 'expert') return colors.avatarTint5;
   return colors.avatarTint1;
 }
 
@@ -113,9 +122,13 @@ function SkillTileItem({
   sport: string;
   level: string;
 }): React.JSX.Element {
+  const t = useT();
   const sportName = useSportDisplayName(sport);
   const textColor = getLevelTextColor(level);
   const bgColor = getLevelBgColor(level);
+  const normalized = level.trim().toLowerCase() as SkillLevelValue;
+  const labelKey = LEVEL_LABEL_KEY[normalized];
+  const levelText = labelKey ? t(labelKey) : level;
 
   return (
     <View style={[styles.skillTile, { backgroundColor: bgColor }]}>
@@ -127,7 +140,7 @@ function SkillTileItem({
           {sportName}
         </Text>
         <Text style={[styles.skillLevelText, { color: textColor }]}>
-          {level}
+          {levelText}
         </Text>
       </View>
     </View>

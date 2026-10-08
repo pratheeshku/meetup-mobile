@@ -89,12 +89,33 @@ function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: Skil
  * rest of `getProfile()`'s response, so it calls this endpoint on its own
  * rather than fetching the whole profile just for `skill_levels`.
  */
+export function normalizeSkillLevel(level?: string | null): SkillLevelValue | null {
+  if (!level) return null;
+  const normalized = level.trim().toLowerCase();
+  if (normalized === 'beginner') return 'beginner';
+  if (normalized === 'intermediate') return 'intermediate';
+  if (normalized === 'expert') return 'expert';
+  return null;
+}
+
 export async function getSkillLevels(options?: RequestOptions): Promise<SkillLevel[]> {
   try {
-    const { data } = await apiClient.get<SkillLevel[]>('/users/me/skill-levels', {
+    const { data } = await apiClient.get<Array<{ sport: string; skill_level: string; updated_at?: string }>>('/users/me/skill-levels', {
       correlationId: options?.correlationId,
     });
-    return Array.isArray(data) ? data : [];
+    if (!Array.isArray(data)) return [];
+    const result: SkillLevel[] = [];
+    for (const item of data) {
+      const canonical = normalizeSkillLevel(item.skill_level);
+      if (canonical) {
+        result.push({
+          sport: item.sport,
+          skill_level: canonical,
+          ...(item.updated_at ? { updated_at: item.updated_at } : {}),
+        });
+      }
+    }
+    return result;
   } catch {
     return [];
   }
@@ -131,9 +152,10 @@ export async function updateSkillLevel(
   skill_level: SkillLevelValue,
   options?: RequestOptions,
 ): Promise<void> {
+  const canonical = normalizeSkillLevel(skill_level) ?? skill_level;
   await apiClient.put(
     '/users/me/skill-level',
-    { sport, skill_level },
+    { sport, skill_level: canonical },
     { correlationId: options?.correlationId },
   );
 }

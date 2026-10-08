@@ -18,7 +18,7 @@
  * been verified to always include the other shape's fields. Correct
  * against the actual backend contract on conformance review.
  */
-export type SkillLevelValue = 'Beginner' | 'Intermediate' | 'Expert';
+export type SkillLevelValue = 'beginner' | 'intermediate' | 'expert';
 
 /**
  * `updated_at` (ADDENDUM-MOBILE-SPORTS-FILTER-PRESELECT-001 §3): the

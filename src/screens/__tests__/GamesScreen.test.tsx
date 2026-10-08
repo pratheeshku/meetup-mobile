@@ -255,7 +255,7 @@ describe('Games list (AD-15)', () => {
   });
 
   it('uses the same sport defaults as Home: the user\'s skill sports, otherwise All', async () => {
-    mockGetProfile.mockResolvedValue(profileOf([{ sport: 'tennis', skill_level: 'Expert' }]));
+    mockGetProfile.mockResolvedValue(profileOf([{ sport: 'tennis', skill_level: 'expert' }]));
     const root = await mount();
     expect(selected(root, 'Tennis')).toBe(true);
     expect(selected(root, 'All')).toBe(false);

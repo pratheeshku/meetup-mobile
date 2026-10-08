@@ -90,16 +90,16 @@ function SkillRowItem({
         <Pressable
           style={[
             styles.segmentButton,
-            currentLevel === 'Beginner' && styles.segmentButtonActive,
+            currentLevel === 'beginner' && styles.segmentButtonActive,
           ]}
-          onPress={() => onSelectLevel(sport, 'Beginner')}
+          onPress={() => onSelectLevel(sport, 'beginner')}
           accessibilityRole="button"
           accessibilityLabel={`${sportName} ${t('mob.profile.level_beginner')}`}
         >
           <Text
             style={[
               styles.segmentText,
-              currentLevel === 'Beginner' && styles.segmentTextActive,
+              currentLevel === 'beginner' && styles.segmentTextActive,
             ]}
           >
             {t('mob.profile.level_beginner')}
@@ -109,16 +109,16 @@ function SkillRowItem({
         <Pressable
           style={[
             styles.segmentButton,
-            currentLevel === 'Intermediate' && styles.segmentButtonActive,
+            currentLevel === 'intermediate' && styles.segmentButtonActive,
           ]}
-          onPress={() => onSelectLevel(sport, 'Intermediate')}
+          onPress={() => onSelectLevel(sport, 'intermediate')}
           accessibilityRole="button"
           accessibilityLabel={`${sportName} ${t('mob.profile.level_intermediate')}`}
         >
           <Text
             style={[
               styles.segmentText,
-              currentLevel === 'Intermediate' && styles.segmentTextActive,
+              currentLevel === 'intermediate' && styles.segmentTextActive,
             ]}
           >
             {t('mob.profile.level_intermediate')}
@@ -128,16 +128,16 @@ function SkillRowItem({
         <Pressable
           style={[
             styles.segmentButton,
-            currentLevel === 'Expert' && styles.segmentButtonActive,
+            currentLevel === 'expert' && styles.segmentButtonActive,
           ]}
-          onPress={() => onSelectLevel(sport, 'Expert')}
+          onPress={() => onSelectLevel(sport, 'expert')}
           accessibilityRole="button"
           accessibilityLabel={`${sportName} ${t('mob.profile.level_expert')}`}
         >
           <Text
             style={[
               styles.segmentText,
-              currentLevel === 'Expert' && styles.segmentTextActive,
+              currentLevel === 'expert' && styles.segmentTextActive,
             ]}
           >
             {t('mob.profile.level_expert')}

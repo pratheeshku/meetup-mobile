@@ -180,6 +180,9 @@ export const sizes = {
  * Light theme only — the app has no dark mode.
  */
 export const levelColors = {
+  beginner: { bg: '#E8F5E9', text: '#1B5E20', border: '#2E7D32' },
+  intermediate: { bg: '#E3F2FD', text: '#0D47A1', border: '#1565C0' },
+  expert: { bg: '#EDE7F6', text: '#4527A0', border: '#5E35B1' },
   Beginner: { bg: '#E8F5E9', text: '#1B5E20', border: '#2E7D32' },
   Intermediate: { bg: '#E3F2FD', text: '#0D47A1', border: '#1565C0' },
   Expert: { bg: '#EDE7F6', text: '#4527A0', border: '#5E35B1' },

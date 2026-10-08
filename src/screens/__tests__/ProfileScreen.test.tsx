@@ -212,7 +212,7 @@ describe('ProfileScreen add sport (BUG-M05, skill-level redesign)', () => {
   it('limits the picker to sports not yet set', async () => {
     mockGetProfile.mockResolvedValue({
       ...PROFILE,
-      skill_levels: [{ sport: 'table_tennis', skill_level: 'Beginner' }],
+      skill_levels: [{ sport: 'table_tennis', skill_level: 'beginner' }],
     });
     const root = await startAdd();
     expect(control(root, 'checkbox', 'Badminton')).toBeTruthy();
@@ -224,14 +224,14 @@ describe('ProfileScreen add sport (BUG-M05, skill-level redesign)', () => {
   it('saves the chosen sport’s name (not its display label) with the chosen level', async () => {
     mockGetProfile.mockResolvedValueOnce(PROFILE).mockResolvedValueOnce({
       ...PROFILE,
-      skill_levels: [{ sport: 'table_tennis', skill_level: 'Intermediate' }],
+      skill_levels: [{ sport: 'table_tennis', skill_level: 'intermediate' }],
     });
     const root = await startAdd();
     tap(root, 'checkbox', 'Table Tennis');
     act(() => pressableWithText(root, 'Next').props.onPress());
     tap(root, 'radio', 'Table Tennis, Intermediate');
     await act(async () => pressableWithText(root, 'Save').props.onPress());
-    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'Intermediate', expect.anything());
+    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'intermediate', expect.anything());
     expect(mockGetProfile).toHaveBeenCalledTimes(2);
     // Sheet closed, new row listed.
     expect(texts(root)).not.toContain('Save');
@@ -268,7 +268,7 @@ describe('ProfileScreen skill-levels list sport display name (BUG-M02)', () => {
   it('resolves each declared sport to its display_name instead of the raw slug', async () => {
     mockGetProfile.mockResolvedValue({
       ...PROFILE,
-      skill_levels: [{ sport: 'table_tennis', skill_level: 'Intermediate' }],
+      skill_levels: [{ sport: 'table_tennis', skill_level: 'intermediate' }],
     });
     const root = await mount();
     expect(texts(root)).toEqual(expect.arrayContaining(['Table Tennis', 'Intermediate']));
@@ -278,7 +278,7 @@ describe('ProfileScreen skill-levels list sport display name (BUG-M02)', () => {
   it('falls back to the raw slug for a declared sport not in the sports list', async () => {
     mockGetProfile.mockResolvedValue({
       ...PROFILE,
-      skill_levels: [{ sport: 'unlisted_sport', skill_level: 'Beginner' }],
+      skill_levels: [{ sport: 'unlisted_sport', skill_level: 'beginner' }],
     });
     const root = await mount();
     expect(texts(root)).toContain('unlisted_sport');
@@ -288,7 +288,7 @@ describe('ProfileScreen skill-levels list sport display name (BUG-M02)', () => {
 describe('ProfileScreen My sports rows and edit sheet', () => {
   const WITH_ONE_SKILL_LEVEL: UserProfile = {
     ...PROFILE,
-    skill_levels: [{ sport: 'table_tennis', skill_level: 'Intermediate' }],
+    skill_levels: [{ sport: 'table_tennis', skill_level: 'intermediate' }],
   };
 
   it('lists read-only rows: no editing controls until a row is tapped', async () => {
@@ -307,8 +307,8 @@ describe('ProfileScreen My sports rows and edit sheet', () => {
     mockGetProfile.mockResolvedValue({
       ...PROFILE,
       skill_levels: [
-        { sport: 'table_tennis', skill_level: 'Intermediate' },
-        { sport: 'badminton', skill_level: 'Beginner' },
+        { sport: 'table_tennis', skill_level: 'intermediate' },
+        { sport: 'badminton', skill_level: 'beginner' },
       ],
     });
     const root = await mount();
@@ -333,7 +333,7 @@ describe('ProfileScreen My sports rows and edit sheet', () => {
     openRow(root, 'Table Tennis, Intermediate');
     tap(root, 'radio', 'Table Tennis, Expert');
     await act(async () => pressableWithText(root, 'Save').props.onPress());
-    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'Expert', expect.anything());
+    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'expert', expect.anything());
     expect(mockGetProfile).toHaveBeenCalledTimes(2);
     expect(texts(root)).not.toContain('Save');
   });
@@ -353,7 +353,7 @@ describe('ProfileScreen My sports rows and edit sheet', () => {
 describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001), from the edit sheet', () => {
   const WITH_ONE_SKILL_LEVEL: UserProfile = {
     ...PROFILE,
-    skill_levels: [{ sport: 'table_tennis', skill_level: 'Intermediate' }],
+    skill_levels: [{ sport: 'table_tennis', skill_level: 'intermediate' }],
   };
 
   it('asks for confirmation before deleting', async () => {
