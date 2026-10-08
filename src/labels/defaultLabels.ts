@@ -735,7 +735,6 @@ export const DEFAULT_LABELS = {
   'mob.create_game.venue_label': 'Venue',
   'mob.create_game.venue_search_placeholder': 'Search venue',
   'mob.create_game.use_current_location': 'Use my current location',
-  'mob.create_game.drag_map_hint': 'Drag the map to adjust the pin',
   'mob.create_game.court_details_label': 'Court or hall details (optional)',
   'mob.create_game.court_details_placeholder': 'e.g. Court 2',
   'mob.create_game.step_who': 'Who can play?',

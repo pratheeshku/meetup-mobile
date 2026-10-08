@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import {
+  Image,
   PermissionsAndroid,
   Platform,
   ScrollView,
@@ -615,17 +616,17 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             </Text>
           </TouchableOpacity>
 
-          {/* Map Preview Box */}
-          <View style={styles.mapPreviewBox}>
-            <View style={styles.mapRoad1} />
-            <View style={styles.mapRoad2} />
-            <View style={styles.mapPinContainer}>
-              <PinIcon size={32} />
+          {mapsApiKey && selectedVenue.lat != null && selectedVenue.lng != null ? (
+            <View style={styles.mapPreviewBox}>
+              <Image
+                style={styles.mapImage}
+                source={{
+                  uri: `https://maps.googleapis.com/maps/api/staticmap?center=${selectedVenue.lat},${selectedVenue.lng}&zoom=15&size=600x300&markers=color:red%7C${selectedVenue.lat},${selectedVenue.lng}&key=${mapsApiKey}`,
+                }}
+                resizeMode="cover"
+              />
             </View>
-            <View style={styles.mapBadge}>
-              <Text style={styles.mapBadgeText}>{t('mob.create_game.drag_map_hint')}</Text>
-            </View>
-          </View>
+          ) : null}
 
           {/* Selected Location Row */}
           <View style={styles.selectedLocationRow}>
@@ -1122,48 +1123,14 @@ const styles = StyleSheet.create({
   },
   mapPreviewBox: {
     height: 140,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.background,
     borderRadius: radius.md,
     overflow: 'hidden',
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: spacing.md,
   },
-  mapRoad1: {
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    height: 24,
-    backgroundColor: colors.surface,
-  },
-  mapRoad2: {
-    position: 'absolute',
-    left: 140,
-    top: 0,
-    bottom: 0,
-    width: 24,
-    backgroundColor: colors.surface,
-  },
-  mapPinContainer: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapBadge: {
-    position: 'absolute',
-    bottom: spacing.sm,
-    left: spacing.sm,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-  },
-  mapBadgeText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontSize: 11,
+  mapImage: {
+    width: '100%',
+    height: '100%',
   },
   selectedLocationRow: {
     flexDirection: 'row',
