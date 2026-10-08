@@ -97,8 +97,10 @@ export function stripIconGlyphs(text: string): string {
   if (typeof text !== 'string') {
     return '';
   }
-  const leadingGlyphs = /^(?:[\p{Extended_Pictographic}\u2190-\u21FF\u2794-\u27BF\uFE0E\uFE0F\u200D\s]+)/u;
-  const trailingGlyphs = /(?:[\p{Extended_Pictographic}\u2190-\u21FF\u2794-\u27BF\uFE0E\uFE0F\u200D\s]+)$/u;
+  const leadingGlyphs =
+    /^(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{FE0E}\u{FE0F}\u{200D}\u{20E3}\s]+)/u;
+  const trailingGlyphs =
+    /(?:[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B00}-\u{2BFF}\u{2190}-\u{21FF}\u{FE0E}\u{FE0F}\u{200D}\u{20E3}\s]+)$/u;
   return text.replace(leadingGlyphs, '').replace(trailingGlyphs, '').trim();
 }
 
