@@ -80,6 +80,8 @@ export type TournamentsStackParamList = {
  */
 export type ProfileStackParamList = {
   ProfileHome: undefined;
+  EditProfile: undefined;
+  Settings: undefined;
   NotificationPreferences: undefined;
   AccountDeletionBlocked: {
     groups?: OwnedGroupInfo[];

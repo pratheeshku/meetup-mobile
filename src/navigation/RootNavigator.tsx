@@ -117,6 +117,8 @@ import TournamentTeamsScreen from '../screens/TournamentTeamsScreen';
 import GamesScreen from '../screens/GamesScreen';
 import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
 import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
 import EditGroupScreen from '../screens/EditGroupScreen';
@@ -268,7 +270,21 @@ function ProfileStack(): React.JSX.Element {
   const t = useT();
   return (
     <ProfileStackNav.Navigator screenOptions={stackScreenOptions}>
-      <ProfileStackNav.Screen name="ProfileHome" component={ProfileScreen} options={{ title: t('mob.nav.title_profile') }} />
+      <ProfileStackNav.Screen
+        name="ProfileHome"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <ProfileStackNav.Screen
+        name="EditProfile"
+        component={EditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <ProfileStackNav.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ headerShown: false }}
+      />
       <ProfileStackNav.Screen
         name="NotificationPreferences"
         component={NotificationPreferencesScreen}
@@ -327,7 +343,11 @@ function AppStack(): React.JSX.Element {
         component={TournamentsStack}
         options={{ headerShown: false }}
       />
-      <AppTabsNav.Screen name="Profile" component={ProfileStack} options={{ headerShown: false }} />
+      <AppTabsNav.Screen
+        name="Profile"
+        component={ProfileStack}
+        options={{ headerShown: false, tabBarStyle: { display: 'none' } }}
+      />
     </AppTabsNav.Navigator>
   );
 }

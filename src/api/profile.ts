@@ -46,6 +46,7 @@ interface PrivateUserProfileApiItem {
   email: string;
   is_admin: boolean;
   mobile_number?: string | null;
+  cover_url?: string | null;
 }
 
 function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: SkillLevel[]): UserProfile {
@@ -66,6 +67,7 @@ function mapPrivateUserProfile(raw: PrivateUserProfileApiItem, skillLevels: Skil
     role: undefined,
     skill_levels: skillLevels,
     mobile_number: raw.mobile_number ?? null,
+    cover_url: raw.cover_url ?? null,
   };
 }
 
@@ -242,3 +244,64 @@ export async function confirmDeletion(code: string, options?: RequestOptions): P
     { correlationId: options?.correlationId },
   );
 }
+
+/**
+ * `POST /users/me/cover` — multipart file upload (Phase 2 revamp, 3:1 aspect ratio).
+ * Returns `{ cover_url: string }`.
+ */
+export async function uploadCover(
+  fileUri: string,
+  fileName: string,
+  fileType: string,
+  options?: RequestOptions,
+): Promise<{ cover_url: string }> {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: fileUri,
+    name: fileName,
+    type: fileType,
+  } as unknown as Blob);
+
+  const { data } = await apiClient.post<{ cover_url: string }>('/users/me/cover', formData, {
+    correlationId: options?.correlationId,
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return data;
+}
+
+/**
+ * `DELETE /users/me/cover` — remove custom cover image, reverting to default banner.
+ */
+export async function deleteCover(options?: RequestOptions): Promise<void> {
+  await apiClient.delete('/users/me/cover', {
+    correlationId: options?.correlationId,
+  });
+}
+
+export interface RecentGameItem {
+  id: string;
+  title: string;
+  sport: string;
+  starts_at: string;
+  venue_name: string;
+}
+
+export interface ProfileSummary {
+  games_played: number;
+  games_hosted: number;
+  groups_count: number;
+  recent_games: RecentGameItem[];
+}
+
+/**
+ * `GET /users/me/profile-summary` — summary metrics and recent games for profile home.
+ */
+export async function getProfileSummary(options?: RequestOptions): Promise<ProfileSummary> {
+  const { data } = await apiClient.get<ProfileSummary>('/users/me/profile-summary', {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+

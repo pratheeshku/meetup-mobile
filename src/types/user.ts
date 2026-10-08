@@ -95,6 +95,11 @@ export interface UserProfile {
    * pass it through navigation params or analytics.
    */
   mobile_number?: string | null;
+  /**
+   * User profile cover photo URL (DES-MEETUP-FEEDBACK-001 / Phase 2 profile revamp).
+   * Null when the user has not uploaded a custom cover.
+   */
+  cover_url?: string | null;
 }
 
 /**
