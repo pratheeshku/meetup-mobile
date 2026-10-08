@@ -13,8 +13,10 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Button from './Button';
+import { LinkIcon } from './icons/SharedIcons';
 import { colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import { useT } from '../labels/LabelsContext';
+import { stripIconGlyphs } from '../utils/labels';
 
 export interface ShareActionSheetProps {
   visible: boolean;
@@ -60,11 +62,11 @@ export default function ShareActionSheet({
             onPress={onShareWhatsApp}
             style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
           >
-            <Text style={styles.emoji} accessibilityElementsHidden importantForAccessibility="no">
+            <Text style={styles.emoji} accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true}>
               💬
             </Text>
             <View style={styles.textContainer}>
-              <Text style={styles.rowLabel}>{t('mob.share_sheet.whatsapp')}</Text>
+              <Text style={styles.rowLabel}>{stripIconGlyphs(t('mob.share_sheet.whatsapp'))}</Text>
               <Text style={styles.rowSubLabel}>{t('mob.share_sheet.whatsapp_hint')}</Text>
             </View>
           </Pressable>
@@ -75,11 +77,11 @@ export default function ShareActionSheet({
             onPress={onShareGeneric}
             style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
           >
-            <Text style={styles.emoji} accessibilityElementsHidden importantForAccessibility="no">
+            <Text style={styles.emoji} accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true}>
               📤
             </Text>
             <View style={styles.textContainer}>
-              <Text style={styles.rowLabel}>{t('mob.share_sheet.other_apps')}</Text>
+              <Text style={styles.rowLabel}>{stripIconGlyphs(t('mob.share_sheet.other_apps'))}</Text>
               <Text style={styles.rowSubLabel}>{t('mob.share_sheet.other_apps_hint')}</Text>
             </View>
           </Pressable>
@@ -90,11 +92,16 @@ export default function ShareActionSheet({
             onPress={onCopyLink}
             style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
           >
-            <Text style={styles.emoji} accessibilityElementsHidden importantForAccessibility="no">
-              🔗
-            </Text>
+            <View
+              style={styles.iconWrap}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              aria-hidden={true}
+            >
+              <LinkIcon size={24} />
+            </View>
             <View style={styles.textContainer}>
-              <Text style={styles.rowLabel}>{t('mob.share_sheet.copy_link')}</Text>
+              <Text style={styles.rowLabel}>{stripIconGlyphs(t('mob.share_sheet.copy_link'))}</Text>
               <Text style={styles.rowSubLabel}>{t('mob.share_sheet.copy_link_hint')}</Text>
             </View>
           </Pressable>
@@ -141,6 +148,13 @@ const styles = StyleSheet.create({
   },
   emoji: {
     fontSize: 24,
+    marginRight: spacing.md,
+  },
+  iconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: spacing.md,
   },
   textContainer: {

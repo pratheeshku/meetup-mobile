@@ -19,10 +19,13 @@
  * and `src/api/labels.ts`. `sport`'s own display field (`display_name`,
  * above) is unaffected — a separate mechanism, out of scope for that fix.
  */
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import type { StyleProp, TextStyle } from 'react-native';
 
 import { getSports } from '../api/sports';
 import type { LabelMap } from '../api/labels';
+import { GlobeIcon, GroupsIcon, LockIcon } from '../components/icons/SharedIcons';
 import { getLabel } from '../labels/LabelsContext';
 import type { EventVisibility } from '../types/event';
 
@@ -85,10 +88,25 @@ export function __resetSportDisplayNamesCacheForTests(): void {
 }
 
 /**
- * Returns formatted event visibility with emoji and localized label:
- *   🌍 {getLabel(labels, 'event_visibility.public')}
- *   🔒 {getLabel(labels, 'event_visibility.invite_only')}
- *   👥 {getLabel(labels, 'event_visibility.group')}
+ * Removes leading or trailing emoji/pictographs, arrows (← → ↗),
+ * variation selectors, and surrounding whitespace from a label
+ * before it is rendered next to an icon. Never touches letters,
+ * digits, or placeholders like {email}.
+ */
+export function stripIconGlyphs(text: string): string {
+  if (typeof text !== 'string') {
+    return '';
+  }
+  const leadingGlyphs = /^(?:[\p{Extended_Pictographic}\u2190-\u21FF\u2794-\u27BF\uFE0E\uFE0F\u200D\s]+)/u;
+  const trailingGlyphs = /(?:[\p{Extended_Pictographic}\u2190-\u21FF\u2794-\u27BF\uFE0E\uFE0F\u200D\s]+)$/u;
+  return text.replace(leadingGlyphs, '').replace(trailingGlyphs, '').trim();
+}
+
+/**
+ * Returns formatted event visibility label (without emojis):
+ *   {getLabel(labels, 'event_visibility.public')}
+ *   {getLabel(labels, 'event_visibility.invite_only')}
+ *   {getLabel(labels, 'event_visibility.group')}
  */
 export function getEventVisibilityLabel(
   visibility: EventVisibility | string | undefined,
@@ -96,12 +114,75 @@ export function getEventVisibilityLabel(
 ): string {
   switch (visibility) {
     case 'invite_only':
-      return `🔒 ${getLabel(labels, 'event_visibility.invite_only')}`;
+      return stripIconGlyphs(getLabel(labels, 'event_visibility.invite_only'));
     case 'group':
-      return `👥 ${getLabel(labels, 'event_visibility.group')}`;
+      return stripIconGlyphs(getLabel(labels, 'event_visibility.group'));
     case 'public':
     default:
-      return `🌍 ${getLabel(labels, 'event_visibility.public')}`;
+      return stripIconGlyphs(getLabel(labels, 'event_visibility.public'));
   }
 }
+
+/**
+ * Returns the matching shared icon for an event visibility setting.
+ */
+export function getEventVisibilityIcon(
+  visibility: EventVisibility | string | undefined,
+  size = 18,
+): React.ReactElement {
+  switch (visibility) {
+    case 'invite_only':
+      return React.createElement(LockIcon, { size });
+    case 'group':
+      return React.createElement(GroupsIcon, { size });
+    case 'public':
+    default:
+      return React.createElement(GlobeIcon, { size });
+  }
+}
+
+/**
+ * Renders the visibility badge with a SharedIcon and localized label.
+ */
+export function EventVisibilityBadge({
+  visibility,
+  labels,
+  size = 18,
+  textStyle,
+}: {
+  visibility: EventVisibility | string | undefined;
+  labels: LabelMap;
+  size?: number;
+  textStyle?: StyleProp<TextStyle>;
+}): React.ReactElement {
+  return React.createElement(
+    View,
+    { style: visibilityBadgeStyles.row },
+    React.createElement(
+      View,
+      {
+        accessibilityElementsHidden: true,
+        importantForAccessibility: 'no',
+        'aria-hidden': true,
+        style: visibilityBadgeStyles.icon,
+      },
+      getEventVisibilityIcon(visibility, size),
+    ),
+    React.createElement(
+      Text,
+      { style: textStyle },
+      getEventVisibilityLabel(visibility, labels),
+    ),
+  );
+}
+
+const visibilityBadgeStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  icon: {
+    marginRight: 6,
+  },
+});
 

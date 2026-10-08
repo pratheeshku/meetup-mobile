@@ -36,6 +36,13 @@ import { getMyGroups } from '../api/groups';
 import { getSports } from '../api/sports';
 import { createTournament } from '../api/tournaments';
 import Button from '../components/Button';
+import {
+  GameIcon,
+  GlobeIcon,
+  GroupsIcon,
+  LockIcon,
+  TrophyIcon,
+} from '../components/icons/SharedIcons';
 import DateTimePickerField from '../components/DateTimePickerField';
 import DropdownField from '../components/DropdownField';
 import ErrorView from '../components/ErrorView';
@@ -87,8 +94,8 @@ export default function CreateGameScreen(_props: Props): React.JSX.Element {
   tRef.current = t;
 
   const MODE_OPTIONS: ChipOption<GameKind>[] = [
-    { value: 'game', label: t('mob.create_game.mode_game') },
-    { value: 'tournament', label: t('mob.create_game.mode_tournament') },
+    { value: 'game', label: t('mob.create_game.mode_game'), icon: <GameIcon size={18} /> },
+    { value: 'tournament', label: t('mob.create_game.mode_tournament'), icon: <TrophyIcon size={18} /> },
   ];
 
   const PARTICIPATION_OPTIONS: ChipOption<TournamentParticipationMode>[] = [
@@ -355,9 +362,9 @@ export default function CreateGameScreen(_props: Props): React.JSX.Element {
    * (e.g. `EventCard`) stay in sync with the backend's own source of truth.
    */
   const CASUAL_VISIBILITY_OPTIONS: ChipOption<EventVisibility>[] = [
-    { value: 'public', label: getEventVisibilityLabel('public', labels) },
-    { value: 'invite_only', label: getEventVisibilityLabel('invite_only', labels) },
-    { value: 'group', label: getEventVisibilityLabel('group', labels) },
+    { value: 'public', label: getEventVisibilityLabel('public', labels), icon: <GlobeIcon size={16} /> },
+    { value: 'invite_only', label: getEventVisibilityLabel('invite_only', labels), icon: <LockIcon size={16} /> },
+    { value: 'group', label: getEventVisibilityLabel('group', labels), icon: <GroupsIcon size={16} /> },
   ];
 
   /** `EventCreate.skill_level_requirement` (`validate_skill`): enforced enum. */
@@ -377,9 +384,9 @@ export default function CreateGameScreen(_props: Props): React.JSX.Element {
    * differ — never cross-wired.
    */
   const TOURNAMENT_VISIBILITY_OPTIONS: ChipOption<TournamentVisibility>[] = [
-    { value: 'public', label: getLabel(labels, 'tournament_visibility.public') },
-    { value: 'invite', label: getLabel(labels, 'tournament_visibility.invite') },
-    { value: 'group', label: getLabel(labels, 'tournament_visibility.group') },
+    { value: 'public', label: getLabel(labels, 'tournament_visibility.public'), icon: <GlobeIcon size={16} /> },
+    { value: 'invite', label: getLabel(labels, 'tournament_visibility.invite'), icon: <LockIcon size={16} /> },
+    { value: 'group', label: getLabel(labels, 'tournament_visibility.group'), icon: <GroupsIcon size={16} /> },
   ];
 
   const renderGroupPicker = (

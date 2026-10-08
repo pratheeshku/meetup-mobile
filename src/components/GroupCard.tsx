@@ -13,8 +13,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import { borderWidth, colors, radius, shadows, spacing, typography } from '../theme/tokens';
 import type { Group, GroupRole } from '../types/group';
 import Card from './Card';
+import { ArrowRightIcon } from './icons/SharedIcons';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
+import { stripIconGlyphs } from '../utils/labels';
 
 export interface GroupCardProps {
   group: Group;
@@ -98,7 +100,17 @@ export default function GroupCard({ group, onPress, currentUserId }: GroupCardPr
           {memberText ? <Text style={styles.metaDot}> · </Text> : null}
           <Text style={styles.ownerText}>{ownerDisplay}</Text>
         </View>
-        <Text style={styles.actionLink}>{t('mob.common.view_arrow')}</Text>
+        <View style={styles.actionLinkWrap}>
+          <Text style={styles.actionLink}>{stripIconGlyphs(t('mob.common.view_arrow'))}</Text>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            aria-hidden={true}
+            style={styles.actionArrow}
+          >
+            <ArrowRightIcon size={14} />
+          </View>
+        </View>
       </View>
     </Card>
   );
@@ -168,6 +180,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     color: colors.textSecondary,
+  },
+  actionLinkWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionArrow: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   actionLink: {
     fontSize: 13,

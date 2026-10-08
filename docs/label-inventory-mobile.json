@@ -290,7 +290,7 @@
     },
     {
       "key": "mob.common.view_arrow",
-      "defaultText": "View →",
+      "defaultText": "View",
       "screen": "Shared",
       "placeholders": [],
       "status": "new-label (was hardcoded)"
@@ -1289,14 +1289,14 @@
     },
     {
       "key": "mob.game_card.action_manage",
-      "defaultText": "Manage →",
+      "defaultText": "Manage",
       "screen": "Game card",
       "placeholders": [],
       "status": "new-label (was hardcoded)"
     },
     {
       "key": "mob.game_card.action_join",
-      "defaultText": "Join →",
+      "defaultText": "Join",
       "screen": "Game card",
       "placeholders": [],
       "status": "new-label (was hardcoded)"
@@ -1519,14 +1519,14 @@
     },
     {
       "key": "mob.create_group.mode_group",
-      "defaultText": "👥 Group",
+      "defaultText": "Group",
       "screen": "Create Group",
       "placeholders": [],
       "status": "new-label (was hardcoded)"
     },
     {
       "key": "mob.create_group.mode_team",
-      "defaultText": "🛡️ Tournament team",
+      "defaultText": "Tournament team",
       "screen": "Create Group",
       "placeholders": [],
       "status": "new-label (was hardcoded)"
@@ -1942,7 +1942,7 @@
     },
     {
       "key": "mob.user_search.invite_email_title",
-      "defaultText": "✉️ Invite {email} as new {entity}",
+      "defaultText": "Invite {email} as new {entity}",
       "screen": "User search (Group detail / Game detail)",
       "placeholders": [
         "email",
@@ -2068,14 +2068,14 @@
     },
     {
       "key": "mob.create_game.mode_game",
-      "defaultText": "🎮 Game",
+      "defaultText": "Game",
       "screen": "Create Game / Tournament",
       "placeholders": [],
       "status": "new-label (was hardcoded)"
     },
     {
       "key": "mob.create_game.mode_tournament",
-      "defaultText": "🏆 Tournament",
+      "defaultText": "Tournament",
       "screen": "Create Game / Tournament",
       "placeholders": [],
       "status": "new-label (was hardcoded)"

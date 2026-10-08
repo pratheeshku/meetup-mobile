@@ -95,7 +95,7 @@ function CreateFab({
         onPress={() => setMenuOpen(true)}
         style={({ pressed }) => [styles.fab, pressed ? styles.pressed : null]}
       >
-        <Text style={styles.plus} accessibilityElementsHidden importantForAccessibility="no">
+        <Text style={styles.plus} accessibilityElementsHidden importantForAccessibility="no" aria-hidden={true}>
           +
         </Text>
       </Pressable>

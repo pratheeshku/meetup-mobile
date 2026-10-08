@@ -19,9 +19,11 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Button from '../components/Button';
+import { GameIcon, GroupsIcon } from '../components/icons/SharedIcons';
 import { colors, opacity, radius, shadows, sizes, spacing, typography } from '../theme/tokens';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
+import { stripIconGlyphs } from '../utils/labels';
 
 export type CreateTarget = 'game' | 'group';
 
@@ -65,10 +67,15 @@ export default function CreateMenu({ visible, onSelect, onClose }: CreateMenuPro
               onPress={() => onSelect(item.target)}
               style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
             >
-              <Text style={styles.emoji} accessibilityElementsHidden importantForAccessibility="no">
-                {item.emoji}
-              </Text>
-              <Text style={styles.rowLabel}>{t(item.labelKey)}</Text>
+              <View
+                style={styles.iconWrap}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+                aria-hidden={true}
+              >
+                {item.target === 'game' ? <GameIcon size={24} /> : <GroupsIcon size={24} />}
+              </View>
+              <Text style={styles.rowLabel}>{stripIconGlyphs(t(item.labelKey))}</Text>
             </Pressable>
           ))}
           <Button label={t('mob.common.close')} variant="secondary" onPress={onClose} style={styles.close} />
@@ -97,7 +104,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   pressed: { opacity: opacity.pressed },
-  emoji: { ...typography.h2, width: spacing.xl, textAlign: 'center', marginRight: spacing.md },
+  iconWrap: {
+    width: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
   rowLabel: { ...typography.bodyBold, color: colors.textPrimary },
   close: { marginTop: spacing.sm },
 });

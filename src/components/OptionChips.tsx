@@ -8,17 +8,13 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { borderWidth, colors, opacity, radius, sizes, spacing, typography } from '../theme/tokens';
+import { stripIconGlyphs } from '../utils/labels';
 
 export interface ChipOption<T extends string> {
   value: T;
   label: string;
-  /**
-   * Optional per-option selected background/border colour (e.g. each
-   * sport's own colour on a Sport chip group). Takes precedence over
-   * `selectedColor`; both fall back to `colors.primary` when omitted, so
-   * every existing call site is unaffected.
-   */
   color?: string;
+  icon?: React.ReactNode;
 }
 
 interface OptionChipsProps<T extends string> {
@@ -65,9 +61,21 @@ export default function OptionChips<T extends string>({
               disabled ? styles.disabled : pressed ? styles.pressed : null,
             ]}
           >
-            <Text style={[typography.bodyBold, selected ? styles.textSelected : styles.textIdle]}>
-              {option.label}
-            </Text>
+            <View style={styles.chipContent}>
+              {option.icon ? (
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                  aria-hidden={true}
+                  style={styles.chipIcon}
+                >
+                  {option.icon}
+                </View>
+              ) : null}
+              <Text style={[typography.bodyBold, selected ? styles.textSelected : styles.textIdle]}>
+                {stripIconGlyphs(option.label)}
+              </Text>
+            </View>
           </Pressable>
         );
       })}
@@ -86,6 +94,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipIdle: { backgroundColor: colors.surface, borderColor: colors.border },
+  chipContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  chipIcon: { marginRight: spacing.xs },
   pressed: { opacity: opacity.pressed },
   disabled: { opacity: opacity.disabled },
   textIdle: { color: colors.textPrimary },
