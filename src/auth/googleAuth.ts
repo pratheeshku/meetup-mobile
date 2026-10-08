@@ -39,7 +39,7 @@ import {
 
 import { Platform } from 'react-native';
 
-import appConfig from '../../config/appConfig.json';
+import { getTermsVersion } from './terms';
 import { ENV } from '../../config/env';
 import { apiClient } from '../api/client';
 import { clearCookieJar } from '../api/cookies';
@@ -121,8 +121,7 @@ export async function signIn(): Promise<UserProfile> {
     throw new Error('Google sign-in did not return a usable credential');
   }
 
-  const termsVersion =
-    (appConfig as { terms_version?: string }).terms_version ?? '2026-10-02';
+  const termsVersion = await getTermsVersion();
 
   const { data } = await apiClient.post<AuthResponse>('/auth/oauth/google/callback', {
     id_token: response.data.idToken,

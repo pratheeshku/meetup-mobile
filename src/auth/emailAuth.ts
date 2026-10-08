@@ -7,6 +7,7 @@
  */
 import { apiClient } from '../api/client';
 import { saveTokens } from '../storage/tokens';
+import { getTermsVersion } from './terms';
 import type { AuthResponse } from './types';
 import type { UserProfile } from '../types/user';
 
@@ -15,6 +16,7 @@ export interface SignupParams {
   password: string;
   display_name: string;
   nickname: string;
+  terms_version?: string;
 }
 
 /** Signs in with email/password (R-012) and stores the returned tokens. */
@@ -26,14 +28,16 @@ export async function login(email: string, password: string): Promise<UserProfil
 
 /**
  * Signs up a new account (DES-MEETUP-ADDENDUM-email-auth AD-5, D1).
- * Exactly four fields sent. Returns no tokens; user must verify email.
+ * Returns no tokens; user must verify email.
  */
 export async function signup(params: SignupParams): Promise<void> {
+  const termsVersion = params.terms_version ?? (await getTermsVersion());
   await apiClient.post('/auth/signup', {
     email: params.email,
     password: params.password,
     display_name: params.display_name,
     nickname: params.nickname,
+    terms_version: termsVersion,
   });
 }
 

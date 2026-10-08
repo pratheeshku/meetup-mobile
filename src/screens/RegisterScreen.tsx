@@ -22,6 +22,7 @@ import appConfig from '../../config/appConfig.json';
 import { AuthContext } from '../auth/AuthContext';
 import { AppleSignInCancelledError } from '../auth/appleAuth';
 import { signup } from '../auth/emailAuth';
+import { getTermsVersion } from '../auth/terms';
 import SocialTermsNotice from '../components/auth/SocialTermsNotice';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
@@ -121,11 +122,13 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
 
     setIsSubmitting(true);
     try {
+      const termsVersion = await getTermsVersion();
       await signup({
         email: trimmedEmail,
         password,
         display_name: trimmedDisplayName,
         nickname: trimmedNickname,
+        terms_version: termsVersion,
       });
       navigation.navigate('Verify', { email: trimmedEmail });
     } catch (err) {

@@ -10,7 +10,7 @@
 import { Platform } from 'react-native';
 import { appleAuth } from '@invertase/react-native-apple-authentication';
 
-import appConfig from '../../config/appConfig.json';
+import { getTermsVersion } from './terms';
 import { apiClient } from '../api/client';
 import { saveTokens } from '../storage/tokens';
 import type { AuthResponse } from './types';
@@ -68,8 +68,7 @@ export async function signIn(): Promise<UserProfile> {
     }
   }
 
-  const termsVersion =
-    (appConfig as { terms_version?: string }).terms_version ?? '2026-10-02';
+  const termsVersion = await getTermsVersion();
 
   const payload: {
     code: string;
