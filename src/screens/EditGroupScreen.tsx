@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accentPurple,
     borderWidth: 2,
     borderColor: colors.white,
     alignItems: 'center',

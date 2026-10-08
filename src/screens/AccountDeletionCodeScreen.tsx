@@ -24,9 +24,9 @@ import { getApiErrorMessage } from '../utils/apiError';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'AccountDeletionCode'>;
 
-function maskEmail(email?: string): string {
+function maskEmail(email?: string, fallback = 'your email'): string {
   if (!email || !email.includes('@')) {
-    return 'your email';
+    return fallback;
   }
   const [local, domain] = email.split('@');
   if (local.length <= 1) {
@@ -110,7 +110,7 @@ export default function AccountDeletionCodeScreen({ navigation }: Props): React.
   };
 
   const digits = code.split('');
-  const maskedUserEmail = maskEmail(user?.email);
+  const maskedUserEmail = maskEmail(user?.email, t('mob.account_delete.email_fallback'));
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>

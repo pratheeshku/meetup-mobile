@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: colors.overlayWhite25,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -740,7 +740,7 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   ownerChip: {
-    backgroundColor: colors.warning,
+    backgroundColor: colors.ownerChipBg,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.full,
@@ -748,7 +748,7 @@ const styles = StyleSheet.create({
   },
   ownerChipText: {
     ...typography.label,
-    color: '#78350F',
+    color: colors.ownerChipText,
     fontWeight: '700',
   },
   memberChip: {

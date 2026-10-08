@@ -34,19 +34,19 @@ function getInitials(name: string): string {
 }
 
 const AVATAR_COLORS = [
-  '#DBEAFE', // Light blue
-  '#FEF3C7', // Light yellow / peach
-  '#D1FAE5', // Light green / mint
-  '#FCE7F3', // Light pink
-  '#EDE9FE', // Light purple
+  colors.avatarTint1,
+  colors.avatarTint2,
+  colors.avatarTint3,
+  colors.avatarTint4,
+  colors.avatarTint5,
 ];
 
 const AVATAR_TEXT_COLORS = [
-  '#1E40AF',
-  '#92400E',
-  '#065F46',
-  '#9D174D',
-  '#5B21B6',
+  colors.avatarTintText1,
+  colors.avatarTintText2,
+  colors.avatarTintText3,
+  colors.avatarTintText4,
+  colors.avatarTintText5,
 ];
 
 export default function TransferGroupOwnershipScreen({ navigation, route }: Props): React.JSX.Element {

@@ -588,6 +588,7 @@ export const DEFAULT_LABELS = {
   'mob.account_delete.otp_banner_p3': 'You will be signed out on all devices.',
   'mob.account_delete.otp_title': 'Enter the code we emailed you',
   'mob.account_delete.otp_subtitle': 'We sent a 6-digit code to {email}. It expires in 10 minutes.',
+  'mob.account_delete.email_fallback': 'your email',
   'mob.account_delete.resend_prompt': 'Didn\'t get it? Resend in {time}',
   'mob.account_delete.resend_prompt_ready': 'Didn\'t get it?',
   'mob.account_delete.delete_my_account': 'Delete my account',

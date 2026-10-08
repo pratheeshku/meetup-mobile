@@ -62,6 +62,20 @@ export const colors = {
   track: '#EFECE6',
   /** Additive: modal backdrop — `textPrimary` at 50% opacity. */
   scrim: 'rgba(27, 25, 24, 0.5)',
+  accentPurple: '#8B5CF6',
+  ownerChipBg: '#FEF3C7',
+  ownerChipText: '#78350F',
+  overlayWhite25: 'rgba(255, 255, 255, 0.25)',
+  avatarTint1: '#DBEAFE',
+  avatarTint2: '#FEF3C7',
+  avatarTint3: '#D1FAE5',
+  avatarTint4: '#FCE7F3',
+  avatarTint5: '#EDE9FE',
+  avatarTintText1: '#1E40AF',
+  avatarTintText2: '#92400E',
+  avatarTintText3: '#065F46',
+  avatarTintText4: '#9D174D',
+  avatarTintText5: '#5B21B6',
 };
 
 export const sportColors: Record<string, string> = {
