@@ -346,7 +346,7 @@ function AppStack(): React.JSX.Element {
       <AppTabsNav.Screen
         name="Profile"
         component={ProfileStack}
-        options={{ headerShown: false, tabBarStyle: { display: 'none' } }}
+        options={{ headerShown: false }}
       />
     </AppTabsNav.Navigator>
   );
