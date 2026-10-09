@@ -22,6 +22,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   ActivityIndicator,
   Linking,
   Pressable,
@@ -43,7 +44,7 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { RegistryIcon } from '../components/icons/RegistryIcons';
 import { BackArrowIcon, CheckIcon } from '../components/icons/ActionIcons';
-import { useT } from '../labels/LabelsContext';
+import { useT, currentT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/LabelsContext';
 import {
   navigateToNotificationTarget,
@@ -77,9 +78,24 @@ function isKnownType(value: string): value is NotificationType {
 function openNotification(item: NotificationHistoryItem): void {
   const url = item.payload?.display?.url;
   if (url) {
-    Linking.openURL(url).catch(() => {});
+    try {
+      const parsedUrl = new URL(url);
+      const isApiOrWebHost = parsedUrl.protocol === 'https:' && parsedUrl.hostname === 'meetups.duckdns.org';
+      const isAppScheme = parsedUrl.protocol === 'shuttlr:' || parsedUrl.protocol === 'meetup:';
+      
+      if (isApiOrWebHost || isAppScheme) {
+        Linking.openURL(url).catch(() => {
+          Alert.alert(currentT('mob.errors.open_link_failed'), currentT('mob.errors.try_later'));
+        });
+      } else {
+        Alert.alert(currentT('mob.errors.open_link_failed'), currentT('mob.errors.try_later'));
+      }
+    } catch {
+      Alert.alert(currentT('mob.errors.open_link_failed'), currentT('mob.errors.try_later'));
+    }
     return;
   }
+
 
   if (!isKnownType(item.notification_type)) {
     return;
