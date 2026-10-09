@@ -9,7 +9,9 @@ import {
   getNotificationHistory,
   getPreferences,
   getUnreadCount,
+  markAllNotificationsRead,
   markNotificationRead,
+  markNotificationUnread,
 } from '../notifications';
 
 jest.mock('../client', () => ({
@@ -89,6 +91,26 @@ describe('markNotificationRead', () => {
     await expect(markNotificationRead('abc-123')).resolves.toBeUndefined();
 
     expect(mockedPost).toHaveBeenCalledWith('/notifications/abc-123/read');
+  });
+});
+
+describe('markNotificationUnread', () => {
+  it('POSTs /notifications/{id}/unread', async () => {
+    mockedPost.mockResolvedValueOnce({ status: 204 });
+
+    await expect(markNotificationUnread('abc-123')).resolves.toBeUndefined();
+
+    expect(mockedPost).toHaveBeenCalledWith('/notifications/abc-123/unread');
+  });
+});
+
+describe('markAllNotificationsRead', () => {
+  it('POSTs /notifications/read-all', async () => {
+    mockedPost.mockResolvedValueOnce({ status: 204 });
+
+    await expect(markAllNotificationsRead()).resolves.toBeUndefined();
+
+    expect(mockedPost).toHaveBeenCalledWith('/notifications/read-all');
   });
 });
 

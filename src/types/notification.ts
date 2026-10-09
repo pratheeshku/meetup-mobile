@@ -113,6 +113,16 @@ export interface NotificationHistoryItem {
   created_at: string;
   /** ISO 8601 date-time; `null` while unread. */
   read_at: string | null;
+  /** Optional metadata from API, including display.title and display.body. */
+  data?: Record<string, any> | null;
+  payload?: {
+    display?: {
+      title?: string | null;
+      body?: string | null;
+      url?: string | null;
+    } | null;
+    [key: string]: any;
+  } | null;
 }
 
 /**
@@ -123,4 +133,6 @@ export interface NotificationHistoryItem {
 export interface NotificationHistoryPage {
   items: NotificationHistoryItem[];
   next_cursor?: string | null;
+  retention_days?: number;
+  days?: number;
 }

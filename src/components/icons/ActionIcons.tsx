@@ -166,3 +166,63 @@ export function BackArrowIcon({ size = 20, color = colors.white }: ActionIconPro
     </Svg>
   );
 }
+
+export function CancelledIcon({ size = 20, color = colors.white }: ActionIconProps): React.JSX.Element {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="4" width="18" height="17" rx="3" stroke={color} strokeWidth={2} />
+      <Path d="M3 9h18" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M8 2v3M16 2v3" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Path
+        d="m10 13 4 4m0-4-4 4"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function PlayerRemovedIcon({ size = 20, color = colors.white }: ActionIconProps): React.JSX.Element {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="9" cy="8" r="4" stroke={color} strokeWidth={2} />
+      <Path
+        d="M2 19c0-3.3 3.1-6 7-6s7 2.7 7 6"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      <Path d="M17 11h5" stroke={color} strokeWidth={2.5} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function OwnerIcon({ size = 20, color = colors.white }: ActionIconProps): React.JSX.Element {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M4 17h16l1.2-8.5a.6.6 0 0 0-.9-.6L15.5 11l-3-6a.6.6 0 0 0-1 0l-3 6-4.8-3.1a.6.6 0 0 0-.9.6L4 17z"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <Circle cx="4.5" cy="8" r="1.2" fill={color} />
+      <Circle cx="12" cy="4.5" r="1.2" fill={color} />
+      <Circle cx="19.5" cy="8" r="1.2" fill={color} />
+      <Path d="M6 14.5h12" stroke={color} strokeWidth={1.4} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function MarkUnreadIcon({ size = 20, color = colors.white }: ActionIconProps): React.JSX.Element {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="8" stroke={color} strokeWidth={2.5} />
+      <Circle cx="12" cy="12" r="3.5" fill={color} />
+    </Svg>
+  );
+}
+
