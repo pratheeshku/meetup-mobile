@@ -1,19 +1,18 @@
-## Status — 2026-10-09T19:38:00+08:00
+## Status — 2026-10-09T20:17:00+08:00
 
 ### Completed
 - Verified git identity (Pratheesh, pratheeshknow@gmail.com)
-- Copied and analyzed reference design images 01-13 in docs/design/notifications/
-- Added all revamp label keys and template strings to src/labels/defaultLabels.ts and verified with `node scripts/check-labels.js`
-- Extended API endpoints in src/api/notifications.ts (`markNotificationUnread`, `markAllNotificationsRead`)
-- Implemented Icon Registry and 4 new glyphs (`cancelled`, `player-removed`, `owner`, `mark-unread`) in src/components/icons/RegistryIcons.tsx
-- Implemented NotificationIcon component with read/unread opacity and shadow handling
-- Implemented date grouping and relative formatting in src/utils/notificationDateUtils.ts
-- Implemented template rendering with placeholder substitution in src/utils/notificationTemplateUtils.ts
-- Implemented swipeable NotificationCard with 96px action button, full unread/read visual styling, and accessible triggers
-- Revamped NotificationHistoryScreen with header, pill tabs, unread count chip, SectionList date grouping, empty states, retention footer, and undo toast
-- Unit tests written and passing for all notification components, API, utilities, and screen (63/63 passing)
-- Produced agent enhancement document docs/reports/agent-enhancement-2026-10-09.md
-- Produced Implementation Report docs/reports/IMPL-DES-MEETUP-MOBILE-notifications-revamp.md
+- Implemented in-app notification revamp (sections, tabs, card styling, swipe actions, undo toasts, icon registry)
+- Applied Addendum:
+  - Removed per-type title/body label keys (`notif.*`) from defaultLabels.ts
+  - Removed template rendering utility and tests
+  - Displayed notification title and body directly as returned by API (`payload.display.title`/`payload.display.body` or `item.title`/`item.body`)
+  - Ensured icon selection is strictly by `notification_type`, never parsing text
+  - Preserved admin-managed `ui_labels` for all screen controls, tabs, empty states, toasts, and footer
+  - Updated all test suites and verified 62/62 tests passing
+  - Verified label check passes cleanly (183 files scanned, 810 labels checked)
+  - Updated agent enhancement report docs/reports/agent-enhancement-2026-10-09.md
+  - Updated Implementation Report docs/reports/IMPL-DES-MEETUP-MOBILE-notifications-revamp.md
 
 ### In Progress
 - Final handoff

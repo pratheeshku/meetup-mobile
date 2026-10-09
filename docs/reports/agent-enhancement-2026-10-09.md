@@ -39,3 +39,17 @@ Calendar day boundaries are intrinsically timezone-dependent. Tests asserting lo
 ### Suggested Addition
 In the Developer Agent Shared Instructions under **Testing discipline**:
 > When writing tests for local calendar day grouping ("Today", "Yesterday"), avoid hardcoded UTC timestamps that can straddle local midnight under non-UTC test runners. Always generate test dates relative to the fixture's base `now` Date using millisecond offsets or local calendar getters.
+
+---
+
+## 4. Stored Backend Display Content vs Static UI Label System
+
+### What Happened
+When notification events arrive with backend-computed text in payload envelopes (`payload.display.title` / `payload.display.body`), attempting to reconstruct notification content on the client via per-type string interpolation templates creates redundant client-side mapping that can drift from backend formatting. Applying an explicit architectural boundary — client UI chrome (buttons, tabs, toasts, empty states) consumes admin `ui_labels`, while message contents display as stored — avoids unnecessary client template bloat.
+
+### Why It Matters Generally
+Differentiating between application chrome labels and server-persisted user message text prevents overcomplicating client-side localization systems with domain message templates that already have an authoritative rendering upstream.
+
+### Suggested Addition
+In the Developer Agent Shared Instructions under **Fidelity rules / Contracts**:
+> Distinguish between static application UI copy (which strictly routes through client localization/`ui_labels`) and server-generated activity/notification messages returned directly in API payloads (`payload.display`). Do not generate client-side string interpolation templates for messages that the backend already renders and returns as stored.
