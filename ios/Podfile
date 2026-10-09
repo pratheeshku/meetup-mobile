@@ -39,5 +39,39 @@ target 'MeetupMobile' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        ['OTHER_CPLUSPLUSFLAGS', 'OTHER_CFLAGS', 'OTHER_SWIFT_FLAGS'].each do |flag_key|
+          if config.build_settings[flag_key]
+            config.build_settings[flag_key] = config.build_settings[flag_key].gsub('-DRCT_NEW_ARCH_ENABLED=1', '').gsub('-DRCT_NEW_ARCH_ENABLED', '')
+          end
+        end
+      end
+    end
+    installer.pods_project.save
+
+    installer.pod_targets.each do |pod_target|
+      pod_target.build_settings.each do |config_name, _|
+        xcconfig_path = pod_target.xcconfig_path(config_name)
+        next unless File.exist?(xcconfig_path)
+        xcconfig = Xcodeproj::Config.new(xcconfig_path)
+        ['OTHER_CPLUSPLUSFLAGS', 'OTHER_CFLAGS', 'OTHER_SWIFT_FLAGS'].each do |flag_key|
+          if xcconfig.attributes[flag_key]
+            xcconfig.attributes[flag_key] = xcconfig.attributes[flag_key].gsub('-DRCT_NEW_ARCH_ENABLED=1', '').gsub('-DRCT_NEW_ARCH_ENABLED', '')
+          end
+        end
+        xcconfig.save_as(xcconfig_path)
+      end
+    end
+
+    installer.aggregate_targets.each do |aggregate_target|
+      aggregate_target.xcconfigs.each do |config_name, config_file|
+        if config_file.attributes['OTHER_CPLUSPLUSFLAGS']
+          config_file.attributes['OTHER_CPLUSPLUSFLAGS'] = config_file.attributes['OTHER_CPLUSPLUSFLAGS'].gsub('-DRCT_NEW_ARCH_ENABLED=1', '').gsub('-DRCT_NEW_ARCH_ENABLED', '')
+        end
+        config_file.save_as(aggregate_target.xcconfig_path(config_name))
+      end
+    end
   end
 end
