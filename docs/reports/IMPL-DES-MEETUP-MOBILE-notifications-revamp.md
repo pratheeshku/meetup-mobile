@@ -113,6 +113,38 @@ None. All visual and behavioral contracts from images 01-13, the task brief, and
 
 ---
 
+
+### Out-of-Scope Files Changed
+A `git diff --stat main...feat/notifications-revamp` reveals the following files changed or deleted outside the notifications screen, card, and icon-registry files:
+- `docs/reports/IMPL-DES-MEETUP-MOBILE-notifications-revamp.md`
+- `docs/reports/agent-enhancement-2026-10-09.md`
+- `implementation-status-DES-MEETUP-MOBILE.md`
+- `src/api/__tests__/notifications.test.ts`
+- `src/api/notifications.ts`
+- `src/components/IconBadge.tsx`
+- `src/labels/LabelsContext.tsx`
+- `src/labels/defaultLabels.ts`
+- `src/theme/tokens.ts`
+- `src/types/notification.ts`
+- `src/utils/__tests__/notificationDateUtils.test.ts`
+- `src/utils/notificationDateUtils.ts`
+
+**Icon Status Confirmation:**
+A check using `git diff --stat main src/components/icons` confirms that no icon files that existed on `main` were modified. The changed/added files in `src/components/icons/` (`ActionIcons.tsx`, `NotificationIcon.tsx`, `RegistryIcons.tsx`, `RegistryIcons.test.tsx`) are entirely new or fully isolated to this feature. No other screen's icons changed.
+
+**Commits ahead of main:**
+The branch is 9 commits ahead of main:
+1. `dd617d0` fix: validate deep link url before routing
+2. `27df5a5` docs(notifications): update implementation report with final completion proof
+3. `faf0db6` fix(notifications): update swipe action and muted header colors to design values
+4. `3bf0e9b` fix(notifications): restore missing dependencies for RegistryIcons
+5. `05aaede` fix(notifications): add tap-to-open url deep link and fix routing
+6. `cf6b6cf` docs(notifications): update implementation and enhancement reports for addendum
+7. `0c548ab` feat(notifications): display title and body directly as returned by API per addendum
+8. `767f82b` docs(notifications): add implementation report and update status
+9. `0b4a5fc` feat(notifications): revamp in-app notifications screen to match design
+
+
 ## 6. Known Gaps / Follow-ups
 
 - Push notifications SDK and system notification routing are out of scope per user specification.
@@ -148,13 +180,19 @@ Ran all test suites matching /src\/api\/__tests__\/notifications.test.ts|src\/ut
 
 **Git evidence**:
 ```
-faf0db6 (HEAD -> feat/notifications-revamp) fix(notifications): update swipe action and muted header colors to design values
+dd617d0 (HEAD -> feat/notifications-revamp) fix: validate deep link url before routing
+27df5a5 docs(notifications): update implementation report with final completion proof
+faf0db6 fix(notifications): update swipe action and muted header colors to design values
 3bf0e9b fix(notifications): restore missing dependencies for RegistryIcons
 05aaede fix(notifications): add tap-to-open url deep link and fix routing
+cf6b6cf docs(notifications): update implementation and enhancement reports for addendum
+0c548ab feat(notifications): display title and body directly as returned by API per addendum
+767f82b docs(notifications): add implementation report and update status
+0b4a5fc feat(notifications): revamp in-app notifications screen to match design
 ```
 ```
 On branch feat/notifications-revamp
-Your branch is ahead of 'origin/main' by 7 commits.
+Your branch is ahead of 'origin/main' by 9 commits.
   (use "git push" to publish your local commits)
 
 nothing to commit, working tree clean
