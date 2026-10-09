@@ -62,6 +62,20 @@ export const colors = {
   track: '#EFECE6',
   /** Additive: modal backdrop — `textPrimary` at 50% opacity. */
   scrim: 'rgba(27, 25, 24, 0.5)',
+  accentPurple: '#8B5CF6',
+  ownerChipBg: '#FEF3C7',
+  ownerChipText: '#78350F',
+  overlayWhite25: 'rgba(255, 255, 255, 0.25)',
+  avatarTint1: '#DBEAFE',
+  avatarTint2: '#FEF3C7',
+  avatarTint3: '#D1FAE5',
+  avatarTint4: '#FCE7F3',
+  avatarTint5: '#EDE9FE',
+  avatarTintText1: '#1E40AF',
+  avatarTintText2: '#92400E',
+  avatarTintText3: '#065F46',
+  avatarTintText4: '#9D174D',
+  avatarTintText5: '#5B21B6',
 };
 
 export const sportColors: Record<string, string> = {
@@ -166,6 +180,9 @@ export const sizes = {
  * Light theme only — the app has no dark mode.
  */
 export const levelColors = {
+  beginner: { bg: '#E8F5E9', text: '#1B5E20', border: '#2E7D32' },
+  intermediate: { bg: '#E3F2FD', text: '#0D47A1', border: '#1565C0' },
+  expert: { bg: '#EDE7F6', text: '#4527A0', border: '#5E35B1' },
   Beginner: { bg: '#E8F5E9', text: '#1B5E20', border: '#2E7D32' },
   Intermediate: { bg: '#E3F2FD', text: '#0D47A1', border: '#1565C0' },
   Expert: { bg: '#EDE7F6', text: '#4527A0', border: '#5E35B1' },
@@ -192,3 +209,20 @@ export const skillSizes = {
   chevron: 18,
   segmentMinHeight: 64,
 };
+
+/**
+ * Gradient badge palettes (IconBadge, design-ref-p23 Icons.png).
+ * Two-stop linear gradients mapped to semantic roles.
+ */
+export const gradientTokens = {
+  blue: { start: '#3B82F6', end: '#1D4ED8' },
+  green: { start: '#10B981', end: '#047857' },
+  amber: { start: '#F59E0B', end: '#D97706' },
+  orange: { start: '#F97316', end: '#C2410C' },
+  red: { start: '#EF4444', end: '#B91C1C' },
+  purple: { start: '#8B5CF6', end: '#6D28D9' },
+  teal: { start: '#14B8A6', end: '#0F766E' },
+  gray: { start: '#64748B', end: '#475569' },
+} as const;
+
+export type GradientTokenKey = keyof typeof gradientTokens;
