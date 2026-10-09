@@ -109,9 +109,15 @@ export interface NotificationHistoryItem {
   created_at: string;
   /** ISO 8601 date-time; `null` while unread. */
   read_at: string | null;
-  /** Optional metadata / placeholder values from API. */
-  data?: Record<string, string | number> | null;
-  payload?: Record<string, string | number> | null;
+  /** Optional metadata from API, including display.title and display.body. */
+  data?: Record<string, any> | null;
+  payload?: {
+    display?: {
+      title?: string | null;
+      body?: string | null;
+    } | null;
+    [key: string]: any;
+  } | null;
 }
 
 /**

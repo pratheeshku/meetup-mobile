@@ -174,4 +174,44 @@ describe('NotificationCard', () => {
     });
     expect(onToggleRead).toHaveBeenCalledWith(item);
   });
+
+  it('renders payload.display.title and payload.display.body directly as stored', () => {
+    const item = makeItem({
+      title: 'Ignored Title',
+      body: 'Ignored Body',
+      payload: {
+        display: {
+          title: 'Stored API Title',
+          body: 'Stored API Body',
+        },
+      },
+    });
+    const rendered = render(
+      <NotificationCard
+        item={item}
+        onPress={jest.fn()}
+        onToggleRead={jest.fn()}
+      />,
+    );
+
+    expect(texts(rendered)).toContain('Stored API Title');
+    expect(texts(rendered)).toContain('Stored API Body');
+  });
+
+  it('falls back to fallback title when both payload.display.title and title are null', () => {
+    const item = makeItem({
+      title: null,
+      body: null,
+      payload: null,
+    });
+    const rendered = render(
+      <NotificationCard
+        item={item}
+        onPress={jest.fn()}
+        onToggleRead={jest.fn()}
+      />,
+    );
+
+    expect(texts(rendered)).toContain('Notification');
+  });
 });

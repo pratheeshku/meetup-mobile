@@ -22,7 +22,6 @@ import {
 import { useT } from '../labels/LabelsContext';
 import type { NotificationHistoryItem } from '../types/notification';
 import { formatNotificationCardTime } from '../utils/notificationDateUtils';
-import { renderNotificationContent } from '../utils/notificationTemplateUtils';
 import { CheckIcon, MarkUnreadIcon } from './icons/ActionIcons';
 import NotificationIcon from './icons/NotificationIcon';
 
@@ -102,7 +101,11 @@ export default function NotificationCard({
     }),
   ).current;
 
-  const { title, body } = renderNotificationContent(item, t);
+  const rawTitle = item.payload?.display?.title ?? item.title;
+  const title =
+    rawTitle && rawTitle.trim() ? rawTitle.trim() : t('mob.notif_history.fallback_title');
+  const rawBody = item.payload?.display?.body ?? item.body;
+  const body = rawBody && rawBody.trim() ? rawBody.trim() : '';
   const timeText = formatNotificationCardTime(item.created_at, now);
 
   const toggleActionLabel = isUnread

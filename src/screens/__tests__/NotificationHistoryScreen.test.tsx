@@ -229,10 +229,30 @@ describe('routing guards (negative)', () => {
     expect(mockNavigate).toHaveBeenCalledWith({ tab: 'Home', screen: 'EventsList' });
   });
 
-  it('renders a row with null title/body using fallback template without crashing', async () => {
+  it('renders a row with null title/body using fallback title without crashing', async () => {
     mockHistory.mockResolvedValue({ items: [makeItem({ title: null, body: null })] });
     const root = await renderAsync(<NotificationHistoryScreen />);
-    expect(texts(root)).toContain('Game details changed');
+    expect(texts(root)).toContain('Notification');
+  });
+
+  it('displays payload.display.title and payload.display.body directly as returned by API', async () => {
+    mockHistory.mockResolvedValue({
+      items: [
+        makeItem({
+          title: 'Direct Title',
+          body: 'Direct Body',
+          payload: {
+            display: {
+              title: 'API Display Title',
+              body: 'API Display Body',
+            },
+          },
+        }),
+      ],
+    });
+    const root = await renderAsync(<NotificationHistoryScreen />);
+    expect(texts(root)).toContain('API Display Title');
+    expect(texts(root)).toContain('API Display Body');
   });
 });
 
