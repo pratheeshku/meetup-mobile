@@ -129,46 +129,39 @@ None. All visual and behavioral contracts from images 01-13, the task brief, and
 Test Suites: 5 passed, 5 total
 Tests:       62 passed, 62 total
 Snapshots:   0 total
-Time:        1.141 s
-Ran all test suites matching /src\/api\/__tests__\/notifications.test.ts|src\/utils\/__tests__\/notificationDateUtils.test.ts|src\/components\/icons\/__tests__/RegistryIcons.test.tsx|src\/components\/__tests__/NotificationCard.test.tsx|src\/screens\/__tests__/NotificationHistoryScreen.test.tsx/i.
+Time:        1.066 s
+Ran all test suites matching /src\/api\/__tests__\/notifications.test.ts|src\/utils\/__tests__\/notificationDateUtils.test.ts|src\/components\/icons\/__tests__\/RegistryIcons.test.tsx|src\/components\/__tests__\/NotificationCard.test.tsx|src\/screens\/__tests__\/NotificationHistoryScreen.test.tsx/i.
 --- Run 1 ---
 Test Suites: 5 passed, 5 total
 Tests:       62 passed, 62 total
 Snapshots:   0 total
-Time:        0.924 s, estimated 1 s
-Ran all test suites matching /src\/api\/__tests__\/notifications.test.ts|src\/utils\/__tests__\/notificationDateUtils.test.ts|src\/components\/icons\/__tests__/RegistryIcons.test.tsx|src\/components\/__tests__/NotificationCard.test.tsx|src\/screens\/__tests__/NotificationHistoryScreen.test.tsx/i.
+Time:        0.861 s, estimated 1 s
+Ran all test suites matching /src\/api\/__tests__\/notifications.test.ts|src\/utils\/__tests__\/notificationDateUtils.test.ts|src\/components\/icons\/__tests__\/RegistryIcons.test.tsx|src\/components\/__tests__\/NotificationCard.test.tsx|src\/screens\/__tests__\/NotificationHistoryScreen.test.tsx/i.
 --- Run 2 ---
 Test Suites: 5 passed, 5 total
 Tests:       62 passed, 62 total
 Snapshots:   0 total
-Time:        0.862 s, estimated 1 s
-Ran all test suites matching /src\/api\/__tests__\/notifications.test.ts|src\/utils\/__tests__\/notificationDateUtils.test.ts|src\/components\/icons\/__tests__/RegistryIcons.test.tsx|src\/components\/__tests__/NotificationCard.test.tsx|src\/screens\/__tests__/NotificationHistoryScreen.test.tsx/i.
+Time:        0.845 s, estimated 1 s
+Ran all test suites matching /src\/api\/__tests__\/notifications.test.ts|src\/utils\/__tests__\/notificationDateUtils.test.ts|src\/components\/icons\/__tests__\/RegistryIcons.test.tsx|src\/components\/__tests__\/NotificationCard.test.tsx|src\/screens\/__tests__\/NotificationHistoryScreen.test.tsx/i.
 --- Run 3 ---
 ```
 
 **Git evidence**:
 ```
-478d7e4 (HEAD -> chore/merge-p2p3-into-main) feat(notifications): display title and body directly as returned by API per addendum
-e510820 docs(notifications): add implementation report and update status
-e38e5bb feat(notifications): revamp in-app notifications screen to match design
+faf0db6 (HEAD -> feat/notifications-revamp) fix(notifications): update swipe action and muted header colors to design values
+3bf0e9b fix(notifications): restore missing dependencies for RegistryIcons
+05aaede fix(notifications): add tap-to-open url deep link and fix routing
 ```
 ```
-On branch chore/merge-p2p3-into-main
-Your branch is ahead of 'origin/chore/merge-p2p3-into-main' by 3 commits.
+On branch feat/notifications-revamp
+Your branch is ahead of 'origin/main' by 7 commits.
   (use "git push" to publish your local commits)
 
-Changes not staged for commit:
-  (use "git add <file>..." to update what will be committed)
-  (use "git restore <file>..." to discard changes in working directory)
-	modified:   docs/reports/IMPL-DES-MEETUP-MOBILE-notifications-revamp.md
-	modified:   docs/reports/agent-enhancement-2026-10-09.md
-	modified:   implementation-status-DES-MEETUP-MOBILE.md
-
-no changes added to commit (use "git add" and/or "git commit -a")
+nothing to commit, working tree clean
 ```
 
 **File evidence** (grep showing key change exists on disk):
 ```
-src/components/NotificationCard.tsx:104:  const rawTitle = item.payload?.display?.title ?? item.title;
-src/components/NotificationCard.tsx:106:    rawTitle && rawTitle.trim() ? rawTitle.trim() : t('mob.notif_history.fallback_title');
+src/screens/NotificationHistoryScreen.tsx:80:    Linking.openURL(url).catch(() => {});
+src/components/NotificationCard.tsx:247:    backgroundColor: '#1F5FE0',
 ```
