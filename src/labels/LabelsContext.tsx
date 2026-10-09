@@ -24,6 +24,7 @@ import { getLabels } from '../api/labels';
 import type { LabelMap } from '../api/labels';
 import { FALLBACK_LABELS } from './fallbackLabels';
 import type { LabelKey } from './fallbackLabels';
+export type { LabelKey };
 
 export const LABELS_CACHE_KEY = '@meetup/labels-cache';
 export const LABELS_FETCHED_AT_KEY = '@meetup/labels-fetched-at';
