@@ -37,6 +37,10 @@ function serverWithValidToken(getValid: () => string, onRefresh: () => { status?
   };
 }
 
+function logged(): string {
+  return (console.log as jest.Mock).mock.calls.map(call => call.map(String).join(' ')).join('\n');
+}
+
 async function until(condition: () => boolean, tries = 100): Promise<void> {
   for (let i = 0; i < tries && !condition(); i += 1) {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -145,6 +149,13 @@ describe('the session ended', () => {
     expect(backend.stored[ACCESS_SERVICE]).toBeUndefined();
     expect(mockClearCookieJar).toHaveBeenCalledTimes(1);
     expect(expired).toHaveBeenCalledTimes(1);
+    const body = 'data' in reply ? reply.data : undefined;
+    const cause =
+      typeof body === 'object' && body !== null && 'access_token' in body
+        ? 'refresh-no-session status=200'
+        : 'refresh-rejected status=401';
+    expect(logged()).toContain(`[auth] routing to login cause=${cause}`);
+    expect(logged()).not.toContain('old');
   });
 
   it('a 401 even after a successful refresh ends the session — one refresh, one retry, no loop', async () => {
@@ -155,6 +166,8 @@ describe('the session ended', () => {
     expect(backend.urls()).toEqual(['/events', '/auth/refresh', '/events']);
     expect(expired).toHaveBeenCalledTimes(1);
     expect(backend.stored[ACCESS_SERVICE]).toBeUndefined();
+    expect(logged()).toContain('[auth] routing to login cause=retried-request-401 status=401');
+    expect(logged()).not.toContain('new');
   });
 
   it('still raises auth-expired when clearing local state fails', async () => {
@@ -181,6 +194,23 @@ describe('a transport failure while refreshing keeps the session', () => {
     expect(backend.stored[ACCESS_SERVICE]).toBe('old');
     expect(mockClearCookieJar).not.toHaveBeenCalled();
     expect(expired).not.toHaveBeenCalled();
+    expect(logged()).toContain('token refresh failed; session kept');
+    expect(logged()).not.toContain('routing to login');
+    expect(logged()).not.toContain('old');
+  });
+
+  it('a Keychain read failure keeps a caller-supplied access token and does not end the session', async () => {
+    (Keychain.getGenericPassword as jest.Mock).mockRejectedValue(new Error('keystore key invalidated'));
+
+    const response = await apiClient.get('/events', { headers: { Authorization: 'Bearer kept' } });
+
+    expect(response.data).toEqual({});
+    expect(backend.callsTo('/events')[0].authorization).toBe('Bearer kept');
+    expect(expired).not.toHaveBeenCalled();
+    expect(backend.stored[ACCESS_SERVICE]).toBe('old');
+    expect(logged()).not.toContain('keystore key invalidated');
+    expect(logged()).not.toContain('kept');
+    expect(logged()).not.toContain('old');
   });
 });
 
