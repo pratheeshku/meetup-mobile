@@ -39,6 +39,7 @@ export interface Group {
   logo_url?: string | null;
   members_preview?: Array<{ display_name: string; photo_url: string | null }>;
   member_count?: number | null;
+  upcoming_game_count?: number | null;
   created_at: string;
   /**
    * On `getMyGroups()` list items: a Proposed Assumption ('owner' for
@@ -105,6 +106,14 @@ export interface GroupsListResponse {
  * `GroupResponse`).
  */
 export interface CreateGroupInput {
+  name: string;
+  description?: string;
+}
+
+/**
+ * `PATCH /groups/{id}` request body — { name, description? }.
+ */
+export interface UpdateGroupInput {
   name: string;
   description?: string;
 }

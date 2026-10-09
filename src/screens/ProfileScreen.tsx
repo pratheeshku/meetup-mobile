@@ -1,474 +1,216 @@
 /**
- * Profile screen (DES-MEETUP-MOBILE.md §4.13, §7.2; R-124).
+ * Profile screen (Phase 2 revamp, Main.png).
  *
- * Doubles as the Settings surface per this task's Step 5 — no separate
- * Settings screen/tab exists; the Profile tab is it.
- *
- * Implementation notes (see Implementation Report for full rationale):
- * - The account-deletion "Step 2" code-entry UI is a plain inline
- *   TextInput + button on this screen, not a second native `Alert`.
- *   `Alert.prompt` (the only RN `Alert` API with a text field) is
- *   iOS-only and this app is Android-only (CLAUDE.md) — Android's
- *   `Alert.alert` has no text-input capability at all. Step 1 (a plain
- *   yes/no confirmation) uses `Alert.alert` exactly as specified.
- * - Skill levels ("My sports"): read-only rows; tapping one opens a bottom
- *   sheet for that sport (segmented level control, Save, Remove). "Add sport"
- *   opens the shared sport-picker -> level-card flow in a sheet. Components
- *   live in `components/skills/`; no picker library is involved.
- * - Errors are shown inline (this screen has no navigation back-stack
- *   concept to redirect through) rather than via `Alert`, except the
- *   deletion confirmation dialog itself which the brief explicitly asks
- *   to be an `Alert`.
- *
- * Push-notifications task (§4.8, R-076): now nested inside its own
- * `ProfileStack` (`RootNavigator.tsx`) rather than sitting directly on the
- * tab bar, so it can push `NotificationPreferencesScreen` — this screen's
- * "no navigation back-stack concept" note above predates that change and
- * now only describes this screen's own error-handling style, not its
- * navigation context.
+ * Visual hierarchy:
+ * - Top cover banner with semi-transparent Edit Profile and Settings buttons
+ * - Centered overlapping avatar (88x88) with display name & @nickname
+ * - 3-column stats strip (Played, Hosted, Groups) with IconBadge
+ * - Skills card with sport icon and colored level pills
+ * - My groups card with squircle logos/initials and "View all" link
+ * - Recent games card with sport icon, date/time, venue and "View all" link
+ * - Outlined Log out button with confirmation dialog
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
-import ImageCropPicker from 'react-native-image-crop-picker';
-import Svg, { Path } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useAuth } from '../auth/AuthContext';
-import { withCorrelationId } from '../api/correlationId';
 import {
-  confirmDeletion,
-  deleteAvatar,
-  deleteSkillLevel,
   getProfile,
-  requestDeletion,
-  updateProfile,
-  updateSkillLevel,
-  uploadAvatar,
+  getProfileSummary,
+  type ProfileSummary,
 } from '../api/profile';
-import { getSports } from '../api/sports';
-import Button from '../components/Button';
-import Card from '../components/Card';
+import { getMyGroups } from '../api/groups';
+import type { Group } from '../types/group';
+import { getCachedBanners, type BannerFallback } from '../api/home';
+import { BannerBackground, SportIcon } from '../components/icons/DashboardIcons';
+import { EditIcon } from '../components/icons/ActionIcons';
+import {
+  ClockIcon,
+  DoorIcon,
+  GearIcon,
+  PeopleIcon,
+  PinIcon,
+  StarIcon,
+  TrophyIcon,
+} from '../components/icons/SharedIcons';
+import IconBadge from '../components/IconBadge';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
-import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
-import MySportRow from '../components/skills/MySportRow';
-import BottomSheet from '../components/skills/BottomSheet';
-import SkillLevelFlow from '../components/skills/SkillLevelFlow';
-import type { SkillLevelMap } from '../components/skills/SkillLevelFlow';
-import SportLevelSheet from '../components/skills/SportLevelSheet';
-import TextField from '../components/TextField';
-import TextLink from '../components/TextLink';
-import appConfig from '../../config/appConfig.json';
-import { getApiErrorMessage } from '../utils/apiError';
-import { toHttpsUrl } from '../utils/httpsUrl';
-import { openLink } from '../utils/openLink';
-import { toSupportLink } from '../utils/supportLink';
-import MobileNumberCard from '../components/MobileNumberCard';
+import { useSportDisplayName } from '../utils/labels';
 import { getDisplayName } from '../utils/displayName';
-import { getLabel, useLabels } from '../labels/LabelsContext';
-import { useFieldChain } from '../hooks/useFieldChain';
-import { borderWidth, colors, radius, shadows, sizes, spacing, typography } from '../theme/tokens';
-import type { SkillLevelValue, UserProfile } from '../types/user';
-import type { Sport } from '../types/sport';
-import type { ProfileStackParamList } from '../navigation/types';
 import { useT } from '../labels/LabelsContext';
+import {
+  borderWidth,
+  colors,
+  radius,
+  spacing,
+  typography,
+} from '../theme/tokens';
+import type { SkillLevelValue, UserProfile } from '../types/user';
+import type { LabelKey } from '../labels/fallbackLabels';
+import type { ProfileStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
-export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
-  const { signOut, updateUser } = useAuth();
+function getInitials(name?: string | null): string {
+  if (!name) return '??';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '??';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function formatRecentGameDate(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+    const day = d.getDate();
+    const month = d.toLocaleDateString(undefined, { month: 'short' });
+    const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    return `${weekday} ${day} ${month}, ${time}`;
+  } catch {
+    return '';
+  }
+}
+
+const GROUP_BADGE_COLORS = [
+  colors.primary,
+  colors.success,
+  colors.warning,
+  colors.accentPurple,
+];
+
+const LEVEL_LABEL_KEY: Record<SkillLevelValue, LabelKey> = {
+  beginner: 'mob.profile.level_beginner_full',
+  intermediate: 'mob.profile.level_intermediate_full',
+  expert: 'mob.profile.level_expert_full',
+};
+
+function getLevelTextColor(level?: string | null): string {
+  const normalized = level?.trim().toLowerCase();
+  if (normalized === 'beginner') return colors.warning;
+  if (normalized === 'intermediate') return colors.primary;
+  if (normalized === 'expert') return colors.accentPurple;
+  return colors.textPrimary;
+}
+
+function getLevelBgColor(level?: string | null): string {
+  const normalized = level?.trim().toLowerCase();
+  if (normalized === 'beginner') return colors.warningLight;
+  if (normalized === 'intermediate') return colors.primaryLight;
+  if (normalized === 'expert') return colors.avatarTint5;
+  return colors.avatarTint1;
+}
+
+function SkillTileItem({
+  sport,
+  level,
+}: {
+  sport: string;
+  level: string;
+}): React.JSX.Element {
   const t = useT();
-  const tRef = useRef(t);
-  tRef.current = t;
+  const sportName = useSportDisplayName(sport);
+  const textColor = getLevelTextColor(level);
+  const bgColor = getLevelBgColor(level);
+  const normalized = level.trim().toLowerCase() as SkillLevelValue;
+  const labelKey = LEVEL_LABEL_KEY[normalized];
+  const levelText = labelKey ? t(labelKey) : level;
+
+  return (
+    <View style={[styles.skillTile, { backgroundColor: bgColor }]}>
+      <View style={styles.skillIconCircle}>
+        <SportIcon slug={sport} size={20} />
+      </View>
+      <View style={styles.skillTextCol}>
+        <Text numberOfLines={1} style={styles.skillSportName}>
+          {sportName}
+        </Text>
+        <Text style={[styles.skillLevelText, { color: textColor }]}>
+          {levelText}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
+  const { signOut } = useAuth();
+  const t = useT();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileSummary, setProfileSummary] = useState<ProfileSummary | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [bannerFallback, setBannerFallback] = useState<BannerFallback | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  const labels = useLabels();
-
-  // BUG-M05: sport choices for "Add sport", from the same
-  // `GET /admin/sports/public` source as `CreateGameScreen`.
-  // Secondary/non-blocking (same pattern as that screen's Group picker) — a
-  // failure just leaves the picker empty; it never blocks the rest of
-  // Profile from loading.
-  const [sports, setSports] = useState<Sport[]>([]);
-
-  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
-  const [displayNameDraft, setDisplayNameDraft] = useState('');
-  const [isSavingDisplayName, setIsSavingDisplayName] = useState(false);
-  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
-
-  // Skill-level sheets: edit one sport (`editingSkill`) or add sports.
-  // `skillLevelError` is shown inside whichever sheet is open — for a delete
-  // blocked by an active tournament registration (409) it is the backend's
-  // own message, verbatim.
-  const [editingSkill, setEditingSkill] = useState<{ sport: string; level: SkillLevelValue } | null>(
-    null,
-  );
-  const [isAddingSport, setIsAddingSport] = useState(false);
-  const [isSavingSkillLevel, setIsSavingSkillLevel] = useState(false);
-  const [isDeletingSkillLevel, setIsDeletingSkillLevel] = useState(false);
-  const [skillLevelError, setSkillLevelError] = useState<string | null>(null);
-
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [signOutError, setSignOutError] = useState<string | null>(null);
 
-  const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
-  const [isAwaitingConfirmationCode, setIsAwaitingConfirmationCode] = useState(false);
-  const [confirmationCodeDraft, setConfirmationCodeDraft] = useState('');
-  const [isConfirmingDeletion, setIsConfirmingDeletion] = useState(false);
-  const [deletionError, setDeletionError] = useState<string | null>(null);
-
-  // Avatar upload/remove state (DES-MEETUP-ADDENDUM-profile-photo §10.4).
-  // `avatarPreviewUri` holds a local file URI for immediate visual feedback
-  // while the upload is in progress — reverted on failure (§10.4 step 5).
-  const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-
-  /**
-   * §10.4 step 1: Tap avatar → camera/gallery action sheet.
-   * Opens react-native-image-crop-picker with cropping enabled (pinch-zoom,
-   * reposition, square aspect ratio, rotation). On crop confirmation,
-   * shows a local preview and fires the multipart upload.
-   */
-  const handleAvatarPress = (): void => {
-    if (isUploadingAvatar || isRemovingAvatar) {
-      return;
-    }
-
-    // If there's already an avatar, offer change or remove options
-    if (profile?.avatar_url) {
-      Alert.alert(t('mob.profile.photo_title'), undefined, [
-        { text: t('mob.common.cancel'), style: 'cancel' },
-        {
-          text: t('mob.profile.take_photo'),
-          onPress: () => pickImage('camera'),
-        },
-        {
-          text: t('mob.profile.choose_photo'),
-          onPress: () => pickImage('library'),
-        },
-        {
-          text: t('mob.profile.remove_photo'),
-          style: 'destructive',
-          onPress: handleRemoveAvatar,
-        },
+  const loadData = useCallback(async () => {
+    try {
+      setLoadError(null);
+      const [profileData, summaryData, myGroupsData, bannerData] = await Promise.all([
+        getProfile(),
+        getProfileSummary().catch(() => ({
+          games_played: 0,
+          games_hosted: 0,
+          groups_count: 0,
+          recent_games: [],
+        })),
+        getMyGroups().catch(() => ({ items: [], total: 0 })),
+        getCachedBanners().catch(() => null),
       ]);
-    } else {
-      Alert.alert(t('mob.profile.photo_title'), undefined, [
-        { text: t('mob.common.cancel'), style: 'cancel' },
-        {
-          text: t('mob.profile.take_photo'),
-          onPress: () => pickImage('camera'),
-        },
-        {
-          text: t('mob.profile.choose_photo'),
-          onPress: () => pickImage('library'),
-        },
-      ]);
-    }
-  };
-
-  const pickImage = async (source: 'camera' | 'library'): Promise<void> => {
-    setAvatarError(null);
-    try {
-      const cropOptions = {
-        mediaType: 'photo' as const,
-        cropping: true,
-        width: 500,
-        height: 500,
-        compressImageQuality: 0.8,
-        // iOS only (ignored on Android): HEIC must never reach the backend.
-        forceJpg: true,
-        cropperToolbarTitle: t('mob.profile.crop_title'),
-        hideBottomControls: false,
-        enableRotationGesture: true,
-        cropperRotateButtonsHidden: false,
-      };
-
-      const image =
-        source === 'camera'
-          ? await ImageCropPicker.openCamera(cropOptions)
-          : await ImageCropPicker.openPicker(cropOptions);
-
-      if (!image || !image.path) {
-        return;
+      setProfile(profileData);
+      setProfileSummary(summaryData);
+      setGroups(myGroupsData.items ?? []);
+      if (bannerData?.fallback) {
+        setBannerFallback(bannerData.fallback);
       }
-
-      const fileName =
-        image.filename || image.path.split('/').pop() || 'avatar.jpg';
-      const fileType = image.mime || 'image/jpeg';
-
-      // §10.4 step 2: local preview (selected URI, pre-upload)
-      setAvatarPreviewUri(image.path);
-      setIsUploadingAvatar(true);
-
-      // §10.4 step 3: POST /users/me/avatar multipart, same correlation-ID
-      // threading already used throughout profile.ts
-      await withCorrelationId(async correlationId => {
-        await uploadAvatar(image.path, fileName, fileType, { correlationId });
-        // §10.4 step 4: re-fetch profile → getAvatarUrl() picks up the new
-        // key → FastImage renders it (new key = cache miss = fresh fetch)
-        const refreshed = await getProfile({ correlationId });
-        setProfile(refreshed);
-      });
-      // Upload succeeded — clear the local preview; the profile's avatar_url
-      // (via getAvatarUrl) now points to the new storage object.
-      setAvatarPreviewUri(null);
-    } catch (e: any) {
-      // User cancelled photo selection or cropping — do nothing
-      if (
-        e?.code === 'E_PICKER_CANCELLED' ||
-        e?.message?.toLowerCase().includes('cancel')
-      ) {
-        return;
-      }
-
-      // §10.4 step 5: on failure, revert preview, reuse the existing
-      // getApiErrorMessage pattern already established for the skill-level 409
-      setAvatarPreviewUri(null);
-      setAvatarError(
-        getApiErrorMessage(e, t('mob.profile.photo_upload_error')),
-      );
-    } finally {
-      setIsUploadingAvatar(false);
-    }
-  };
-
-  /**
-   * DELETE /users/me/avatar → avatar_url → null → existing placeholder
-   * renders. Same shape as the upload flow (§10.4).
-   */
-  const handleRemoveAvatar = async (): Promise<void> => {
-    setAvatarError(null);
-    setIsRemovingAvatar(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        await deleteAvatar({ correlationId });
-        const refreshed = await getProfile({ correlationId });
-        setProfile(refreshed);
-      });
-    } catch (e) {
-      setAvatarError(
-        getApiErrorMessage(e, t('mob.profile.photo_remove_error')),
-      );
-    } finally {
-      setIsRemovingAvatar(false);
-    }
-  };
-
-  const loadProfile = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const data = await getProfile();
-      setProfile(data);
     } catch {
-      setLoadError(tRef.current('mob.profile.load_error'));
+      setLoadError(t('mob.profile.load_error'));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
-  useEffect(() => {
-    loadProfile();
-    getSports().then(setSports, () => setSports([]));
-  }, [loadProfile]);
-
-  const handleStartEditDisplayName = (): void => {
-    if (!profile) {
-      return;
-    }
-    setDisplayNameError(null);
-    setDisplayNameDraft(getDisplayName(profile));
-    setIsEditingDisplayName(true);
-  };
-
-  const handleCancelEditDisplayName = (): void => {
-    setIsEditingDisplayName(false);
-    setDisplayNameError(null);
-  };
-
-  const nameChain = useFieldChain(['displayName']);
-  const deletionChain = useFieldChain(['confirmationCode']);
-
-  const handleSaveDisplayName = async (): Promise<void> => {
-    if (!displayNameDraft.trim()) {
-      setDisplayNameError(t('mob.profile.display_name_empty'));
-      nameChain.focus('displayName');
-      return;
-    }
-    setDisplayNameError(null);
-    setIsSavingDisplayName(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        await updateProfile({ display_name: displayNameDraft.trim() }, { correlationId });
-        const refreshed = await getProfile({ correlationId });
-        setProfile(refreshed);
-        // Keep the auth user (Home greeting) in step with what was saved.
-        updateUser({ display_name: refreshed.display_name });
-      });
-      setIsEditingDisplayName(false);
-    } catch {
-      setDisplayNameError(t('mob.profile.display_name_error'));
-    } finally {
-      setIsSavingDisplayName(false);
-    }
-  };
-
-  const handleStartAddSkillLevel = (): void => {
-    setSkillLevelError(null);
-    setIsAddingSport(true);
-  };
-
-  const handleStartEditSkillLevel = (sport: string, skillLevel: SkillLevelValue): void => {
-    setSkillLevelError(null);
-    setEditingSkill({ sport, level: skillLevel });
-  };
-
-  const handleCloseSkillLevelSheet = (): void => {
-    setEditingSkill(null);
-    setIsAddingSport(false);
-    setSkillLevelError(null);
-  };
-
-  /** Saves the given levels (one PUT each), re-fetches, then closes the open sheet. */
-  const handleSaveSkillLevels = async (levels: SkillLevelMap): Promise<void> => {
-    setSkillLevelError(null);
-    setIsSavingSkillLevel(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        for (const [sport, level] of Object.entries(levels)) {
-          await updateSkillLevel(sport, level, { correlationId });
-        }
-        setProfile(await getProfile({ correlationId }));
-      });
-      handleCloseSkillLevelSheet();
-    } catch {
-      setSkillLevelError(t('mob.profile.skill_save_error'));
-    } finally {
-      setIsSavingSkillLevel(false);
-    }
-  };
-
-  /**
-   * ADDENDUM-MOBILE-SKILL-DELETE-001 §4: on 409 (active tournament
-   * registration guard), the backend's message is shown verbatim via
-   * `getApiErrorMessage` — not swallowed into a generic string — inside the
-   * edit sheet, and the entry stays in the list (no optimistic removal). On
-   * success, re-fetch via `getProfile()`/`getSkillLevels()`, same refresh
-   * pattern as Add/Modify above, and close the sheet.
-   */
-  const handleDeleteSkillLevel = async (sport: string): Promise<void> => {
-    setSkillLevelError(null);
-    setIsDeletingSkillLevel(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        await deleteSkillLevel(sport, { correlationId });
-        setProfile(await getProfile({ correlationId }));
-      });
-      handleCloseSkillLevelSheet();
-    } catch (e) {
-      setSkillLevelError(
-        getApiErrorMessage(e, t('mob.profile.skill_remove_error')),
-      );
-    } finally {
-      setIsDeletingSkillLevel(false);
-    }
-  };
-
-  /** Same yes/no confirmation the old per-row Remove link used. */
-  const handleDeleteSkillLevelPress = (sport: string, sportLabel: string): void => {
-    Alert.alert(
-      t('mob.profile.skill_remove_title'),
-      t('mob.profile.skill_remove_message', { sport: sportLabel }),
-      [
-      { text: t('mob.common.cancel'), style: 'cancel' },
-      { text: t('mob.common.remove'), style: 'destructive', onPress: () => handleDeleteSkillLevel(sport) },
-      ],
-    );
-  };
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData]),
+  );
 
   const handleSignOut = async (): Promise<void> => {
-    setSignOutError(null);
-    setIsSigningOut(true);
     try {
+      setIsSigningOut(true);
       await signOut();
     } catch {
-      setSignOutError(t('mob.profile.sign_out_error'));
       setIsSigningOut(false);
+      Alert.alert(t('mob.profile.sign_out'), t('mob.profile.sign_out_error'));
     }
   };
 
-  const handleRequestDeletion = async (): Promise<void> => {
-    setDeletionError(null);
-    setIsRequestingDeletion(true);
-    try {
-      await requestDeletion();
-      setIsAwaitingConfirmationCode(true);
-    } catch {
-      // §4.13: admin self-deletion is rejected server-side with an
-      // explicit error — surfaced generically here since the backend
-      // owns the actual reason (server is the sole authority, §5.3).
-      setDeletionError(t('mob.profile.delete_start_error'));
-    } finally {
-      setIsRequestingDeletion(false);
-    }
-  };
-
-  // Report form, privacy policy, support contact (DES-MEETUP-ADDENDUM-IOS-App.md
-  // §7, §11): each row is hidden unless its configured value is valid.
-  const reportFormUrl = toHttpsUrl(appConfig.reportFormUrl);
-
-  const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
-  const termsOfUseUrl = toHttpsUrl(appConfig.termsOfUseUrl);
-  const supportLink = toSupportLink(appConfig.supportContact);
-
-  const handleDeleteAccountPress = (): void => {
+  const handleLogoutPress = (): void => {
     Alert.alert(
-      t('mob.profile.delete_title'),
-      t('mob.profile.delete_message'),
+      t('mob.profile.logout_confirm_title'),
+      t('mob.profile.logout_confirm_body'),
       [
         { text: t('mob.common.cancel'), style: 'cancel' },
-        { text: t('mob.common.delete'), style: 'destructive', onPress: handleRequestDeletion },
+        { text: t('mob.profile.logout'), style: 'destructive', onPress: handleSignOut },
       ],
     );
-  };
-
-  const handleCancelDeletionCode = (): void => {
-    setIsAwaitingConfirmationCode(false);
-    setConfirmationCodeDraft('');
-    setDeletionError(null);
-  };
-
-  const handleConfirmDeletion = async (): Promise<void> => {
-    if (!confirmationCodeDraft.trim()) {
-      setDeletionError(t('mob.profile.code_required'));
-      deletionChain.focus('confirmationCode');
-      return;
-    }
-    setDeletionError(null);
-    setIsConfirmingDeletion(true);
-    try {
-      await confirmDeletion(confirmationCodeDraft.trim());
-      await signOut();
-    } catch {
-      // Enumeration-safe per §4.13 ("expired/consumed confirmation
-      // token") — never distinguish "wrong code" from "expired code".
-      setDeletionError(t('mob.profile.code_invalid'));
-      setIsConfirmingDeletion(false);
-    }
   };
 
   if (isLoading) {
@@ -476,358 +218,527 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   }
 
   if (loadError || !profile) {
-    return <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadProfile} />;
+    return <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadData} />;
   }
 
-  // `skill_levels` is optional on the canonical `UserProfile` type (it's
-  // only present in this module's original shape, pre-consolidation —
-  // see docs/reports/IMPL-DES-MEETUP-MOBILE-types-consolidation.md).
-  // Treated as empty when absent; no behavioral change versus before the
-  // consolidation, since the actual `GET /users/me` response always
-  // includes it in practice (Proposed Assumption, unchanged).
-  const skillLevels = profile.skill_levels ?? [];
-  const declaredSports = new Set(skillLevels.map(item => item.sport));
-  const addableSports = sports.filter(item => !declaredSports.has(item.name));
+  const initials = getInitials(getDisplayName(profile));
+  const coverUrl = profile.cover_url || bannerFallback?.image_url;
 
   return (
-    <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <Card style={styles.header}>
-        <Pressable
-          onPress={handleAvatarPress}
-          accessibilityRole="button"
-          accessibilityLabel={t('mob.profile.change_photo_a11y')}
-          disabled={isUploadingAvatar || isRemovingAvatar}
-          style={styles.avatarContainer}
-        >
-          {avatarPreviewUri ? (
-            <View style={styles.avatar}>
-              <FastImage
-                source={{ uri: avatarPreviewUri }}
-                style={styles.avatar}
-                resizeMode={FastImage.resizeMode.cover}
-              />
-              <View style={styles.avatarOverlay}>
-                <ActivityIndicator color={colors.white} />
-              </View>
-            </View>
-          ) : profile.avatar_url ? (
-            <View style={styles.avatar}>
-              <FastImage
-                source={{ uri: profile.avatar_url, priority: FastImage.priority.normal }}
-                style={styles.avatar}
-                resizeMode={FastImage.resizeMode.cover}
-              />
-              {isRemovingAvatar ? (
-                <View style={styles.avatarOverlay}>
-                  <ActivityIndicator color={colors.white} />
-                </View>
-              ) : null}
-            </View>
-          ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Text style={styles.avatarPlaceholderText}>
-                {getDisplayName(profile).charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-
-          <View
-            style={styles.avatarEditBadge}
-            testID="avatar-edit-badge"
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          >
-            <Svg width={14} height={14} viewBox="0 0 24 24" fill={colors.white}>
-              <Path d="M4 7h3l2-3h6l2 3h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm8 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0-2a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" />
-            </Svg>
-          </View>
-        </Pressable>
-
-        {avatarError ? <Text style={styles.errorText}>{avatarError}</Text> : null}
-
-        {isEditingDisplayName ? (
-          <View style={styles.editRow}>
-            <TextField
-              style={styles.input}
-              {...nameChain.props('displayName')}
-              value={displayNameDraft}
-              onChangeText={setDisplayNameDraft}
-              editable={!isSavingDisplayName}
-              accessibilityLabel={t('mob.profile.display_name')}
-              placeholder={t('mob.profile.display_name')}
-              autoFocus
-            />
-            {displayNameError ? <Text style={styles.errorText}>{displayNameError}</Text> : null}
-            <View style={styles.editActionsRow}>
-              <Button
-                label={t('mob.common.save')}
-                size="sm"
-                onPress={handleSaveDisplayName}
-                loading={isSavingDisplayName}
-                style={styles.actionSpacing}
-              />
-              <Button
-                label={t('mob.common.cancel')}
-                size="sm"
-                variant="secondary"
-                onPress={handleCancelEditDisplayName}
-                disabled={isSavingDisplayName}
-              />
-            </View>
-          </View>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Cover banner */}
+      <View style={styles.bannerContainer}>
+        {coverUrl ? (
+          <Image source={{ uri: coverUrl }} style={styles.bannerImage} resizeMode="cover" />
         ) : (
-          <View style={styles.displayNameRow}>
-            <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
-            <TextLink label={t('mob.common.edit')} onPress={handleStartEditDisplayName} />
+          <View style={styles.bannerFallback}>
+            <BannerBackground width="100%" height="100%" />
           </View>
-        )}
-
-        <Text style={styles.nicknameLine}>
-          {t('mob.profile.nickname_line', { nickname: profile.nickname })}{' '}
-          <Text style={styles.nicknameHint}>{t('mob.profile.nickname_hint')}</Text>
-        </Text>
-
-        <Text style={styles.email}>{profile.email}</Text>
-      </Card>
-
-      <Card style={styles.section}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{getLabel(labels, 'mob_my_sports_title')}</Text>
-          <TextLink label={getLabel(labels, 'mob_add_sport')} onPress={handleStartAddSkillLevel} />
-        </View>
-
-        {skillLevels.length === 0 ? (
-          <Text style={styles.emptyText}>{t('mob.profile.no_skills')}</Text>
-        ) : (
-          skillLevels.map(item => (
-            <MySportRow
-              key={item.sport}
-              sport={item.sport}
-              skillLevel={item.skill_level}
-              onPress={() => handleStartEditSkillLevel(item.sport, item.skill_level)}
-            />
-          ))
-        )}
-      </Card>
-
-      {editingSkill ? (
-        <SportLevelSheet
-          sport={editingSkill.sport}
-          initialLevel={editingSkill.level}
-          saving={isSavingSkillLevel}
-          deleting={isDeletingSkillLevel}
-          error={skillLevelError}
-          saveLabel={t('mob.common.save')}
-          deleteLabel={t('mob.common.remove')}
-          closeLabel={t('mob.common.cancel')}
-          onSave={level => handleSaveSkillLevels({ [editingSkill.sport]: level })}
-          onDelete={sportLabel => handleDeleteSkillLevelPress(editingSkill.sport, sportLabel)}
-          onClose={handleCloseSkillLevelSheet}
-        />
-      ) : null}
-
-      {isAddingSport ? (
-        <BottomSheet onClose={handleCloseSkillLevelSheet} closeLabel={t('mob.common.cancel')}>
-          {addableSports.length === 0 ? (
-            <Text style={styles.hint}>{t('mob.common.no_sports')}</Text>
-          ) : (
-            <SkillLevelFlow
-              sports={addableSports}
-              saving={isSavingSkillLevel}
-              error={skillLevelError}
-              nextLabel={t('mob.common.next')}
-              backLabel={t('mob.common.back')}
-              saveLabel={t('mob.common.save')}
-              onSave={handleSaveSkillLevels}
-            />
-          )}
-        </BottomSheet>
-      ) : null}
-
-      <MobileNumberCard
-        storedNumber={profile.mobile_number}
-        onSaved={mobileNumber =>
-          setProfile(current => (current ? { ...current, mobile_number: mobileNumber } : current))
-        }
-      />
-
-      <Button
-        label={t('mob.profile.notification_prefs')}
-        variant="secondary"
-        onPress={() => navigation.navigate('NotificationPreferences')}
-        style={styles.stackedButton}
-      />
-
-      {signOutError ? <Text style={styles.errorText}>{signOutError}</Text> : null}
-
-      <Button
-        label={t('mob.profile.sign_out')}
-        variant="secondary"
-        onPress={handleSignOut}
-        loading={isSigningOut}
-        style={styles.signOutButton}
-      />
-
-      {privacyPolicyUrl ? (
-        <Button
-          label={t('mob.register.privacy_link')}
-          variant="secondary"
-          onPress={() => openLink(privacyPolicyUrl, t('mob.errors.open_page_failed'))}
-          style={styles.stackedButton}
-        />
-      ) : null}
-
-      {termsOfUseUrl ? (
-        <Button
-          label={t('mob.register.terms_link')}
-          variant="secondary"
-          onPress={() => openLink(termsOfUseUrl, t('mob.errors.open_page_failed'))}
-          style={styles.stackedButton}
-        />
-      ) : null}
-
-      {supportLink ? (
-        <Button
-          label={t('mob.profile.contact_support')}
-          variant="secondary"
-          onPress={() => openLink(supportLink, t('mob.errors.open_link_failed'))}
-          style={styles.stackedButton}
-        />
-      ) : null}
-
-      {reportFormUrl ? (
-        <Button
-          label={t('mob.profile.report')}
-          variant="secondary"
-          onPress={() => openLink(reportFormUrl, t('mob.errors.open_form_failed'))}
-          style={styles.stackedButton}
-        />
-      ) : null}
-
-      <View style={styles.dangerZone}>
-        {deletionError ? <Text style={styles.errorText}>{deletionError}</Text> : null}
-
-        {isAwaitingConfirmationCode ? (
-          <View style={styles.editRow}>
-            <Text style={styles.dangerZoneText}>
-              {t('mob.profile.code_prompt')}
-            </Text>
-            <TextField
-              style={styles.input}
-              placeholder={t('mob.profile.code_placeholder')}
-              {...deletionChain.props('confirmationCode')}
-              value={confirmationCodeDraft}
-              onChangeText={setConfirmationCodeDraft}
-              editable={!isConfirmingDeletion}
-              autoCapitalize="none"
-            />
-            <View style={styles.editActionsRow}>
-              <Button
-                label={t('mob.profile.confirm_delete')}
-                size="sm"
-                variant="destructive"
-                onPress={handleConfirmDeletion}
-                loading={isConfirmingDeletion}
-                style={styles.actionSpacing}
-              />
-              <Button
-                label={t('mob.common.cancel')}
-                size="sm"
-                variant="secondary"
-                onPress={handleCancelDeletionCode}
-                disabled={isConfirmingDeletion}
-              />
-            </View>
-          </View>
-        ) : (
-          <Button
-            label={t('mob.profile.delete_account')}
-            variant="destructive"
-            onPress={handleDeleteAccountPress}
-            loading={isRequestingDeletion}
-          />
         )}
       </View>
-    </KeyboardAwareScreen>
+
+      {/* Identity */}
+      <View style={styles.identityContainer}>
+        <View style={styles.avatarBorder}>
+          {profile.avatar_url ? (
+            <FastImage source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarInitials}>
+              <Text style={styles.avatarInitialsText}>{initials}</Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
+        <Text style={styles.nickname}>@{profile.nickname}</Text>
+      </View>
+
+      {/* Main cards */}
+      <View style={styles.cardsContainer}>
+        {/* Stats strip */}
+        <View style={styles.statsCard}>
+          <View style={styles.statColumn}>
+            <IconBadge color="blue" size={36} borderRadius={18}>
+              <TrophyIcon size={18} />
+            </IconBadge>
+            <Text style={[styles.statNumber, { color: colors.primary }]}>
+              {profileSummary?.games_played ?? 0}
+            </Text>
+            <Text style={styles.statLabel}>{t('mob.profile.stat_played')}</Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statColumn}>
+            <IconBadge color="amber" size={36} borderRadius={18}>
+              <StarIcon size={18} />
+            </IconBadge>
+            <Text style={[styles.statNumber, { color: colors.warning }]}>
+              {profileSummary?.games_hosted ?? 0}
+            </Text>
+            <Text style={styles.statLabel}>{t('mob.profile.stat_hosted')}</Text>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statColumn}>
+            <IconBadge color="green" size={36} borderRadius={18}>
+              <PeopleIcon size={18} />
+            </IconBadge>
+            <Text style={[styles.statNumber, { color: colors.success }]}>
+              {profileSummary?.groups_count ?? groups.length}
+            </Text>
+            <Text style={styles.statLabel}>{t('mob.profile.stat_groups')}</Text>
+          </View>
+        </View>
+
+        {/* Skills card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{t('mob.profile.skills')}</Text>
+          {profile.skill_levels && profile.skill_levels.length > 0 ? (
+            <View style={styles.skillsGrid}>
+              {profile.skill_levels.map(skill => (
+                <SkillTileItem
+                  key={skill.sport}
+                  sport={skill.sport}
+                  level={skill.skill_level}
+                />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>{t('mob.profile.no_skills')}</Text>
+          )}
+        </View>
+
+        {/* My groups card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>{t('mob.profile.my_groups')}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.dashboard.view_all')}
+              onPress={() => (navigation.getParent() as any)?.navigate('Groups', { screen: 'GroupsList' })}
+            >
+              <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+            </Pressable>
+          </View>
+
+          {groups.length > 0 ? (
+            <View style={styles.groupsRow}>
+              {groups.slice(0, 3).map((group, idx) => (
+                <Pressable
+                  key={group.id}
+                  style={styles.groupItem}
+                  onPress={() =>
+                    (navigation.getParent() as any)?.navigate('Groups', {
+                      screen: 'GroupDetail',
+                      params: { groupId: group.id },
+                    })
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={group.name}
+                >
+                  {group.logo_url ? (
+                    <Image source={{ uri: group.logo_url }} style={styles.groupLogo} resizeMode="cover" />
+                  ) : (
+                    <View
+                      style={[
+                        styles.groupLogoInitials,
+                        { backgroundColor: GROUP_BADGE_COLORS[idx % GROUP_BADGE_COLORS.length] },
+                      ]}
+                    >
+                      <Text style={styles.groupInitialsText}>{getInitials(group.name)}</Text>
+                    </View>
+                  )}
+                  <Text numberOfLines={2} style={styles.groupName}>
+                    {group.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>{t('mob.profile.no_groups')}</Text>
+          )}
+        </View>
+
+        {/* Recent games card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>{t('mob.profile.recent_games')}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.dashboard.view_all')}
+              onPress={() =>
+                (navigation.getParent() as any)?.navigate('Tournaments', {
+                  screen: 'TournamentsList',
+                  params: { scope: 'mine' },
+                })
+              }
+            >
+              <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+            </Pressable>
+          </View>
+
+          {profileSummary?.recent_games && profileSummary.recent_games.length > 0 ? (
+            <View style={styles.recentGamesList}>
+              {profileSummary.recent_games.map((game, idx) => (
+                <View key={game.id}>
+                  {idx > 0 ? <View style={styles.gameDivider} /> : null}
+                  <Pressable
+                    style={styles.gameRow}
+                    onPress={() =>
+                      (navigation.getParent() as any)?.navigate('Home', {
+                        screen: 'EventDetail',
+                        params: { eventId: game.id },
+                      })
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={game.title}
+                  >
+                    <View style={styles.gameSportIconCircle}>
+                      <SportIcon slug={game.sport} size={20} />
+                    </View>
+                    <View style={styles.gameDetailsCol}>
+                      <Text numberOfLines={1} style={styles.gameTitle}>
+                        {game.title}
+                      </Text>
+                      <View style={styles.gameMetaRow}>
+                        <ClockIcon size={14} />
+                        <Text style={styles.gameMetaText}>
+                          {formatRecentGameDate(game.starts_at)}
+                        </Text>
+                        <PinIcon size={14} />
+                        <Text numberOfLines={1} style={styles.gameMetaText}>
+                          {game.venue_name}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>{t('mob.profile.no_recent_games')}</Text>
+          )}
+        </View>
+
+        {/* Action buttons (Edit Profile and Settings) */}
+        <View style={styles.actionRow}>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('EditProfile')}
+            accessibilityRole="button"
+            accessibilityLabel={t('mob.profile.edit_profile')}
+          >
+            <EditIcon size={18} color={colors.textPrimary} />
+            <Text style={styles.actionButtonText}>{t('mob.profile.edit_profile')}</Text>
+          </Pressable>
+          <Pressable
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('Settings')}
+            accessibilityRole="button"
+            accessibilityLabel={t('mob.profile.settings')}
+          >
+            <GearIcon size={18} />
+            <Text style={styles.actionButtonText}>{t('mob.profile.settings')}</Text>
+          </Pressable>
+        </View>
+
+        {/* Log out button */}
+        <Pressable
+          style={styles.logoutButton}
+          onPress={handleLogoutPress}
+          disabled={isSigningOut}
+          accessibilityRole="button"
+          accessibilityLabel={t('mob.profile.logout')}
+        >
+          {isSigningOut ? (
+            <ActivityIndicator size="small" color={colors.error} />
+          ) : (
+            <>
+              <DoorIcon size={20} />
+              <Text style={styles.logoutButtonText}>{t('mob.profile.logout')}</Text>
+            </>
+          )}
+        </Pressable>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.md },
-  header: { alignItems: 'center', marginBottom: spacing.md },
-  avatarContainer: {
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xxl + spacing.lg,
+  },
+  bannerContainer: {
+    height: 160,
+    backgroundColor: colors.primary,
     position: 'relative',
-    width: sizes.avatar,
-    height: sizes.avatar,
+    overflow: 'hidden',
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bannerFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.primary,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.md,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: 14,
+    backgroundColor: colors.surface,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+  },
+  actionButtonText: {
+    ...typography.button,
+    color: colors.textPrimary,
+  },
+  identityContainer: {
+    alignItems: 'center',
+    marginTop: -44,
     marginBottom: spacing.md,
   },
-  avatar: {
-    width: sizes.avatar,
-    height: sizes.avatar,
-    borderRadius: radius.full,
-  },
-  avatarPlaceholder: {
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPlaceholderText: { ...typography.h1, color: colors.white },
-  avatarOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.scrim,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarEditBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    borderWidth: borderWidth.thick,
+  avatarBorder: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 3,
     borderColor: colors.surface,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.card,
   },
-  displayNameRow: { flexDirection: 'row', alignItems: 'center' },
-  displayName: { ...typography.h2, color: colors.textPrimary, marginRight: spacing.sm },
-  nicknameLine: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
-  nicknameHint: { ...typography.caption, color: colors.textMuted },
-  email: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
-  section: { marginBottom: spacing.md },
-  sectionHeaderRow: {
+  avatarImage: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+  },
+  avatarInitials: {
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: colors.avatarTint1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitialsText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.avatarTintText1,
+  },
+  displayName: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    marginTop: spacing.sm,
+  },
+  nickname: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  cardsContainer: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.md,
+  },
+  statsCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  statLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  statDivider: {
+    width: borderWidth.thin,
+    height: 48,
+    backgroundColor: colors.border,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  cardTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+  },
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  sectionTitle: { ...typography.h3, color: colors.textPrimary },
-  emptyText: { ...typography.body, color: colors.textSecondary },
-  hint: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
-  editRow: { marginTop: spacing.sm, width: '100%' },
-  input: { marginBottom: spacing.sm },
-  editActionsRow: { flexDirection: 'row', marginTop: spacing.xs },
-  actionSpacing: { marginRight: spacing.sm },
-  stackedButton: { marginBottom: spacing.sm },
-  signOutButton: { marginBottom: spacing.xl },
-  dangerZone: {
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: colors.border,
-    paddingTop: spacing.md,
+  viewAllLink: {
+    ...typography.label,
+    color: colors.primary,
   },
-  dangerZoneText: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.sm },
-  errorText: {
-    ...typography.body,
-    color: colors.error,
-    marginBottom: spacing.sm,
+  skillsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  skillTile: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    gap: spacing.sm,
+  },
+  skillIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skillTextCol: {
+    flex: 1,
+  },
+  skillSportName: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 14,
+  },
+  skillLevelText: {
+    ...typography.caption,
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  groupsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: spacing.xs,
+  },
+  groupItem: {
+    alignItems: 'center',
+    width: 72,
+  },
+  groupLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+  },
+  groupLogoInitials: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  groupInitialsText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.white,
+  },
+  groupName: {
+    ...typography.label,
+    color: colors.textPrimary,
     textAlign: 'center',
+    marginTop: 6,
+  },
+  recentGamesList: {
+    marginTop: spacing.xs,
+  },
+  gameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  gameDivider: {
+    height: borderWidth.thin,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xs,
+  },
+  gameSportIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.avatarTint1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gameDetailsCol: {
+    flex: 1,
+  },
+  gameTitle: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  gameMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: 3,
+  },
+  gameMetaText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginRight: spacing.xs,
+  },
+  logoutButton: {
+    borderWidth: 1.5,
+    borderColor: colors.error,
+    borderRadius: radius.full,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    marginTop: spacing.xs,
+  },
+  logoutButtonText: {
+    ...typography.button,
+    color: colors.error,
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
 });

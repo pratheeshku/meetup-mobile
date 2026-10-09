@@ -39,5 +39,38 @@ target 'MeetupMobile' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # React-Core-prebuilt is built in release mode (with REACT_NATIVE_PRODUCTION / NDEBUG).
+    # When compiling third-party pods in Debug configuration, ensure REACT_NATIVE_PRODUCTION
+    # is defined so Fabric headers don't emit debug-only symbols (Sealable, ShadowNode::getDebug*, etc.)
+    # that are not exported by the prebuilt binary.
+    rn_prod_flag = ' -DREACT_NATIVE_PRODUCTION=1'
+
+    installer.aggregate_targets.each do |aggregate_target|
+      aggregate_target.xcconfigs.each do |config_name, config_file|
+        ReactNativePodsUtils.add_flag_to_map_with_inheritance(config_file.attributes, 'OTHER_CPLUSPLUSFLAGS', rn_prod_flag)
+        ReactNativePodsUtils.add_flag_to_map_with_inheritance(config_file.attributes, 'OTHER_CFLAGS', rn_prod_flag)
+        config_file.save_as(aggregate_target.xcconfig_path(config_name))
+      end
+    end
+
+    installer.pod_targets.each do |pod_target|
+      pod_target.build_settings.each do |config_name, _|
+        xcconfig_path = pod_target.xcconfig_path(config_name)
+        next unless File.exist?(xcconfig_path)
+
+        xcconfig = Xcodeproj::Config.new(xcconfig_path)
+        ReactNativePodsUtils.add_flag_to_map_with_inheritance(xcconfig.attributes, 'OTHER_CPLUSPLUSFLAGS', rn_prod_flag)
+        ReactNativePodsUtils.add_flag_to_map_with_inheritance(xcconfig.attributes, 'OTHER_CFLAGS', rn_prod_flag)
+        xcconfig.save_as(xcconfig_path)
+      end
+    end
+
+    installer.target_installation_results.pod_target_installation_results.each do |pod_name, target_installation_result|
+      target_installation_result.native_target.build_configurations.each do |cfg|
+        ReactNativePodsUtils.add_flag_to_map_with_inheritance(cfg.build_settings, 'OTHER_CPLUSPLUSFLAGS', rn_prod_flag)
+        ReactNativePodsUtils.add_flag_to_map_with_inheritance(cfg.build_settings, 'OTHER_CFLAGS', rn_prod_flag)
+      end
+    end
   end
 end

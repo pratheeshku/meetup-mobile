@@ -38,6 +38,7 @@ import type {
   GroupsListResponse,
   InviteMemberResult,
   SuggestedMember,
+  UpdateGroupInput,
 } from '../types/group';
 
 interface RequestOptions {
@@ -72,6 +73,8 @@ interface GroupApiItem {
   } | null;
   member_count?: number | null;
   memberCount?: number | null;
+  upcoming_game_count?: number | null;
+  upcomingGameCount?: number | null;
   members_preview?: Array<{
     display_name?: string;
     displayName?: string;
@@ -141,6 +144,12 @@ function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
       : raw.memberCount !== undefined
       ? raw.memberCount
       : null;
+  const upcomingGameCount =
+    raw.upcoming_game_count !== undefined
+      ? raw.upcoming_game_count
+      : raw.upcomingGameCount !== undefined
+      ? raw.upcomingGameCount
+      : null;
 
   const role = (raw.current_user_role ?? raw.currentUserRole ?? raw.role ?? currentUserRole) as GroupRole;
 
@@ -153,6 +162,7 @@ function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
     owner: ownerObj,
     logo_url: raw.logo_url ?? raw.logoUrl ?? null,
     member_count: memberCount,
+    upcoming_game_count: upcomingGameCount,
     members_preview: membersPreview,
     created_at: raw.created_at ?? raw.createdAt ?? '',
     current_user_role: role,
@@ -467,3 +477,86 @@ export async function createGroupInvitation(
   );
   return data;
 }
+
+/**
+ * `PATCH /groups/{id}` — update name and description.
+ */
+export async function updateGroup(
+  groupId: string,
+  input: UpdateGroupInput,
+  options?: RequestOptions,
+): Promise<Group> {
+  const body: { name: string; description?: string } = { name: input.name };
+  if (input.description !== undefined) {
+    body.description = input.description;
+  }
+  const { data } = await apiClient.patch<GroupApiItem>(`/groups/${groupId}`, body, {
+    correlationId: options?.correlationId,
+  });
+  return mapGroupApiItem(data, 'owner');
+}
+
+/**
+ * `DELETE /groups/{id}` — soft delete group.
+ */
+export async function deleteGroup(
+  groupId: string,
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.delete(`/groups/${groupId}`, {
+    correlationId: options?.correlationId,
+  });
+}
+
+/**
+ * `POST /groups/{id}/transfer-ownership` — transfer group ownership to another member.
+ */
+export async function transferGroupOwnership(
+  groupId: string,
+  newOwnerId: string,
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.post(
+    `/groups/${groupId}/transfer-ownership`,
+    { new_owner_id: newOwnerId },
+    { correlationId: options?.correlationId },
+  );
+}
+
+/**
+ * `POST /groups/{id}/logo` — multipart file upload for group logo.
+ */
+export async function uploadGroupLogo(
+  groupId: string,
+  fileUri: string,
+  fileName: string,
+  fileType: string,
+  options?: RequestOptions,
+): Promise<void> {
+  const formData = new FormData();
+  formData.append('file', {
+    uri: fileUri,
+    name: fileName,
+    type: fileType,
+  } as unknown as Blob);
+
+  await apiClient.post(`/groups/${groupId}/logo`, formData, {
+    correlationId: options?.correlationId,
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+}
+
+/**
+ * `DELETE /groups/{id}/logo` — remove group logo.
+ */
+export async function deleteGroupLogo(
+  groupId: string,
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.delete(`/groups/${groupId}/logo`, {
+    correlationId: options?.correlationId,
+  });
+}
+

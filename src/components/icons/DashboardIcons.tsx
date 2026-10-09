@@ -14,6 +14,8 @@
 import React from 'react';
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 
+import { SwimmingIcon, VolleyballIcon } from './SharedIcons';
+
 export interface IconProps {
   size?: number;
 }
@@ -186,6 +188,8 @@ export const SPORT_ICONS: Record<string, IconComponent> = {
   basketball: BasketballIcon,
   football: FootballIcon,
   tennis: TennisIcon,
+  volleyball: VolleyballIcon,
+  swimming: SwimmingIcon,
 };
 
 /** Normalised slug used for icon and tile-colour lookup. */

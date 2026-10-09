@@ -7,11 +7,12 @@
 import { levelColors, levelColorsUnknown } from '../../theme/tokens';
 import type { SkillLevelValue } from '../../types/user';
 
-export const SKILL_LEVEL_ORDER: readonly SkillLevelValue[] = ['Beginner', 'Intermediate', 'Expert'];
+export const SKILL_LEVEL_ORDER: readonly SkillLevelValue[] = ['beginner', 'intermediate', 'expert'];
 
 /** 1-based position in `SKILL_LEVEL_ORDER`; 0 for a stored value this build does not know. */
 export function levelDotCount(level: string): number {
-  return SKILL_LEVEL_ORDER.indexOf(level as SkillLevelValue) + 1;
+  const normalized = level.toLowerCase() as SkillLevelValue;
+  return SKILL_LEVEL_ORDER.indexOf(normalized) + 1;
 }
 
 export function levelLabelKey(level: string): string {
@@ -23,5 +24,6 @@ export function levelDescKey(level: string): string {
 }
 
 export function levelTint(level: string): { bg: string; text: string; border: string } {
-  return levelColors[level as SkillLevelValue] ?? levelColorsUnknown;
+  const normalized = level.toLowerCase() as SkillLevelValue;
+  return levelColors[normalized] ?? (levelColors as any)[level] ?? levelColorsUnknown;
 }

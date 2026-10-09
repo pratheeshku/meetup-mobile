@@ -89,7 +89,7 @@ describe('SkillLevelFlow', () => {
     tap(root, 'radio', 'Tennis, Intermediate'); // change of mind
     press(root, 'Save');
     expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onSave).toHaveBeenCalledWith({ badminton: 'Beginner', tennis: 'Intermediate' });
+    expect(onSave).toHaveBeenCalledWith({ badminton: 'beginner', tennis: 'intermediate' });
   });
 
   it('deselecting a sport drops it and its level; Back returns to the picker keeping the selection', () => {
@@ -111,21 +111,21 @@ describe('SkillLevelFlow', () => {
     ]);
     tap(root, 'radio', 'Badminton, Expert');
     press(root, 'Save');
-    expect(onSave).toHaveBeenCalledWith({ badminton: 'Expert' });
+    expect(onSave).toHaveBeenCalledWith({ badminton: 'expert' });
   });
 
   it('pre-selects initial levels and shows them already chosen', () => {
-    const { root, onSave } = flow({ initialLevels: { tennis: 'Expert' } });
+    const { root, onSave } = flow({ initialLevels: { tennis: 'expert' } });
     expect(control(root, 'checkbox', 'Tennis').props.accessibilityState.checked).toBe(true);
     press(root, 'Next');
     expect(control(root, 'radio', 'Tennis, Expert').props.accessibilityState.selected).toBe(true);
     press(root, 'Save');
-    expect(onSave).toHaveBeenCalledWith({ tennis: 'Expert' });
+    expect(onSave).toHaveBeenCalledWith({ tennis: 'expert' });
   });
 
   it('shows a caller-supplied save error inline and renders the footer', () => {
     const { root } = flow({
-      initialLevels: { tennis: 'Expert' },
+      initialLevels: { tennis: 'expert' },
       error: 'Could not save',
       footer: <></>,
     });

@@ -88,6 +88,20 @@ export async function markNotificationRead(id: string): Promise<void> {
   await apiClient.post(`/notifications/${encodeURIComponent(id)}/read`);
 }
 
+/**
+ * `POST /notifications/{notification_id}/unread` — marks a single notification as unread.
+ */
+export async function markNotificationUnread(id: string): Promise<void> {
+  await apiClient.post(`/notifications/${encodeURIComponent(id)}/unread`);
+}
+
+/**
+ * `POST /notifications/read-all` — marks all notifications as read in bulk.
+ */
+export async function markAllNotificationsRead(): Promise<void> {
+  await apiClient.post('/notifications/read-all');
+}
+
 /** `GET /notifications/unread-count` — live OpenAPI `UnreadCountResponse`. */
 export async function getUnreadCount(): Promise<{ count: number }> {
   const { data } = await apiClient.get<{ count: number }>(
@@ -95,3 +109,4 @@ export async function getUnreadCount(): Promise<{ count: number }> {
   );
   return data;
 }
+

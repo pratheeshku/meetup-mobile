@@ -60,6 +60,9 @@ export interface Event {
   is_organiser: boolean;
   venue_name?: string | null;
   venue_address?: string | null;
+  venue_place_id?: string | null;
+  venue_lat?: number | null;
+  venue_lng?: number | null;
   skill_level_requirement?: EventSkillLevel | null;
   allow_waitlist?: boolean;
   estimated_cost_cents?: number | null;
@@ -80,10 +83,14 @@ export interface UpdateEventInput {
   starts_at?: string;
   ends_at?: string | null;
   visibility?: EventVisibility | string;
+  group_ids?: string[];
   sport?: string;
   allow_waitlist?: boolean;
   estimated_cost_cents?: number | null;
   estimated_cost_currency?: string | null;
+  venue_place_id?: string | null;
+  venue_lat?: number | null;
+  venue_lng?: number | null;
 }
 
 export interface EventInvitation {
@@ -137,7 +144,8 @@ export interface CreateEventInput {
   title: string;
   sport?: string;
   visibility: EventVisibility;
-  group_id?: string;
+  group_ids?: string[];
+  invite_user_ids?: string[];
   skill_level_requirement: EventSkillLevel;
   /** Integer, schema `gt=0` (i.e. at least 1); form enforces 2–200 to match web. */
   capacity: number;
@@ -146,6 +154,9 @@ export interface CreateEventInput {
   ends_at: null;
   venue_name?: string;
   venue_address?: string;
+  venue_place_id?: string | null;
+  venue_lat?: number | null;
+  venue_lng?: number | null;
   description?: string;
   /**
    * Contract-verification finding (Create Game screen rebuild task):

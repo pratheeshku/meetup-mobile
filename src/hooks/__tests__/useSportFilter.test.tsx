@@ -59,8 +59,8 @@ describe('useSportFilter', () => {
     const { filter, mount } = setup({
       sports: sportsResource('ready', SPORTS),
       skills: [
-        { sport: 'Tennis', skill_level: 'Beginner' },
-        { sport: 'rugby', skill_level: 'Expert' },
+        { sport: 'Tennis', skill_level: 'beginner' },
+        { sport: 'rugby', skill_level: 'expert' },
       ],
       settled: true,
     });
@@ -100,7 +100,7 @@ describe('useSportFilter', () => {
 
     await rerender({
       sports: sportsResource('ready', SPORTS),
-      skills: [{ sport: 'football', skill_level: 'Expert' }],
+      skills: [{ sport: 'football', skill_level: 'expert' }],
       settled: true,
     });
     expect(filter.current?.isLoading).toBe(false);
@@ -110,7 +110,7 @@ describe('useSportFilter', () => {
   it('toggles chips, keeps All exclusive, and re-selects All when every sport is cleared', async () => {
     const { filter, mount } = setup({
       sports: sportsResource('ready', SPORTS),
-      skills: [{ sport: 'tennis', skill_level: 'Expert' }],
+      skills: [{ sport: 'tennis', skill_level: 'expert' }],
       settled: true,
     });
     await mount();
@@ -132,7 +132,7 @@ describe('useSportFilter', () => {
   it("never overwrites the user's selection after a re-render or a data reload", async () => {
     const { filter, mount, rerender } = setup({
       sports: sportsResource('ready', SPORTS),
-      skills: [{ sport: 'tennis', skill_level: 'Expert' }],
+      skills: [{ sport: 'tennis', skill_level: 'expert' }],
       settled: true,
     });
     await mount();
@@ -143,13 +143,13 @@ describe('useSportFilter', () => {
     // Plain re-render, then a reload delivering fresh sports/skill data.
     await rerender({
       sports: sportsResource('ready', SPORTS),
-      skills: [{ sport: 'tennis', skill_level: 'Expert' }],
+      skills: [{ sport: 'tennis', skill_level: 'expert' }],
       settled: true,
     });
     expect(filter.current?.selected).toEqual(['football']);
     await rerender({
       sports: sportsResource('ready', [...SPORTS]),
-      skills: [{ sport: 'badminton', skill_level: 'Beginner' }],
+      skills: [{ sport: 'badminton', skill_level: 'beginner' }],
       settled: true,
     });
     expect(filter.current?.selected).toEqual(['football']);
@@ -165,7 +165,7 @@ describe('useSportFilter', () => {
     await act(async () => filter.current?.toggle('tennis'));
     await rerender({
       sports: sportsResource('ready', SPORTS),
-      skills: [{ sport: 'football', skill_level: 'Expert' }],
+      skills: [{ sport: 'football', skill_level: 'expert' }],
       settled: true,
     });
     expect(filter.current?.selected).toEqual(['tennis']);

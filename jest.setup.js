@@ -276,4 +276,30 @@ jest.mock('./src/api/home', () => {
     getLegalLinks: jest.fn(async () => null),
   };
 });
+
+// Centralized mock for @react-native-community/geolocation
+jest.mock('@react-native-community/geolocation', () => ({
+  __esModule: true,
+  default: {
+    setRNConfiguration: jest.fn(),
+    requestAuthorization: jest.fn(),
+    getCurrentPosition: jest.fn((success) => {
+      success({
+        coords: {
+          latitude: 1.3521,
+          longitude: 103.8198,
+          altitude: null,
+          accuracy: 10,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null,
+        },
+        timestamp: Date.now(),
+      });
+    }),
+    watchPosition: jest.fn(() => 1),
+    clearWatch: jest.fn(),
+    stopObserving: jest.fn(),
+  },
+}));
 /* eslint-enable no-undef */
