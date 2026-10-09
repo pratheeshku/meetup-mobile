@@ -244,10 +244,10 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 16,
   },
   actionUnreadBg: {
-    backgroundColor: '#1961F7',
+    backgroundColor: '#1F5FE0',
   },
   actionReadBg: {
-    backgroundColor: '#52617E',
+    backgroundColor: '#62718F',
   },
   actionButton: {
     width: ACTION_WIDTH,

@@ -42,6 +42,7 @@ import NotificationCard from '../components/NotificationCard';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { RegistryIcon } from '../components/icons/RegistryIcons';
+import { BackArrowIcon, CheckIcon } from '../components/icons/ActionIcons';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/LabelsContext';
 import {
@@ -477,7 +478,7 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
         >
           <CheckIcon
             size={18}
-            color={isMarkAllDisabled ? '#A0ABC0' : '#1961F7'}
+            color={isMarkAllDisabled ? '#9AA8C4' : '#1961F7'}
           />
           <Text
             style={[
@@ -716,7 +717,7 @@ const styles = StyleSheet.create({
     color: '#1961F7',
   },
   markAllDisabledText: {
-    color: '#A0ABC0',
+    color: '#9AA8C4',
   },
   pressed: {
     opacity: 0.7,
