@@ -40,11 +40,21 @@ target 'MeetupMobile' do
       # :ccache_enabled => true
     )
 
+    strip_flag = lambda do |val|
+      if val.is_a?(Array)
+        val.map { |x| strip_flag.call(x) }
+      elsif val.is_a?(String)
+        val.gsub('-DRCT_NEW_ARCH_ENABLED=1', '').gsub('-DRCT_NEW_ARCH_ENABLED', '').strip
+      else
+        val
+      end
+    end
+
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         ['OTHER_CPLUSPLUSFLAGS', 'OTHER_CFLAGS', 'OTHER_SWIFT_FLAGS'].each do |flag_key|
           if config.build_settings[flag_key]
-            config.build_settings[flag_key] = config.build_settings[flag_key].gsub('-DRCT_NEW_ARCH_ENABLED=1', '').gsub('-DRCT_NEW_ARCH_ENABLED', '')
+            config.build_settings[flag_key] = strip_flag.call(config.build_settings[flag_key])
           end
         end
       end
@@ -58,7 +68,7 @@ target 'MeetupMobile' do
         xcconfig = Xcodeproj::Config.new(xcconfig_path)
         ['OTHER_CPLUSPLUSFLAGS', 'OTHER_CFLAGS', 'OTHER_SWIFT_FLAGS'].each do |flag_key|
           if xcconfig.attributes[flag_key]
-            xcconfig.attributes[flag_key] = xcconfig.attributes[flag_key].gsub('-DRCT_NEW_ARCH_ENABLED=1', '').gsub('-DRCT_NEW_ARCH_ENABLED', '')
+            xcconfig.attributes[flag_key] = strip_flag.call(xcconfig.attributes[flag_key])
           end
         end
         xcconfig.save_as(xcconfig_path)
@@ -67,8 +77,10 @@ target 'MeetupMobile' do
 
     installer.aggregate_targets.each do |aggregate_target|
       aggregate_target.xcconfigs.each do |config_name, config_file|
-        if config_file.attributes['OTHER_CPLUSPLUSFLAGS']
-          config_file.attributes['OTHER_CPLUSPLUSFLAGS'] = config_file.attributes['OTHER_CPLUSPLUSFLAGS'].gsub('-DRCT_NEW_ARCH_ENABLED=1', '').gsub('-DRCT_NEW_ARCH_ENABLED', '')
+        ['OTHER_CPLUSPLUSFLAGS', 'OTHER_CFLAGS', 'OTHER_SWIFT_FLAGS'].each do |flag_key|
+          if config_file.attributes[flag_key]
+            config_file.attributes[flag_key] = strip_flag.call(config_file.attributes[flag_key])
+          end
         end
         config_file.save_as(aggregate_target.xcconfig_path(config_name))
       end
