@@ -115,6 +115,7 @@ export interface NotificationHistoryItem {
     display?: {
       title?: string | null;
       body?: string | null;
+      url?: string | null;
     } | null;
     [key: string]: any;
   } | null;

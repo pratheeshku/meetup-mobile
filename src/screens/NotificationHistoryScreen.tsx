@@ -23,6 +23,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   SectionList,
   StyleSheet,
@@ -40,7 +41,6 @@ import {
 import NotificationCard from '../components/NotificationCard';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
-import { BackArrowIcon, CheckIcon } from '../components/icons/ActionIcons';
 import { RegistryIcon } from '../components/icons/RegistryIcons';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/LabelsContext';
@@ -74,6 +74,12 @@ function isKnownType(value: string): value is NotificationType {
 }
 
 function openNotification(item: NotificationHistoryItem): void {
+  const url = item.payload?.display?.url;
+  if (url) {
+    Linking.openURL(url).catch(() => {});
+    return;
+  }
+
   if (!isKnownType(item.notification_type)) {
     return;
   }
