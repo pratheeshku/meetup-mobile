@@ -47,7 +47,7 @@ import { generateCorrelationId } from './correlationId';
 import { authEvents } from './authEvents';
 import { clearCookieJar } from './cookies';
 import { logRouteToLogin } from './loginRouteLog';
-import { perfLog, startSpan, toPathTemplate, isPerfEnabled } from '../diagnostics/perfLog';
+import { perfLog, startSpan, toPathTemplate, isPerfCapturing, now } from '../diagnostics/perfLog';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -95,6 +95,16 @@ const REFRESH_TIMEOUT_MS = 10_000;
 /** Auth endpoints answer 401 for reasons a refresh cannot fix (e.g. wrong password). */
 const AUTH_PATH_PREFIX = '/auth/';
 
+/** content-length only. Missing or non-numeric → null. Never reads the body. */
+function contentLengthBytes(raw: unknown): number | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return null;
+  }
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export const apiClient = axios.create({
   baseURL: ENV.API_BASE_URL,
   timeout: 30_000,
@@ -119,16 +129,10 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   // ── Perf: enter timestamp and in-flight concurrency ──────────────────────
   const reqId = ++_reqIdSeq;
   _inFlightCount++;
-  const enterT = (() => {
-    if (!isPerfEnabled()) {
-      return 0;
-    }
-    // Import here avoids a circular-import; 'now' is a trivial fn.
-    const { now } = require('../diagnostics/perfLog') as typeof import('../diagnostics/perfLog');
-    return now();
-  })();
+  const capturing = isPerfCapturing();
+  const enterT = capturing ? now() : 0;
 
-  if (isPerfEnabled()) {
+  if (capturing) {
     config._perfReqId = reqId;
     config._perfEnterT = enterT;
     const method = config.method?.toUpperCase() ?? 'GET';
@@ -141,15 +145,9 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   const tokenSpan = startSpan('_token_read_for_request');
   try {
     const accessToken = await getAccessToken();
-    const tokenWaitEnd = (() => {
-      if (!isPerfEnabled()) {
-        return 0;
-      }
-      const { now } = require('../diagnostics/perfLog') as typeof import('../diagnostics/perfLog');
-      return now();
-    })();
+    const tokenWaitEnd = capturing ? now() : 0;
 
-    if (isPerfEnabled() && enterT > 0) {
+    if (capturing && enterT > 0) {
       config._perfSentT = tokenWaitEnd;
       const tokenWaitMs = Math.round((tokenWaitEnd - enterT) * 10) / 10;
       perfLog('http_token_wait', { req_id: reqId, token_wait_ms: tokenWaitMs });
@@ -247,25 +245,17 @@ apiClient.interceptors.response.use(
   response => {
     // ── Perf: response received ─────────────────────────────────────────────
     _inFlightCount = Math.max(0, _inFlightCount - 1);
-    if (isPerfEnabled()) {
+    if (isPerfCapturing()) {
       const config = response.config as InternalAxiosRequestConfig;
       const reqId = config._perfReqId;
       const enterT = config._perfEnterT ?? 0;
       const sentT = config._perfSentT ?? enterT;
-      const { now } = require('../diagnostics/perfLog') as typeof import('../diagnostics/perfLog');
       const responseT = now();
       const totalMs = Math.round((responseT - enterT) * 10) / 10;
       const networkMs = Math.round((responseT - sentT) * 10) / 10;
-      // Response size: prefer content-length header; fall back to JSON stringify length.
-      // NEVER log the response body itself.
-      const contentLengthHeader = response.headers['content-length'];
-      const responseBytes = contentLengthHeader
-        ? Number(contentLengthHeader)
-        : typeof response.data === 'string'
-        ? response.data.length
-        : response.data
-        ? JSON.stringify(response.data).length
-        : 0;
+      // Response size: content-length header only. Absent → null.
+      // Never stringify the body (JS-thread cost, and the body is never logged).
+      const responseBytes = contentLengthBytes(response.headers['content-length']);
 
       const method = (config.method ?? 'GET').toUpperCase();
       const path = toPathTemplate(config.url ?? '');
@@ -286,6 +276,25 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const { config, response } = error;
     _inFlightCount = Math.max(0, _inFlightCount - 1);
+
+    // Every failure, including timeout, network, 4xx/5xx, and 401 before retry.
+    // Status or Axios error code only — never error.message or response data.
+    if (isPerfCapturing()) {
+      const enterT = config?._perfEnterT ?? 0;
+      const sentT = config?._perfSentT ?? enterT;
+      const responseT = now();
+      const method = (config?.method ?? 'GET').toUpperCase();
+      const path = toPathTemplate(config?.url ?? '');
+      perfLog('http_error', {
+        req_id: config?._perfReqId ?? null,
+        method,
+        path,
+        status: response?.status ?? error.code ?? null,
+        total_ms: enterT > 0 ? Math.round((responseT - enterT) * 10) / 10 : null,
+        network_ms: sentT > 0 ? Math.round((responseT - sentT) * 10) / 10 : null,
+        in_flight: _inFlightCount,
+      });
+    }
 
     if (response?.status !== 401 || !config || config.url?.startsWith(AUTH_PATH_PREFIX)) {
       return Promise.reject(error);

@@ -34,6 +34,7 @@ import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import type { Event } from '../../types/event';
 import type { Group, GroupRole } from '../../types/group';
+import { perfImageError, perfImageLoad, perfImageLoadStart } from '../../diagnostics/perfLog';
 import { formatRowDate } from '../../utils/formatGameTime';
 import type { GameBadge } from '../../utils/gameLists';
 import type { LabelKey } from '../../labels/fallbackLabels';
@@ -54,6 +55,7 @@ interface UnifiedCardProps {
   onPress: () => void;
   accessibilityLabel: string;
   badge?: React.ReactNode;
+  perfScreen?: string;
 }
 
 export function UnifiedCard({
@@ -67,6 +69,7 @@ export function UnifiedCard({
   onPress,
   accessibilityLabel,
   badge,
+  perfScreen,
 }: UnifiedCardProps): React.JSX.Element {
   const t = useT();
   const hasAvatars = (avatars && avatars.length > 0) || moreCount > 0;
@@ -104,6 +107,7 @@ export function UnifiedCard({
                     name={person.display_name}
                     size={22}
                     accessibilityLabel={person.display_name}
+                    perfScreen={perfScreen}
                   />
                 </View>
               ))}
@@ -162,7 +166,13 @@ function DateBlock({ dateString }: { dateString: string }): React.JSX.Element {
 }
 
 /** Logo tile for Group Cards */
-function GroupLogoBlock({ logoUrl }: { logoUrl: string | null | undefined }): React.JSX.Element {
+function GroupLogoBlock({
+  logoUrl,
+  perfScreen,
+}: {
+  logoUrl: string | null | undefined;
+  perfScreen?: string;
+}): React.JSX.Element {
   const [loadFailed, setLoadFailed] = useState(false);
 
   if (logoUrl && !loadFailed) {
@@ -171,8 +181,28 @@ function GroupLogoBlock({ logoUrl }: { logoUrl: string | null | undefined }): Re
         <Image
           source={{ uri: logoUrl }}
           style={styles.groupLogoImage}
-          onError={() => setLoadFailed(true)}
           resizeMode="cover"
+          onLoadStart={
+            perfScreen ? () => perfImageLoadStart(perfScreen, logoUrl, 'group_logo') : undefined
+          }
+          onLoad={
+            perfScreen
+              ? event =>
+                  perfImageLoad(
+                    perfScreen,
+                    logoUrl,
+                    'group_logo',
+                    event.nativeEvent.source.width,
+                    event.nativeEvent.source.height,
+                  )
+              : undefined
+          }
+          onError={() => {
+            setLoadFailed(true);
+            if (perfScreen) {
+              perfImageError(perfScreen, logoUrl, 'group_logo');
+            }
+          }}
         />
       </View>
     );
@@ -209,10 +239,12 @@ export function UnifiedGameCard({
   event,
   onPress,
   badge,
+  perfScreen,
 }: {
   event: Event;
   onPress: () => void;
   badge?: GameBadge | null | React.ReactNode;
+  perfScreen?: string;
 }): React.JSX.Element {
   const t = useT();
 
@@ -267,6 +299,7 @@ export function UnifiedGameCard({
       onPress={onPress}
       accessibilityLabel={`${event.title}, ${timeLine}, ${venue}, ${countLabel}`}
       badge={badgeNode}
+      perfScreen={perfScreen}
     />
   );
 }
@@ -277,11 +310,13 @@ export function UnifiedGroupCard({
   onPress,
   currentUserId,
   showRolePill = false,
+  perfScreen,
 }: {
   group: Group;
   onPress: () => void;
   currentUserId?: string;
   showRolePill?: boolean;
+  perfScreen?: string;
 }): React.JSX.Element {
   const t = useT();
 
@@ -319,7 +354,7 @@ export function UnifiedGroupCard({
 
   return (
     <UnifiedCard
-      leftTile={<GroupLogoBlock logoUrl={group.logo_url} />}
+      leftTile={<GroupLogoBlock logoUrl={group.logo_url} perfScreen={perfScreen} />}
       badge={
         showRolePill && effectiveRole !== 'none' ? (
           <View style={[styles.rolePill, { backgroundColor: roleBg }]}>
@@ -349,6 +384,7 @@ export function UnifiedGroupCard({
       actionButtonLabel={t('mob.home.view_group')}
       onPress={onPress}
       accessibilityLabel={`${group.name}, ${ownerLine}${countLabel ? `, ${countLabel}` : ''}`}
+      perfScreen={perfScreen}
     />
   );
 }

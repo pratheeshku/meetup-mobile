@@ -120,7 +120,7 @@ export function useResource<T>(
         }
       },
     );
-  }, [resourceName]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resourceName]);
 
   return { status: state.status, data: state.data, load };
 }

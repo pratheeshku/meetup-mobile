@@ -109,14 +109,19 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const unreadCount = useUnreadBadgeCount();
 
   // ── Perf: screen timing ────────────────────────────────────────────────────
-  const homeIsLoading = liveUpcoming.status === 'loading';
+  // First paint shows the active tab's list (skeleton while that list has no items
+  // and is not in the error state).
+  const homeIsLoading =
+    selectedTab === 'upcoming'
+      ? liveUpcoming.items === null && liveUpcoming.status !== 'error'
+      : liveGroups.items === null && liveGroups.status !== 'error';
   usePerfRender('HomeScreen');
   usePerfScreen('HomeScreen', homeIsLoading);
 
   // Resources (bootstrap data & banners)
-  const sports = useResource(options => getSports(options));
-  const profile = useResource(options => getProfile(options));
-  const banners = useResource(options => getHomeBanners(options));
+  const sports = useResource(options => getSports(options), 'getSports');
+  const profile = useResource(options => getProfile(options), 'getProfile');
+  const banners = useResource(options => getHomeBanners(options), 'getHomeBanners');
 
   const { load: loadSports } = sports;
   const { load: loadProfile } = profile;
@@ -514,6 +519,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
                 <UnifiedGameCard
                   key={event.id}
                   event={event}
+                  perfScreen="HomeScreen"
                   onPress={() => openEvent(event)}
                 />
               ))
@@ -537,6 +543,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
                 <UnifiedGroupCard
                   key={group.id}
                   group={group}
+                  perfScreen="HomeScreen"
                   currentUserId={user?.id}
                   onPress={() =>
                     navigation.navigate('Groups', {

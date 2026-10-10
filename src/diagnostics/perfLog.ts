@@ -18,8 +18,10 @@
  *   - Events are logged as single-line JSON prefixed with "[PERF]" via
  *     console.log (visible in logcat).
  *   - Events are also pushed into an in-memory ring buffer (cap 3000).
- *   - A startup buffer (cap 200) captures events before the runtime flag is
- *     resolved; kept on ON, discarded on OFF.
+ *   - While the runtime flag is still 'pending' (build flag OFF), events and
+ *     spans are recorded into a startup buffer (cap 200) without printing.
+ *     When the flag resolves ON they are printed and committed to the ring;
+ *     when it resolves OFF they are discarded. Build-flag ON prints immediately.
  *
  * SENSITIVE FIELD RULES (hard constraints, never relaxed):
  *   - Never log tokens, Authorization/Cookie/Set-Cookie headers, request or
@@ -33,6 +35,7 @@ import { Share, Platform, AppState } from 'react-native';
 import type { AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from 'react-native-config';
+import DeviceInfo from 'react-native-device-info';
 
 // ─── Build flag ────────────────────────────────────────────────────────────
 // Explicit boolean parse: env strings like "false" are truthy under naive
@@ -61,16 +64,18 @@ let ringHead = 0; // next write index
 /** Whether we have already committed the startup buffer to the ring. */
 let startupFlushed = false;
 
+/** Image load-start timestamps, keyed by screen + type + url key. Diagnostics only. */
+const imageLoadStarts = new Map<string, number>();
+
 // ─── Timing ────────────────────────────────────────────────────────────────
 /**
  * Milliseconds since JS bundle start (performance.now() origin).
  * `performance` is available on Hermes and JSC in React Native ≥ 0.63.
  */
 export function now(): number {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if (typeof (globalThis as any).performance?.now === 'function') {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return Math.round((globalThis as any).performance.now() * 10) / 10;
+  const performanceNow = (globalThis as { performance?: { now?: () => number } }).performance?.now;
+  if (typeof performanceNow === 'function') {
+    return Math.round(performanceNow() * 10) / 10;
   }
   return Date.now(); // fallback (should not be needed on Hermes)
 }
@@ -97,15 +102,18 @@ export async function resolveRuntimeFlag(): Promise<void> {
   if (!startupFlushed) {
     startupFlushed = true;
     if (effectiveOn) {
-      // Commit startup buffer into the ring.
+      // Commit startup buffer into the ring. Lines captured while the flag
+      // was pending were not printed; build-flag events already were.
       for (const entry of startupBuffer) {
+        if (!BUILD_FLAG_ON) {
+          console.log(entry);
+        }
         _pushToRing(entry);
       }
-      startupBuffer.length = 0;
     } else {
-      // Discard startup buffer.
-      startupBuffer.length = 0;
+      imageLoadStarts.clear();
     }
+    startupBuffer.length = 0;
   }
 
   if (effectiveOn && !wasOn) {
@@ -114,9 +122,17 @@ export async function resolveRuntimeFlag(): Promise<void> {
   }
 }
 
-/** Returns the current effective state. */
+/** Returns the current effective state. False while the runtime flag is pending. */
 export function isPerfEnabled(): boolean {
   return effectiveOn;
+}
+
+/**
+ * True when an event should be recorded: diagnostics is ON, or the runtime
+ * flag has not resolved yet (startup buffer). False once the flag is OFF.
+ */
+export function isPerfCapturing(): boolean {
+  return effectiveOn || runtimeFlag === 'pending';
 }
 
 /**
@@ -155,12 +171,24 @@ function _write(fields: Record<string, unknown>): void {
 
   if (startupFlushed) {
     _pushToRing(tagged);
-  } else {
-    // Runtime flag not yet resolved: put into startup buffer.
-    if (startupBuffer.length < STARTUP_BUFFER_CAP) {
-      startupBuffer.push(tagged);
-    }
+  } else if (startupBuffer.length < STARTUP_BUFFER_CAP) {
+    // Build flag is ON: printed above, held until the runtime flag resolves.
+    startupBuffer.push(tagged);
   }
+}
+
+/** Record one event while the runtime flag is still pending. Does not print. */
+function _bufferStartup(fields: Record<string, unknown>): void {
+  if (startupBuffer.length >= STARTUP_BUFFER_CAP) {
+    return;
+  }
+  const t = now();
+  const line = JSON.stringify({ t, ...fields });
+  startupBuffer.push('[PERF] ' + line);
+}
+
+function _pendingCapture(): boolean {
+  return runtimeFlag === 'pending' && !BUILD_FLAG_ON;
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -169,10 +197,15 @@ function _write(fields: Record<string, unknown>): void {
  * No-op when diagnostics is OFF.
  */
 export function perfLog(ev: string, fields?: Record<string, unknown>): void {
+  const payload = { ev, ...(fields ?? {}) };
+  if (_pendingCapture()) {
+    _bufferStartup(payload);
+    return;
+  }
   if (!effectiveOn) {
     return;
   }
-  _write({ ev, ...(fields ?? {}) });
+  _write(payload);
 }
 
 /**
@@ -197,13 +230,81 @@ export function imageUrlKey(url: string | undefined | null): string {
   if (!url) {
     return '';
   }
-  try {
-    const u = new URL(url);
-    const key = u.pathname.replace(/^\//, '');
-    return u.host + '/' + key.slice(0, 16);
-  } catch {
-    return url.slice(0, 16);
+  // React Native's URL does not implement host/pathname reliably. Split the
+  // string: scheme, host, path. Query and fragment are dropped (never logged).
+  const withoutQuery = url.split('?')[0].split('#')[0];
+  const schemeIdx = withoutQuery.indexOf('://');
+  if (schemeIdx === -1) {
+    return withoutQuery.slice(0, 16);
   }
+  const afterScheme = withoutQuery.slice(schemeIdx + 3);
+  const slashIdx = afterScheme.indexOf('/');
+  if (slashIdx === -1) {
+    return afterScheme;
+  }
+  const host = afterScheme.slice(0, slashIdx);
+  const storageKey = afterScheme.slice(slashIdx + 1);
+  return host + '/' + storageKey.slice(0, 16);
+}
+
+function imageSlot(screen: string, key: string, type: string): string {
+  return screen + '\0' + type + '\0' + key;
+}
+
+/** Image load started. No-op when diagnostics is OFF. */
+export function perfImageLoadStart(
+  screen: string,
+  url: string | null | undefined,
+  type: string,
+): void {
+  if (!isPerfCapturing()) {
+    return;
+  }
+  const key = imageUrlKey(url);
+  imageLoadStarts.set(imageSlot(screen, key, type), now());
+  perfLog('img_load_start', { screen, key, type });
+}
+
+/** Image loaded. Width and height are logged only when the event provides them. */
+export function perfImageLoad(
+  screen: string,
+  url: string | null | undefined,
+  type: string,
+  width?: number,
+  height?: number,
+): void {
+  if (!isPerfCapturing()) {
+    return;
+  }
+  const key = imageUrlKey(url);
+  const slot = imageSlot(screen, key, type);
+  const started = imageLoadStarts.get(slot);
+  imageLoadStarts.delete(slot);
+  const fields: Record<string, unknown> = { screen, key, type };
+  if (started != null) {
+    fields.load_ms = Math.round((now() - started) * 10) / 10;
+  }
+  if (typeof width === 'number' && Number.isFinite(width)) {
+    fields.width = width;
+  }
+  if (typeof height === 'number' && Number.isFinite(height)) {
+    fields.height = height;
+  }
+  perfLog('img_load', fields);
+}
+
+/** Image failed to load. The URL and any error message are not logged. */
+export function perfImageError(
+  screen: string,
+  url: string | null | undefined,
+  type: string,
+): void {
+  if (!isPerfCapturing()) {
+    return;
+  }
+  const key = imageUrlKey(url);
+  imageLoadStarts.delete(imageSlot(screen, key, type));
+  perfLog('img_error', { screen, key, type });
 }
 
 // ─── Span helpers ───────────────────────────────────────────────────────────
@@ -216,6 +317,19 @@ export interface SpanEnd {
  * duration in ms. No-op (zero allocations) when OFF.
  */
 export function startSpan(name: string, fields?: Record<string, unknown>): SpanEnd {
+  if (_pendingCapture()) {
+    const t0 = now();
+    const startFields = fields;
+    return (endFields?: Record<string, unknown>) => {
+      const duration_ms = Math.round((now() - t0) * 10) / 10;
+      const payload = { ev: name, duration_ms, ...(startFields ?? {}), ...(endFields ?? {}) };
+      if (_pendingCapture()) {
+        _bufferStartup(payload);
+      } else if (effectiveOn) {
+        _write(payload);
+      }
+    };
+  }
   if (!effectiveOn) {
     return _noop;
   }
@@ -242,10 +356,8 @@ export function logSessionHeader(apiBaseUrl: string): void {
     return;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const DeviceInfo = require('react-native-device-info');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hermesEnabled = typeof (globalThis as any).HermesInternal !== 'undefined';
+  const hermesEnabled =
+    typeof (globalThis as { HermesInternal?: unknown }).HermesInternal !== 'undefined';
 
   _write({
     ev: 'session_header',
@@ -364,12 +476,6 @@ interface ScreenVisit {
   slowest_image_ms?: number;
 }
 
-interface KeychainStat {
-  total_calls: number;
-  durations: number[];
-  max_concurrent: number;
-}
-
 interface StallEntry {
   t: number;
   drift_ms: number;
@@ -463,13 +569,15 @@ export function buildSummary(): string {
       if (sv && typeof e.count === 'number') {
         sv.render_count = e.count as number;
       }
-    } else if (e.ev === 'http_response') {
+    } else if (e.ev === 'http_response' || e.ev === 'http_error') {
+      const totalMs = Number(e.total_ms ?? 0);
+      const tokenWaitMs = Number(e.token_wait_ms ?? 0);
       const req: RequestEntry = {
         path: String(e.path ?? ''),
         method: String(e.method ?? ''),
-        token_wait_ms: Number(e.token_wait_ms ?? 0),
+        token_wait_ms: tokenWaitMs,
         network_ms: Number(e.network_ms ?? 0),
-        total_ms: Number(e.total_ms ?? 0),
+        total_ms: totalMs,
         status: Number(e.status ?? 0),
       };
       const screenReqs = requestsByScreen.get(currentScreen) ?? [];
@@ -478,10 +586,10 @@ export function buildSummary(): string {
       const sv = screenVisits.get(currentScreen);
       if (sv) {
         sv.request_count++;
-        sv.sum_total_ms += req.total_ms;
-        sv.max_total_ms = Math.max(sv.max_total_ms, req.total_ms);
-        sv.sum_token_wait_ms += req.token_wait_ms;
-        sv.max_token_wait_ms = Math.max(sv.max_token_wait_ms, req.token_wait_ms);
+        sv.sum_total_ms += totalMs;
+        sv.max_total_ms = Math.max(sv.max_total_ms, totalMs);
+        sv.sum_token_wait_ms += tokenWaitMs;
+        sv.max_token_wait_ms = Math.max(sv.max_token_wait_ms, tokenWaitMs);
       }
     } else if (e.ev === 'img_load' && typeof e.screen === 'string') {
       const sv = screenVisits.get(e.screen as string);
@@ -509,32 +617,62 @@ export function buildSummary(): string {
   }
 
   // ── 4. Keychain stats ────────────────────────────────────────────────────
-  const keychainCalls: KeychainStat = { total_calls: 0, durations: [], max_concurrent: 0 };
+  const readDurations: number[] = [];
+  let cacheHits = 0;
+  let cacheMisses = 0;
+  let writeCalls = 0;
+  let maxConcurrent = 0;
+  let firstReadMs: number | null = null;
+  let storageType: string | null = null;
   for (const e of parsed) {
-    if (e.ev === 'keychain_read' || e.ev === 'keychain_write') {
-      keychainCalls.total_calls++;
+    if (e.ev === 'token_cache_hit') {
+      cacheHits++;
+    } else if (e.ev === 'keychain_read') {
+      cacheMisses++;
       if (typeof e.duration_ms === 'number') {
-        keychainCalls.durations.push(e.duration_ms as number);
+        readDurations.push(e.duration_ms as number);
+        if (e.first_read === true && firstReadMs == null) {
+          firstReadMs = e.duration_ms as number;
+        }
+      }
+      if (typeof e.storage === 'string' && (e.first_read === true || storageType == null)) {
+        storageType = e.storage;
       }
       if (typeof e.in_flight === 'number') {
-        keychainCalls.max_concurrent = Math.max(keychainCalls.max_concurrent, e.in_flight as number);
+        maxConcurrent = Math.max(maxConcurrent, e.in_flight as number);
+      }
+    } else if (e.ev === 'keychain_write') {
+      writeCalls++;
+      if (typeof e.in_flight === 'number') {
+        maxConcurrent = Math.max(maxConcurrent, e.in_flight as number);
       }
     }
   }
-  if (keychainCalls.total_calls > 0) {
-    keychainCalls.durations.sort((a, b) => a - b);
-    const n = keychainCalls.durations.length;
-    const avg = n > 0 ? Math.round(keychainCalls.durations.reduce((a, b) => a + b, 0) / n) : 0;
-    const p95 = n > 0 ? keychainCalls.durations[Math.floor(n * 0.95)] ?? keychainCalls.durations[n - 1] : 0;
-    const max = n > 0 ? keychainCalls.durations[n - 1] : 0;
+  if (cacheHits > 0 || cacheMisses > 0 || writeCalls > 0) {
+    readDurations.sort((a, b) => a - b);
+    const n = readDurations.length;
+    const avg = n > 0 ? Math.round(readDurations.reduce((a, b) => a + b, 0) / n) : 0;
+    const p95 = n > 0 ? readDurations[Math.floor(n * 0.95)] ?? readDurations[n - 1] : 0;
+    const max = n > 0 ? readDurations[n - 1] : 0;
     lines.push('── Keychain Stats ──────────────────────────');
-    lines.push(`  calls          : ${keychainCalls.total_calls}`);
-    lines.push(`  avg_ms         : ${avg}`);
-    lines.push(`  p95_ms         : ${p95}`);
-    lines.push(`  max_ms         : ${max}`);
-    lines.push(`  max_concurrent : ${keychainCalls.max_concurrent}`);
+    lines.push(`  reads          : ${cacheMisses}`);
+    lines.push(`  cache_hits     : ${cacheHits}`);
+    lines.push(`  cache_misses   : ${cacheMisses}`);
+    lines.push(`  read_avg_ms    : ${avg}`);
+    lines.push(`  read_p95_ms    : ${p95}`);
+    lines.push(`  read_max_ms    : ${max}`);
+    lines.push(`  first_read_ms  : ${firstReadMs ?? '-'}`);
+    lines.push(`  storage        : ${storageType ?? '-'}`);
+    lines.push(`  writes         : ${writeCalls}`);
+    lines.push(`  max_concurrent : ${maxConcurrent}`);
     lines.push('');
   }
+
+  // ── 4b. HTTP errors ──────────────────────────────────────────────────────
+  const httpErrorCount = parsed.filter(e => e.ev === 'http_error').length;
+  lines.push('── HTTP Errors ─────────────────────────────');
+  lines.push(`  count          : ${httpErrorCount}`);
+  lines.push('');
 
   // ── 5. Top 10 slowest requests ───────────────────────────────────────────
   const allRequests: RequestEntry[] = [];

@@ -20,6 +20,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type AlertButton,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -64,7 +65,15 @@ import type { SkillLevelValue, UserProfile } from '../types/user';
 import type { LabelKey } from '../labels/fallbackLabels';
 import type { ProfileStackParamList } from '../navigation/types';
 import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
-import { perfLog, startSpan, isPerfEnabled, shareLog, imageUrlKey } from '../diagnostics/perfLog';
+import {
+  startSpan,
+  isPerfEnabled,
+  shareLog,
+  perfImageLoadStart,
+  perfImageLoad,
+  perfImageError,
+  setRuntimeFlag,
+} from '../diagnostics/perfLog';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
@@ -191,8 +200,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
     if (tapTimestamps.current.length >= 7) {
       tapTimestamps.current = [];
       const enabled = isPerfEnabled();
-      const { setRuntimeFlag } = require('../diagnostics/perfLog') as typeof import('../diagnostics/perfLog');
-      const buttons: import('react-native').AlertButton[] = [
+      const buttons: AlertButton[] = [
         {
           text: enabled ? 'Turn OFF' : 'Turn ON',
           onPress: () => {
@@ -304,15 +312,17 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
             source={{ uri: coverUrl }}
             style={styles.bannerImage}
             resizeMode="cover"
-            onLoadStart={() => {
-              perfLog('img_load_start', { screen: 'ProfileScreen', key: imageUrlKey(coverUrl), type: 'cover' });
-            }}
-            onLoad={() => {
-              perfLog('img_load', { screen: 'ProfileScreen', key: imageUrlKey(coverUrl), type: 'cover' });
-            }}
-            onError={() => {
-              perfLog('img_error', { screen: 'ProfileScreen', key: imageUrlKey(coverUrl), type: 'cover' });
-            }}
+            onLoadStart={() => perfImageLoadStart('ProfileScreen', coverUrl, 'cover')}
+            onLoad={event =>
+              perfImageLoad(
+                'ProfileScreen',
+                coverUrl,
+                'cover',
+                event.nativeEvent.source.width,
+                event.nativeEvent.source.height,
+              )
+            }
+            onError={() => perfImageError('ProfileScreen', coverUrl, 'cover')}
           />
         ) : (
           <View style={styles.bannerFallback}>
@@ -328,15 +338,17 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
             <FastImage
               source={{ uri: profile.avatar_url }}
               style={styles.avatarImage}
-              onLoadStart={() => {
-                perfLog('img_load_start', { screen: 'ProfileScreen', key: imageUrlKey(profile.avatar_url), type: 'avatar' });
-              }}
-              onLoad={() => {
-                perfLog('img_load', { screen: 'ProfileScreen', key: imageUrlKey(profile.avatar_url), type: 'avatar' });
-              }}
-              onError={() => {
-                perfLog('img_error', { screen: 'ProfileScreen', key: imageUrlKey(profile.avatar_url), type: 'avatar' });
-              }}
+              onLoadStart={() => perfImageLoadStart('ProfileScreen', profile.avatar_url, 'avatar')}
+              onLoad={event =>
+                perfImageLoad(
+                  'ProfileScreen',
+                  profile.avatar_url,
+                  'avatar',
+                  event.nativeEvent.width,
+                  event.nativeEvent.height,
+                )
+              }
+              onError={() => perfImageError('ProfileScreen', profile.avatar_url, 'avatar')}
             />
           ) : (
             <View style={styles.avatarInitials}>
@@ -442,7 +454,24 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
                   accessibilityLabel={group.name}
                 >
                   {group.logo_url ? (
-                    <Image source={{ uri: group.logo_url }} style={styles.groupLogo} resizeMode="cover" />
+                    <Image
+                      source={{ uri: group.logo_url }}
+                      style={styles.groupLogo}
+                      resizeMode="cover"
+                      onLoadStart={() =>
+                        perfImageLoadStart('ProfileScreen', group.logo_url, 'group_logo')
+                      }
+                      onLoad={event =>
+                        perfImageLoad(
+                          'ProfileScreen',
+                          group.logo_url,
+                          'group_logo',
+                          event.nativeEvent.source.width,
+                          event.nativeEvent.source.height,
+                        )
+                      }
+                      onError={() => perfImageError('ProfileScreen', group.logo_url, 'group_logo')}
+                    />
                   ) : (
                     <View
                       style={[

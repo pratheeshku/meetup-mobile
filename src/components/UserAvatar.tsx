@@ -8,6 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
+import { perfImageError, perfImageLoad, perfImageLoadStart } from '../diagnostics/perfLog';
 import { colors, typography } from '../theme/tokens';
 import { toHttpsUrl } from '../utils/httpsUrl';
 
@@ -16,6 +17,9 @@ interface UserAvatarProps {
   name?: string | null;
   size?: number;
   accessibilityLabel?: string;
+  /** When set, image load timing is recorded for this screen. Diagnostics only. */
+  perfScreen?: string;
+  perfType?: string;
 }
 
 export default function UserAvatar({
@@ -23,6 +27,8 @@ export default function UserAvatar({
   name,
   size = 48,
   accessibilityLabel,
+  perfScreen,
+  perfType = 'avatar',
 }: UserAvatarProps): React.JSX.Element {
   const [failed, setFailed] = useState(false);
   const url = toHttpsUrl(imageUrl);
@@ -39,7 +45,27 @@ export default function UserAvatar({
       <Image
         source={{ uri: url }}
         style={dimension}
-        onError={() => setFailed(true)}
+        onLoadStart={
+          perfScreen ? () => perfImageLoadStart(perfScreen, url, perfType) : undefined
+        }
+        onLoad={
+          perfScreen
+            ? event =>
+                perfImageLoad(
+                  perfScreen,
+                  url,
+                  perfType,
+                  event.nativeEvent.source.width,
+                  event.nativeEvent.source.height,
+                )
+            : undefined
+        }
+        onError={() => {
+          setFailed(true);
+          if (perfScreen) {
+            perfImageError(perfScreen, url, perfType);
+          }
+        }}
         accessible={hasA11y}
         accessibilityLabel={accessibilityLabel}
         accessibilityRole={hasA11y ? 'image' : undefined}

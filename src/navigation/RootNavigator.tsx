@@ -130,7 +130,7 @@ import AccountDeletionCodeScreen from '../screens/AccountDeletionCodeScreen';
 import NotificationBanner from '../components/NotificationBanner';
 import OnboardingOverlay from './OnboardingOverlay';
 import { useT } from '../labels/LabelsContext';
-import { perfLog, isPerfEnabled } from '../diagnostics/perfLog';
+import { perfLog, isPerfCapturing } from '../diagnostics/perfLog';
 import { recordNavChange } from '../hooks/usePerfScreen';
 
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
@@ -469,7 +469,7 @@ export default function RootNavigator(): React.JSX.Element {
           handleInitialNotification();
         }}
         onStateChange={state => {
-          if (!isPerfEnabled() || !state) {
+          if (!isPerfCapturing() || !state) {
             return;
           }
           // Find the active route name from navigation state tree.

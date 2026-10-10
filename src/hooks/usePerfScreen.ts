@@ -10,7 +10,7 @@
 import { useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
-import { perfLog, isPerfEnabled, now } from '../diagnostics/perfLog';
+import { perfLog, isPerfCapturing, now } from '../diagnostics/perfLog';
 
 // ── Module-level: last navigation state-change timestamp ────────────────────
 // Written by RootNavigator's onStateChange (see RootNavigator.tsx).
@@ -19,7 +19,7 @@ let _lastNavChangeT = 0;
 
 /** Called by RootNavigator.onStateChange to record the nav event time. */
 export function recordNavChange(routeName: string): void {
-  if (!isPerfEnabled()) {
+  if (!isPerfCapturing()) {
     return;
   }
   _lastNavChangeT = now();
@@ -33,7 +33,7 @@ export function recordNavChange(routeName: string): void {
  */
 export function usePerfRender(screenName: string): void {
   const renderCount = useRef(0);
-  const isEnabled = isPerfEnabled();
+  const isEnabled = isPerfCapturing();
 
   useEffect(() => {
     if (!isEnabled) {
@@ -70,7 +70,7 @@ export function usePerfRender(screenName: string): void {
 export function usePerfScreen(screenName: string, isLoading: boolean): void {
   const focusT = useRef(0);
   const firstContentLogged = useRef(false);
-  const isEnabled = isPerfEnabled();
+  const isEnabled = isPerfCapturing();
 
   useFocusEffect(
     useCallback(() => {

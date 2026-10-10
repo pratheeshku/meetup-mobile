@@ -32,7 +32,7 @@ import { useT } from '../../labels/LabelsContext';
 import { dash } from '../../theme/dashboardTheme';
 import { radius, spacing, typography } from '../../theme/tokens';
 import { toHttpsUrl } from '../../utils/httpsUrl';
-import { imageUrlKey, perfLog } from '../../diagnostics/perfLog';
+import { perfImageError, perfImageLoad, perfImageLoadStart } from '../../diagnostics/perfLog';
 
 const SHUTTLR_ICON = require('../../assets/shuttlr-icon.png');
 
@@ -204,15 +204,17 @@ export default function BannerCarousel({
             source={{ uri: fallback.image_url }}
             style={styles.bannerImage}
             resizeMode="cover"
-            onLoadStart={() => perfLog('img_load_start', { url: imageUrlKey(fallback.image_url!) })}
+            onLoadStart={() => perfImageLoadStart('HomeScreen', fallback.image_url, 'banner')}
             onLoad={e =>
-              perfLog('img_load', {
-                url: imageUrlKey(fallback.image_url!),
-                width: e.nativeEvent.source.width,
-                height: e.nativeEvent.source.height,
-              })
+              perfImageLoad(
+                'HomeScreen',
+                fallback.image_url,
+                'banner',
+                e.nativeEvent.source.width,
+                e.nativeEvent.source.height,
+              )
             }
-            onError={() => perfLog('img_error', { url: imageUrlKey(fallback.image_url!) })}
+            onError={() => perfImageError('HomeScreen', fallback.image_url, 'banner')}
           />
         ) : (
           <View style={styles.fallbackStaticAsset}>
@@ -264,15 +266,17 @@ export default function BannerCarousel({
           source={{ uri: banner.image_url }}
           style={styles.bannerImage}
           resizeMode="cover"
-          onLoadStart={() => perfLog('img_load_start', { url: imageUrlKey(banner.image_url) })}
+          onLoadStart={() => perfImageLoadStart('HomeScreen', banner.image_url, 'banner')}
           onLoad={e =>
-            perfLog('img_load', {
-              url: imageUrlKey(banner.image_url),
-              width: e.nativeEvent.source.width,
-              height: e.nativeEvent.source.height,
-            })
+            perfImageLoad(
+              'HomeScreen',
+              banner.image_url,
+              'banner',
+              e.nativeEvent.source.width,
+              e.nativeEvent.source.height,
+            )
           }
-          onError={() => perfLog('img_error', { url: imageUrlKey(banner.image_url) })}
+          onError={() => perfImageError('HomeScreen', banner.image_url, 'banner')}
         />
         {banner.is_sponsored ? (
           <View style={styles.adTag} testID="banner-ad-tag">
@@ -364,15 +368,17 @@ export default function BannerCarousel({
                   source={{ uri: banner.image_url }}
                   style={styles.bannerImage}
                   resizeMode="cover"
-                  onLoadStart={() => perfLog('img_load_start', { url: imageUrlKey(banner.image_url) })}
+                  onLoadStart={() => perfImageLoadStart('HomeScreen', banner.image_url, 'banner')}
                   onLoad={e =>
-                    perfLog('img_load', {
-                      url: imageUrlKey(banner.image_url),
-                      width: e.nativeEvent.source.width,
-                      height: e.nativeEvent.source.height,
-                    })
+                    perfImageLoad(
+                      'HomeScreen',
+                      banner.image_url,
+                      'banner',
+                      e.nativeEvent.source.width,
+                      e.nativeEvent.source.height,
+                    )
                   }
-                  onError={() => perfLog('img_error', { url: imageUrlKey(banner.image_url) })}
+                  onError={() => perfImageError('HomeScreen', banner.image_url, 'banner')}
                 />
                 {banner.is_sponsored ? (
                   <View style={styles.adTag} testID="banner-ad-tag">
