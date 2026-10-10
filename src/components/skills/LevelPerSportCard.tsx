@@ -9,7 +9,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { getLabel, useLabels } from '../../labels/LabelsContext';
 import { SportIcon } from '../icons/DashboardIcons';
-import { sportTileColor } from '../home/GameRow';
+import { sportPalette } from '../../sports/style';
+import { useSportVisual } from '../../sports/catalog';
 import { colors, radius, shadows, skillSizes, spacing, typography } from '../../theme/tokens';
 import type { SkillLevelValue } from '../../types/user';
 import LevelSegmentedControl from './LevelSegmentedControl';
@@ -34,14 +35,15 @@ export default function LevelPerSportCard({
   disabled = false,
 }: LevelPerSportCardProps): React.JSX.Element {
   const labels = useLabels();
+  const visual = useSportVisual(sport);
   const line = value
     ? getLabel(labels, levelDescKey(value))
     : getLabel(labels, 'mob_skill_pick_level_hint');
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <View style={[styles.circle, { backgroundColor: sportTileColor(sport) }]}>
-          <SportIcon slug={sport} size={skillSizes.sportIconSmall} />
+        <View style={[styles.circle, { backgroundColor: sportPalette(visual.color).chip }]}>
+          <SportIcon iconKey={visual.iconKey} size={skillSizes.sportIconSmall} />
         </View>
         <Text style={styles.name} numberOfLines={1}>
           {sportLabel}

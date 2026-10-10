@@ -26,15 +26,10 @@ export const dash = {
   skeleton: '#E3EAF8',
 } as const;
 
-/** Sport tile background colours, keyed by lower-case slug. */
-export const sportTileColors: Record<string, string> = {
-  badminton: '#DBEAFE',
-  basketball: '#FFEDD5',
-  football: '#DCFCE7',
-  tennis: '#EDE9FE',
+/** "All sports" chip fill. Per-sport fills come from the sports API colour. */
+export const sportTileColors = {
   all: '#F1F5F9',
-  fallback: '#E2E8F0',
-};
+} as const;
 
 export const dashRadius = {
   card: 20,

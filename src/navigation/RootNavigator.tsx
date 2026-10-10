@@ -119,6 +119,7 @@ import GamesScreen from '../screens/GamesScreen';
 import TournamentDetailScreen from '../screens/TournamentDetailScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import EditSkillLevelsScreen from '../screens/EditSkillLevelsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
 import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
@@ -279,6 +280,11 @@ function ProfileStack(): React.JSX.Element {
       <ProfileStackNav.Screen
         name="EditProfile"
         component={EditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <ProfileStackNav.Screen
+        name="EditSkillLevels"
+        component={EditSkillLevelsScreen}
         options={{ headerShown: false }}
       />
       <ProfileStackNav.Screen

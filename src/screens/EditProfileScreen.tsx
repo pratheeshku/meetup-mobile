@@ -5,7 +5,7 @@
  * - Cover image card: 3:1 preview with "Default banner" badge, "Choose image" and "Use default" buttons
  * - Profile photo card: 72x72 avatar with camera badge, "Profile photo" title and "Change photo" link
  * - Form fields card: Display name (editable), Nickname (read-only), Mobile number (optional) with admin visibility hint
- * - Skill levels card: Badminton, Pickleball, Tennis with segmented pill [Beginner | Inter. | Adv.]
+ * - Skill levels card: summary of saved levels, with an Edit link to the skill screen
  * - Sticky footer: Cancel and Save buttons
  */
 import React, { useCallback, useEffect, useState } from 'react';
@@ -21,28 +21,31 @@ import {
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import ImageCropPicker from 'react-native-image-crop-picker';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import {
   deleteAvatar,
   deleteCover,
-  deleteSkillLevel,
   getProfile,
+  getSkillLevels,
   updateProfile,
-  updateSkillLevel,
   uploadAvatar,
   uploadCover,
 } from '../api/profile';
+import { getSports } from '../api/sports';
 import { updateMobileNumber } from '../api/mobileNumber';
 import { BannerBackground, SportIcon } from '../components/icons/DashboardIcons';
 import { BackArrowIcon, CameraIcon } from '../components/icons/ActionIcons';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
-import { useSportDisplayName } from '../utils/labels';
+import { findSport } from '../sports/catalog';
+import { sportPalette } from '../sports/style';
+import { levelLabelKey } from '../components/skills/levels';
 import { getDisplayName } from '../utils/displayName';
 import { getApiErrorMessage } from '../utils/apiError';
-import { useT } from '../labels/LabelsContext';
+import { getLabel, useLabels, useT } from '../labels/LabelsContext';
 import {
   borderWidth,
   colors,
@@ -50,12 +53,11 @@ import {
   spacing,
   typography,
 } from '../theme/tokens';
-import type { SkillLevelValue, UserProfile } from '../types/user';
+import type { Sport } from '../types/sport';
+import type { SkillLevel, UserProfile } from '../types/user';
 import type { ProfileStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'EditProfile'>;
-
-const EDITABLE_SPORTS = ['badminton', 'pickleball', 'tennis'];
 
 function getInitials(name?: string | null): string {
   if (!name) return '??';
@@ -65,84 +67,28 @@ function getInitials(name?: string | null): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-function SkillRowItem({
+function SkillSummaryChip({
+  skill,
   sport,
-  currentLevel,
-  onSelectLevel,
 }: {
-  sport: string;
-  currentLevel: SkillLevelValue | null;
-  onSelectLevel: (sport: string, level: SkillLevelValue) => void;
+  skill: SkillLevel;
+  sport: Sport | undefined;
 }): React.JSX.Element {
-  const sportName = useSportDisplayName(sport);
-  const t = useT();
+  const labels = useLabels();
+  const palette = sportPalette(sport?.color);
+  const name = sport?.display_name ?? skill.sport;
+  const level = getLabel(labels, levelLabelKey(skill.skill_level));
 
   return (
-    <View style={styles.skillRow}>
-      <View style={styles.skillLeading}>
-        <View style={styles.skillIconCircle}>
-          <SportIcon slug={sport} size={20} />
-        </View>
-        <Text style={styles.skillSportName}>{sportName}</Text>
+    <View style={[styles.skillChip, { backgroundColor: palette.chip }]}>
+      <View style={[styles.skillIconCircle, { backgroundColor: colors.surface }]}>
+        <SportIcon iconKey={sport?.icon_key} size={18} />
       </View>
-
-      <View style={styles.segmentContainer}>
-        <Pressable
-          style={[
-            styles.segmentButton,
-            currentLevel === 'beginner' && styles.segmentButtonActive,
-          ]}
-          onPress={() => onSelectLevel(sport, 'beginner')}
-          accessibilityRole="button"
-          accessibilityLabel={`${sportName} ${t('mob.profile.level_beginner')}`}
-        >
-          <Text
-            style={[
-              styles.segmentText,
-              currentLevel === 'beginner' && styles.segmentTextActive,
-            ]}
-          >
-            {t('mob.profile.level_beginner')}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={[
-            styles.segmentButton,
-            currentLevel === 'intermediate' && styles.segmentButtonActive,
-          ]}
-          onPress={() => onSelectLevel(sport, 'intermediate')}
-          accessibilityRole="button"
-          accessibilityLabel={`${sportName} ${t('mob.profile.level_intermediate')}`}
-        >
-          <Text
-            style={[
-              styles.segmentText,
-              currentLevel === 'intermediate' && styles.segmentTextActive,
-            ]}
-          >
-            {t('mob.profile.level_intermediate')}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={[
-            styles.segmentButton,
-            currentLevel === 'expert' && styles.segmentButtonActive,
-          ]}
-          onPress={() => onSelectLevel(sport, 'expert')}
-          accessibilityRole="button"
-          accessibilityLabel={`${sportName} ${t('mob.profile.level_expert')}`}
-        >
-          <Text
-            style={[
-              styles.segmentText,
-              currentLevel === 'expert' && styles.segmentTextActive,
-            ]}
-          >
-            {t('mob.profile.level_expert')}
-          </Text>
-        </Pressable>
+      <View style={styles.skillTextCol}>
+        <Text numberOfLines={1} style={styles.skillSportName}>
+          {name}
+        </Text>
+        <Text style={[styles.skillLevelText, { color: palette.tint }]}>{level}</Text>
       </View>
     </View>
   );
@@ -169,12 +115,8 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
   const [avatarPreviewUri, setAvatarPreviewUri] = useState<string | null>(null);
   const [newAvatarFile, setNewAvatarFile] = useState<{ uri: string; name: string; type: string } | null>(null);
 
-  // Skills
-  const [skillLevels, setSkillLevels] = useState<Record<string, SkillLevelValue | null>>({
-    badminton: null,
-    pickleball: null,
-    tennis: null,
-  });
+  const [savedSkills, setSavedSkills] = useState<SkillLevel[]>([]);
+  const [adminSports, setAdminSports] = useState<Sport[]>([]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -187,19 +129,7 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
       setProfile(data);
       setDisplayName(data.display_name || '');
       setMobileNumber(data.mobile_number || '');
-
-      const initialSkills: Record<string, SkillLevelValue | null> = {
-        badminton: null,
-        pickleball: null,
-        tennis: null,
-      };
-      if (data.skill_levels) {
-        for (const item of data.skill_levels) {
-          const key = item.sport.toLowerCase();
-          initialSkills[key] = item.skill_level;
-        }
-      }
-      setSkillLevels(initialSkills);
+      setSavedSkills(data.skill_levels ?? []);
     } catch {
       setLoadError(t('mob.profile.load_error'));
     } finally {
@@ -210,6 +140,29 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getSkillLevels()
+        .then(levels => {
+          if (active) {
+            setSavedSkills(levels);
+          }
+        })
+        .catch(() => undefined);
+      getSports()
+        .then(list => {
+          if (active) {
+            setAdminSports(list);
+          }
+        })
+        .catch(() => undefined);
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
 
   // Cover picker
   const handleChooseCover = async (): Promise<void> => {
@@ -297,16 +250,6 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
     Alert.alert(t('mob.profile.profile_photo'), undefined, buttons);
   };
 
-  const handleSelectSkillLevel = (sport: string, level: SkillLevelValue): void => {
-    setSkillLevels(prev => {
-      const current = prev[sport];
-      return {
-        ...prev,
-        [sport]: current === level ? null : level,
-      };
-    });
-  };
-
   const handleSave = async (): Promise<void> => {
     if (!profile) return;
     try {
@@ -335,22 +278,6 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
       // 4. Mobile number
       if (mobileNumber.trim() !== (profile.mobile_number ?? '')) {
         await updateMobileNumber({ mobile_number: mobileNumber.trim() || null });
-      }
-
-      // 5. Skill levels
-      const initialMap = (profile.skill_levels ?? []).reduce<Record<string, SkillLevelValue>>((acc, sl) => {
-        acc[sl.sport.toLowerCase()] = sl.skill_level;
-        return acc;
-      }, {});
-
-      for (const sport of EDITABLE_SPORTS) {
-        const level = skillLevels[sport];
-        const initialLevel = initialMap[sport];
-        if (level && level !== initialLevel) {
-          await updateSkillLevel(sport, level);
-        } else if (!level && initialLevel) {
-          await deleteSkillLevel(sport).catch(() => {});
-        }
       }
 
       navigation.goBack();
@@ -510,20 +437,30 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
           </View>
         </View>
 
-        {/* Card 4: Skill levels */}
         <View style={styles.card}>
-          <Text style={[styles.cardTitle, styles.skillsTitle]}>{t('mob.profile.skill_levels_title')}</Text>
-
-          <View style={styles.skillsList}>
-            {EDITABLE_SPORTS.map(sport => (
-              <SkillRowItem
-                key={sport}
-                sport={sport}
-                currentLevel={skillLevels[sport]}
-                onSelectLevel={handleSelectSkillLevel}
-              />
-            ))}
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>{t('mob.profile.skill_levels_title')}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.common.edit')}
+              onPress={() => navigation.navigate('EditSkillLevels')}
+            >
+              <Text style={styles.changePhotoLink}>{t('mob.common.edit')}</Text>
+            </Pressable>
           </View>
+          {savedSkills.length > 0 ? (
+            <View style={styles.skillsList}>
+              {savedSkills.map(skill => (
+                <SkillSummaryChip
+                  key={skill.sport}
+                  skill={skill}
+                  sport={findSport(adminSports, skill.sport)}
+                />
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.inputHelperText}>{t('mob.profile.no_skills')}</Text>
+          )}
         </View>
       </KeyboardAwareScreen>
 
@@ -764,58 +701,33 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: spacing.xs,
   },
-  skillsTitle: {
-    marginBottom: spacing.md,
-  },
   skillsList: {
     gap: spacing.md,
   },
-  skillRow: {
+  skillChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  skillLeading: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderRadius: radius.md,
+    padding: spacing.sm,
     gap: spacing.sm,
-    flex: 1,
   },
   skillIconCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.avatarTint1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  skillTextCol: { flex: 1 },
   skillSportName: {
     ...typography.bodyBold,
     color: colors.textPrimary,
     fontSize: 14,
   },
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
-    padding: 3,
-  },
-  segmentButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.sm,
-  },
-  segmentButtonActive: {
-    backgroundColor: colors.primary,
-  },
-  segmentText: {
+  skillLevelText: {
     ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '500',
-  },
-  segmentTextActive: {
-    color: colors.white,
-    fontWeight: '700',
+    fontWeight: '600',
+    marginTop: 1,
   },
   errorBanner: {
     backgroundColor: colors.errorLight,

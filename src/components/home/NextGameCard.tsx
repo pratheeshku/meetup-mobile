@@ -11,7 +11,8 @@ import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
 import type { Event } from '../../types/event';
 import { formatDayLabel, formatTimeOfDay } from '../../utils/formatGameTime';
-import { sportTileColor } from './GameRow';
+import { sportPalette } from '../../sports/style';
+import { useSportVisual } from '../../sports/catalog';
 import { useT } from '../../labels/LabelsContext';
 
 export default function NextGameCard({
@@ -23,6 +24,7 @@ export default function NextGameCard({
 }): React.JSX.Element {
   const venue = event.venue_name || event.location || '';
   const t = useT();
+  const sport = useSportVisual(event.sport);
   const day = formatDayLabel(event.starts_at, undefined, t);
   const detail = [formatTimeOfDay(event.starts_at), venue].filter(Boolean).join(' · ');
 
@@ -33,8 +35,8 @@ export default function NextGameCard({
       onPress={onPress}
       style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
     >
-      <View style={[styles.tile, { backgroundColor: sportTileColor(event.sport) }]}>
-        <SportIcon slug={event.sport} size={dashSize.sportIcon} />
+      <View style={[styles.tile, { backgroundColor: sportPalette(sport.color).chip }]}>
+        <SportIcon iconKey={sport.iconKey} size={dashSize.sportIcon} />
       </View>
       <View style={styles.body}>
         <Text style={styles.kicker}>{day ? t('mob.next_game.kicker_day', { day }) : t('mob.next_game.kicker')}</Text>

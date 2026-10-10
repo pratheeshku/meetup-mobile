@@ -8,18 +8,15 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { SportIcon } from '../icons/DashboardIcons';
-import { dash, dashRadius, dashSize, sportTileColors } from '../../theme/dashboardTheme';
+import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
 import type { Event } from '../../types/event';
-import { sportSlug } from '../icons/DashboardIcons';
+import { sportPalette } from '../../sports/style';
+import { useSportVisual } from '../../sports/catalog';
 import { formatRowDate } from '../../utils/formatGameTime';
 import type { GameBadge } from '../../utils/gameLists';
 import { useT } from '../../labels/LabelsContext';
 import type { LabelKey } from '../../labels/fallbackLabels';
-
-export function sportTileColor(slug: string | null | undefined): string {
-  return sportTileColors[sportSlug(slug)] ?? sportTileColors.fallback;
-}
 
 interface GameRowProps {
   event: Event;
@@ -37,6 +34,8 @@ const BADGE_LABEL_KEY: Record<GameBadge, LabelKey> = {
 
 export default function GameRow({ event, onPress, badge }: GameRowProps): React.JSX.Element {
   const t = useT();
+  const sport = useSportVisual(event.sport);
+  const tileColor = sportPalette(sport.color).chip;
   const badgeText = badge ? t(BADGE_LABEL_KEY[badge]) : null;
   const venue = event.venue_name || event.location || '';
   const dateLine = [formatRowDate(event.starts_at), venue].filter(Boolean).join(' · ');
@@ -52,8 +51,8 @@ export default function GameRow({ event, onPress, badge }: GameRowProps): React.
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
     >
-      <View style={[styles.tile, { backgroundColor: sportTileColor(event.sport) }]}>
-        <SportIcon slug={event.sport} size={dashSize.rowIcon} />
+      <View style={[styles.tile, { backgroundColor: tileColor }]}>
+        <SportIcon iconKey={sport.iconKey} size={dashSize.rowIcon} />
       </View>
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={1}>

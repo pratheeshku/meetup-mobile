@@ -19,72 +19,29 @@
  * and `src/api/labels.ts`. `sport`'s own display field (`display_name`,
  * above) is unaffected — a separate mechanism, out of scope for that fix.
  */
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { StyleProp, TextStyle } from 'react-native';
 
-import { getSports } from '../api/sports';
+import { invalidateSportsCatalog, useSportRecord } from '../sports/catalog';
 import type { LabelMap } from '../api/labels';
 import { GlobeIcon, GroupsIcon, LockIcon } from '../components/icons/SharedIcons';
 import { getLabel } from '../labels/LabelsContext';
 import type { EventVisibility } from '../types/event';
 
-// Module-wide cache: `getSports()` is fetched at most once across the whole
-// app's lifetime (per process), not once per screen/render. A slower earlier
-// fetch racing a faster later one can't matter here — both requests return
-// the same list — so, unlike `UserSearchPicker`'s per-query race guard, no
-// "latest wins" token is needed, only "don't refetch once we have it".
-let sportNamesPromise: Promise<Record<string, string>> | null = null;
-let cachedSportNames: Record<string, string> | null = null;
-
-function loadSportNames(): Promise<Record<string, string>> {
-  if (!sportNamesPromise) {
-    sportNamesPromise = getSports().then(sports => {
-      cachedSportNames = Object.fromEntries(sports.map(sport => [sport.name, sport.display_name]));
-      return cachedSportNames;
-    });
-  }
-  return sportNamesPromise;
-}
-
 /**
- * Resolves a raw `sport` slug (e.g. `table_tennis`) to its `display_name`
- * (e.g. `Table Tennis`) from `GET /admin/sports/public`, cached module-wide.
- * Falls back to the raw slug — same as before this fix — while the list is
- * still loading, or if an unknown slug isn't in it, or if the fetch fails;
- * this never blocks or errors the screen calling it, it only upgrades the
- * label once (if) the list resolves.
+ * Resolves a raw `sport` slug to its admin `display_name` from the shared
+ * sports catalog (`GET /admin/sports/public`). The catalog is fetched at most
+ * once until `invalidateSportsCatalog()` replaces it.
  */
 export function useSportDisplayName(sport: string): string {
-  const [names, setNames] = useState<Record<string, string> | null>(cachedSportNames);
-
-  useEffect(() => {
-    if (cachedSportNames) {
-      return;
-    }
-    let cancelled = false;
-    loadSportNames().then(
-      resolved => {
-        if (!cancelled) {
-          setNames(resolved);
-        }
-      },
-      () => {
-        // Leave `names` as-is; callers fall back to the raw sport value.
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return names?.[sport] ?? sport;
+  const record = useSportRecord(sport);
+  return record?.display_name ?? sport;
 }
 
-/** Test-only: clears the module-wide cache so each test controls its own fetch. */
+/** Test-only: clears the shared sports catalog so each test controls its own fetch. */
 export function __resetSportDisplayNamesCacheForTests(): void {
-  sportNamesPromise = null;
-  cachedSportNames = null;
+  invalidateSportsCatalog();
 }
 
 /**

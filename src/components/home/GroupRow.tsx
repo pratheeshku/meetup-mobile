@@ -10,7 +10,8 @@ import { GroupsIcon, SportIcon } from '../icons/DashboardIcons';
 import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
 import type { Group } from '../../types/group';
-import { sportTileColor } from './GameRow';
+import { sportPalette } from '../../sports/style';
+import { useSportVisual } from '../../sports/catalog';
 import { useT } from '../../labels/LabelsContext';
 
 interface GroupRowProps {
@@ -22,6 +23,7 @@ interface GroupRowProps {
 
 export default function GroupRow({ group, onPress, team }: GroupRowProps): React.JSX.Element {
   const t = useT();
+  const sport = useSportVisual(team?.sportSlug);
   const metaParts: string[] = [];
   if (typeof group.member_count === 'number') {
     metaParts.push(
@@ -45,11 +47,11 @@ export default function GroupRow({ group, onPress, team }: GroupRowProps): React
       <View
         style={[
           styles.tile,
-          { backgroundColor: team ? sportTileColor(team.sportSlug) : dash.page },
+          { backgroundColor: team ? sportPalette(sport.color).chip : dash.page },
         ]}
       >
         {team ? (
-          <SportIcon slug={team.sportSlug} size={dashSize.rowIcon} />
+          <SportIcon iconKey={sport.iconKey} size={dashSize.rowIcon} />
         ) : (
           <GroupsIcon size={dashSize.rowIcon} />
         )}

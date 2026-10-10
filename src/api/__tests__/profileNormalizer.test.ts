@@ -39,7 +39,7 @@ describe('normalizeSkillLevel', () => {
       data: [
         { sport: 'badminton', skill_level: 'Beginner' },
         { sport: 'tennis', skill_level: 'INTERMEDIATE' },
-        { sport: 'pickleball', skill_level: 'expert' },
+        { sport: 'basketball', skill_level: 'expert' },
       ],
     });
 
@@ -47,7 +47,7 @@ describe('normalizeSkillLevel', () => {
     expect(levels).toEqual([
       { sport: 'badminton', skill_level: 'beginner', updated_at: undefined },
       { sport: 'tennis', skill_level: 'intermediate', updated_at: undefined },
-      { sport: 'pickleball', skill_level: 'expert', updated_at: undefined },
+      { sport: 'basketball', skill_level: 'expert', updated_at: undefined },
     ]);
   });
 

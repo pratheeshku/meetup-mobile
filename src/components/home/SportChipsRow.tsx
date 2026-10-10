@@ -19,7 +19,7 @@ import { AllSportsIcon, SportIcon } from '../icons/DashboardIcons';
 import { dash, dashRadius, dashSize, sportTileColors } from '../../theme/dashboardTheme';
 import { spacing } from '../../theme/tokens';
 import type { SportOption } from '../../utils/gameLists';
-import { sportTileColor } from './GameRow';
+import { sportPalette } from '../../sports/style';
 import { useT } from '../../labels/LabelsContext';
 
 interface SportChipsRowProps {
@@ -107,9 +107,9 @@ export default function SportChipsRow({
           label={option.label}
           selected={selected.includes(option.key)}
           onPress={() => onToggle(option.key)}
-          tileColor={sportTileColor(option.slug)}
+          tileColor={sportPalette(option.color).chip}
         >
-          <SportIcon slug={option.slug} size={dashSize.sportIcon} />
+          <SportIcon iconKey={option.icon_key} size={dashSize.sportIcon} />
         </Chip>
       ))}
     </ScrollView>

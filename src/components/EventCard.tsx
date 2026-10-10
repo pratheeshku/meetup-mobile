@@ -15,7 +15,9 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useAuth } from '../auth/AuthContext';
-import { borderWidth, colors, getSportColor, radius, spacing, typography } from '../theme/tokens';
+import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
+import { sportPalette } from '../sports/style';
+import { useSportVisual } from '../sports/catalog';
 import type { Event } from '../types/event';
 import { useSportDisplayName, stripIconGlyphs } from '../utils/labels';
 import { ArrowRightIcon } from './icons/SharedIcons';
@@ -117,7 +119,7 @@ export default function EventCard({
   const authUser = useOptionalUser();
   const effectiveUserId = currentUserId ?? authUser?.id;
   const sportLabel = useSportDisplayName(event.sport);
-  const sportColor = getSportColor(event.sport);
+  const sportColor = sportPalette(useSportVisual(event.sport).color).tint;
   const t = useT();
   const statusLabel = getEventStatusLabel(event, effectiveUserId, t);
   const actionLabel = getEventActionLabel(event, effectiveUserId, t);

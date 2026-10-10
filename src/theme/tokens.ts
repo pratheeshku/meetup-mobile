@@ -78,21 +78,6 @@ export const colors = {
   avatarTintText5: '#5B21B6',
 };
 
-export const sportColors: Record<string, string> = {
-  badminton: '#2A7B72',
-  football: '#835C2B',
-  '5-a-side football': '#835C2B',
-  futsal: '#835C2B',
-  basketball: '#67509B',
-  tennis: '#A54362',
-};
-
-export function getSportColor(sport?: string | null): string {
-  if (!sport) return '#2A7B72';
-  const key = sport.trim().toLowerCase();
-  return sportColors[key] ?? '#2A7B72';
-}
-
 export const spacing = {
   xs: 4,
   sm: 8,

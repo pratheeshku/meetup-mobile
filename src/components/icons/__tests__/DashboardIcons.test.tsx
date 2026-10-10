@@ -3,43 +3,64 @@ import React from 'react';
 import Svg from 'react-native-svg';
 
 import { render } from '../../../test-utils/render';
+import { SportMarkerIcon } from '../SharedIcons';
 import {
   BannerBackground,
   FallbackBallIcon,
   GamesIcon,
-  SPORT_ICONS,
+  ICON_GLYPHS,
   SportIcon,
   hasSportIcon,
   sportSlug,
 } from '../DashboardIcons';
+
+const WHITELIST = [
+  'badminton',
+  'basketball',
+  'football',
+  'tennis',
+  'volleyball',
+  'swimming',
+  'sport-marker',
+] as const;
 
 function hostSvg(element: React.ReactElement) {
   return render(element).findByType(Svg);
 }
 
 describe('sport icon lookup', () => {
-  it.each(['badminton', 'basketball', 'football', 'tennis'])('has an icon for %s', slug => {
-    expect(hasSportIcon(slug)).toBe(true);
-    expect(SPORT_ICONS[slug]).toBeDefined();
+  it.each(WHITELIST)('has a bundled glyph for whitelist icon_key %s', iconKey => {
+    expect(hasSportIcon(iconKey)).toBe(true);
+    expect(ICON_GLYPHS[iconKey]).toBeDefined();
+    const rendered = render(<SportIcon iconKey={iconKey} size={24} />);
+    expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(0);
+    expect(rendered.findAllByType(Svg).length).toBeGreaterThan(0);
   });
 
-  it('matches the slug case-insensitively and ignoring whitespace', () => {
+  it('renders the sport-marker glyph, not the neutral ball', () => {
+    const rendered = render(<SportIcon iconKey="  Sport-Marker  " size={24} />);
+    expect(rendered.findAllByType(SportMarkerIcon)).toHaveLength(1);
+    expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(0);
+  });
+
+  it('matches an icon_key case-insensitively and ignoring whitespace', () => {
     expect(hasSportIcon('BADMINTON')).toBe(true);
     expect(hasSportIcon('  Tennis ')).toBe(true);
     expect(sportSlug(' Football ')).toBe('football');
   });
 
-  it('uses the fallback ball for an unknown, empty or missing slug', () => {
-    for (const slug of ['curling', '', null, undefined]) {
-      expect(hasSportIcon(slug)).toBe(false);
-      const rendered = render(<SportIcon slug={slug} size={24} />);
+  it('uses the fallback ball for an unknown, empty or missing icon_key', () => {
+    for (const iconKey of ['curling', 'not-a-glyph', '', null, undefined]) {
+      expect(hasSportIcon(iconKey)).toBe(false);
+      const rendered = render(<SportIcon iconKey={iconKey} size={24} />);
       expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(1);
+      expect(rendered.findAllByType(Svg).length).toBeGreaterThan(0);
     }
   });
 
-  it('renders the matching icon (not the fallback) for a known slug', () => {
-    const rendered = render(<SportIcon slug="Basketball" size={24} />);
-    expect(rendered.findAllByType(SPORT_ICONS.basketball)).toHaveLength(1);
+  it('renders the matching glyph (not the fallback) for a known icon_key', () => {
+    const rendered = render(<SportIcon iconKey="Basketball" size={24} />);
+    expect(rendered.findAllByType(ICON_GLYPHS.basketball)).toHaveLength(1);
     expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(0);
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Multi-select sport tiles, two columns: tinted circular sport icon, name and
- * a tick badge when selected. Icons/tints reuse the Home mapping
- * (`SportIcon`, `sportTileColor`). Pure presentation; selection is owned by
+ * a tick badge when selected. The icon comes from `icon_key` and the circle
+ * colour from the API `color`. Pure presentation; selection is owned by
  * the caller. Each tile is a checkbox (checked state + name), so selection
  * never relies on colour alone.
  */
@@ -9,8 +9,8 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { sportTileColor } from '../home/GameRow';
 import { SportIcon } from '../icons/DashboardIcons';
+import { sportPalette } from '../../sports/style';
 import { borderWidth, colors, opacity, radius, sizes, skillSizes, spacing, typography } from '../../theme/tokens';
 import type { Sport } from '../../types/sport';
 
@@ -32,7 +32,6 @@ export default function SportPicker({
     <View style={styles.grid}>
       {sports.map(sport => {
         const checked = selected.includes(sport.name);
-        const slug = sport.slug ?? sport.name;
         return (
           <Pressable
             key={sport.name}
@@ -48,8 +47,8 @@ export default function SportPicker({
               disabled ? styles.disabled : null,
             ]}
           >
-            <View style={[styles.circle, { backgroundColor: sportTileColor(slug) }]}>
-              <SportIcon slug={slug} size={skillSizes.sportIcon} />
+            <View style={[styles.circle, { backgroundColor: sportPalette(sport.color).chip }]}>
+              <SportIcon iconKey={sport.icon_key} size={skillSizes.sportIcon} />
             </View>
             <Text style={styles.name} numberOfLines={2}>
               {sport.display_name}
