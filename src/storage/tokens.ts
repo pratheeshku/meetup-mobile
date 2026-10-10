@@ -14,8 +14,14 @@
  * The access token and refresh token are stored as two independent generic
  * password entries, distinguished by `service`, since a single keychain
  * entry holds one username/password pair.
+ *
+ * Perf instrumentation (perf-diagnostics task, Item C):
+ *   - Every call to getAccessToken() and saveTokens() is wrapped with a
+ *     perfLog span: duration_ms, call count, and in-flight concurrency.
+ *   - The token value itself is never logged (R-014/R-111/P10).
  */
 import * as Keychain from 'react-native-keychain';
+import { perfLog, startSpan } from '../diagnostics/perfLog';
 
 const ACCESS_TOKEN_SERVICE = 'com.meetupmobile.auth.accessToken';
 const REFRESH_TOKEN_SERVICE = 'com.meetupmobile.auth.refreshToken';
@@ -38,6 +44,9 @@ function logStorageBacking(label: string, storage: Keychain.STORAGE_TYPE | undef
   }
 }
 
+// ── Perf diagnostics: in-flight concurrency tracking (Item C) ────────────────
+let _keychainInFlight = 0;
+
 /**
  * Persists the session tokens.
  *
@@ -49,41 +58,74 @@ function logStorageBacking(label: string, storage: Keychain.STORAGE_TYPE | undef
  * untouched, because writing an empty password is rejected natively.
  */
 export async function saveTokens(access: string, refresh?: string | null): Promise<void> {
-  const writes: Array<ReturnType<typeof Keychain.setGenericPassword>> = [
-    Keychain.setGenericPassword(ACCESS_TOKEN_USERNAME, access, {
-      ...KEYCHAIN_OPTIONS,
-      service: ACCESS_TOKEN_SERVICE,
-    }),
-  ];
-  if (refresh) {
-    writes.push(
-      Keychain.setGenericPassword(REFRESH_TOKEN_USERNAME, refresh, {
+  _keychainInFlight++;
+  const endSpan = startSpan('keychain_write', { in_flight: _keychainInFlight });
+  try {
+    const writes: Array<ReturnType<typeof Keychain.setGenericPassword>> = [
+      Keychain.setGenericPassword(ACCESS_TOKEN_USERNAME, access, {
         ...KEYCHAIN_OPTIONS,
-        service: REFRESH_TOKEN_SERVICE,
+        service: ACCESS_TOKEN_SERVICE,
       }),
-    );
-  }
+    ];
+    if (refresh) {
+      writes.push(
+        Keychain.setGenericPassword(REFRESH_TOKEN_USERNAME, refresh, {
+          ...KEYCHAIN_OPTIONS,
+          service: REFRESH_TOKEN_SERVICE,
+        }),
+      );
+    }
 
-  const [accessResult, refreshResult] = await Promise.all(writes);
+    const [accessResult, refreshResult] = await Promise.all(writes);
 
-  if (!accessResult || (refresh && !refreshResult)) {
-    throw new Error('Failed to persist tokens to secure storage');
-  }
+    if (!accessResult || (refresh && !refreshResult)) {
+      throw new Error('Failed to persist tokens to secure storage');
+    }
 
-  logStorageBacking('access token', accessResult.storage);
-  if (refreshResult) {
-    logStorageBacking('refresh token', refreshResult.storage);
+    logStorageBacking('access token', accessResult.storage);
+    if (refreshResult) {
+      logStorageBacking('refresh token', refreshResult.storage);
+    }
+    endSpan({ wrote_refresh: !!refresh });
+  } catch (err) {
+    endSpan({ error: true });
+    throw err;
+  } finally {
+    _keychainInFlight--;
   }
 }
 
 export async function getAccessToken(): Promise<string | null> {
-  const result = await Keychain.getGenericPassword({ service: ACCESS_TOKEN_SERVICE });
-  return result ? result.password : null;
+  _keychainInFlight++;
+  const endSpan = startSpan('keychain_read', { in_flight: _keychainInFlight });
+  try {
+    const result = await Keychain.getGenericPassword({ service: ACCESS_TOKEN_SERVICE });
+    const found = !!result;
+    endSpan({ found });
+    return result ? result.password : null;
+  } catch (err) {
+    endSpan({ error: true });
+    throw err;
+  } finally {
+    _keychainInFlight--;
+  }
 }
 
 export async function clearTokens(): Promise<void> {
+  // clearTokens is internal cleanup; no perf span needed (not on the
+  // critical path being measured).
   await Promise.all([
     Keychain.resetGenericPassword({ service: ACCESS_TOKEN_SERVICE }),
     Keychain.resetGenericPassword({ service: REFRESH_TOKEN_SERVICE }),
   ]);
+}
+
+// ── Diagnostics: log flag resolution event (boot timeline, Item B) ──────────
+/**
+ * Called by AuthContext after resolving the perf runtime flag, so the boot
+ * timeline records when Keychain was first instrumented.
+ * No-op when perfLog is disabled.
+ */
+export function logKeychainReady(): void {
+  perfLog('boot_keychain_ready');
 }

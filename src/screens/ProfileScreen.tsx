@@ -10,7 +10,7 @@
  * - Recent games card with sport icon, date/time, venue and "View all" link
  * - Outlined Log out button with confirmation dialog
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -63,6 +63,8 @@ import {
 import type { SkillLevelValue, UserProfile } from '../types/user';
 import type { LabelKey } from '../labels/fallbackLabels';
 import type { ProfileStackParamList } from '../navigation/types';
+import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
+import { perfLog, startSpan, isPerfEnabled, shareLog, imageUrlKey } from '../diagnostics/perfLog';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;
 
@@ -173,19 +175,70 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  // ── Perf: render count and screen timing ──────────────────────────────────
+  usePerfRender('ProfileScreen');
+  usePerfScreen('ProfileScreen', isLoading);
+
+  // ── Perf: 7-tap diagnostics toggle (Item SWITCH) ──────────────────────────
+  // Tracks taps on the display name within a 3-second window.
+  const tapTimestamps = useRef<number[]>([]);
+
+  const handleDisplayNamePress = useCallback((): void => {
+    const now = Date.now();
+    // Keep only taps within the last 3000 ms.
+    tapTimestamps.current = tapTimestamps.current.filter(ts => now - ts < 3000);
+    tapTimestamps.current.push(now);
+    if (tapTimestamps.current.length >= 7) {
+      tapTimestamps.current = [];
+      const enabled = isPerfEnabled();
+      const { setRuntimeFlag } = require('../diagnostics/perfLog') as typeof import('../diagnostics/perfLog');
+      const buttons: import('react-native').AlertButton[] = [
+        {
+          text: enabled ? 'Turn OFF' : 'Turn ON',
+          onPress: () => {
+            setRuntimeFlag(!enabled).catch(() => {});
+          },
+        },
+        {
+          text: 'Close',
+          style: 'cancel',
+        },
+      ];
+      if (enabled) {
+        buttons.splice(1, 0, {
+          text: 'Share log',
+          onPress: () => {
+            shareLog().catch(() => {});
+          },
+        });
+      }
+      Alert.alert(`Diagnostics is ${enabled ? 'ON' : 'OFF'}`, '', buttons);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     try {
       setLoadError(null);
+      // ── Perf: instrument each parallel call with a span ────────────────
+      const profileSpan = startSpan('fetch', { resource: 'getProfile', screen: 'ProfileScreen' });
+      const summarySpan = startSpan('fetch', { resource: 'getProfileSummary', screen: 'ProfileScreen' });
+      const groupsSpan = startSpan('fetch', { resource: 'getMyGroups', screen: 'ProfileScreen' });
+      const bannersSpan = startSpan('fetch', { resource: 'getCachedBanners', screen: 'ProfileScreen' });
+
       const [profileData, summaryData, myGroupsData, bannerData] = await Promise.all([
-        getProfile(),
-        getProfileSummary().catch(() => ({
-          games_played: 0,
-          games_hosted: 0,
-          groups_count: 0,
-          recent_games: [],
-        })),
-        getMyGroups().catch(() => ({ items: [], total: 0 })),
-        getCachedBanners().catch(() => null),
+        getProfile().then(r => { profileSpan({ result: 'ok' }); return r; }).catch(e => { profileSpan({ result: 'error' }); throw e; }),
+        getProfileSummary().then(r => { summarySpan({ result: 'ok' }); return r; }).catch(() => {
+          summarySpan({ result: 'fallback' });
+          return { games_played: 0, games_hosted: 0, groups_count: 0, recent_games: [] };
+        }),
+        getMyGroups().then(r => { groupsSpan({ result: 'ok' }); return r; }).catch(() => {
+          groupsSpan({ result: 'fallback' });
+          return { items: [], total: 0 };
+        }),
+        getCachedBanners().then(r => { bannersSpan({ result: 'ok' }); return r; }).catch(() => {
+          bannersSpan({ result: 'fallback' });
+          return null;
+        }),
       ]);
       setProfile(profileData);
       setProfileSummary(summaryData);
@@ -247,7 +300,20 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       {/* Cover banner */}
       <View style={styles.bannerContainer}>
         {coverUrl ? (
-          <Image source={{ uri: coverUrl }} style={styles.bannerImage} resizeMode="cover" />
+          <Image
+            source={{ uri: coverUrl }}
+            style={styles.bannerImage}
+            resizeMode="cover"
+            onLoadStart={() => {
+              perfLog('img_load_start', { screen: 'ProfileScreen', key: imageUrlKey(coverUrl), type: 'cover' });
+            }}
+            onLoad={() => {
+              perfLog('img_load', { screen: 'ProfileScreen', key: imageUrlKey(coverUrl), type: 'cover' });
+            }}
+            onError={() => {
+              perfLog('img_error', { screen: 'ProfileScreen', key: imageUrlKey(coverUrl), type: 'cover' });
+            }}
+          />
         ) : (
           <View style={styles.bannerFallback}>
             <BannerBackground width="100%" height="100%" />
@@ -259,7 +325,19 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
       <View style={styles.identityContainer}>
         <View style={styles.avatarBorder}>
           {profile.avatar_url ? (
-            <FastImage source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+            <FastImage
+              source={{ uri: profile.avatar_url }}
+              style={styles.avatarImage}
+              onLoadStart={() => {
+                perfLog('img_load_start', { screen: 'ProfileScreen', key: imageUrlKey(profile.avatar_url), type: 'avatar' });
+              }}
+              onLoad={() => {
+                perfLog('img_load', { screen: 'ProfileScreen', key: imageUrlKey(profile.avatar_url), type: 'avatar' });
+              }}
+              onError={() => {
+                perfLog('img_error', { screen: 'ProfileScreen', key: imageUrlKey(profile.avatar_url), type: 'avatar' });
+              }}
+            />
           ) : (
             <View style={styles.avatarInitials}>
               <Text style={styles.avatarInitialsText}>{initials}</Text>
@@ -267,7 +345,14 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           )}
         </View>
 
-        <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
+        <Pressable
+          onPress={handleDisplayNamePress}
+          accessibilityRole="text"
+          accessibilityLabel={getDisplayName(profile)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
+        </Pressable>
         <Text style={styles.nickname}>@{profile.nickname}</Text>
       </View>
 

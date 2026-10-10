@@ -25,6 +25,19 @@
  *
  * Security (R-111, P10): tokens are never logged, printed, or included in
  * thrown-error messages anywhere in this module.
+ *
+ * Perf instrumentation (perf-diagnostics task, Item D):
+ *   - A per-request numeric ID (stored in Axios config metadata) links all
+ *     events for one HTTP call.
+ *   - t_enter: request interceptor entry.
+ *   - token_wait_ms: time spent awaiting getAccessToken().
+ *   - t_sent: when the request is handed to the network.
+ *   - t_response / http_response: response interceptor entry; total_ms,
+ *     network_ms, status, response bytes, method, path template.
+ *   - refresh_start / refresh_end: 401 refresh-and-retry logging.
+ *   - in_flight_count at enter (concurrency gauge).
+ *   - NEVER logged: tokens, Authorization/Cookie headers, bodies, query
+ *     strings, user IDs, emails. Path is always the template (toPathTemplate).
  */
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { ENV } from '../../config/env';
@@ -34,6 +47,7 @@ import { generateCorrelationId } from './correlationId';
 import { authEvents } from './authEvents';
 import { clearCookieJar } from './cookies';
 import { logRouteToLogin } from './loginRouteLog';
+import { perfLog, startSpan, toPathTemplate, isPerfEnabled } from '../diagnostics/perfLog';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -45,6 +59,12 @@ declare module 'axios' {
     /** Internal — marks a request that has already gone through one
      * refresh-and-retry cycle, so it is never retried a second time. */
     _retriedAfterRefresh?: boolean;
+    /** Perf diagnostics: numeric request ID for correlating events. */
+    _perfReqId?: number;
+    /** Perf diagnostics: timestamp when the request interceptor was entered. */
+    _perfEnterT?: number;
+    /** Perf diagnostics: timestamp when getAccessToken() returned. */
+    _perfSentT?: number;
   }
 }
 
@@ -91,9 +111,51 @@ export const refreshClient = axios.create({
   withCredentials: true,
 });
 
+// ── Perf: in-flight request counter ─────────────────────────────────────────
+let _reqIdSeq = 0;
+let _inFlightCount = 0;
+
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  // ── Perf: enter timestamp and in-flight concurrency ──────────────────────
+  const reqId = ++_reqIdSeq;
+  _inFlightCount++;
+  const enterT = (() => {
+    if (!isPerfEnabled()) {
+      return 0;
+    }
+    // Import here avoids a circular-import; 'now' is a trivial fn.
+    const { now } = require('../diagnostics/perfLog') as typeof import('../diagnostics/perfLog');
+    return now();
+  })();
+
+  if (isPerfEnabled()) {
+    config._perfReqId = reqId;
+    config._perfEnterT = enterT;
+    const method = config.method?.toUpperCase() ?? 'GET';
+    const rawPath = config.url ?? '';
+    const path = toPathTemplate(rawPath);
+    perfLog('http_enter', { req_id: reqId, method, path, in_flight: _inFlightCount });
+  }
+
+  // ── Token injection ───────────────────────────────────────────────────────
+  const tokenSpan = startSpan('_token_read_for_request');
   try {
     const accessToken = await getAccessToken();
+    const tokenWaitEnd = (() => {
+      if (!isPerfEnabled()) {
+        return 0;
+      }
+      const { now } = require('../diagnostics/perfLog') as typeof import('../diagnostics/perfLog');
+      return now();
+    })();
+
+    if (isPerfEnabled() && enterT > 0) {
+      config._perfSentT = tokenWaitEnd;
+      const tokenWaitMs = Math.round((tokenWaitEnd - enterT) * 10) / 10;
+      perfLog('http_token_wait', { req_id: reqId, token_wait_ms: tokenWaitMs });
+    }
+    tokenSpan();
+
     if (accessToken) {
       config.headers.set('Authorization', `Bearer ${accessToken}`);
     }
@@ -101,6 +163,7 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
     // A Keychain read failure is not a logged-out session. Keep any
     // Authorization the caller already set (startup restore passes the token
     // just issued by POST /auth/refresh) and let the request proceed.
+    tokenSpan({ error: true });
     console.log('[auth] access token unreadable for request', describeError(error));
   }
 
@@ -181,9 +244,48 @@ export function endSession(): Promise<void> {
 }
 
 apiClient.interceptors.response.use(
-  response => response,
+  response => {
+    // ── Perf: response received ─────────────────────────────────────────────
+    _inFlightCount = Math.max(0, _inFlightCount - 1);
+    if (isPerfEnabled()) {
+      const config = response.config as InternalAxiosRequestConfig;
+      const reqId = config._perfReqId;
+      const enterT = config._perfEnterT ?? 0;
+      const sentT = config._perfSentT ?? enterT;
+      const { now } = require('../diagnostics/perfLog') as typeof import('../diagnostics/perfLog');
+      const responseT = now();
+      const totalMs = Math.round((responseT - enterT) * 10) / 10;
+      const networkMs = Math.round((responseT - sentT) * 10) / 10;
+      // Response size: prefer content-length header; fall back to JSON stringify length.
+      // NEVER log the response body itself.
+      const contentLengthHeader = response.headers['content-length'];
+      const responseBytes = contentLengthHeader
+        ? Number(contentLengthHeader)
+        : typeof response.data === 'string'
+        ? response.data.length
+        : response.data
+        ? JSON.stringify(response.data).length
+        : 0;
+
+      const method = (config.method ?? 'GET').toUpperCase();
+      const path = toPathTemplate(config.url ?? '');
+
+      perfLog('http_response', {
+        req_id: reqId,
+        method,
+        path,
+        status: response.status,
+        total_ms: totalMs,
+        network_ms: networkMs,
+        response_bytes: responseBytes,
+        in_flight: _inFlightCount,
+      });
+    }
+    return response;
+  },
   async (error: AxiosError) => {
     const { config, response } = error;
+    _inFlightCount = Math.max(0, _inFlightCount - 1);
 
     if (response?.status !== 401 || !config || config.url?.startsWith(AUTH_PATH_PREFIX)) {
       return Promise.reject(error);
@@ -208,11 +310,20 @@ apiClient.interceptors.response.use(
       // refresh already completed since. Retry with the current token rather
       // than spend another rotation on it.
       const sentAuthorization = config.headers.get('Authorization');
-      const token =
-        sentAuthorization !== `Bearer ${storedToken}` ? storedToken : await refreshAccessToken();
+      let token: string;
+      if (sentAuthorization !== `Bearer ${storedToken}`) {
+        token = storedToken;
+      } else {
+        // Need a refresh — log it.
+        const refreshSpan = startSpan('http_refresh_start', { req_id: config._perfReqId });
+        token = await refreshAccessToken();
+        refreshSpan({ req_id: config._perfReqId });
+      }
 
       config._retriedAfterRefresh = true;
       config.headers.set('Authorization', `Bearer ${token}`);
+      // Log the retry.
+      perfLog('http_retry_after_refresh', { req_id: config._perfReqId });
       return apiClient(config);
     } catch (refreshError) {
       if (refreshError instanceof SessionEndedError) {

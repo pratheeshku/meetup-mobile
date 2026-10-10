@@ -48,6 +48,7 @@ import type { Event } from '../types/event';
 import { filteredEmptyMessage, getGameBadge, selectGames } from '../utils/gameLists';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
+import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
 
 type Props = NativeStackScreenProps<TournamentsStackParamList, 'TournamentsList'>;
 
@@ -234,6 +235,12 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
   const [scope, setScope] = useState<GamesScope>(route.params?.scope ?? 'all');
   // Tournaments mounts the first time it is shown, then stays mounted.
   const [tournamentsVisited, setTournamentsVisited] = useState(false);
+
+  // ── Perf: screen timing ────────────────────────────────────────────────────
+  usePerfRender('GamesScreen');
+  // GamesScreen is "loaded" when either segment is not loading. Approximate:
+  // always false (no top-level loading state) so first_content_ms = time to focus.
+  usePerfScreen('GamesScreen', false);
 
   // Home entry points: land on Games with the requested scope.
   const entryKey = route.params?.entryKey;

@@ -130,6 +130,8 @@ import AccountDeletionCodeScreen from '../screens/AccountDeletionCodeScreen';
 import NotificationBanner from '../components/NotificationBanner';
 import OnboardingOverlay from './OnboardingOverlay';
 import { useT } from '../labels/LabelsContext';
+import { perfLog, isPerfEnabled } from '../diagnostics/perfLog';
+import { recordNavChange } from '../hooks/usePerfScreen';
 
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
@@ -462,7 +464,28 @@ export default function RootNavigator(): React.JSX.Element {
       <NavigationContainer
         ref={navigationRef}
         theme={navigationTheme}
-        onReady={handleInitialNotification}
+        onReady={() => {
+          perfLog('boot_nav_ready');
+          handleInitialNotification();
+        }}
+        onStateChange={state => {
+          if (!isPerfEnabled() || !state) {
+            return;
+          }
+          // Find the active route name from navigation state tree.
+          const getActiveRouteName = (navState: typeof state): string => {
+            if (!navState) {
+              return 'unknown';
+            }
+            const route = navState.routes[navState.index ?? 0];
+            if (route?.state) {
+              return getActiveRouteName(route.state as typeof state);
+            }
+            return route?.name ?? 'unknown';
+          };
+          const routeName = getActiveRouteName(state);
+          recordNavChange(routeName);
+        }}
       >
         {user ? <AppStack /> : <AuthStack />}
       </NavigationContainer>

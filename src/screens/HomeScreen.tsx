@@ -46,8 +46,6 @@ import {
   getHomeBanners,
   getHomeMenu,
   getHomeSummary,
-  type BannerFallback,
-  type BannerItem,
   type HomeBannersResponse,
   type HomeMenuResponse,
   type HomeSummaryResponse,
@@ -78,6 +76,7 @@ import type { Event } from '../types/event';
 import type { Group } from '../types/group';
 import { getDisplayName } from '../utils/displayName';
 import { filteredEmptyMessage } from '../utils/gameLists';
+import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'EventsList'>,
@@ -108,6 +107,11 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const scrollRef = useRef<ScrollView>(null);
   useScrollToTop(scrollRef);
   const unreadCount = useUnreadBadgeCount();
+
+  // ── Perf: screen timing ────────────────────────────────────────────────────
+  const homeIsLoading = liveUpcoming.status === 'loading';
+  usePerfRender('HomeScreen');
+  usePerfScreen('HomeScreen', homeIsLoading);
 
   // Resources (bootstrap data & banners)
   const sports = useResource(options => getSports(options));
