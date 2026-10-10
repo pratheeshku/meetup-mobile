@@ -59,6 +59,8 @@ import { signIn as appleSignIn } from './appleAuth';
 import { login as emailLogin } from './emailAuth';
 import { startPushRegistration } from '../notifications/pushRegistration';
 import type { UserProfile } from '../types/user';
+import { perfLog, startSpan, logSessionHeader } from '../diagnostics/perfLog';
+import { ENV } from '../../config/env';
 
 interface AuthContextValue {
   user: UserProfile | null;
@@ -114,6 +116,10 @@ function readAppState(): AppStateStatus {
   return 'active';
 }
 
+// Perf diagnostics: session header is logged once per app launch (first
+// successful session restore after the runtime flag is known).
+let hadLoggedSessionHeader = false;
+
 export function AuthProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,14 +149,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         configureGoogleSignIn();
       }
 
+      // ── Perf: boot step — token read ────────────────────────────────────
+      const keychainSpan = startSpan('boot_token_read');
       let accessToken: string | null = null;
       try {
         accessToken = await getAccessToken();
+        keychainSpan({ found: !!accessToken });
       } catch (error) {
         // The Keychain/Keystore read itself failed (e.g. an invalidated key).
         // The refresh token is a cookie the networking layer still sends, so
         // try POST /auth/refresh. Only an error tag is logged, never a value.
         // The splash cannot hang: a transient result ends on the retry state.
+        keychainSpan({ error: true });
         console.log('[auth] stored token unreadable; attempting refresh', describeError(error));
       }
       if (!stillCurrent()) {
@@ -161,19 +171,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       if (!accessToken) {
         // No readable access token, but the 30-day refresh cookie may still
         // be alive (mirrors the PWA's silent refresh on load).
+        const refreshSpan = startSpan('boot_refresh_call');
         try {
           const token = await refreshAccessToken();
           if (!stillCurrent()) {
+            refreshSpan({ aborted: true });
             return { kind: 'aborted' };
           }
           if (typeof token === 'string' && token.length > 0) {
             refreshedToken = token;
             hadSessionRef.current = true;
+            refreshSpan({ result: 'ok' });
           } else {
+            refreshSpan({ result: 'no-token' });
             return { kind: 'give-up', error: new Error('refresh returned no token') };
           }
         } catch (error) {
           if (!stillCurrent()) {
+            refreshSpan({ aborted: true });
             return { kind: 'aborted' };
           }
           if (error instanceof SessionEndedError) {
@@ -182,6 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
               // or reused): a real session just ended, so tell the user.
               logRouteToLogin('refresh-rejected', 401);
               hadSessionRef.current = true;
+              refreshSpan({ result: 'rejected' });
               await endSession();
             } else {
               // `{ access_token: null }` is "never signed in" when we had no
@@ -189,11 +205,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
               // are (endSession is not called on this path).
               logRouteToLogin('refresh-no-session', 200);
               hadSessionRef.current = false;
+              refreshSpan({ result: 'no-session' });
               setSessionExpired(false);
               setUser(null);
             }
             return { kind: 'signed-out' };
           }
+          refreshSpan({ error: true });
           return { kind: 'give-up', error };
         }
       } else {
@@ -208,6 +226,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       const stopWatching = authEvents.on('auth-expired', () => {
         sessionEnded = true;
       });
+      // ── Perf: boot step — GET /users/me ────────────────────────────────
+      const meSpan = startSpan('boot_users_me');
       try {
         // When the Keychain could not be read, pass the token the refresh
         // just returned. The request interceptor keeps that header if a
@@ -217,20 +237,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
           refreshedToken ? { headers: { Authorization: `Bearer ${refreshedToken}` } } : undefined,
         );
         if (sessionEnded) {
+          meSpan({ result: 'session-ended' });
           return { kind: 'signed-out' };
         }
         if (!stillCurrent()) {
+          meSpan({ aborted: true });
           return { kind: 'aborted' };
         }
+        meSpan({ result: 'ok' });
         setSessionExpired(false);
         setUser(data);
+        // ── Perf: session restore done → log session header ──────────────
+        perfLog('boot_session_restore_done', { first: !hadLoggedSessionHeader });
+        if (!hadLoggedSessionHeader) {
+          hadLoggedSessionHeader = true;
+          logSessionHeader(ENV.API_BASE_URL);
+        }
         return { kind: 'ready' };
       } catch (error) {
         if (sessionEnded) {
           // The client already called endSession() and logged the cause
           // (refresh rejected, no-session, or a 401 on the retried request).
+          meSpan({ result: 'session-ended' });
           return { kind: 'signed-out' };
         }
+        meSpan({ error: true });
         return { kind: 'give-up', error: restoreFailureOf(error) };
       } finally {
         stopWatching();

@@ -29,9 +29,10 @@ import {
 
 import type { BannerFallback, BannerItem } from '../../api/home';
 import { useT } from '../../labels/LabelsContext';
-import { dash, dashRadius } from '../../theme/dashboardTheme';
+import { dash } from '../../theme/dashboardTheme';
 import { radius, spacing, typography } from '../../theme/tokens';
 import { toHttpsUrl } from '../../utils/httpsUrl';
+import { perfImageError, perfImageLoad, perfImageLoadStart } from '../../diagnostics/perfLog';
 
 const SHUTTLR_ICON = require('../../assets/shuttlr-icon.png');
 
@@ -203,6 +204,17 @@ export default function BannerCarousel({
             source={{ uri: fallback.image_url }}
             style={styles.bannerImage}
             resizeMode="cover"
+            onLoadStart={() => perfImageLoadStart('HomeScreen', fallback.image_url, 'banner')}
+            onLoad={e =>
+              perfImageLoad(
+                'HomeScreen',
+                fallback.image_url,
+                'banner',
+                e.nativeEvent.source.width,
+                e.nativeEvent.source.height,
+              )
+            }
+            onError={() => perfImageError('HomeScreen', fallback.image_url, 'banner')}
           />
         ) : (
           <View style={styles.fallbackStaticAsset}>
@@ -254,6 +266,17 @@ export default function BannerCarousel({
           source={{ uri: banner.image_url }}
           style={styles.bannerImage}
           resizeMode="cover"
+          onLoadStart={() => perfImageLoadStart('HomeScreen', banner.image_url, 'banner')}
+          onLoad={e =>
+            perfImageLoad(
+              'HomeScreen',
+              banner.image_url,
+              'banner',
+              e.nativeEvent.source.width,
+              e.nativeEvent.source.height,
+            )
+          }
+          onError={() => perfImageError('HomeScreen', banner.image_url, 'banner')}
         />
         {banner.is_sponsored ? (
           <View style={styles.adTag} testID="banner-ad-tag">
@@ -345,6 +368,17 @@ export default function BannerCarousel({
                   source={{ uri: banner.image_url }}
                   style={styles.bannerImage}
                   resizeMode="cover"
+                  onLoadStart={() => perfImageLoadStart('HomeScreen', banner.image_url, 'banner')}
+                  onLoad={e =>
+                    perfImageLoad(
+                      'HomeScreen',
+                      banner.image_url,
+                      'banner',
+                      e.nativeEvent.source.width,
+                      e.nativeEvent.source.height,
+                    )
+                  }
+                  onError={() => perfImageError('HomeScreen', banner.image_url, 'banner')}
                 />
                 {banner.is_sponsored ? (
                   <View style={styles.adTag} testID="banner-ad-tag">

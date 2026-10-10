@@ -29,6 +29,7 @@ import SocialTermsNotice from '../components/auth/SocialTermsNotice';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
+import ScreenContainer from '../components/ScreenContainer';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { useFieldChain } from '../hooks/useFieldChain';
@@ -168,6 +169,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
   const successMessage = route?.params?.successMessage;
 
   return (
+    <ScreenContainer edges="bottom">
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Text style={styles.title}>{t('mob.login.title')}</Text>
 
@@ -254,6 +256,7 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
         style={styles.link}
       />
     </KeyboardAwareScreen>
+    </ScreenContainer>
   );
 }
 

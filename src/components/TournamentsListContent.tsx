@@ -24,6 +24,8 @@ interface Props {
   onOpenTournament: (tournamentId: string) => void;
   /** Set by a successful tournament create; each new value refetches once. */
   refreshKey?: number;
+  /** Reports whether the list is still on its first-load spinner. */
+  onLoadingChange?: (loading: boolean) => void;
 }
 
 const REGISTRATION_BADGE_LABEL_KEY: Record<TournamentRegistrationStatus, LabelKey> = {
@@ -84,6 +86,7 @@ function TournamentRow({
 export default function TournamentsListContent({
   onOpenTournament,
   refreshKey,
+  onLoadingChange,
 }: Props): React.JSX.Element {
   const t = useT();
   const tRef = useRef(t);
@@ -114,6 +117,10 @@ export default function TournamentsListContent({
   useEffect(() => {
     loadTournaments(false);
   }, [loadTournaments]);
+
+  useEffect(() => {
+    onLoadingChange?.(isLoading);
+  }, [isLoading, onLoadingChange]);
 
   // Create Group/Tournament pops back here with a fresh `refreshKey` on
   // success; re-fetch once per new key (the initial mount load is above).

@@ -42,6 +42,7 @@ import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import NumberField from '../components/NumberField';
+import ScreenContainer from '../components/ScreenContainer';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
 import {
@@ -932,6 +933,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       {/* Delete Game Bottom Sheet (DeleteGame.png) */}
       <Modal visible={isDeleteModalOpen} transparent animationType="slide">
         <View style={styles.modalBackdrop}>
+          <ScreenContainer edges="bottom" fill={false} style={styles.bottomSheetSafe}>
           <View style={styles.bottomSheet}>
             <View style={styles.dragHandle} />
 
@@ -979,6 +981,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               <Text style={styles.deleteKeepBtnText}>{t('mob.game_detail.keep_game_button')}</Text>
             </TouchableOpacity>
           </View>
+          </ScreenContainer>
         </View>
       </Modal>
     </View>
@@ -1423,6 +1426,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.scrim,
     justifyContent: 'flex-end',
+  },
+  bottomSheetSafe: {
+    backgroundColor: colors.surface,
   },
   bottomSheet: {
     backgroundColor: colors.surface,

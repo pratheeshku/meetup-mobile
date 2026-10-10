@@ -32,4 +32,9 @@ export const ENV = {
   // same as API_BASE_URL.
   AVATAR_BUCKET_BASE_URL:
     Config.AVATAR_BUCKET_BASE_URL ?? 'https://meetup.hel1.your-objectstorage.com',
+  // Perf-diagnostics build flag (perf-diagnostics task).
+  // Set PERF_LOG=true in .env to enable the diagnostics layer at build time.
+  // Default empty = OFF. Parsed explicitly (not truthy-cast) to avoid the
+  // "false" string being truthy under naive boolean coercion.
+  PERF_LOG: Config.PERF_LOG ?? '',
 };

@@ -40,6 +40,7 @@ import { BackArrowIcon, CameraIcon } from '../components/icons/ActionIcons';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
+import ScreenContainer from '../components/ScreenContainer';
 import { findSport } from '../sports/catalog';
 import { sportPalette } from '../sports/style';
 import { levelLabelKey } from '../components/skills/levels';
@@ -289,11 +290,19 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
   };
 
   if (isLoading) {
-    return <LoadingView />;
+    return (
+      <ScreenContainer edges="top">
+        <LoadingView />
+      </ScreenContainer>
+    );
   }
 
   if (loadError || !profile) {
-    return <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadData} />;
+    return (
+      <ScreenContainer edges="top">
+        <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadData} />
+      </ScreenContainer>
+    );
   }
 
   const isDefaultCover = coverAction === 'default' || (!profile.cover_url && coverAction === 'keep');
@@ -302,6 +311,7 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
   const initials = getInitials(displayName || getDisplayName(profile));
 
   return (
+    <ScreenContainer edges="top" style={styles.screen}>
     <View style={styles.screen}>
       {/* Header bar */}
       <View style={styles.headerBar}>
@@ -491,6 +501,7 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
         </Pressable>
       </View>
     </View>
+    </ScreenContainer>
   );
 }
 

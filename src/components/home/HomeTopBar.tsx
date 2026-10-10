@@ -120,7 +120,7 @@ export default function HomeTopBar({
             onPress={onProfilePress}
             style={({ pressed }) => [styles.avatarTouch, pressed ? styles.pressed : null]}
           >
-            <UserAvatar imageUrl={photoUrl} name={trimmed} size={36} />
+            <UserAvatar imageUrl={photoUrl} name={trimmed} size={36} perfScreen="HomeScreen" />
           </Pressable>
         </View>
       </View>

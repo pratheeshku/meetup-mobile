@@ -10,6 +10,28 @@ import { createNotificationChannels } from './src/notifications/channels';
 import { registerParticipantBackgroundHandler } from './src/notifications/participantHandler';
 import { registerEventBackgroundHandler } from './src/notifications/eventNotificationHandler';
 
+// ── Perf diagnostics bootstrap (perf-diagnostics task) ──────────────────────
+// Imported as early as possible so `now()` is close to true bundle-start time.
+// `resolveRuntimeFlag` is async and non-blocking; the startup buffer (cap 200)
+// captures events that fire before it resolves so the boot timeline is preserved.
+import {
+  perfLog,
+  resolveRuntimeFlag,
+  startAppStateLogging,
+  startStallDetector,
+} from './src/diagnostics/perfLog';
+
+perfLog('boot_bundle_start');
+resolveRuntimeFlag()
+  .then(() => {
+    startAppStateLogging();
+    startStallDetector();
+  })
+  .catch(() => {
+    // Diagnostics failure must never affect app startup.
+  });
+// ────────────────────────────────────────────────────────────────────────────
+
 // FCM requires the background handler to be registered at top level, outside
 // any React lifecycle, so it exists when a message wakes the JS runtime before
 // (or without) any component mounting. It only acts on the data-only

@@ -13,6 +13,7 @@ import React, { useEffect } from 'react';
 import { BackHandler, Linking, StyleSheet, Text, View } from 'react-native';
 
 import Button from '../components/Button';
+import ScreenContainer from '../components/ScreenContainer';
 import { colors, spacing, typography } from '../theme/tokens';
 import { PLAY_STORE_FALLBACK_URL, resolveStoreUrl } from '../utils/playStoreUrl';
 import { describeError } from '../utils/logSafeError';
@@ -50,6 +51,7 @@ export default function ForceUpdateScreen({ storeUrl }: ForceUpdateScreenProps):
   }, []);
 
   return (
+    <ScreenContainer edges="both" style={styles.container}>
     <View style={styles.container}>
       <Text style={styles.title} accessibilityRole="header">
         {t('mob.force_update.title')}
@@ -57,6 +59,7 @@ export default function ForceUpdateScreen({ storeUrl }: ForceUpdateScreenProps):
       <Text style={styles.message}>{t('mob.force_update.message')}</Text>
       <Button label={t('mob.force_update.action')} onPress={() => openStore(storeUrl)} style={styles.button} />
     </View>
+    </ScreenContainer>
   );
 }
 
