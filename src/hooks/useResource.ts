@@ -9,11 +9,19 @@
  * - Does not fetch by itself: the owner calls `load(correlationId?)` (mount,
  *   pull-to-refresh, per-section Retry), so one logical user action can share
  *   one correlation ID (§3.12, R-113).
+ *
+ * Perf instrumentation (perf-diagnostics task, Item E):
+ *   - fetch_start / fetch_end per load() call, with duration_ms.
+ *   - focus-triggered refetch count is tracked by callers (FocusCount hook).
+ *   - The fetcher name is passed via `resourceName` option for readability.
  */
 import { useCallback, useRef, useState } from 'react';
+import { startSpan } from '../diagnostics/perfLog';
 
 export interface ResourceOptions {
   correlationId?: string;
+  /** Optional human-readable name for perf logging. */
+  resourceName?: string;
 }
 
 export type ResourceStatus = 'loading' | 'ready' | 'error';
@@ -66,7 +74,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return true;
 }
 
-export function useResource<T>(fetcher: (options: ResourceOptions) => Promise<T>): Resource<T> {
+export function useResource<T>(
+  fetcher: (options: ResourceOptions) => Promise<T>,
+  resourceName?: string,
+): Resource<T> {
   const [state, setState] = useState<State<T>>({ status: 'loading', data: undefined });
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
@@ -79,26 +90,37 @@ export function useResource<T>(fetcher: (options: ResourceOptions) => Promise<T>
     setState(previous =>
       previous.data !== undefined ? previous : { status: 'loading', data: undefined },
     );
-    return fetcherRef.current({ correlationId }).then(
+
+    // ── Perf: span the fetch ────────────────────────────────────────────────
+    const name = resourceName ?? 'resource';
+    const endSpan = startSpan('fetch', { resource: name });
+
+    return fetcherRef.current({ correlationId, resourceName: name }).then(
       data => {
         if (sequence.current === mine) {
+          endSpan({ result: 'ok' });
           setState(previous => {
             if (previous.status === 'ready' && deepEqual(previous.data, data)) {
               return previous;
             }
             return { status: 'ready', data };
           });
+        } else {
+          endSpan({ result: 'stale' });
         }
       },
       () => {
         if (sequence.current === mine) {
+          endSpan({ result: 'error' });
           setState(previous =>
             previous.data !== undefined ? previous : { status: 'error', data: undefined },
           );
+        } else {
+          endSpan({ result: 'stale-error' });
         }
       },
     );
-  }, []);
+  }, [resourceName]);
 
   return { status: state.status, data: state.data, load };
 }

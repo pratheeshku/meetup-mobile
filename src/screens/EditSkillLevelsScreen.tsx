@@ -14,6 +14,7 @@ import { SportIcon } from '../components/icons/DashboardIcons';
 import ErrorView from '../components/ErrorView';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import LoadingView from '../components/LoadingView';
+import ScreenContainer from '../components/ScreenContainer';
 import { levelLabelKey, SKILL_LEVEL_ORDER } from '../components/skills/levels';
 import { getLabel, useLabels, useT } from '../labels/LabelsContext';
 import { findSport, rememberSportsCatalog } from '../sports/catalog';
@@ -161,14 +162,23 @@ export default function EditSkillLevelsScreen({ navigation }: Props): React.JSX.
   };
 
   if (isLoading) {
-    return <LoadingView />;
+    return (
+      <ScreenContainer edges="top">
+        <LoadingView />
+      </ScreenContainer>
+    );
   }
 
   if (loadError) {
-    return <ErrorView message={loadError} onRetry={load} />;
+    return (
+      <ScreenContainer edges="top">
+        <ErrorView message={loadError} onRetry={load} />
+      </ScreenContainer>
+    );
   }
 
   return (
+    <ScreenContainer edges="top" style={styles.screen}>
     <View style={styles.screen}>
       <View style={styles.headerBar}>
         <Pressable
@@ -216,6 +226,7 @@ export default function EditSkillLevelsScreen({ navigation }: Props): React.JSX.
         </Pressable>
       </View>
     </View>
+    </ScreenContainer>
   );
 }
 

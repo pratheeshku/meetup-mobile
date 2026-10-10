@@ -48,6 +48,7 @@ import type { Event } from '../types/event';
 import { filteredEmptyMessage, getGameBadge, selectGames } from '../utils/gameLists';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
+import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
 
 type Props = NativeStackScreenProps<TournamentsStackParamList, 'TournamentsList'>;
 
@@ -109,18 +110,20 @@ function GamesSegment({
   scope,
   onScopeChange,
   onOpenEvent,
+  onListLoadingChange,
 }: {
   scope: GamesScope;
   onScopeChange: (scope: GamesScope) => void;
   onOpenEvent: (event: Event) => void;
+  onListLoadingChange: (loading: boolean) => void;
 }): React.JSX.Element {
   const { user } = useAuth();
   const t = useT();
   const userId = user?.id;
 
-  const events = useResource(options => getEvents(undefined, options));
-  const sports = useResource(options => getSports(options));
-  const profile = useResource(options => getProfile(options));
+  const events = useResource(options => getEvents(undefined, options), 'getEvents');
+  const sports = useResource(options => getSports(options), 'getSports');
+  const profile = useResource(options => getProfile(options), 'getProfile');
   const { load: loadEvents } = events;
   const { load: loadSports } = sports;
   const { load: loadProfile } = profile;
@@ -141,6 +144,10 @@ function GamesSegment({
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  useEffect(() => {
+    onListLoadingChange(events.status === 'loading');
+  }, [events.status, onListLoadingChange]);
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -203,6 +210,7 @@ function GamesSegment({
           <UnifiedGameCard
             event={item}
             badge={getGameBadge(item, userId)}
+            perfScreen="GamesScreen"
             onPress={() => onOpenEvent(item)}
           />
         )}
@@ -234,6 +242,23 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
   const [scope, setScope] = useState<GamesScope>(route.params?.scope ?? 'all');
   // Tournaments mounts the first time it is shown, then stays mounted.
   const [tournamentsVisited, setTournamentsVisited] = useState(false);
+
+  const [gamesListLoading, setGamesListLoading] = useState(true);
+  const [tournamentsListLoading, setTournamentsListLoading] = useState(true);
+  const onGamesListLoading = useCallback((loading: boolean) => {
+    setGamesListLoading(loading);
+  }, []);
+  const onTournamentsListLoading = useCallback((loading: boolean) => {
+    setTournamentsListLoading(loading);
+  }, []);
+
+  // ── Perf: screen timing ────────────────────────────────────────────────────
+  // first_content_ms waits for the list actually on screen (active segment).
+  usePerfRender('GamesScreen');
+  usePerfScreen(
+    'GamesScreen',
+    segment === 'tournaments' ? tournamentsListLoading : gamesListLoading,
+  );
 
   // Home entry points: land on Games with the requested scope.
   const entryKey = route.params?.entryKey;
@@ -296,13 +321,19 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
         />
       </View>
       <View style={[styles.flex, segment === 'games' ? null : styles.hidden]}>
-        <GamesSegment scope={scope} onScopeChange={setScope} onOpenEvent={openEvent} />
+        <GamesSegment
+          scope={scope}
+          onScopeChange={setScope}
+          onOpenEvent={openEvent}
+          onListLoadingChange={onGamesListLoading}
+        />
       </View>
       {tournamentsVisited ? (
         <View style={[styles.flex, segment === 'tournaments' ? null : styles.hidden]}>
           <WipStrip labelKey="mob.wip.banner_text" />
           <TournamentsListContent
             refreshKey={refreshKey}
+            onLoadingChange={onTournamentsListLoading}
             onOpenTournament={tournamentId =>
               navigation.navigate('TournamentDetail', { tournamentId })
             }

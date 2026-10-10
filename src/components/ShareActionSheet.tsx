@@ -13,6 +13,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Button from './Button';
+import ScreenContainer from './ScreenContainer';
 import { LinkIcon } from './icons/SharedIcons';
 import { colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import { useT } from '../labels/LabelsContext';
@@ -51,6 +52,7 @@ export default function ShareActionSheet({
           onPress={onClose}
           style={[StyleSheet.absoluteFill, styles.backdrop]}
         />
+        <ScreenContainer edges="bottom" pointerEvents="box-none" style={styles.sheetHost}>
         <View style={styles.sheet}>
           <Text style={styles.title} accessibilityRole="header">
             {title ?? t('mob.share_sheet.title')}
@@ -108,6 +110,7 @@ export default function ShareActionSheet({
 
           <Button label={t('mob.common.close')} variant="secondary" onPress={onClose} style={styles.close} />
         </View>
+        </ScreenContainer>
       </View>
     </Modal>
   );
@@ -118,6 +121,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
+  sheetHost: { justifyContent: 'flex-end' },
   backdrop: {
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },

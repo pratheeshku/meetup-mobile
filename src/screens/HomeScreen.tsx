@@ -46,8 +46,6 @@ import {
   getHomeBanners,
   getHomeMenu,
   getHomeSummary,
-  type BannerFallback,
-  type BannerItem,
   type HomeBannersResponse,
   type HomeMenuResponse,
   type HomeSummaryResponse,
@@ -78,6 +76,7 @@ import type { Event } from '../types/event';
 import type { Group } from '../types/group';
 import { getDisplayName } from '../utils/displayName';
 import { filteredEmptyMessage } from '../utils/gameLists';
+import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'EventsList'>,
@@ -109,10 +108,20 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   useScrollToTop(scrollRef);
   const unreadCount = useUnreadBadgeCount();
 
+  // ── Perf: screen timing ────────────────────────────────────────────────────
+  // First paint shows the active tab's list (skeleton while that list has no items
+  // and is not in the error state).
+  const homeIsLoading =
+    selectedTab === 'upcoming'
+      ? liveUpcoming.items === null && liveUpcoming.status !== 'error'
+      : liveGroups.items === null && liveGroups.status !== 'error';
+  usePerfRender('HomeScreen');
+  usePerfScreen('HomeScreen', homeIsLoading);
+
   // Resources (bootstrap data & banners)
-  const sports = useResource(options => getSports(options));
-  const profile = useResource(options => getProfile(options));
-  const banners = useResource(options => getHomeBanners(options));
+  const sports = useResource(options => getSports(options), 'getSports');
+  const profile = useResource(options => getProfile(options), 'getProfile');
+  const banners = useResource(options => getHomeBanners(options), 'getHomeBanners');
 
   const { load: loadSports } = sports;
   const { load: loadProfile } = profile;
@@ -510,6 +519,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
                 <UnifiedGameCard
                   key={event.id}
                   event={event}
+                  perfScreen="HomeScreen"
                   onPress={() => openEvent(event)}
                 />
               ))
@@ -533,6 +543,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
                 <UnifiedGroupCard
                   key={group.id}
                   group={group}
+                  perfScreen="HomeScreen"
                   currentUserId={user?.id}
                   onPress={() =>
                     navigation.navigate('Groups', {

@@ -44,6 +44,7 @@ import {
 } from '../components/icons/SharedIcons';
 import IconBadge from '../components/IconBadge';
 import LoadingView from '../components/LoadingView';
+import ScreenContainer from '../components/ScreenContainer';
 import { useT } from '../labels/LabelsContext';
 import {
   borderWidth,
@@ -140,10 +141,15 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
   };
 
   if (isLoading) {
-    return <LoadingView />;
+    return (
+      <ScreenContainer edges="top">
+        <LoadingView />
+      </ScreenContainer>
+    );
   }
 
   return (
+    <ScreenContainer edges="top" style={styles.screen}>
     <View style={styles.screen}>
       {/* Header bar */}
       <View style={styles.headerBar}>
@@ -303,6 +309,7 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
         </View>
       </ScrollView>
     </View>
+    </ScreenContainer>
   );
 }
 
