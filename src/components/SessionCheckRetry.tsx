@@ -11,6 +11,7 @@ import type { SessionCheckFailure } from '../auth/sessionRestore';
 import { useT } from '../labels/LabelsContext';
 import { colors, spacing, typography } from '../theme/tokens';
 import Button from './Button';
+import ScreenContainer from './ScreenContainer';
 
 const MESSAGE_KEYS = {
   network: 'mob.errors.network',
@@ -32,6 +33,7 @@ export default function SessionCheckRetry({
   const retryLabel = t('mob.common.retry');
 
   return (
+    <ScreenContainer edges="both" style={styles.container}>
     <View style={styles.container} accessibilityRole="alert">
       <Text style={styles.message}>{message}</Text>
       <Button
@@ -40,6 +42,7 @@ export default function SessionCheckRetry({
         accessibilityLabel={retryLabel}
       />
     </View>
+    </ScreenContainer>
   );
 }
 

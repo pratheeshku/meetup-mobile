@@ -51,6 +51,7 @@ import {
 import IconBadge from '../components/IconBadge';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
+import ScreenContainer from '../components/ScreenContainer';
 import { useSportDisplayName } from '../utils/labels';
 import { getDisplayName } from '../utils/displayName';
 import { useT } from '../labels/LabelsContext';
@@ -289,17 +290,26 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   };
 
   if (isLoading) {
-    return <LoadingView />;
+    return (
+      <ScreenContainer edges="top">
+        <LoadingView />
+      </ScreenContainer>
+    );
   }
 
   if (loadError || !profile) {
-    return <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadData} />;
+    return (
+      <ScreenContainer edges="top">
+        <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadData} />
+      </ScreenContainer>
+    );
   }
 
   const initials = getInitials(getDisplayName(profile));
   const coverUrl = profile.cover_url || bannerFallback?.image_url;
 
   return (
+    <ScreenContainer edges="top" style={styles.screen}>
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.scrollContent}
@@ -593,6 +603,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         </Pressable>
       </View>
     </ScrollView>
+    </ScreenContainer>
   );
 }
 

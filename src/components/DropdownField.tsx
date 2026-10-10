@@ -24,6 +24,7 @@ import {
   ViewStyle,
 } from 'react-native';
 
+import ScreenContainer from './ScreenContainer';
 import {
   borderWidth,
   colors,
@@ -104,6 +105,7 @@ export default function DropdownField({
       >
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={handleClose} />
+          <ScreenContainer edges="bottom" fill={false} style={styles.modalSafe}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{accessibilityLabel}</Text>
@@ -141,6 +143,7 @@ export default function DropdownField({
             ))}
             </ScrollView>
           </View>
+          </ScreenContainer>
         </View>
       </Modal>
     </>
@@ -174,6 +177,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.scrim,
   },
   modalBackdrop: { flex: 1 },
+  modalSafe: {
+    backgroundColor: colors.surface,
+  },
   modalContent: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,

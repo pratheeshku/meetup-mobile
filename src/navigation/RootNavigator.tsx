@@ -130,6 +130,7 @@ import AccountDeletionCodeScreen from '../screens/AccountDeletionCodeScreen';
 import NotificationBanner from '../components/NotificationBanner';
 import OnboardingOverlay from './OnboardingOverlay';
 import { useT } from '../labels/LabelsContext';
+import ScreenContainer from '../components/ScreenContainer';
 import { perfLog, isPerfCapturing } from '../diagnostics/perfLog';
 import { recordNavChange } from '../hooks/usePerfScreen';
 
@@ -452,7 +453,11 @@ export default function RootNavigator(): React.JSX.Element {
   // is the splash retry state after those attempts fail transiently: the
   // session is still held, so this must not fall through to the Auth Stack.
   if (isLoading) {
-    return <LoadingView />;
+    return (
+      <ScreenContainer edges="both">
+        <LoadingView />
+      </ScreenContainer>
+    );
   }
 
   if (sessionCheckPendingRetry) {

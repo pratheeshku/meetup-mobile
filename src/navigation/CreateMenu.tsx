@@ -19,6 +19,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import Button from '../components/Button';
+import ScreenContainer from '../components/ScreenContainer';
 import { GameIcon, GroupsIcon } from '../components/icons/SharedIcons';
 import { colors, opacity, radius, shadows, sizes, spacing, typography } from '../theme/tokens';
 import { useT } from '../labels/LabelsContext';
@@ -55,6 +56,7 @@ export default function CreateMenu({ visible, onSelect, onClose }: CreateMenuPro
           onPress={onClose}
           style={[StyleSheet.absoluteFill, styles.backdrop]}
         />
+        <ScreenContainer edges="bottom" pointerEvents="box-none" style={styles.sheetHost}>
         <View style={styles.sheet}>
           <Text style={styles.title} accessibilityRole="header">
             {t('mob.create_menu.title')}
@@ -80,6 +82,7 @@ export default function CreateMenu({ visible, onSelect, onClose }: CreateMenuPro
           ))}
           <Button label={t('mob.common.close')} variant="secondary" onPress={onClose} style={styles.close} />
         </View>
+        </ScreenContainer>
       </View>
     </Modal>
   );
@@ -87,6 +90,7 @@ export default function CreateMenu({ visible, onSelect, onClose }: CreateMenuPro
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
+  sheetHost: { justifyContent: 'flex-end' },
   backdrop: { backgroundColor: colors.scrim },
   sheet: {
     backgroundColor: colors.surface,

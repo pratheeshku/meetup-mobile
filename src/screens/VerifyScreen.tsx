@@ -19,6 +19,7 @@ import { resendVerification, verifyEmail } from '../auth/emailAuth';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
+import ScreenContainer from '../components/ScreenContainer';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { useFieldChain } from '../hooks/useFieldChain';
@@ -130,6 +131,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     cooldown > 0 ? t('mob.verify.resend_cooldown', { seconds: cooldown }) : t('mob.verify.resend');
 
   return (
+    <ScreenContainer edges="bottom">
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Text style={styles.title}>{t('mob.verify.title')}</Text>
 
@@ -189,6 +191,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
         style={styles.link}
       />
     </KeyboardAwareScreen>
+    </ScreenContainer>
   );
 }
 

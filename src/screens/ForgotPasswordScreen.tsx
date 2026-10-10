@@ -23,6 +23,7 @@ import { requestPasswordReset } from '../auth/emailAuth';
 import Button from '../components/Button';
 import InlineError from '../components/InlineError';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
+import ScreenContainer from '../components/ScreenContainer';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
 import { useFieldChain } from '../hooks/useFieldChain';
@@ -127,6 +128,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
   };
 
   return (
+    <ScreenContainer edges="bottom">
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
       <Text style={styles.title}>{t('mob.forgot.title')}</Text>
 
@@ -218,6 +220,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
         </>
       )}
     </KeyboardAwareScreen>
+    </ScreenContainer>
   );
 }
 
