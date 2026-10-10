@@ -32,14 +32,6 @@ on:
         type: choice
         options: [none, static, dynamic]
         default: none
-      api_base_url:
-        description: "Optional API base URL baked into this build (blank = app default). Must start with https://"
-        type: string
-        default: ""
-      avatar_bucket_base_url:
-        description: "Optional photo bucket base URL baked into this build (blank = app default). Must start with https://"
-        type: string
-        default: ""
 
 permissions:
   contents: read
@@ -178,10 +170,7 @@ jobs:
             if [ -n "$line" ]; then echo "::add-mask::$line"; fi
           done < "$ASC_KEY_PATH"
 
-      - name: Write build-time .env overrides (optional)
-        env:
-          API_BASE_URL_INPUT: ${{ inputs.api_base_url }}
-          AVATAR_BUCKET_INPUT: ${{ inputs.avatar_bucket_base_url }}
+      - name: Write build-time .env from config/appConfig.json
         run: |
           set -euo pipefail
           : > .env
@@ -190,12 +179,12 @@ jobs:
             case "$value" in
               "") ;;
               https://*) echo "$name=$value" >> .env ;;
-              *) echo "::error::$name must start with https://"; exit 1 ;;
+              *) echo "::error::$name in config/appConfig.json must start with https://"; exit 1 ;;
             esac
           }
-          add API_BASE_URL "$API_BASE_URL_INPUT"
-          add AVATAR_BUCKET_BASE_URL "$AVATAR_BUCKET_INPUT"
-          if [ -s .env ]; then sed -E 's/=.*/=<set>/' .env; else echo "no overrides: the build uses the app defaults"; fi
+          add API_BASE_URL "$(node -p "require('./config/appConfig.json').ios.apiBaseUrl || ''")"
+          add AVATAR_BUCKET_BASE_URL "$(node -p "require('./config/appConfig.json').ios.avatarBucketBaseUrl || ''")"
+          if [ -s .env ]; then cat .env; else echo "no overrides: the build uses the app defaults"; fi
 
       - name: Cache Pods
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

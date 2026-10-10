@@ -33,4 +33,12 @@ describe('appConfig.json', () => {
     expect(count('APP_DISPLAY_NAME', appConfig.displayName)).toBe(2);
     expect(read('MeetupMobile/Info.plist')).toContain('<string>$(APP_DISPLAY_NAME)</string>');
   });
+
+  it('iOS build URL overrides are empty or https', () => {
+    for (const value of [appConfig.ios.apiBaseUrl, appConfig.ios.avatarBucketBaseUrl]) {
+      expect(typeof value).toBe('string');
+      expect(value === '' || value.startsWith('https://')).toBe(true);
+      expect(value.endsWith('/')).toBe(false);
+    }
+  });
 });
