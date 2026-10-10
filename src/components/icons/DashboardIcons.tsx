@@ -14,7 +14,7 @@
 import React from 'react';
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 
-import { SwimmingIcon, VolleyballIcon } from './SharedIcons';
+import { SportMarkerIcon, SwimmingIcon, VolleyballIcon } from './SharedIcons';
 
 export interface IconProps {
   size?: number;
@@ -192,6 +192,7 @@ export const ICON_GLYPHS: Record<string, IconComponent> = {
   tennis: TennisIcon,
   volleyball: VolleyballIcon,
   swimming: SwimmingIcon,
+  'sport-marker': SportMarkerIcon,
 };
 
 /** Normalised icon_key / sport key. */
@@ -203,15 +204,44 @@ export function hasSportIcon(iconKey: string | null | undefined): boolean {
   return Object.prototype.hasOwnProperty.call(ICON_GLYPHS, sportSlug(iconKey));
 }
 
+function glyphFor(iconKey: string | null | undefined): IconComponent {
+  const key = sportSlug(iconKey);
+  if (!key || !Object.prototype.hasOwnProperty.call(ICON_GLYPHS, key)) {
+    return FallbackBallIcon;
+  }
+  const icon = ICON_GLYPHS[key];
+  return typeof icon === 'function' ? icon : FallbackBallIcon;
+}
+
+/** A glyph that throws must not take the row down with it. */
+class GlyphBoundary extends React.Component<
+  { size?: number; children: React.ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  render(): React.ReactNode {
+    if (this.state.failed) {
+      return <FallbackBallIcon size={this.props.size} />;
+    }
+    return this.props.children;
+  }
+}
+
 export function SportIcon({
   iconKey,
   size,
 }: IconProps & { iconKey?: string | null }): React.JSX.Element {
-  const key = sportSlug(iconKey);
-  const Icon = Object.prototype.hasOwnProperty.call(ICON_GLYPHS, key)
-    ? ICON_GLYPHS[key]
-    : FallbackBallIcon;
-  return <Icon size={size} />;
+  const Icon = glyphFor(iconKey);
+  return (
+    <GlyphBoundary size={size}>
+      <Icon size={size} />
+    </GlyphBoundary>
+  );
 }
 
 /**

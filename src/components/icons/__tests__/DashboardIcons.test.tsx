@@ -3,6 +3,7 @@ import React from 'react';
 import Svg from 'react-native-svg';
 
 import { render } from '../../../test-utils/render';
+import { SportMarkerIcon } from '../SharedIcons';
 import {
   BannerBackground,
   FallbackBallIcon,
@@ -13,14 +14,33 @@ import {
   sportSlug,
 } from '../DashboardIcons';
 
+const WHITELIST = [
+  'badminton',
+  'basketball',
+  'football',
+  'tennis',
+  'volleyball',
+  'swimming',
+  'sport-marker',
+] as const;
+
 function hostSvg(element: React.ReactElement) {
   return render(element).findByType(Svg);
 }
 
 describe('sport icon lookup', () => {
-  it.each(['badminton', 'basketball', 'football', 'tennis'])('has a glyph for icon_key %s', iconKey => {
+  it.each(WHITELIST)('has a bundled glyph for whitelist icon_key %s', iconKey => {
     expect(hasSportIcon(iconKey)).toBe(true);
     expect(ICON_GLYPHS[iconKey]).toBeDefined();
+    const rendered = render(<SportIcon iconKey={iconKey} size={24} />);
+    expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(0);
+    expect(rendered.findAllByType(Svg).length).toBeGreaterThan(0);
+  });
+
+  it('renders the sport-marker glyph, not the neutral ball', () => {
+    const rendered = render(<SportIcon iconKey="  Sport-Marker  " size={24} />);
+    expect(rendered.findAllByType(SportMarkerIcon)).toHaveLength(1);
+    expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(0);
   });
 
   it('matches an icon_key case-insensitively and ignoring whitespace', () => {
@@ -30,10 +50,11 @@ describe('sport icon lookup', () => {
   });
 
   it('uses the fallback ball for an unknown, empty or missing icon_key', () => {
-    for (const iconKey of ['curling', '', null, undefined]) {
+    for (const iconKey of ['curling', 'not-a-glyph', '', null, undefined]) {
       expect(hasSportIcon(iconKey)).toBe(false);
       const rendered = render(<SportIcon iconKey={iconKey} size={24} />);
       expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(1);
+      expect(rendered.findAllByType(Svg).length).toBeGreaterThan(0);
     }
   });
 
