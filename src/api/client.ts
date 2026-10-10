@@ -33,6 +33,7 @@ import { describeError } from '../utils/logSafeError';
 import { generateCorrelationId } from './correlationId';
 import { authEvents } from './authEvents';
 import { clearCookieJar } from './cookies';
+import { logRouteToLogin } from './loginRouteLog';
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -91,9 +92,16 @@ export const refreshClient = axios.create({
 });
 
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
-  const accessToken = await getAccessToken();
-  if (accessToken) {
-    config.headers.set('Authorization', `Bearer ${accessToken}`);
+  try {
+    const accessToken = await getAccessToken();
+    if (accessToken) {
+      config.headers.set('Authorization', `Bearer ${accessToken}`);
+    }
+  } catch (error) {
+    // A Keychain read failure is not a logged-out session. Keep any
+    // Authorization the caller already set (startup restore passes the token
+    // just issued by POST /auth/refresh) and let the request proceed.
+    console.log('[auth] access token unreadable for request', describeError(error));
   }
 
   config.headers.set(ENV.CORRELATION_ID_HEADER, config.correlationId ?? generateCorrelationId());
@@ -183,6 +191,7 @@ apiClient.interceptors.response.use(
 
     if (config._retriedAfterRefresh) {
       // 401 even with a freshly issued token: the session cannot be recovered.
+      logRouteToLogin('retried-request-401', response?.status);
       await endSession();
       return Promise.reject(error);
     }
@@ -207,12 +216,17 @@ apiClient.interceptors.response.use(
       return apiClient(config);
     } catch (refreshError) {
       if (refreshError instanceof SessionEndedError) {
+        logRouteToLogin(
+          refreshError.reason === 'rejected' ? 'refresh-rejected' : 'refresh-no-session',
+          refreshError.reason === 'rejected' ? 401 : 200,
+        );
         await endSession();
       } else {
-        // Transport failure / 5xx while refreshing: the session may be fine, so
-        // keep it. This request fails with its original 401; the next request
-        // that hits a 401 will try a refresh again.
+        // Transport failure / 5xx / 429 while refreshing: the session may be
+        // fine, so keep it. This request fails with its original 401; startup
+        // reads `refreshFailure` to retry instead of routing to login.
         console.log('[auth] token refresh failed; session kept', describeError(refreshError));
+        (error as AxiosError & { refreshFailure?: unknown }).refreshFailure = refreshError;
       }
       return Promise.reject(error);
     }

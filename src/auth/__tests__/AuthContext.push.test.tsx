@@ -104,6 +104,9 @@ describe('start', () => {
     await mount();
 
     expect(auth.user).toBeNull();
+    expect(auth.sessionCheckPendingRetry).toBe(true);
+    expect(auth.sessionExpired).toBe(false);
+    expect(mockGet).toHaveBeenCalledTimes(1);
     expect(mockStart).not.toHaveBeenCalled();
   });
 

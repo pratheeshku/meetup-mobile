@@ -70,6 +70,7 @@ import type { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 
 import { useAuth } from '../auth/AuthContext';
 import LoadingView from '../components/LoadingView';
+import SessionCheckRetry from '../components/SessionCheckRetry';
 import { navigationTheme } from '../theme/navigationTheme';
 import { colors, typography } from '../theme/tokens';
 import { dash } from '../theme/dashboardTheme';
@@ -353,7 +354,8 @@ function AppStack(): React.JSX.Element {
 }
 
 export default function RootNavigator(): React.JSX.Element {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, sessionCheckPendingRetry, sessionCheckFailure, retrySessionCheck } =
+    useAuth();
 
   // A one-shot guard: `getInitialNotification` is only meaningful the
   // very first time this app instance checks it (the tap that launched
@@ -438,8 +440,15 @@ export default function RootNavigator(): React.JSX.Element {
     }
   }, [user, handleInitialNotification]);
 
+  // `isLoading` covers the automatic restore attempts. `sessionCheckPendingRetry`
+  // is the splash retry state after those attempts fail transiently: the
+  // session is still held, so this must not fall through to the Auth Stack.
   if (isLoading) {
     return <LoadingView />;
+  }
+
+  if (sessionCheckPendingRetry) {
+    return <SessionCheckRetry failure={sessionCheckFailure} onRetry={retrySessionCheck} />;
   }
 
   return (

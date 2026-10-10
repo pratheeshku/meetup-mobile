@@ -18,8 +18,14 @@ import { clearCookieJar } from '../../api/cookies';
 import { ACCESS_SERVICE, installFakeBackend } from '../../test-utils/apiHarness';
 import type { FakeBackend, FakeReply } from '../../test-utils/apiHarness';
 import { act } from '../../test-utils/render';
+import { bundledT } from '../../labels/LabelsContext';
 import { AuthProvider, useAuth } from '../AuthContext';
 import { SESSION_EXPIRED_MESSAGE } from '../messages';
+
+jest.mock('../../utils/delay', () => {
+  const actual = jest.requireActual('../../utils/delay') as typeof import('../../utils/delay');
+  return { ...actual, delay: jest.fn(() => Promise.resolve()) };
+});
 
 jest.mock('../../api/cookies', () => ({ clearCookieJar: jest.fn() }));
 jest.mock('../../notifications/fcm', () => ({
@@ -119,9 +125,18 @@ describe('cold start with a stored access token', () => {
     expect(auth.isLoading).toBe(false);
     expect(auth.user).toBeNull();
     expect(auth.sessionExpired).toBe(true);
+    expect(auth.sessionCheckPendingRetry).toBe(false);
     expect(backend.urls()).toEqual(['/users/me', '/auth/refresh']); // one refresh, no retry
     expect(backend.stored[ACCESS_SERVICE]).toBeUndefined();
     expect(mockClearCookieJar).toHaveBeenCalledTimes(1);
+    const body = 'data' in refreshReply ? refreshReply.data : undefined;
+    const cause =
+      typeof body === 'object' && body !== null && 'access_token' in body
+        ? 'refresh-no-session status=200'
+        : 'refresh-rejected status=401';
+    expect(logged()).toContain(`[auth] routing to login cause=${cause}`);
+    expect(logged()).not.toContain('expired-access');
+    expect(logged()).not.toContain('a@b.c');
   });
 
   it('an expired access token with a live cookie is renewed silently: user restored, no notice', async () => {
@@ -144,8 +159,52 @@ describe('cold start with a stored access token', () => {
 
     expect(auth.user).toBeNull();
     expect(auth.sessionExpired).toBe(false);
+    expect(auth.sessionCheckPendingRetry).toBe(true);
+    expect(auth.isLoading).toBe(false);
+    expect(backend.stored[ACCESS_SERVICE]).toBe('access');
+    expect(mockClearCookieJar).not.toHaveBeenCalled();
+    expect(backend.callsTo('/users/me')).toHaveLength(3);
+    expect(logged()).not.toContain('routing to login');
+  });
+
+  it('an expired access token whose refresh hits the network stays signed-in in the background', async () => {
+    backend.stored[ACCESS_SERVICE] = 'expired-access';
+    backend.route = config => (config.url === '/auth/refresh' ? { network: true } : { status: 401 });
+
+    await mount();
+
+    expect(auth.user).toBeNull();
+    expect(auth.sessionExpired).toBe(false);
+    expect(auth.sessionCheckPendingRetry).toBe(true);
+    expect(auth.sessionCheckFailure).toBe('network');
+    expect(backend.stored[ACCESS_SERVICE]).toBe('expired-access');
+    expect(mockClearCookieJar).not.toHaveBeenCalled();
+    expect(backend.callsTo('/auth/refresh')).toHaveLength(3);
+    expect(logged()).not.toContain('routing to login');
+    expect(logged()).not.toContain('expired-access');
+  });
+
+  it('a 401 on the retried profile request ends the session once and is logged', async () => {
+    backend.stored[ACCESS_SERVICE] = 'expired-access';
+    backend.route = config =>
+      config.url === '/auth/refresh' ? { data: { access_token: 'fresh' } } : { status: 401 };
+
+    await mount();
+
+    expect(auth.user).toBeNull();
+    expect(auth.sessionExpired).toBe(true);
+    expect(auth.sessionCheckPendingRetry).toBe(false);
+    expect(backend.urls()).toEqual(['/users/me', '/auth/refresh', '/users/me']);
+    expect(backend.stored[ACCESS_SERVICE]).toBeUndefined();
+    expect(logged()).toContain('[auth] routing to login cause=retried-request-401 status=401');
+    expect(logged()).not.toContain('fresh');
+    expect(logged()).not.toContain('expired-access');
   });
 });
+
+function logged(): string {
+  return (console.log as jest.Mock).mock.calls.map(call => call.map(String).join(' ')).join('\n');
+}
 
 describe('mid-session expiry', () => {
   it.each([
@@ -258,5 +317,6 @@ describe('the notice is only for a session that existed', () => {
 });
 
 it('exposes the exact user-facing message', () => {
-  expect(SESSION_EXPIRED_MESSAGE).toBe('Session expired. Please sign in again.');
+  expect(SESSION_EXPIRED_MESSAGE).toBe('mob.errors.session_expired');
+  expect(bundledT(SESSION_EXPIRED_MESSAGE)).toBe('Session expired. Please sign in again.');
 });
