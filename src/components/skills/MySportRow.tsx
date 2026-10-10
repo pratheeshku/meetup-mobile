@@ -6,7 +6,8 @@ import Svg, { Path } from 'react-native-svg';
 import { getLabel, useLabels } from '../../labels/LabelsContext';
 import { useSportDisplayName } from '../../utils/labels';
 import { SportIcon } from '../icons/DashboardIcons';
-import { sportTileColor } from '../home/GameRow';
+import { sportPalette } from '../../sports/style';
+import { useSportVisual } from '../../sports/catalog';
 import { borderWidth, colors, opacity, sizes, skillSizes, spacing, typography } from '../../theme/tokens';
 import LevelPill from './LevelPill';
 import { levelLabelKey } from './levels';
@@ -21,6 +22,7 @@ interface MySportRowProps {
 export default function MySportRow({ sport, skillLevel, onPress }: MySportRowProps): React.JSX.Element {
   const labels = useLabels();
   const sportLabel = useSportDisplayName(sport);
+  const visual = useSportVisual(sport);
   return (
     <Pressable
       accessibilityRole="button"
@@ -28,8 +30,8 @@ export default function MySportRow({ sport, skillLevel, onPress }: MySportRowPro
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
     >
-      <View style={[styles.circle, { backgroundColor: sportTileColor(sport) }]}>
-        <SportIcon slug={sport} size={skillSizes.sportIconSmall} />
+      <View style={[styles.circle, { backgroundColor: sportPalette(visual.color).chip }]}>
+        <SportIcon iconKey={visual.iconKey} size={skillSizes.sportIconSmall} />
       </View>
       <Text style={styles.name} numberOfLines={1}>
         {sportLabel}

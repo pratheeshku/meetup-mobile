@@ -4,9 +4,9 @@
  * appendix SVGs (viewBox 0 0 48 48; banner 0 0 390 208) to
  * `react-native-svg` elements. No emoji, no raster images, no icon font.
  *
- * Sport icons are chosen by slug, case-insensitively; an unknown (or
- * missing) slug uses the fallback ball (AD-2, §5). Adding a sport is one
- * entry in `SPORT_ICONS` (plus its tile colour in `dashboardTheme.ts`).
+ * Sport glyphs are chosen by the API's `icon_key`, case-insensitively.
+ * An unknown or missing key uses the neutral ball. The keys below are glyph
+ * ids an admin can assign; they are not a list of sports.
  *
  * All icons are decorative: they are hidden from screen readers; the text
  * next to them carries the meaning.
@@ -182,8 +182,10 @@ export function ProfileIcon({ size }: IconProps): React.JSX.Element {
 
 type IconComponent = (props: IconProps) => React.JSX.Element;
 
-/** Slug (lower-case) → icon. Adding a sport icon is one entry here. */
-export const SPORT_ICONS: Record<string, IconComponent> = {
+/**
+ * Bundled glyphs an admin `icon_key` can select. Not a catalogue of sports.
+ */
+export const ICON_GLYPHS: Record<string, IconComponent> = {
   badminton: BadmintonIcon,
   basketball: BasketballIcon,
   football: FootballIcon,
@@ -192,22 +194,22 @@ export const SPORT_ICONS: Record<string, IconComponent> = {
   swimming: SwimmingIcon,
 };
 
-/** Normalised slug used for icon and tile-colour lookup. */
+/** Normalised icon_key / sport key. */
 export function sportSlug(slug: string | null | undefined): string {
   return (slug ?? '').trim().toLowerCase();
 }
 
-export function hasSportIcon(slug: string | null | undefined): boolean {
-  return Object.prototype.hasOwnProperty.call(SPORT_ICONS, sportSlug(slug));
+export function hasSportIcon(iconKey: string | null | undefined): boolean {
+  return Object.prototype.hasOwnProperty.call(ICON_GLYPHS, sportSlug(iconKey));
 }
 
 export function SportIcon({
-  slug,
+  iconKey,
   size,
-}: IconProps & { slug: string | null | undefined }): React.JSX.Element {
-  const key = sportSlug(slug);
-  const Icon = Object.prototype.hasOwnProperty.call(SPORT_ICONS, key)
-    ? SPORT_ICONS[key]
+}: IconProps & { iconKey?: string | null }): React.JSX.Element {
+  const key = sportSlug(iconKey);
+  const Icon = Object.prototype.hasOwnProperty.call(ICON_GLYPHS, key)
+    ? ICON_GLYPHS[key]
     : FallbackBallIcon;
   return <Icon size={size} />;
 }

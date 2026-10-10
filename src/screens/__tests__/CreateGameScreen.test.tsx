@@ -12,7 +12,7 @@ import { createEvent } from '../../api/events';
 import { getMyGroups } from '../../api/groups';
 import { getSports } from '../../api/sports';
 import { createTournament } from '../../api/tournaments';
-import { colors, getSportColor } from '../../theme/tokens';
+import { colors } from '../../theme/tokens';
 import { act, pressableLabelled, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import CreateGameScreen from '../CreateGameScreen';
@@ -32,8 +32,8 @@ const popTo = jest.fn();
 const navigate = jest.fn();
 
 const SPORTS = [
-  { name: 'badminton', display_name: 'Badminton' },
-  { name: 'football', display_name: 'Football' },
+  { name: 'badminton', display_name: 'Badminton', icon_key: 'badminton', color: '#2A7B72' },
+  { name: 'football', display_name: 'Football', icon_key: 'football', color: '#835C2B' },
 ];
 const GROUPS = {
   items: [{ id: 'g-1', name: 'Sunday Footballers', description: '', owner_id: 'me', created_at: '', current_user_role: 'owner' as const }],
@@ -299,7 +299,7 @@ describe('CreateGameScreen — chip colors and CTA styling', () => {
   it("Sport chip selected state uses that sport's own color, not a neutral or the default primary", async () => {
     const root = await mount();
     choose(root, 'Football');
-    expect(chipBackground(pressableLabelled(root, 'Football'))).toBe(getSportColor('football'));
+    expect(chipBackground(pressableLabelled(root, 'Football'))).toBe('#835C2B');
   });
 
   it('Skill Level and Visibility chips use the neutral #1B1918 selected color, not the sport color or default primary', async () => {

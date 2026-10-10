@@ -53,6 +53,7 @@ import {
   TrashIcon,
 } from '../components/icons/ActionIcons';
 import { SportIcon } from '../components/icons/DashboardIcons';
+import { useSportVisual } from '../sports/catalog';
 import {
   CalendarIcon,
   ClockIcon,
@@ -104,8 +105,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const { eventId } = route.params;
   const { user } = useAuth();
   const t = useT();
-
   const [event, setEvent] = useState<Event | null>(null);
+  const sportVisual = useSportVisual(event?.sport);
+
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -483,7 +485,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 </Text>
                 <View style={styles.lockedRow}>
                   <View style={styles.lockedIconCircle}>
-                    <SportIcon slug={event.sport} size={28} />
+                    <SportIcon iconKey={sportVisual.iconKey} size={28} />
                   </View>
                   <View style={styles.lockedInfo}>
                     <Text style={styles.lockedTitle}>{sportLabel}</Text>
@@ -692,7 +694,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               <View style={styles.cardContainer}>
                 <View style={styles.reviewMainRow}>
                   <View style={styles.reviewSportBadge}>
-                    <SportIcon slug={event.sport} size={28} />
+                    <SportIcon iconKey={sportVisual.iconKey} size={28} />
                   </View>
                   <View style={styles.reviewMainText}>
                     <Text style={styles.reviewGameTitle}>{editTitle}</Text>
@@ -814,7 +816,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           {/* Centered Sport Circle */}
           <View style={styles.sportBadgeCenter}>
-            <SportIcon slug={event.sport} size={36} />
+            <SportIcon iconKey={sportVisual.iconKey} size={36} />
           </View>
 
           <Text style={styles.detailTitle}>{event.title}</Text>

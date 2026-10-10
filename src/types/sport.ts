@@ -1,12 +1,18 @@
 /**
  * A sport from `GET /admin/sports/public` (unauthenticated; DES-MEETUP-MOBILE.md
- * §7). Subset of the live `SportResponse` schema
- * (`id, name, slug, display_name, is_active`).
+ * §7). Active rows only, in the order the API returns them (admin order).
+ *
+ * `icon_key` selects a bundled glyph. `color` is the single colour the UI
+ * tints, chips and shadows are derived from. Either may be absent until the
+ * sports API sends them; the UI then uses a neutral icon and colour.
  */
 export interface Sport {
   /** The value sent as `sport` on create requests (see `api/sports.ts`). */
   name: string;
   display_name: string;
-  /** Icon lookup key on the dashboard (AD-2); falls back to `name` when absent. */
   slug?: string;
+  /** Bundled glyph id. Null or absent when the API does not send one. */
+  icon_key?: string | null;
+  /** CSS hex colour from the API. Null or absent when the API does not send one. */
+  color?: string | null;
 }

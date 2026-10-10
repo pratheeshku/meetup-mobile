@@ -14,7 +14,6 @@ import ReactTestRenderer from 'react-test-renderer';
 
 import { getSports } from '../../api/sports';
 import EventCard from '../EventCard';
-import { sportColors } from '../../theme/tokens';
 import type { Event } from '../../types/event';
 
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
@@ -28,10 +27,10 @@ const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
 
 beforeAll(async () => {
   mockGetSports.mockResolvedValue([
-    { name: 'badminton', display_name: 'Badminton' },
-    { name: 'football', display_name: 'Football' },
-    { name: 'basketball', display_name: 'Basketball' },
-    { name: 'tennis', display_name: 'Tennis' },
+    { name: 'badminton', display_name: 'Badminton', icon_key: 'badminton', color: '#2A7B72' },
+    { name: 'football', display_name: 'Football', icon_key: 'football', color: '#835C2B' },
+    { name: 'basketball', display_name: 'Basketball', icon_key: 'basketball', color: '#67509B' },
+    { name: 'tennis', display_name: 'Tennis', icon_key: 'tennis', color: '#A54362' },
   ]);
   await ReactTestRenderer.act(async () => {
     ReactTestRenderer.create(<EventCard event={{ ...BASE_EVENT }} onPress={jest.fn()} />);
@@ -98,7 +97,7 @@ describe('EventCard', () => {
       const views = renderer.root.findAll(
         node =>
           (node.type as unknown) === 'View' &&
-          StyleSheet.flatten(node.props.style)?.backgroundColor === sportColors.badminton,
+          StyleSheet.flatten(node.props.style)?.backgroundColor === '#2A7B72',
       );
       // Both the sport pill and the progress bar fill use the sport color
       expect(views.length).toBe(2);
@@ -109,7 +108,7 @@ describe('EventCard', () => {
       const views = renderer.root.findAll(
         node =>
           (node.type as unknown) === 'View' &&
-          StyleSheet.flatten(node.props.style)?.backgroundColor === sportColors.basketball,
+          StyleSheet.flatten(node.props.style)?.backgroundColor === '#67509B',
       );
       expect(views.length).toBe(2);
     });
@@ -119,7 +118,7 @@ describe('EventCard', () => {
       const views = renderer.root.findAll(
         node =>
           (node.type as unknown) === 'View' &&
-          StyleSheet.flatten(node.props.style)?.backgroundColor === sportColors.tennis,
+          StyleSheet.flatten(node.props.style)?.backgroundColor === '#A54362',
       );
       expect(views.length).toBe(2);
     });
@@ -187,7 +186,7 @@ describe('EventCard', () => {
       const fills = renderer.root.findAll(
         node =>
           (node.type as unknown) === 'View' &&
-          StyleSheet.flatten(node.props.style)?.backgroundColor === sportColors.badminton &&
+          StyleSheet.flatten(node.props.style)?.backgroundColor === '#2A7B72' &&
           StyleSheet.flatten(node.props.style)?.width === '50%',
       );
       expect(fills.length).toBeGreaterThanOrEqual(1);

@@ -173,7 +173,7 @@ export default function HomeTopBar({
                       pressed ? styles.pressed : null,
                     ]}
                   >
-                    <SportIcon slug={option.slug} size={20} />
+                    <SportIcon iconKey={option.icon_key} size={20} />
                   </Pressable>
                 );
               })}

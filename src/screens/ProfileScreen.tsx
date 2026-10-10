@@ -35,6 +35,8 @@ import { getMyGroups } from '../api/groups';
 import type { Group } from '../types/group';
 import { getCachedBanners, type BannerFallback } from '../api/home';
 import { BannerBackground, SportIcon } from '../components/icons/DashboardIcons';
+import { sportPalette } from '../sports/style';
+import { useSportVisual } from '../sports/catalog';
 import { EditIcon } from '../components/icons/ActionIcons';
 import {
   ClockIcon,
@@ -94,9 +96,9 @@ const GROUP_BADGE_COLORS = [
 ];
 
 const LEVEL_LABEL_KEY: Record<SkillLevelValue, LabelKey> = {
-  beginner: 'mob.profile.level_beginner_full',
-  intermediate: 'mob.profile.level_intermediate_full',
-  expert: 'mob.profile.level_expert_full',
+  beginner: 'skill_level.beginner',
+  intermediate: 'skill_level.intermediate',
+  expert: 'skill_level.expert',
 };
 
 function getLevelTextColor(level?: string | null): string {
@@ -124,6 +126,8 @@ function SkillTileItem({
 }): React.JSX.Element {
   const t = useT();
   const sportName = useSportDisplayName(sport);
+  const visual = useSportVisual(sport);
+  const palette = sportPalette(visual.color);
   const textColor = getLevelTextColor(level);
   const bgColor = getLevelBgColor(level);
   const normalized = level.trim().toLowerCase() as SkillLevelValue;
@@ -132,8 +136,8 @@ function SkillTileItem({
 
   return (
     <View style={[styles.skillTile, { backgroundColor: bgColor }]}>
-      <View style={styles.skillIconCircle}>
-        <SportIcon slug={sport} size={20} />
+      <View style={[styles.skillIconCircle, { backgroundColor: palette.chip }]}>
+        <SportIcon iconKey={visual.iconKey} size={20} />
       </View>
       <View style={styles.skillTextCol}>
         <Text numberOfLines={1} style={styles.skillSportName}>
@@ -143,6 +147,16 @@ function SkillTileItem({
           {levelText}
         </Text>
       </View>
+    </View>
+  );
+}
+
+function GameSportMark({ sport }: { sport: string }): React.JSX.Element {
+  const visual = useSportVisual(sport);
+  const palette = sportPalette(visual.color);
+  return (
+    <View style={[styles.gameSportIconCircle, { backgroundColor: palette.chip }]}>
+      <SportIcon iconKey={visual.iconKey} size={20} />
     </View>
   );
 }
@@ -399,9 +413,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
                     accessibilityRole="button"
                     accessibilityLabel={game.title}
                   >
-                    <View style={styles.gameSportIconCircle}>
-                      <SportIcon slug={game.sport} size={20} />
-                    </View>
+                    <GameSportMark sport={game.sport} />
                     <View style={styles.gameDetailsCol}>
                       <Text numberOfLines={1} style={styles.gameTitle}>
                         {game.title}

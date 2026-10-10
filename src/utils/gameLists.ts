@@ -183,17 +183,23 @@ export interface SportOption {
   key: string;
   /** Admin `display_name` (authoritative casing). */
   label: string;
-  /** Icon lookup slug (admin `slug`, falling back to `name`). */
+  /** Admin `slug`, falling back to `name`, for matching events. */
   slug: string;
+  /** Bundled glyph id from the sports API. Null when the API omits it. */
+  icon_key: string | null;
+  /** API colour. Null when the API omits it. */
+  color: string | null;
 }
 
-/** One option per active admin sport, sorted by label for a stable order. */
+/** One option per active admin sport, sorted by label for a stable chip order. */
 export function getSportOptions(sports: readonly Sport[]): SportOption[] {
   return sports
     .map(sport => ({
       key: sportKey(sport.name),
       label: sport.display_name,
       slug: sportKey(sport.slug ?? sport.name),
+      icon_key: sport.icon_key ?? null,
+      color: sport.color ?? null,
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }

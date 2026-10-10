@@ -81,6 +81,7 @@ export type TournamentsStackParamList = {
 export type ProfileStackParamList = {
   ProfileHome: undefined;
   EditProfile: undefined;
+  EditSkillLevels: undefined;
   Settings: undefined;
   NotificationPreferences: undefined;
   AccountDeletionBlocked: {

@@ -41,6 +41,8 @@ import {
   SearchIcon,
 } from '../components/icons/ActionIcons';
 import { SportIcon } from '../components/icons/DashboardIcons';
+import InlineError from '../components/InlineError';
+import { sportPalette } from '../sports/style';
 import {
   CalendarIcon,
   ClockIcon,
@@ -84,15 +86,6 @@ type Props = CompositeScreenProps<
 
 type GameKind = 'game' | 'tournament';
 
-const DEFAULT_SPORTS: { name: string; display_name: string }[] = [
-  { name: 'badminton', display_name: 'Badminton' },
-  { name: 'pickleball', display_name: 'Pickleball' },
-  { name: 'tennis', display_name: 'Tennis' },
-  { name: 'football', display_name: 'Football' },
-  { name: 'cricket', display_name: 'Cricket' },
-  { name: 'padel', display_name: 'Padel' },
-];
-
 const AVATAR_TINTS = [
   { bg: colors.avatarTint1, text: colors.avatarTintText1 },
   { bg: colors.avatarTint2, text: colors.avatarTintText2 },
@@ -131,7 +124,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   const [groups, setGroups] = useState<Group[]>([]);
 
   // Step 2: Sport & Title
-  const [gSport, setGSport] = useState<string>('badminton');
+  const [gSport, setGSport] = useState<string>('');
+  const [sportsError, setSportsError] = useState(false);
   const [gTitle, setGTitle] = useState<string>('Sunday Doubles');
 
   // Step 3: When & Where
@@ -185,7 +179,13 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   useEffect(() => {
     getGameLimits().then(setGameLimits).catch(() => {});
     getClientConfig().then(cfg => setMapsApiKey(cfg.google_maps_api_key)).catch(() => {});
-    getSports().then(setSports).catch(() => {});
+    getSports()
+      .then(list => {
+        setSports(list);
+        setSportsError(false);
+        setGSport(current => current || list[0]?.name || '');
+      })
+      .catch(() => setSportsError(true));
     getMyGroups().then(res => {
       setGroups(res.items);
       if (res.items.length > 0) {
@@ -467,19 +467,30 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   );
 
   // Step 2: Pick a sport
+  const reloadSports = (): void => {
+    setSportsError(false);
+    getSports()
+      .then(list => {
+        setSports(list);
+        setSportsError(false);
+        setGSport(current => current || list[0]?.name || '');
+      })
+      .catch(() => setSportsError(true));
+  };
+
   const renderStep2 = () => {
-    const displayedSports = sports.length > 0 ? sports : DEFAULT_SPORTS;
     return (
       <View style={styles.stepContent}>
         <Text style={styles.stepHeading}>{t('mob.create_game.step_sport')}</Text>
 
         <View style={styles.sportsGrid}>
-          {displayedSports.slice(0, 6).map(item => {
+          {sports.map(item => {
             const isSelected = gSport === item.name;
+            const palette = sportPalette(item.color);
             return (
               <TouchableOpacity
                 key={item.name}
-                style={[styles.sportTile, isSelected && styles.sportTileSelected]}
+                style={[styles.sportTile, isSelected && { borderColor: palette.tint, backgroundColor: palette.chip }]}
                 onPress={() => {
                   setGSport(item.name);
                   if (gTitle === 'Sunday Doubles' || gTitle.includes('Game')) {
@@ -487,8 +498,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
                   }
                 }}
               >
-                <View style={styles.sportIconCircle}>
-                  <SportIcon slug={item.name} size={36} />
+                <View style={[styles.sportIconCircle, { backgroundColor: isSelected ? palette.tint : palette.chip }]}>
+                  <SportIcon iconKey={item.icon_key} size={36} />
                 </View>
                 <Text style={styles.sportTileText}>{item.display_name}</Text>
               </TouchableOpacity>
@@ -855,7 +866,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           <View style={styles.reviewMainRow}>
             <View style={styles.reviewSportBadge}>
-              <SportIcon slug={gSport} size={28} />
+              <SportIcon iconKey={sports.find(item => item.name === gSport)?.icon_key} size={28} />
             </View>
             <View style={styles.reviewMainText}>
               <Text style={styles.reviewGameTitle}>{gTitle}</Text>
@@ -919,6 +930,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {sportsError ? (
+          <InlineError message={t('mob.common.sports_load_error')} onRetry={reloadSports} />
+        ) : null}
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}

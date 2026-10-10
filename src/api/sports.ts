@@ -24,6 +24,18 @@ interface SportApiItem {
   slug: string;
   display_name: string;
   is_active: boolean;
+  /** Bundled glyph id, when the sports API sends one. */
+  icon_key?: string | null;
+  /** Single sport colour, when the sports API sends one. */
+  color?: string | null;
+}
+
+function optionalText(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 export async function getSports(options?: RequestOptions): Promise<Sport[]> {
@@ -32,5 +44,11 @@ export async function getSports(options?: RequestOptions): Promise<Sport[]> {
   });
   return data
     .filter(sport => sport.is_active)
-    .map(sport => ({ name: sport.name, display_name: sport.display_name, slug: sport.slug }));
+    .map(sport => ({
+      name: sport.name,
+      display_name: sport.display_name,
+      slug: sport.slug,
+      icon_key: optionalText(sport.icon_key),
+      color: optionalText(sport.color),
+    }));
 }

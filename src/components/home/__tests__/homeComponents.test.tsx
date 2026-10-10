@@ -12,6 +12,7 @@ import { makeEvent } from '../../../test-utils/makeEvent';
 import { act, pressableLabelled, pressables, render, texts } from '../../../test-utils/render';
 import type { Instance } from '../../../test-utils/render';
 import { brandBlock, dash, dashRadius, dashSize } from '../../../theme/dashboardTheme';
+import { invalidateSportsCatalog, primeSportsCatalogForTests } from '../../../sports/catalog';
 import type { Group } from '../../../types/group';
 import { FootballIcon, GroupsIcon, SportIcon } from '../../icons/DashboardIcons';
 import DashboardBanner from '../DashboardBanner';
@@ -249,8 +250,8 @@ describe('DashboardBanner', () => {
 
 describe('SportChipsRow', () => {
   const options = [
-    { key: 'badminton', label: 'Badminton', slug: 'badminton' },
-    { key: 'curling', label: 'Curling', slug: 'curling' },
+    { key: 'badminton', label: 'Badminton', slug: 'badminton', icon_key: 'badminton', color: '#2A7B72' },
+    { key: 'curling', label: 'Curling', slug: 'curling', icon_key: null, color: null },
   ];
 
   it('renders All first, then one chip per sport, as buttons', () => {
@@ -292,7 +293,7 @@ describe('SportChipsRow', () => {
 
   it('shows an unknown sport with the fallback icon and a known one with its own', () => {
     const root = render(<SportChipsRow options={options} selected={[]} onToggle={jest.fn()} />);
-    expect(root.findAllByType(SportIcon).map(node => node.props.slug)).toEqual(['badminton', 'curling']);
+    expect(root.findAllByType(SportIcon).map(node => node.props.iconKey)).toEqual(['badminton', null]);
   });
 
   it('applies the spread-or-scroll layout: horizontal scroller whose content grows to fill and spaces between (props only; layout engine not run)', () => {
@@ -323,13 +324,16 @@ describe('GameRow', () => {
     starts_at: '2030-01-04T18:00:00Z',
   });
 
-  it('shows the title, venue, going count, and the sport icon by slug', () => {
+  it('shows the title, venue, going count, and the sport glyph for the API icon_key', () => {
+    primeSportsCatalogForTests([
+      { name: 'Football', display_name: 'Football', slug: 'football', icon_key: 'football', color: '#166534' },
+    ]);
     const root = render(<GameRow event={event} onPress={jest.fn()} />);
     const all = texts(root);
     expect(all).toContain('Friday doubles');
     expect(all).toContain('5/12 going');
     expect(all.some(text => text.includes('Riverside'))).toBe(true);
-    expect(root.findAllByType(SportIcon)[0].props.slug).toBe('Football');
+    expect(root.findAllByType(SportIcon)[0].props.iconKey).toBe('football');
     expect(root.findAllByType(FootballIcon)).toHaveLength(1);
   });
 
@@ -341,10 +345,11 @@ describe('GameRow', () => {
     );
   });
 
-  it('uses the fallback icon for an unknown sport', () => {
+  it('uses the fallback icon when the sport has no icon_key', () => {
+    invalidateSportsCatalog();
     const root = render(<GameRow event={makeEvent({ sport: 'curling' })} onPress={jest.fn()} />);
     expect(root.findAllByType(FootballIcon)).toHaveLength(0);
-    expect(root.findAllByType(SportIcon)[0].props.slug).toBe('curling');
+    expect(root.findAllByType(SportIcon)[0].props.iconKey).toBeNull();
   });
 
   it('is a button with at least a 44px target that fires onPress', () => {
@@ -393,6 +398,9 @@ describe('GroupRow (AD-8)', () => {
   });
 
   it('a Team shows its sport icon, plus the sport in the meta', () => {
+    primeSportsCatalogForTests([
+      { name: 'tennis', display_name: 'Tennis', slug: 'tennis', icon_key: 'tennis', color: null },
+    ]);
     const root = render(
       <GroupRow
         group={group}
@@ -401,7 +409,7 @@ describe('GroupRow (AD-8)', () => {
       />,
     );
     expect(root.findAllByType(GroupsIcon)).toHaveLength(0);
-    expect(root.findAllByType(SportIcon)[0].props.slug).toBe('tennis');
+    expect(root.findAllByType(SportIcon)[0].props.iconKey).toBe('tennis');
     expect(texts(root)).toContain('8 members · Tennis');
   });
 
