@@ -12,6 +12,7 @@ import { clearCookieJar } from '../../api/cookies';
 import { deregisterDeviceToken } from '../../notifications/fcm';
 import { ACCESS_SERVICE, installFakeBackend } from '../../test-utils/apiHarness';
 import type { FakeBackend } from '../../test-utils/apiHarness';
+import { clearTokens } from '../../storage/tokens';
 import { signOut } from '../googleAuth';
 
 jest.mock('../../api/cookies', () => ({ clearCookieJar: jest.fn() }));
@@ -23,13 +24,14 @@ const mockGoogleSignOut = GoogleSignin.signOut as jest.Mock;
 
 let backend: FakeBackend;
 
-beforeEach(() => {
+beforeEach(async () => {
+  backend = installFakeBackend();
+  await clearTokens();
   jest.clearAllMocks();
   jest.spyOn(console, 'log').mockImplementation(() => {});
   mockClearCookieJar.mockResolvedValue(true);
   (deregisterDeviceToken as jest.Mock).mockResolvedValue(undefined);
   mockGoogleSignOut.mockResolvedValue(null);
-  backend = installFakeBackend();
   backend.stored[ACCESS_SERVICE] = 'live-access';
 });
 

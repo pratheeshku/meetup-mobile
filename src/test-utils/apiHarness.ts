@@ -16,6 +16,7 @@ import * as Keychain from 'react-native-keychain';
 
 import { apiClient, refreshClient } from '../api/client';
 import { versionPolicyClient } from '../api/versionPolicy';
+import { clearTokens } from '../storage/tokens';
 
 export const ACCESS_SERVICE = 'com.meetupmobile.auth.accessToken';
 export const REFRESH_SERVICE = 'com.meetupmobile.auth.refreshToken';
@@ -82,6 +83,7 @@ function toResponse(config: InternalAxiosRequestConfig, reply: FakeReply): Promi
 }
 
 export function installFakeBackend(): FakeBackend {
+  clearTokens().catch(() => {});
   const backend: FakeBackend = {
     route: () => ({ status: 200, data: {} }),
     stored: {},
