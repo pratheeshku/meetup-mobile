@@ -50,8 +50,12 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Shuttlr uses the camera to take your profile photo and to scan event QR codes.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Meetup only uses your location while the app is open and only when you choose the location option. It does not track you in the background.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Meetup only uses your location while the app is open and only when you choose the location option. It does not track you in the background.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Shuttlr does not use your location. This notice is required because the app includes standard system components that can reference location services.</string>
+	<string>Meetup uses your location only when you choose to, so it can use your current position in the game or venue you are setting up.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Shuttlr needs access to your photos so you can choose a profile picture.</string>
 	<key>RCTNewArchEnabled</key>
