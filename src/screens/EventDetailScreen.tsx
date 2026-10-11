@@ -9,6 +9,7 @@ import {
   PermissionsAndroid,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -779,7 +780,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   return (
     <View style={styles.screen}>
-      <KeyboardAwareScreen contentContainerStyle={styles.detailScroll}>
+      <ScrollView contentContainerStyle={styles.detailScroll} keyboardShouldPersistTaps="handled">
         {/* Blue Header Banner */}
         <View style={styles.detailHeaderBanner}>
           <View style={styles.bannerTopNav}>
@@ -928,7 +929,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
         </View>
-      </KeyboardAwareScreen>
+      </ScrollView>
 
       {/* Delete Game Bottom Sheet (DeleteGame.png) */}
       <Modal visible={isDeleteModalOpen} transparent animationType="slide">
