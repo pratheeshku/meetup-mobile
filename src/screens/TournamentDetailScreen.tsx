@@ -53,8 +53,9 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
-import { goToDashboard } from '../navigation/goToDashboard';
+import { showCompletion } from '../navigation/showCompletion';
 import { useSportDisplayName } from '../utils/labels';
+import { formatEventDate } from '../utils/formatEventDateTime';
 import type { TournamentsStackParamList } from '../navigation/types';
 import { useT } from '../labels/LabelsContext';
 
@@ -170,7 +171,18 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
     setIsCancelling(true);
     try {
       await cancelTournament(tournamentId);
-      goToDashboard(t('mob.success.tournament_cancelled'));
+      if (tournament) {
+        showCompletion({
+          flow: 'tournament_cancelled',
+          rows: [
+            { label: t('mob.done.f_title'), value: tournament.name },
+            { label: t('mob.done.f_sport'), value: sportLabel },
+            { label: t('mob.done.f_date'), value: formatEventDate(tournament.starts_at) },
+            { label: t('mob.done.f_status'), value: t('mob.done.v_cancelled') },
+          ],
+          primary: 'dashboard',
+        });
+      }
     } catch {
       setCancelError(t('mob.tournament.cancel_error'));
     } finally {

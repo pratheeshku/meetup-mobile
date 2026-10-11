@@ -12,12 +12,16 @@ import { spacing } from '../../theme/tokens';
 import NotificationPreferencesList from '../NotificationPreferencesList';
 import StepFooter from './StepFooter';
 
-export default function NotificationsStep({ onDone }: { onDone: () => void }): React.JSX.Element {
+export default function NotificationsStep({
+  onDone,
+}: {
+  onDone: (outcome: 'saved' | 'skipped') => void;
+}): React.JSX.Element {
   return (
     <View style={styles.container}>
       <NotificationPreferencesList showPermissionBanner />
       <View style={styles.footer}>
-        <StepFooter onSave={onDone} onSkip={onDone} />
+        <StepFooter onSave={() => onDone('saved')} onSkip={() => onDone('skipped')} />
       </View>
     </View>
   );

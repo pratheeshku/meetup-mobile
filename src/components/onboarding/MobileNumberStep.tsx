@@ -24,7 +24,7 @@ export default function MobileNumberStep({
   onDone,
 }: {
   config: ReadyConfig;
-  onDone: () => void;
+  onDone: (outcome: 'saved' | 'skipped') => void;
 }): React.JSX.Element {
   const [change, setChange] = useState<MobileNumberChange>({ e164: null, isEmpty: true });
   const [localError, setLocalError] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export default function MobileNumberStep({
 
   const handleSave = async (): Promise<void> => {
     if (change.isEmpty) {
-      onDone();
+      onDone('skipped');
       return;
     }
     if (change.e164 === null) {
@@ -41,7 +41,7 @@ export default function MobileNumberStep({
       return;
     }
     if (await saver.save(change.e164)) {
-      onDone();
+      onDone('saved');
     }
   };
 
@@ -59,7 +59,7 @@ export default function MobileNumberStep({
       />
       <StepFooter
         onSave={handleSave}
-        onSkip={onDone}
+        onSkip={() => onDone('skipped')}
         saving={saver.isSaving}
         error={saver.error}
         saveLabel={saver.needsReconfirm ? t('mob.mobile_number.confirm_save') : t('mob.common.save')}

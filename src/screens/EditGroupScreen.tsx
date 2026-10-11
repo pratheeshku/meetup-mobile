@@ -24,6 +24,8 @@ import LoadingView from '../components/LoadingView';
 import TextField from '../components/TextField';
 import { CameraIcon } from '../components/icons/ActionIcons';
 import { useT } from '../labels/LabelsContext';
+import { showCompletion } from '../navigation/showCompletion';
+import type { CompletionRow } from '../navigation/showCompletion';
 import type { GroupsStackParamList } from '../navigation/types';
 import { colors, radius, spacing, typography } from '../theme/tokens';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -49,6 +51,7 @@ export default function EditGroupScreen({ navigation, route }: Props): React.JSX
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [baseline, setBaseline] = useState<{ name: string; description: string; hadLogo: boolean } | null>(null);
   const [currentLogoUrl, setCurrentLogoUrl] = useState<string | null>(null);
   const [newLogo, setNewLogo] = useState<PickedImage | null>(null);
   const [isLogoRemoved, setIsLogoRemoved] = useState(false);
@@ -61,9 +64,16 @@ export default function EditGroupScreen({ navigation, route }: Props): React.JSX
     setLoadError(null);
     try {
       const data = await getGroup(groupId);
-      setName(data.name);
-      setDescription(data.description ?? '');
+      const loadedName = data.name;
+      const loadedDescription = data.description ?? '';
+      setName(loadedName);
+      setDescription(loadedDescription);
       setCurrentLogoUrl(data.logo_url ?? null);
+      setBaseline({
+        name: loadedName,
+        description: loadedDescription,
+        hadLogo: Boolean(data.logo_url),
+      });
     } catch {
       setLoadError(t('mob.group_detail.load_error'));
     } finally {
@@ -149,7 +159,28 @@ export default function EditGroupScreen({ navigation, route }: Props): React.JSX
         }
       });
 
-      navigation.goBack();
+      const rows: CompletionRow[] = [];
+      const trimmedDescription = description.trim();
+      if (baseline && trimmedName !== baseline.name) {
+        rows.push({ label: t('mob.done.f_name'), value: trimmedName });
+      }
+      if (baseline && trimmedDescription !== baseline.description) {
+        rows.push({
+          label: t('mob.done.f_description'),
+          value: trimmedDescription || t('mob.done.v_none'),
+        });
+      }
+      if (newLogo) {
+        rows.push({ label: t('mob.done.f_logo'), value: t('mob.done.v_updated') });
+      } else if (isLogoRemoved && baseline?.hadLogo) {
+        rows.push({ label: t('mob.done.f_logo'), value: t('mob.done.v_removed') });
+      }
+      showCompletion({
+        flow: 'group_updated',
+        rows,
+        primary: 'groups',
+        secondary: { button: 'view_group', id: groupId },
+      });
     } catch (e) {
       setSaveError(getApiErrorMessage(e, t('mob.edit_group.err_update')));
     } finally {

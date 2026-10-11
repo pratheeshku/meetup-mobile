@@ -63,7 +63,9 @@ import {
   TargetIcon,
 } from '../components/icons/SharedIcons';
 import { useT } from '../labels/LabelsContext';
-import { goToDashboard } from '../navigation/goToDashboard';
+import type { LabelKey } from '../labels/fallbackLabels';
+import { showCompletion } from '../navigation/showCompletion';
+import type { CompletionRow } from '../navigation/showCompletion';
 import type { HomeStackParamList } from '../navigation/types';
 import {
   borderWidth,
@@ -369,11 +371,54 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       };
 
       await withCorrelationId(async correlationId => {
-        const updated = await updateEvent(eventId, payload, { correlationId });
-        setEvent(updated);
+        await updateEvent(eventId, payload, { correlationId });
       });
+      const originalSkill = (event.skill_level_requirement as EventSkillLevel) || 'intermediate';
+      const originalCapacity = event.capacity || 4;
+      const originalWhen = event.starts_at ? new Date(event.starts_at).getTime() : Number.NaN;
+      const skillKey = (level: EventSkillLevel): LabelKey => {
+        switch (level) {
+          case 'beginner':
+            return 'skill_level.beginner';
+          case 'expert':
+            return 'skill_level.expert';
+          case 'all_levels':
+            return 'skill_level.all_levels';
+          case 'intermediate':
+            return 'skill_level.intermediate';
+          default: {
+            const exhaustive: never = level;
+            return exhaustive;
+          }
+        }
+      };
+      const rows: CompletionRow[] = [];
+      if (editTitle.trim() !== event.title) {
+        rows.push({ label: t('mob.done.f_title'), value: editTitle.trim() });
+      }
+      if (originalWhen !== editDateValue.getTime()) {
+        const iso = editDateValue.toISOString();
+        rows.push({
+          label: t('mob.done.f_when'),
+          value: `${formatEventDate(iso)}, ${formatEventTimeRange(iso, null)}`,
+        });
+      }
+      if (venueChanged) {
+        rows.push({ label: t('mob.done.f_venue'), value: fullVenueName });
+      }
+      if (editSkillLevel !== originalSkill) {
+        rows.push({ label: t('mob.done.f_skill'), value: t(skillKey(editSkillLevel)) });
+      }
+      if (editCapacity !== originalCapacity) {
+        rows.push({ label: t('mob.done.f_players'), value: String(editCapacity) });
+      }
       setIsEditing(false);
-      loadEvent();
+      showCompletion({
+        flow: 'game_updated',
+        rows,
+        primary: 'dashboard',
+        secondary: { button: 'view_game', id: eventId },
+      });
     } catch (e) {
       setEditError(getApiErrorMessage(e, t('mob.game_detail.edit_error')));
     } finally {
@@ -382,13 +427,28 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   };
 
   const handleDeleteGame = async () => {
+    if (!event) {
+      return;
+    }
     setIsDeleting(true);
     try {
       await withCorrelationId(async correlationId => {
         await cancelEvent(eventId, 'Deleted by host', { correlationId });
       });
       setIsDeleteModalOpen(false);
-      goToDashboard(t('mob.success.game_cancelled'));
+      showCompletion({
+        flow: 'game_cancelled',
+        rows: [
+          { label: t('mob.done.f_title'), value: event.title },
+          { label: t('mob.done.f_sport'), value: sportLabel },
+          {
+            label: t('mob.done.f_when'),
+            value: `${formatEventDate(event.starts_at)}, ${formatEventTimeRange(event.starts_at, event.ends_at)}`,
+          },
+          { label: t('mob.done.f_status'), value: t('mob.done.v_cancelled') },
+        ],
+        primary: 'dashboard',
+      });
     } catch (e) {
       setActionError(getApiErrorMessage(e, t('mob.game_detail.cancel_error')));
     } finally {

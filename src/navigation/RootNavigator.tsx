@@ -60,9 +60,10 @@
  * as the design-compliant reading of "or equivalent". No native Android
  * file was modified by this task.
  */
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigationIndependentTree } from '@react-navigation/native';
+import type { NavigationState } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -103,6 +104,9 @@ import {
   registerEventForegroundHandler,
 } from '../notifications/eventNotificationHandler';
 
+import { claimAuthHandoff } from './showCompletion';
+import { rootNavigationRef } from './rootNavigationRef';
+import CompletionScreen from '../screens/CompletionScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import VerifyScreen from '../screens/VerifyScreen';
@@ -134,7 +138,54 @@ import ScreenContainer from '../components/ScreenContainer';
 import { perfLog, isPerfCapturing } from '../diagnostics/perfLog';
 import { recordNavChange } from '../hooks/usePerfScreen';
 
+type AppRootParamList = {
+  Tabs: undefined;
+  Completion: undefined;
+};
+
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
+const AppRootNav = createNativeStackNavigator<AppRootParamList>();
+
+/**
+ * The tab navigator keeps `navigationRef` (Home / Groups / Tournaments).
+ * It sits in its own container so that ref still addresses the tabs after
+ * Completion is registered on the parent stack.
+ */
+const tabHostHandlers: {
+  onReady: () => void;
+  onStateChange: (state: NavigationState | undefined) => void;
+} = {
+  onReady: () => {},
+  onStateChange: () => {},
+};
+
+function TabHost(): React.JSX.Element {
+  return (
+    <NavigationIndependentTree>
+      <NavigationContainer
+        ref={navigationRef}
+        theme={navigationTheme}
+        onReady={() => tabHostHandlers.onReady()}
+        onStateChange={state => tabHostHandlers.onStateChange(state)}
+      >
+        <AppStack />
+      </NavigationContainer>
+    </NavigationIndependentTree>
+  );
+}
+
+function AppRoot(): React.JSX.Element {
+  return (
+    <AppRootNav.Navigator screenOptions={{ headerShown: false }}>
+      <AppRootNav.Screen name="Tabs" component={TabHost} />
+      <AppRootNav.Screen
+        name="Completion"
+        component={CompletionScreen}
+        options={{ headerShown: false, gestureEnabled: false, fullScreenGestureEnabled: false }}
+      />
+    </AppRootNav.Navigator>
+  );
+}
 const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
 const GroupsStackNav = createNativeStackNavigator<GroupsStackParamList>();
 const TournamentsStackNav = createNativeStackNavigator<TournamentsStackParamList>();
@@ -175,12 +226,22 @@ const tabScreenOptions = ({
 };
 
 function AuthStack(): React.JSX.Element {
+  // Claimed once per mount. Account deletion sets this before sign-out so
+  // the summary is still here after the app stack is replaced.
+  const [initialRouteName] = useState<'Login' | 'Completion'>(() =>
+    claimAuthHandoff() ? 'Completion' : 'Login',
+  );
   return (
-    <AuthStackNav.Navigator screenOptions={stackScreenOptions}>
+    <AuthStackNav.Navigator initialRouteName={initialRouteName} screenOptions={stackScreenOptions}>
       <AuthStackNav.Screen name="Login" component={LoginScreen} />
       <AuthStackNav.Screen name="Register" component={RegisterScreen} />
       <AuthStackNav.Screen name="Verify" component={VerifyScreen} />
       <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <AuthStackNav.Screen
+        name="Completion"
+        component={CompletionScreen}
+        options={{ headerShown: false, gestureEnabled: false, fullScreenGestureEnabled: false }}
+      />
     </AuthStackNav.Navigator>
   );
 }
@@ -444,7 +505,10 @@ export default function RootNavigator(): React.JSX.Element {
   // alone only fires once and may fire before a restored session (and
   // therefore the App Stack / tab routes the target needs) exists.
   useEffect(() => {
-    if (user) {
+    // The tab ref becomes ready in the nested container's onReady, which
+    // also runs this check. Skip here until that ref is ready so this
+    // effect does not consume the one-shot before the tabs exist.
+    if (user && navigationRef.isReady()) {
       handleInitialNotification();
     }
   }, [user, handleInitialNotification]);
@@ -464,35 +528,43 @@ export default function RootNavigator(): React.JSX.Element {
     return <SessionCheckRetry failure={sessionCheckFailure} onRetry={retrySessionCheck} />;
   }
 
+  tabHostHandlers.onReady = () => {
+    perfLog('boot_nav_ready');
+    handleInitialNotification();
+  };
+  tabHostHandlers.onStateChange = state => {
+    if (!isPerfCapturing() || !state) {
+      return;
+    }
+    // Find the active route name from navigation state tree.
+    const getActiveRouteName = (navState: typeof state): string => {
+      if (!navState) {
+        return 'unknown';
+      }
+      const route = navState.routes[navState.index ?? 0];
+      if (route?.state) {
+        return getActiveRouteName(route.state as typeof state);
+      }
+      return route?.name ?? 'unknown';
+    };
+    recordNavChange(getActiveRouteName(state));
+  };
+
   return (
     <View style={styles.root}>
       <NavigationContainer
-        ref={navigationRef}
+        ref={rootNavigationRef}
         theme={navigationTheme}
         onReady={() => {
-          perfLog('boot_nav_ready');
-          handleInitialNotification();
-        }}
-        onStateChange={state => {
-          if (!isPerfCapturing() || !state) {
-            return;
+          // Signed-in quit-state taps wait until the tab container is ready
+          // (`tabHostHandlers.onReady`). Signed-out, this container is the
+          // only one, matching the previous one-shot check.
+          if (!userRef.current) {
+            handleInitialNotification();
           }
-          // Find the active route name from navigation state tree.
-          const getActiveRouteName = (navState: typeof state): string => {
-            if (!navState) {
-              return 'unknown';
-            }
-            const route = navState.routes[navState.index ?? 0];
-            if (route?.state) {
-              return getActiveRouteName(route.state as typeof state);
-            }
-            return route?.name ?? 'unknown';
-          };
-          const routeName = getActiveRouteName(state);
-          recordNavChange(routeName);
         }}
       >
-        {user ? <AppStack /> : <AuthStack />}
+        {user ? <AppRoot /> : <AuthStack />}
       </NavigationContainer>
       {user ? <OnboardingOverlay userId={user.id} /> : null}
       <NotificationBanner />

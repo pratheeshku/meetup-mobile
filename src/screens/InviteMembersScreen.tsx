@@ -21,7 +21,8 @@ import { SearchIcon } from '../components/icons/ActionIcons';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
 import { useT } from '../labels/LabelsContext';
-import { goToDashboard } from '../navigation/goToDashboard';
+import { readGroupCreateDraft } from '../navigation/groupCreateDraft';
+import { showCompletion } from '../navigation/showCompletion';
 import type { GroupsStackParamList } from '../navigation/types';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { UserSearchResult } from '../types/user';
@@ -110,7 +111,29 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
   };
 
   const finish = (): void => {
-    goToDashboard(t('mob.success.group_created'));
+    const draft = readGroupCreateDraft(groupId);
+    const names = added
+      .map(user => user.display_name.trim())
+      .filter(name => name.length > 0);
+    const membersValue =
+      names.length > 0 ? `${added.length} — ${names.join(', ')}` : String(added.length);
+    showCompletion({
+      flow: 'group_created',
+      rows: [
+        { label: t('mob.done.f_name'), value: draft?.name ?? '' },
+        {
+          label: t('mob.done.f_description'),
+          value: draft?.description ? draft.description : t('mob.done.v_none'),
+        },
+        {
+          label: t('mob.done.f_logo'),
+          value: t(draft?.logoAdded ? 'mob.done.v_added' : 'mob.done.v_none'),
+        },
+        { label: t('mob.done.f_members'), value: membersValue },
+      ],
+      primary: 'dashboard',
+      secondary: { button: 'view_group', id: groupId },
+    });
   };
 
   const displayedSuggestions = suggestions.filter(

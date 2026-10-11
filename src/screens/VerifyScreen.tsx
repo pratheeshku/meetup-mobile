@@ -34,6 +34,7 @@ import {
 } from '../utils/networkError';
 import type { AuthStackParamList } from '../navigation/types';
 import { useT } from '../labels/LabelsContext';
+import { showCompletion } from '../navigation/showCompletion';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Verify'>;
 
@@ -76,7 +77,14 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     setIsVerifying(true);
     try {
       await verifyEmail(email, trimmedCode);
-      navigation.navigate('Login', { successMessage: t('mob.verify.verified') });
+      showCompletion({
+        flow: 'account_created',
+        rows: [
+          { label: t('mob.done.f_email'), value: email },
+          { label: t('mob.done.f_status'), value: t('mob.done.v_verified') },
+        ],
+        primary: 'signin',
+      });
     } catch (err) {
       if (isNetworkError(err)) {
         setRetryError(t(NETWORK_ERROR_MESSAGE));

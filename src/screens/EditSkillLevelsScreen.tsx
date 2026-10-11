@@ -17,6 +17,8 @@ import LoadingView from '../components/LoadingView';
 import ScreenContainer from '../components/ScreenContainer';
 import { levelLabelKey, SKILL_LEVEL_ORDER } from '../components/skills/levels';
 import { getLabel, useLabels, useT } from '../labels/LabelsContext';
+import { showCompletion } from '../navigation/showCompletion';
+import type { CompletionRow } from '../navigation/showCompletion';
 import { findSport, rememberSportsCatalog } from '../sports/catalog';
 import { sportPalette } from '../sports/style';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
@@ -92,6 +94,7 @@ function SkillLevelRow({
 
 export default function EditSkillLevelsScreen({ navigation }: Props): React.JSX.Element {
   const t = useT();
+  const labels = useLabels();
   const [sports, setSports] = useState<Sport[]>([]);
   const [levels, setLevels] = useState<Record<string, SkillLevelValue | null>>({});
   const [initial, setInitial] = useState<Record<string, SkillLevelValue | null>>({});
@@ -134,6 +137,7 @@ export default function EditSkillLevelsScreen({ navigation }: Props): React.JSX.
     try {
       setIsSaving(true);
       setSaveError(null);
+      const rows: CompletionRow[] = [];
       for (const sport of sports) {
         const next = levels[sport.name] ?? null;
         const previous = initial[sport.name] ?? null;
@@ -144,6 +148,7 @@ export default function EditSkillLevelsScreen({ navigation }: Props): React.JSX.
             setSaveError(getApiErrorMessage(error, t('mob.profile.skill_save_error')));
             return;
           }
+          rows.push({ label: sport.display_name, value: getLabel(labels, levelLabelKey(next)) });
         } else if (!next && previous) {
           try {
             await deleteSkillLevel(sport.name);
@@ -151,9 +156,14 @@ export default function EditSkillLevelsScreen({ navigation }: Props): React.JSX.
             setSaveError(getApiErrorMessage(error, t('mob.profile.skill_remove_error')));
             return;
           }
+          rows.push({ label: sport.display_name, value: t('mob.done.v_removed') });
         }
       }
-      navigation.goBack();
+      showCompletion({
+        flow: 'skills_updated',
+        rows,
+        primary: 'profile',
+      });
     } catch (error) {
       setSaveError(getApiErrorMessage(error, t('mob.profile.skill_save_error')));
     } finally {

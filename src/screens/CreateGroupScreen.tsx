@@ -34,16 +34,17 @@ import OptionChips from '../components/OptionChips';
 import type { ChipOption } from '../components/OptionChips';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
-import { getLabel, useLabels } from '../labels/LabelsContext';
+import { getLabel, useLabels, useT } from '../labels/LabelsContext';
+import type { LabelKey } from '../labels/fallbackLabels';
 import { useFieldChain } from '../hooks/useFieldChain';
 import { colors, spacing, typography } from '../theme/tokens';
 import type { Sport } from '../types/sport';
 import type { TeamVisibility } from '../types/team';
-import { goToDashboard } from '../navigation/goToDashboard';
+import { rememberGroupCreateDraft } from '../navigation/groupCreateDraft';
+import { showCompletion } from '../navigation/showCompletion';
 import { getApiErrorMessage } from '../utils/apiError';
 import { isPickerCancelled, pickImage, type PickedImage } from '../utils/imagePicker';
 import type { GroupsStackParamList } from '../navigation/types';
-import { useT } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'CreateGroup'>;
 
@@ -169,8 +170,16 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
 
         return group;
       });
-      // Step 1 done: open step 2 (invite members). `replace` so Back from
+      // Step 1 done: the group already exists. Remember the submitted
+      // fields in memory for the step-2 summary. `replace` so Back from
       // step 2 never returns to this form and re-submits the group.
+      // Leaving step 2 does not delete the group.
+      rememberGroupCreateDraft({
+        groupId: created.id,
+        name: trimmedName,
+        description: gDescription.trim(),
+        logoAdded: gLogo !== null,
+      });
       navigation.replace('InviteMembers', { groupId: created.id });
     } catch (e) {
       setError(getApiErrorMessage(e, t('mob.create_group.err_create')));
@@ -201,7 +210,18 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
           { correlationId },
         );
       });
-      goToDashboard(t('mob.success.team_created'));
+      const visibilityKey: LabelKey =
+        tVisibility === 'private' ? 'team_visibility.private' : 'team_visibility.public';
+      const sportName = sports.find(item => item.name === tSport)?.display_name ?? tSport;
+      showCompletion({
+        flow: 'team_created',
+        rows: [
+          { label: t('mob.done.f_name'), value: trimmedName },
+          { label: t('mob.done.f_sport'), value: sportName },
+          { label: t('mob.done.f_visibility'), value: t(visibilityKey) },
+        ],
+        primary: 'dashboard',
+      });
     } catch (e) {
       setError(getApiErrorMessage(e, t('mob.create_group.err_team_create')));
       setIsSubmitting(false);

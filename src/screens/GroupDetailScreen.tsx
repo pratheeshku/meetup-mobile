@@ -59,6 +59,7 @@ import Toast from '../components/Toast';
 import UserSearchPicker from '../components/UserSearchPicker';
 import { useAppShare } from '../hooks/useAppShare';
 import { goToDashboard } from '../navigation/goToDashboard';
+import { showCompletion } from '../navigation/showCompletion';
 import { dash } from '../theme/dashboardTheme';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { GroupDetail, GroupMember, GroupMemberRole } from '../types/group';
@@ -286,7 +287,14 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
     setIsLeaving(true);
     try {
       await removeMember(groupId, currentUserId);
-      goToDashboard(t('mob.success.group_left'));
+      showCompletion({
+        flow: 'group_left',
+        rows: [
+          { label: t('mob.done.f_name'), value: group?.name ?? '' },
+          { label: t('mob.done.f_status'), value: t('mob.done.v_left') },
+        ],
+        primary: 'groups',
+      });
     } catch {
       setLeaveError(t('mob.group_detail.leave_error'));
       setIsLeaving(false);
@@ -625,7 +633,14 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         visible={isDeleteSheetVisible}
         onClose={() => setIsDeleteSheetVisible(false)}
         onDeleted={() => {
-          goToDashboard(t('mob.success.group_deleted'));
+          showCompletion({
+            flow: 'group_deleted',
+            rows: [
+              { label: t('mob.done.f_name'), value: group.name },
+              { label: t('mob.done.f_status'), value: t('mob.done.v_deleted') },
+            ],
+            primary: 'groups',
+          });
         }}
       />
       <ShareActionSheet
