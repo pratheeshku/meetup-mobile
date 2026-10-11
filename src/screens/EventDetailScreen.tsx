@@ -152,7 +152,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         getEventParticipants(eventId).catch(() => []),
       ]);
       setEvent(data);
-      setParticipants(parts);
+      setParticipants(Array.isArray(parts) ? parts : []);
     } catch {
       setLoadError(t('mob.game_detail.load_error'));
     } finally {
