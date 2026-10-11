@@ -145,6 +145,21 @@ it('does not render Cost row when estimated_cost_cents and cost are null', async
   expect(has(root, 'Cost')).toBe(false);
 });
 
+it('renders without throwing when the participants endpoint resolves with a non-array', async () => {
+  mockGet.mockImplementation((url: string) => {
+    if (url.includes('/participants')) {
+      return Promise.resolve({ data: { notAnArray: true } });
+    }
+    return Promise.resolve({ data: rawEvent() });
+  });
+  const props = {
+    route: { key: 'k', name: 'EventDetail', params: { eventId: 'evt-1' } },
+    navigation: { goBack },
+  } as unknown as React.ComponentProps<typeof EventDetailScreen>;
+  const root = await renderAsync(<EventDetailScreen {...props} />);
+  expect(root).toBeDefined();
+});
+
 describe('organiser (organizer_id === signed-in user id)', () => {
   it('sees "Edit Game", "Invite Group", "Invite Individual", and "Cancel Event", but not "Join" or "Leave"', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
