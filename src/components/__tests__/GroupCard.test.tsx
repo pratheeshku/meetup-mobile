@@ -12,7 +12,7 @@ import { StyleSheet } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 
 import GroupCard, {
-  ROLE_BADGE_LABEL,
+  ROLE_BADGE_LABEL_KEY,
   ROLE_BADGE_VARIANT,
   getRolePillColor,
 } from '../GroupCard';
@@ -48,20 +48,20 @@ function textOf(node: ReactTestRenderer.ReactTestInstance): string {
 }
 
 describe('GroupCard', () => {
-  it('renders role pill, group name, description, member count, and View → action link', () => {
+  it('renders role pill, group name, description, member count, and View action link', () => {
     const renderer = renderCard();
     const t = texts(renderer).map(textOf);
-    expect(t).toContain('Member');
+    expect(t).toContain('Group member');
     expect(t).toContain('North Badminton Club');
     expect(t).toContain('Weekly badminton sessions for intermediate players');
-    expect(t).toContain('12 members');
-    expect(t).toContain('View →');
+    expect(t).toContain('12 group members');
+    expect(t).toContain('View');
   });
 
   describe('Row 1: Role pill', () => {
     it('maps owner to primary variant and colors.primary background with white text', () => {
       expect(ROLE_BADGE_VARIANT.owner).toBe('primary');
-      expect(ROLE_BADGE_LABEL.owner).toBe('Owner');
+      expect(ROLE_BADGE_LABEL_KEY.owner).toBe('mob.group_role.owner');
       expect(getRolePillColor('owner')).toBe(colors.primary);
 
       const renderer = renderCard({ current_user_role: 'owner' });
@@ -79,7 +79,7 @@ describe('GroupCard', () => {
 
     it('maps admin to primary variant and colors.primary background', () => {
       expect(ROLE_BADGE_VARIANT.admin).toBe('primary');
-      expect(ROLE_BADGE_LABEL.admin).toBe('Admin');
+      expect(ROLE_BADGE_LABEL_KEY.admin).toBe('mob.group_role.admin');
       expect(getRolePillColor('admin')).toBe(colors.primary);
 
       const renderer = renderCard({ current_user_role: 'admin' });
@@ -89,12 +89,12 @@ describe('GroupCard', () => {
 
     it('maps member to neutral variant and colors.textSecondary background', () => {
       expect(ROLE_BADGE_VARIANT.member).toBe('neutral');
-      expect(ROLE_BADGE_LABEL.member).toBe('Member');
+      expect(ROLE_BADGE_LABEL_KEY.member).toBe('mob.group_role.member');
       expect(getRolePillColor('member')).toBe(colors.textSecondary);
 
       const renderer = renderCard({ current_user_role: 'member' });
       const t = texts(renderer).map(textOf);
-      expect(t).toContain('Member');
+      expect(t).toContain('Group member');
     });
 
     it('pill text is white and 600 weight', () => {
@@ -159,25 +159,25 @@ describe('GroupCard', () => {
     it('formats singular member count as "1 member"', () => {
       const renderer = renderCard({ member_count: 1 });
       const t = texts(renderer).map(textOf);
-      expect(t).toContain('1 member');
+      expect(t).toContain('1 group member');
     });
 
     it('formats plural member count as "N members"', () => {
       const renderer = renderCard({ member_count: 25 });
       const t = texts(renderer).map(textOf);
-      expect(t).toContain('25 members');
+      expect(t).toContain('25 group members');
     });
 
     it('handles undefined member_count gracefully', () => {
       const renderer = renderCard({ member_count: undefined });
       const t = texts(renderer).map(textOf);
-      expect(t).toContain('View →');
+      expect(t).toContain('View');
     });
 
     it('renders action link with accent color and 700 weight', () => {
       const renderer = renderCard();
       const actionNode = renderer.root.find(
-        node => (node.type as unknown) === 'Text' && textOf(node) === 'View →',
+        node => (node.type as unknown) === 'Text' && textOf(node) === 'View',
       );
       const flattenedStyle = Object.assign(
         {},
@@ -244,7 +244,7 @@ describe('GroupCard', () => {
         current_user_role: 'owner',
       });
       const t = texts(renderer).map(textOf);
-      expect(t).toContain('8 members');
+      expect(t).toContain('8 group members');
       expect(t).toContain(' · ');
       expect(t).toContain('Owner: Self');
     });
