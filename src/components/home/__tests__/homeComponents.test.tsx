@@ -83,7 +83,8 @@ describe('DashboardBanner', () => {
   // cannot be measured here; these cases assert the style props that produce it.
   it('brand block: icon is the AD-18 header variant (not the original) at 52x52, radius 12, overflow hidden', () => {
     const icon = hostByTestId(banner(), 'banner-app-icon');
-    expect(icon.props.source).toBe(require('../../../assets/shuttlr-icon.png'));
+    expect(icon.props.source).toBe(require('../../../assets/shuttlr-icon-header.png'));
+    expect(icon.props.source).not.toBe(require('../../../assets/shuttlr-icon.png'));
     expect(flat(icon)).toMatchObject({ width: 52, height: 52, borderRadius: 12, overflow: 'hidden' });
   });
 
