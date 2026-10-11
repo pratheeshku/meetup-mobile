@@ -61,8 +61,8 @@ beforeEach(() => {
   mockAuth.signInWithGoogle.mockReset();
 });
 
-const EXPECTED_GENERIC_MESSAGE =
-  "If an account exists for that email, we've sent a reset link. Open it on this phone.";
+const expectedGenericMessage = (email: string): string =>
+  `If an account exists for ${email}, we have sent a one-time reset link. Check your inbox and spam folder. The link opens in your browser.`;
 
 const EXPECTED_OAUTH_ONLY_MESSAGE =
   'This account signs in with Google, so it has no password. Use Continue with Google to sign in.';
@@ -81,7 +81,7 @@ describe('ForgotPasswordScreen', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/auth/reset-password-request', {
       email: 'test@example.com',
     });
-    expect(texts(root)).toContain(EXPECTED_GENERIC_MESSAGE);
+    expect(texts(root)).toContain(expectedGenericMessage('test@example.com'));
     expect(pressableWithText(root, 'Back to sign in')).toBeDefined();
 
     await act(async () => {
@@ -106,7 +106,7 @@ describe('ForgotPasswordScreen', () => {
       pressableWithText(root, 'Submit').props.onPress();
     });
 
-    expect(texts(root)).toContain(EXPECTED_GENERIC_MESSAGE);
+    expect(texts(root)).toContain(expectedGenericMessage('unknown@example.com'));
     expect(pressableWithText(root, 'Back to sign in')).toBeDefined();
   });
 
@@ -128,7 +128,7 @@ describe('ForgotPasswordScreen', () => {
 
     expect(texts(root)).toContain('Something went wrong. Try again.');
     expect(texts(root)).toContain('Retry');
-    expect(texts(root)).not.toContain(EXPECTED_GENERIC_MESSAGE);
+    expect(texts(root)).not.toContain(expectedGenericMessage('error@example.com'));
 
     // Retrying with success
     (apiClient.post as jest.Mock).mockResolvedValueOnce({ data: {} });
@@ -136,7 +136,7 @@ describe('ForgotPasswordScreen', () => {
       pressableWithText(root, 'Retry').props.onPress();
     });
 
-    expect(texts(root)).toContain(EXPECTED_GENERIC_MESSAGE);
+    expect(texts(root)).toContain(expectedGenericMessage('error@example.com'));
   });
 
   it('[Execute] shows "Too many attempts. Try again in a minute." on 429 rate limit and does NOT show the link sent text', async () => {
@@ -156,7 +156,7 @@ describe('ForgotPasswordScreen', () => {
     });
 
     expect(texts(root)).toContain('Too many attempts. Try again in a minute.');
-    expect(texts(root)).not.toContain(EXPECTED_GENERIC_MESSAGE);
+    expect(texts(root)).not.toContain(expectedGenericMessage('ratelimit@example.com'));
     expect(pressables(root).some(p => {
       try {
         return texts(p).includes('Retry');
@@ -182,7 +182,7 @@ describe('ForgotPasswordScreen', () => {
 
     expect(texts(root)).toContain('Unable to connect to server.');
     expect(texts(root)).toContain('Retry');
-    expect(texts(root)).not.toContain(EXPECTED_GENERIC_MESSAGE);
+    expect(texts(root)).not.toContain(expectedGenericMessage('retry@example.com'));
 
     // Retrying with success
     (apiClient.post as jest.Mock).mockResolvedValueOnce({ data: {} });
@@ -190,7 +190,7 @@ describe('ForgotPasswordScreen', () => {
       pressableWithText(root, 'Retry').props.onPress();
     });
 
-    expect(texts(root)).toContain(EXPECTED_GENERIC_MESSAGE);
+    expect(texts(root)).toContain(expectedGenericMessage('retry@example.com'));
   });
 
   it('[Execute] an oauth_only reply shows the Google-only message, the Continue with Google button and Back to sign in, and does not show the normal message', async () => {
@@ -214,7 +214,7 @@ describe('ForgotPasswordScreen', () => {
 
     const rendered = texts(root);
     expect(rendered).toContain(EXPECTED_OAUTH_ONLY_MESSAGE);
-    expect(rendered).not.toContain(EXPECTED_GENERIC_MESSAGE);
+    expect(rendered).not.toContain(expectedGenericMessage('googleonly@example.com'));
 
     expect(pressableWithText(root, 'Continue with Google')).toBeDefined();
     expect(pressableWithText(root, 'Back to sign in')).toBeDefined();

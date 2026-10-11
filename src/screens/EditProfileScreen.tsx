@@ -47,6 +47,8 @@ import { levelLabelKey } from '../components/skills/levels';
 import { getDisplayName } from '../utils/displayName';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getLabel, useLabels, useT } from '../labels/LabelsContext';
+import { showCompletion } from '../navigation/showCompletion';
+import type { CompletionRow } from '../navigation/showCompletion';
 import {
   borderWidth,
   colors,
@@ -59,6 +61,16 @@ import type { SkillLevel, UserProfile } from '../types/user';
 import type { ProfileStackParamList } from '../navigation/types';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'EditProfile'>;
+
+/** Last four digits only. The full number is never logged. */
+function maskMobileLast4(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  const last4 = digits.slice(-4);
+  if (!last4) {
+    return '';
+  }
+  return `•••• ${last4}`;
+}
 
 function getInitials(name?: string | null): string {
   if (!name) return '??';
@@ -281,7 +293,37 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
         await updateMobileNumber({ mobile_number: mobileNumber.trim() || null });
       }
 
-      navigation.goBack();
+      const rows: CompletionRow[] = [];
+      const nextName = displayName.trim();
+      if (nextName && nextName !== profile.display_name) {
+        rows.push({ label: t('mob.done.f_display_name'), value: nextName });
+      }
+      if (avatarAction === 'new') {
+        rows.push({ label: t('mob.done.f_photo'), value: t('mob.done.v_updated') });
+      } else if (avatarAction === 'remove' && profile.avatar_url) {
+        rows.push({ label: t('mob.done.f_photo'), value: t('mob.done.v_removed') });
+      }
+      if (coverAction === 'new') {
+        rows.push({ label: t('mob.done.f_cover'), value: t('mob.done.v_updated') });
+      } else if (coverAction === 'default' && profile.cover_url) {
+        rows.push({ label: t('mob.done.f_cover'), value: t('mob.done.v_removed') });
+      }
+      const nextMobile = mobileNumber.trim();
+      if (nextMobile !== (profile.mobile_number ?? '')) {
+        rows.push({
+          label: t('mob.done.f_mobile'),
+          value: nextMobile ? maskMobileLast4(nextMobile) : t('mob.done.v_removed'),
+        });
+      }
+      if (rows.length === 0) {
+        navigation.goBack();
+      } else {
+        showCompletion({
+          flow: 'profile_updated',
+          rows,
+          primary: 'profile',
+        });
+      }
     } catch (e: any) {
       setSaveError(getApiErrorMessage(e, t('mob.profile.save_error')));
     } finally {

@@ -11,6 +11,8 @@ export type AuthStackParamList = {
   Register: undefined;
   Verify: { email: string; explanation?: string };
   ForgotPassword: { email?: string } | undefined;
+  /** Post-submit summary. Also the signed-out host for account deletion. */
+  Completion: undefined;
 };
 
 /**

@@ -60,7 +60,7 @@
  * as the design-compliant reading of "or equivalent". No native Android
  * file was modified by this task.
  */
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -103,6 +103,8 @@ import {
   registerEventForegroundHandler,
 } from '../notifications/eventNotificationHandler';
 
+import { claimAuthHandoff } from './showCompletion';
+import CompletionScreen from '../screens/CompletionScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import VerifyScreen from '../screens/VerifyScreen';
@@ -134,7 +136,13 @@ import ScreenContainer from '../components/ScreenContainer';
 import { perfLog, isPerfCapturing } from '../diagnostics/perfLog';
 import { recordNavChange } from '../hooks/usePerfScreen';
 
+type AppRootParamList = {
+  Tabs: undefined;
+  Completion: undefined;
+};
+
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
+const AppRootNav = createNativeStackNavigator<AppRootParamList>();
 const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
 const GroupsStackNav = createNativeStackNavigator<GroupsStackParamList>();
 const TournamentsStackNav = createNativeStackNavigator<TournamentsStackParamList>();
@@ -175,12 +183,22 @@ const tabScreenOptions = ({
 };
 
 function AuthStack(): React.JSX.Element {
+  // Claimed once per mount. Account deletion sets this before sign-out so
+  // the summary is still here after the app stack is replaced.
+  const [initialRouteName] = useState<'Login' | 'Completion'>(() =>
+    claimAuthHandoff() ? 'Completion' : 'Login',
+  );
   return (
-    <AuthStackNav.Navigator screenOptions={stackScreenOptions}>
+    <AuthStackNav.Navigator initialRouteName={initialRouteName} screenOptions={stackScreenOptions}>
       <AuthStackNav.Screen name="Login" component={LoginScreen} />
       <AuthStackNav.Screen name="Register" component={RegisterScreen} />
       <AuthStackNav.Screen name="Verify" component={VerifyScreen} />
       <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <AuthStackNav.Screen
+        name="Completion"
+        component={CompletionScreen}
+        options={{ headerShown: false, gestureEnabled: false, fullScreenGestureEnabled: false }}
+      />
     </AuthStackNav.Navigator>
   );
 }
@@ -362,6 +380,19 @@ function AppStack(): React.JSX.Element {
   );
 }
 
+function AppRoot(): React.JSX.Element {
+  return (
+    <AppRootNav.Navigator screenOptions={{ headerShown: false }}>
+      <AppRootNav.Screen name="Tabs" component={AppStack} />
+      <AppRootNav.Screen
+        name="Completion"
+        component={CompletionScreen}
+        options={{ headerShown: false, gestureEnabled: false, fullScreenGestureEnabled: false }}
+      />
+    </AppRootNav.Navigator>
+  );
+}
+
 export default function RootNavigator(): React.JSX.Element {
   const { user, isLoading, sessionCheckPendingRetry, sessionCheckFailure, retrySessionCheck } =
     useAuth();
@@ -469,6 +500,7 @@ export default function RootNavigator(): React.JSX.Element {
       <NavigationContainer
         ref={navigationRef}
         theme={navigationTheme}
+        navigationInChildEnabled
         onReady={() => {
           perfLog('boot_nav_ready');
           handleInitialNotification();
@@ -492,7 +524,7 @@ export default function RootNavigator(): React.JSX.Element {
           recordNavChange(routeName);
         }}
       >
-        {user ? <AppStack /> : <AuthStack />}
+        {user ? <AppRoot /> : <AuthStack />}
       </NavigationContainer>
       {user ? <OnboardingOverlay userId={user.id} /> : null}
       <NotificationBanner />

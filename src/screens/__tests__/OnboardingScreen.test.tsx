@@ -130,23 +130,55 @@ describe('step order and navigation', () => {
     expect(mockComplete).not.toHaveBeenCalled();
   });
 
-  it('the final Save or Skip calls POST /users/me/onboarding/complete once, then finishes', async () => {
+  it('the final Save or Skip calls POST /users/me/onboarding/complete once, shows the summary, and Get started finishes', async () => {
     const root = await mount();
     await press(root, 'Skip');
     await press(root, 'Skip');
     await press(root, 'Skip');
     expect(mockComplete).toHaveBeenCalledTimes(1);
+    // The summary replaces the steps; the flow is not dismissed until Get started.
+    expect(onDone).not.toHaveBeenCalled();
+    expect(texts(root)).toEqual(expect.arrayContaining(['You are all set', 'Here is what you set up.']));
+    expect(texts(root)).toEqual(expect.arrayContaining(['Skills', 'Notifications', 'Mobile number']));
+    expect(texts(root).filter(text => text === 'Skipped')).toHaveLength(3);
+    expect(texts(root)).not.toContain('Saved');
+    await press(root, 'Get started');
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
-  it('a failed complete dismisses locally for the session (fail open)', async () => {
+  it('a failed complete still shows the summary, and Get started dismisses locally for the session (fail open)', async () => {
     mockComplete.mockRejectedValue(httpError(500));
     const root = await mount();
     await press(root, 'Skip');
     await press(root, 'Skip');
     await press(root, 'Skip');
     expect(mockComplete).toHaveBeenCalledTimes(1);
+    expect(texts(root)).toContain('You are all set');
+    expect(onDone).not.toHaveBeenCalled();
+    await press(root, 'Get started');
     expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('on the summary hardware Back does the same as Get started, and only once', async () => {
+    const root = await mount();
+    await press(root, 'Skip');
+    await press(root, 'Skip');
+    await press(root, 'Skip');
+    const handler = backHandlers[backHandlers.length - 1];
+    expect(handler()).toBe(true);
+    expect(onDone).toHaveBeenCalledTimes(1);
+    await press(root, 'Get started');
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it('the summary lists only the steps that were presented (mobile number omitted when the account has one)', async () => {
+    const root = await mount({ hasMobileNumber: true });
+    await press(root, 'Skip');
+    await press(root, 'Skip');
+    expect(texts(root)).toContain('You are all set');
+    expect(texts(root)).toEqual(expect.arrayContaining(['Skills', 'Notifications']));
+    expect(texts(root)).not.toContain('Mobile number');
+    expect(texts(root).filter(text => text === 'Skipped')).toHaveLength(2);
   });
 });
 
@@ -309,7 +341,13 @@ describe('mobile number step', () => {
       expect.anything(),
     );
     expect(mockComplete).toHaveBeenCalledTimes(1);
-    expect(onDone).toHaveBeenCalled();
+    // Summary: the number was saved; the two earlier steps were skipped.
+    expect(texts(root)).toContain('You are all set');
+    expect(texts(root).filter(text => text === 'Saved')).toHaveLength(1);
+    expect(texts(root).filter(text => text === 'Skipped')).toHaveLength(2);
+    expect(onDone).not.toHaveBeenCalled();
+    await press(root, 'Get started');
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 
   it('Save with an empty field sends nothing and completes', async () => {

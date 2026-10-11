@@ -49,6 +49,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [sentToEmail, setSentToEmail] = useState('');
   const [isOAuthOnly, setIsOAuthOnly] = useState(false);
   const [oauthOnlyMessage, setOAuthOnlyMessage] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
@@ -75,12 +76,12 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
       const response = await requestPasswordReset(trimmedEmail);
       if (response?.code === 'oauth_only') {
         setIsOAuthOnly(true);
-        if (response.detail) {
-          setOAuthOnlyMessage(response.detail);
-        }
+        setOAuthOnlyMessage(response.detail ? response.detail : null);
       } else {
         setIsOAuthOnly(false);
+        setOAuthOnlyMessage(null);
       }
+      setSentToEmail(trimmedEmail);
       setSubmitted(true);
     } catch (err) {
       if (isNetworkError(err)) {
@@ -92,8 +93,9 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
         setRetryError(t(SERVER_ERROR_MESSAGE));
         setRetryAction(() => handleSubmit);
       } else {
-        // Any 4xx other than 429: keep generic message and Back to sign in (email enumeration safe)
+        // Any 4xx other than 429: same enumeration-safe copy and Back to sign in
         setIsOAuthOnly(false);
+        setSentToEmail(trimmedEmail);
         setSubmitted(true);
       }
     } finally {
@@ -136,8 +138,9 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
         <View style={styles.confirmationContainer}>
           {isOAuthOnly ? (
             <>
-              <Text style={styles.confirmationText}>{oauthOnlyMessage ?? t('mob.forgot.oauth_only')}</Text>
-
+              <Text style={styles.confirmationText}>
+                {oauthOnlyMessage ?? t('mob.forgot.oauth_only')}
+              </Text>
               {googleError ? <Text style={styles.error}>{googleError}</Text> : null}
 
               {retryError && retryAction ? (
@@ -166,7 +169,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
           ) : (
             <>
               <Text style={styles.confirmationText}>
-                {t('mob.forgot.sent')}
+                {t('mob.forgot.sent_to', { email: sentToEmail })}
               </Text>
               <Button
                 label={t('mob.forgot.back_to_sign_in')}

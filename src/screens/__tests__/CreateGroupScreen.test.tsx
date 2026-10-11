@@ -19,6 +19,10 @@ jest.mock('../../api/groups', () => ({ createGroup: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 jest.mock('../../api/teams', () => ({ createTeam: jest.fn() }));
 jest.mock('../../navigation/goToDashboard', () => ({ goToDashboard: jest.fn() }));
+const mockShowCompletion = jest.fn();
+jest.mock('../../navigation/showCompletion', () => ({
+  showCompletion: (...args: unknown[]) => mockShowCompletion(...args),
+}));
 
 const mockCreateGroup = createGroup as jest.MockedFunction<typeof createGroup>;
 const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
@@ -69,6 +73,7 @@ beforeEach(() => {
   mockCreateTeam.mockReset();
   replace.mockReset();
   mockGoToDashboard.mockReset();
+  mockShowCompletion.mockReset();
   mockGetSports.mockResolvedValue(MOCK_SPORTS);
 });
 
@@ -188,7 +193,7 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
     expect(mockCreateTeam).not.toHaveBeenCalled();
   });
 
-  it('submits team with name, sport and visibility, then returns to the dashboard', async () => {
+  it('submits team with name, sport and visibility, then opens the team_created summary', async () => {
     mockCreateTeam.mockResolvedValueOnce({
       id: 'team-456',
       name: 'Test FC',
@@ -209,8 +214,18 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
       { name: 'Test FC', sport: 'football', visibility: 'public' },
       { correlationId: expect.any(String) },
     );
-    expect(mockGoToDashboard).toHaveBeenCalledTimes(1);
-    expect(mockGoToDashboard).toHaveBeenCalledWith('Tournament team created');
+    // Literal expected summary, not built from label keys.
+    expect(mockShowCompletion).toHaveBeenCalledTimes(1);
+    expect(mockShowCompletion).toHaveBeenCalledWith({
+      flow: 'team_created',
+      rows: [
+        { label: 'Name', value: 'Test FC' },
+        { label: 'Sport', value: 'Football' },
+        { label: 'Visibility', value: 'Public' },
+      ],
+      primary: 'dashboard',
+    });
+    expect(mockGoToDashboard).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
   });
 

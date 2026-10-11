@@ -22,7 +22,7 @@ import StepFooter from './StepFooter';
 import { useT } from '../../labels/LabelsContext';
 
 interface SkillsStepProps {
-  onDone: () => void;
+  onDone: (outcome: 'saved' | 'skipped') => void;
 }
 
 const storageKey = (sport: Sport | string): string =>
@@ -63,7 +63,7 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
       .map(([name, level]) => [storageKey(name), level] as const)
       .filter(([sport, level]) => existing[sport] !== level);
     if (changes.length === 0) {
-      onDone();
+      onDone('saved');
       return;
     }
     setSaving(true);
@@ -74,7 +74,7 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
           await updateSkillLevel(sport, level, { correlationId });
         }
       });
-      onDone();
+      onDone('saved');
     } catch {
       setError(t('mob.onboarding.skills_save_error'));
     } finally {
@@ -89,7 +89,7 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
           {t('mob.onboarding.sports_load_error')}
         </Text>
         <Button label={t('mob.common.retry')} onPress={load} />
-        <StepFooter onSave={onDone} onSkip={onDone} saveLabel={t('mob.common.save')} />
+        <StepFooter onSave={() => onDone('saved')} onSkip={() => onDone('skipped')} saveLabel={t('mob.common.save')} />
       </View>
     );
   }
@@ -116,7 +116,7 @@ export default function SkillsStep({ onDone }: SkillsStepProps): React.JSX.Eleme
         backLabel={t('mob.common.back')}
         saveLabel={t('mob.common.save')}
         onSave={handleSave}
-        footer={<Button label={t('mob.common.skip')} variant="secondary" onPress={onDone} disabled={saving} style={styles.skip} />}
+        footer={<Button label={t('mob.common.skip')} variant="secondary" onPress={() => onDone('skipped')} disabled={saving} style={styles.skip} />}
       />
     </ScrollView>
   );

@@ -58,7 +58,9 @@ import SelectableCard from '../components/SelectableCard';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
 import { useT } from '../labels/LabelsContext';
-import { goToDashboard } from '../navigation/goToDashboard';
+import type { LabelKey } from '../labels/fallbackLabels';
+import { showCompletion } from '../navigation/showCompletion';
+import type { CompletionRow } from '../navigation/showCompletion';
 import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
 import {
   borderWidth,
@@ -78,6 +80,7 @@ import type {
 } from '../types/tournament';
 import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
+import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'CreateGame'>,
@@ -375,6 +378,39 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       const fullVenueName = courtDetails.trim()
         ? `${selectedVenue.name}, ${courtDetails.trim()}`
         : selectedVenue.name;
+      const sportName = sports.find(item => item.name === gSport)?.display_name || gSport;
+      const submittedWhen = `${formatEventDate(startsAtIso)}, ${formatEventTimeRange(startsAtIso, null)}`;
+      const submittedDate = formatEventDate(startsAtIso);
+      const selectedGroupName = groups.find(item => item.id === selectedGroupId)?.name;
+      const skillKey: LabelKey =
+        skillLevel === 'beginner'
+          ? 'skill_level.beginner'
+          : skillLevel === 'expert'
+            ? 'skill_level.expert'
+            : skillLevel === 'all_levels'
+              ? 'skill_level.all_levels'
+              : 'skill_level.intermediate';
+      const audienceFor = (kind: 'game' | 'tournament'): string => {
+        if (gVisibility === 'group' && selectedGroupName) {
+          return selectedGroupName;
+        }
+        if (kind === 'game') {
+          if (gVisibility === 'invite_only') {
+            return t('event_visibility.invite_only');
+          }
+          if (gVisibility === 'group') {
+            return t('event_visibility.group');
+          }
+          return t('event_visibility.public');
+        }
+        if (gVisibility === 'invite_only') {
+          return t('tournament_visibility.invite');
+        }
+        if (gVisibility === 'group') {
+          return t('tournament_visibility.group');
+        }
+        return t('tournament_visibility.public');
+      };
 
       if (mode === 'game') {
         if (gVisibility === 'invite_only' && invitedPlayers.length < 1) {
@@ -406,10 +442,27 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             : {}),
         };
 
-        await withCorrelationId(async correlationId => {
-          await createEvent(input, { correlationId });
+        const created = await withCorrelationId(async correlationId =>
+          createEvent(input, { correlationId }),
+        );
+        const rows: CompletionRow[] = [
+          { label: t('mob.done.f_title'), value: input.title },
+          { label: t('mob.done.f_sport'), value: sportName },
+          { label: t('mob.done.f_when'), value: submittedWhen },
+          { label: t('mob.done.f_venue'), value: fullVenueName },
+          { label: t('mob.done.f_audience'), value: audienceFor('game') },
+          { label: t('mob.done.f_players'), value: String(capacity) },
+          { label: t('mob.done.f_skill'), value: t(skillKey) },
+        ];
+        if (gVisibility === 'invite_only') {
+          rows.push({ label: t('mob.done.f_invited'), value: String(invitedPlayers.length) });
+        }
+        showCompletion({
+          flow: 'game_created',
+          rows,
+          primary: 'dashboard',
+          secondary: { button: 'view_game', id: created.id },
         });
-        goToDashboard(t('mob.success.game_created'));
       } else {
         const input: CreateTournamentInput = {
           title: gTitle.trim(),
@@ -423,10 +476,24 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           venue_name: fullVenueName,
         };
 
-        await withCorrelationId(async correlationId => {
-          await createTournament(input, { correlationId });
+        const created = await withCorrelationId(async correlationId =>
+          createTournament(input, { correlationId }),
+        );
+        showCompletion({
+          flow: 'tournament_created',
+          rows: [
+            { label: t('mob.done.f_title'), value: input.title },
+            { label: t('mob.done.f_sport'), value: sportName },
+            { label: t('mob.done.f_format'), value: t('mob.create_game.format_knockout') },
+            { label: t('mob.done.f_participation'), value: t('mob.create_game.participation_individual') },
+            { label: t('mob.done.f_date'), value: submittedDate },
+            { label: t('mob.done.f_venue'), value: fullVenueName },
+            { label: t('mob.done.f_audience'), value: audienceFor('tournament') },
+            { label: t('mob.done.f_players'), value: String(capacity) },
+          ],
+          primary: 'dashboard',
+          secondary: { button: 'view_tournament', id: created.id },
         });
-        goToDashboard(t('mob.success.tournament_created'));
       }
     } catch (e) {
       setError(getApiErrorMessage(e, t('mob.create_game.err_game_create')));

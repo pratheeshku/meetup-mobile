@@ -18,6 +18,7 @@ import { useAuth } from '../auth/AuthContext';
 import Button from '../components/Button';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import { useT } from '../labels/LabelsContext';
+import { showCompletion } from '../navigation/showCompletion';
 import type { ProfileStackParamList } from '../navigation/types';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -87,7 +88,16 @@ export default function AccountDeletionCodeScreen({ navigation }: Props): React.
       await withCorrelationId(async correlationId => {
         await confirmDeletion(trimmed, { correlationId });
       });
-      // 200 -> done: log out
+      // Show the summary first, then sign out. The Auth stack claims the
+      // in-memory handoff so the same screen is still there afterwards.
+      showCompletion({
+        flow: 'account_deleted',
+        rows: [
+          { label: t('mob.done.f_email'), value: maskEmail(user?.email, t('mob.account_delete.email_fallback')) },
+          { label: t('mob.done.f_status'), value: t('mob.done.v_deleted') },
+        ],
+        primary: 'signin',
+      });
       await signOut();
     } catch (e: any) {
       setIsConfirming(false);
