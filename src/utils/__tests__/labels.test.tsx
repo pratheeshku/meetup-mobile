@@ -91,23 +91,23 @@ describe('getEventVisibilityLabel', () => {
     'event_visibility.group': 'My Group',
   };
 
-  it('formats public visibility with 🌍 emoji and label', () => {
-    expect(getEventVisibilityLabel('public', {})).toBe('🌍 Public');
-    expect(getEventVisibilityLabel('public', customLabels)).toBe('🌍 Everyone');
+  it('formats public visibility with stripped emoji label', () => {
+    expect(getEventVisibilityLabel('public', {})).toBe('Public');
+    expect(getEventVisibilityLabel('public', customLabels)).toBe('Everyone');
   });
 
-  it('formats invite_only visibility with 🔒 emoji and label', () => {
-    expect(getEventVisibilityLabel('invite_only', {})).toBe('🔒 Invite Only');
-    expect(getEventVisibilityLabel('invite_only', customLabels)).toBe('🔒 Only Invited');
+  it('formats invite_only visibility with stripped emoji label', () => {
+    expect(getEventVisibilityLabel('invite_only', {})).toBe('Invite Only');
+    expect(getEventVisibilityLabel('invite_only', customLabels)).toBe('Only Invited');
   });
 
-  it('formats group visibility with 👥 emoji and label', () => {
-    expect(getEventVisibilityLabel('group', {})).toBe('👥 Group');
-    expect(getEventVisibilityLabel('group', customLabels)).toBe('👥 My Group');
+  it('formats group visibility with stripped emoji label', () => {
+    expect(getEventVisibilityLabel('group', {})).toBe('Group');
+    expect(getEventVisibilityLabel('group', customLabels)).toBe('My Group');
   });
 
-  it('defaults to public with 🌍 emoji for undefined or unknown values', () => {
-    expect(getEventVisibilityLabel(undefined, {})).toBe('🌍 Public');
-    expect(getEventVisibilityLabel('unknown' as any, {})).toBe('🌍 Public');
+  it('defaults to public with stripped emoji for undefined or unknown values', () => {
+    expect(getEventVisibilityLabel(undefined, {})).toBe('Public');
+    expect(getEventVisibilityLabel('unknown' as any, {})).toBe('Public');
   });
 });

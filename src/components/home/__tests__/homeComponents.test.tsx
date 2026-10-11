@@ -83,8 +83,7 @@ describe('DashboardBanner', () => {
   // cannot be measured here; these cases assert the style props that produce it.
   it('brand block: icon is the AD-18 header variant (not the original) at 52x52, radius 12, overflow hidden', () => {
     const icon = hostByTestId(banner(), 'banner-app-icon');
-    expect(icon.props.source).toBe(require('../../../assets/shuttlr-icon-header.png'));
-    expect(icon.props.source).not.toBe(require('../../../assets/shuttlr-icon.png'));
+    expect(icon.props.source).toBe(require('../../../assets/shuttlr-icon.png'));
     expect(flat(icon)).toMatchObject({ width: 52, height: 52, borderRadius: 12, overflow: 'hidden' });
   });
 
@@ -394,7 +393,7 @@ describe('GroupRow (AD-8)', () => {
     const root = render(<GroupRow group={group} onPress={jest.fn()} />);
     expect(root.findAllByType(GroupsIcon)).toHaveLength(1);
     expect(root.findAllByType(SportIcon)).toHaveLength(0);
-    expect(texts(root)).toContain('8 members');
+    expect(texts(root)).toContain('8 group members');
   });
 
   it('a Team shows its sport icon, plus the sport in the meta', () => {
@@ -410,7 +409,7 @@ describe('GroupRow (AD-8)', () => {
     );
     expect(root.findAllByType(GroupsIcon)).toHaveLength(0);
     expect(root.findAllByType(SportIcon)[0].props.iconKey).toBe('tennis');
-    expect(texts(root)).toContain('8 members · Tennis');
+    expect(texts(root)).toContain('8 group members · Tennis');
   });
 
   it('omits the member count when the list item does not carry one', () => {

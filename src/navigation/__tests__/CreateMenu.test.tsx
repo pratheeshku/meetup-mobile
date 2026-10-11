@@ -16,10 +16,13 @@ function mount(visible = true) {
 }
 
 describe('CreateMenu', () => {
-  it('offers exactly Game and Group with their emoji', () => {
+  it('offers exactly Game and Group with labelKey', () => {
     const { root } = mount();
-    expect(CREATE_MENU_ITEMS.map(item => item.label)).toEqual(['Create Game', 'Create Group']);
-    expect(texts(root)).toEqual(expect.arrayContaining(['🎮', '👥']));
+    expect(CREATE_MENU_ITEMS.map(item => item.labelKey)).toEqual([
+      'mob.create_menu.game',
+      'mob.create_menu.group',
+    ]);
+    expect(texts(root)).toEqual(expect.arrayContaining(['Create Game', 'Create Group']));
   });
 
   it.each([

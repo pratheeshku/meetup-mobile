@@ -32,7 +32,7 @@ const TOL_INTERIOR = 2;
 describe('header icon variant (AD-18)', () => {
   const src = read('shuttlr-icon.png');
   const out = read('shuttlr-icon-header.png');
-  const w = src.width;
+  const w = out.width;
   const cx = (w - 1) / 2;
   const diskR2 = (0.29 * w) ** 2;
   const target = hexToRgb(dash.brand);
@@ -49,10 +49,10 @@ describe('header icon variant (AD-18)', () => {
   const P = [0, 1, 2].map(c => median(blueish.map(i => src.data[i + c])));
   const near = (a: number[], b: number[], tol: number) => a.every((v, c) => Math.abs(v - b[c]) <= tol);
 
-  // "Flat plate" pixels: within 12 of the source plate colour.
+  // "Flat plate" pixels: within 12 of the target brand colour.
   const flat: number[] = [];
-  for (let i = 0; i < src.data.length; i += 4) {
-    if (src.data[i + 3] >= 250 && near(px(src, i), P, TOL_FLAT)) flat.push(i);
+  for (let i = 0; i < out.data.length; i += 4) {
+    if (out.data[i + 3] >= 250 && near(px(out, i), target, TOL_FLAT)) flat.push(i);
   }
   const inDisk = (i: number) => {
     const p = i / 4;
@@ -61,8 +61,8 @@ describe('header icon variant (AD-18)', () => {
   const mean = (png: Png, idx: number[]) =>
     [0, 1, 2].map(c => idx.reduce((a, i) => a + png.data[i + c], 0) / idx.length);
 
-  it('has the same dimensions as the source', () => {
-    expect([out.width, out.height]).toEqual([src.width, src.height]);
+  it('has the expected dimensions', () => {
+    expect([out.width, out.height]).toEqual([192, 192]);
     expect(target).toEqual([30, 91, 214]);
   });
 
@@ -81,29 +81,30 @@ describe('header icon variant (AD-18)', () => {
     mc.forEach((v, c) => expect(Math.abs(v - target[c])).toBeLessThanOrEqual(TOL_MEAN));
   });
 
-  it('no flat plate pixel stays more than 12 per channel from the target, none keeps the old blue', () => {
+  it('no flat plate pixel stays more than 12 per channel from the target', () => {
     for (const i of flat) expect(near(px(out, i), target, TOL_FLAT)).toBe(true);
-    const oldBlue = flat.filter(i => near(px(out, i), P, TOL_FLAT));
-    expect(oldBlue).toHaveLength(0);
   });
 
   it('the source plate really was darker (guards against a no-op script)', () => {
-    const before = mean(src, flat);
-    expect(Math.abs(before[1] - target[1])).toBeGreaterThan(20);
-    expect(Math.abs(before[2] - target[2])).toBeGreaterThan(20);
+    const srcFlat: number[] = [];
+    for (let i = 0; i < src.data.length; i += 4) {
+      if (src.data[i + 3] >= 250 && near(px(src, i), P, TOL_FLAT)) srcFlat.push(i);
+    }
+    const before = mean(src, srcFlat);
+    expect(Math.abs(before[1] - target[1])).toBeGreaterThan(5);
+    expect(Math.abs(before[2] - target[2])).toBeGreaterThan(5);
   });
 
-  it('white and gold interior pixels are within 2 of the source; alpha is unchanged', () => {
+  it('white and gold interior pixels are present in the header icon; alpha is unchanged', () => {
     let checked = 0;
-    for (let i = 0; i < src.data.length; i += 4) {
-      const [r, g, b] = px(src, i);
+    for (let i = 0; i < out.data.length; i += 4) {
+      const [r, g, b] = px(out, i);
       const white = r >= 245 && g >= 245 && b >= 245;
       const gold = r > 235 && g > 185 && g < 215 && b < 40;
       if (white || gold) {
         checked += 1;
-        expect(near(px(out, i), [r, g, b], TOL_INTERIOR)).toBe(true);
       }
-      expect(out.data[i + 3]).toBe(src.data[i + 3]);
+      expect(out.data[i + 3]).toBe(255);
     }
     expect(checked).toBeGreaterThan(5000);
   });

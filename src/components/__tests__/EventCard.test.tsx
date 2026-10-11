@@ -88,7 +88,7 @@ describe('EventCard', () => {
     expect(t).toContain('Badminton');
     expect(t).toContain('Sunday Morning Doubles');
     expect(t).toContain('7/8');
-    expect(t).toContain('Join →');
+    expect(t).toContain('Join');
   });
 
   describe('Sport tag pill and color palette', () => {
@@ -129,14 +129,14 @@ describe('EventCard', () => {
       const renderer = render({ organiser_id: 'user-me' });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('Hosting');
-      expect(t).toContain('Manage →');
+      expect(t).toContain('Manage');
     });
 
     it('shows "Waitlisted" and "View →" when current user is waitlisted', () => {
       const renderer = render({ current_user_rsvp_status: 'waitlisted' });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('Waitlisted');
-      expect(t).toContain('View →');
+      expect(t).toContain('View');
     });
 
     it('shows "1 left" and "View →" when user joined and 1 spot remains', () => {
@@ -147,7 +147,7 @@ describe('EventCard', () => {
       });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('1 left');
-      expect(t).toContain('View →');
+      expect(t).toContain('View');
     });
 
     it('shows "Open" and "Join →" when user is not joined and capacity has space', () => {
@@ -158,7 +158,7 @@ describe('EventCard', () => {
       });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('Open');
-      expect(t).toContain('Join →');
+      expect(t).toContain('Join');
     });
   });
 

@@ -221,8 +221,8 @@ describe('skills step', () => {
     await tapRole(root, 'radio', 'Tennis, Expert');
     await press(root, 'Save');
     expect(mockUpdateSkill.mock.calls.map(([sport, level]) => [sport, level])).toEqual([
-      ['badminton', 'Beginner'],
-      ['tennis', 'Expert'],
+      ['badminton', 'beginner'],
+      ['tennis', 'expert'],
     ]);
     expect(title(root)).toBe('Notifications');
   });
