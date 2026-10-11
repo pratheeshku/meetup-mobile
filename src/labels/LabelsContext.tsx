@@ -65,14 +65,14 @@ export function LabelsProvider({ children }: { children: React.ReactNode }): Rea
     try {
       const fetched = await getLabels();
       fetchedAt.current = Date.now();
-      if (mounted.current && fetched && typeof fetched === 'object' && !Array.isArray(fetched)) {
+      if (mounted.current) {
         // Keep the same object when nothing changed, so consumers don't re-render.
         setLabels(current =>
           JSON.stringify(current) === JSON.stringify(fetched) ? current : fetched,
         );
-        await AsyncStorage.setItem(LABELS_CACHE_KEY, JSON.stringify(fetched));
-        await AsyncStorage.setItem(LABELS_FETCHED_AT_KEY, String(fetchedAt.current));
       }
+      await AsyncStorage.setItem(LABELS_CACHE_KEY, JSON.stringify(fetched));
+      await AsyncStorage.setItem(LABELS_FETCHED_AT_KEY, String(fetchedAt.current));
     } catch {
       // Fetch/cache failure: keep what is showing (cache or bundled
       // defaults); never surface as a screen-level error.

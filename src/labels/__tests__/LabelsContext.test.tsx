@@ -139,26 +139,66 @@ function LoginTitleProbe(): React.JSX.Element {
   return <Text>{t('mob.login.title')}</Text>;
 }
 
-describe('LabelsProvider — fallback resilience on empty or invalid fetched map', () => {
-  it.each([
-    ['empty object', {}],
-    ['non-object (undefined cast)', undefined as unknown as Record<string, string>],
-    ['null', null as unknown as Record<string, string>],
-  ])('renders t("mob.login.title") from fallback with no throw when fetch resolves %s', async (_label, fetched) => {
-    mockGetLabels.mockResolvedValue(fetched);
+describe('LabelsProvider — resilience on malformed /api/labels response (200 with {}, HTML string, null, labels:null)', () => {
+  const malformedCases = [
+    ['200 with empty object ({})', new Error('Malformed labels response from /api/labels')],
+    ['200 with an HTML string', new Error('Malformed labels response from /api/labels')],
+    ['200 with null', new Error('Malformed labels response from /api/labels')],
+    ['200 with labels: null', new Error('Malformed labels response from /api/labels')],
+  ] as const;
 
-    const root = render(
-      <LabelsProvider>
-        <LoginTitleProbe />
-      </LabelsProvider>,
-    );
+  it.each(malformedCases)(
+    'when fetch fails due to %s with prior cache: (i) no throw reaches UI, (ii) cached labels are displayed, (iii) AsyncStorage cache is not overwritten',
+    async (_label, error) => {
+      const cached = { 'mob.login.title': 'Cached Login Title' };
+      await AsyncStorage.setItem(LABELS_CACHE_KEY, JSON.stringify(cached));
+      mockGetLabels.mockRejectedValue(error);
 
-    await act(async () => {
-      await flush();
-    });
+      let root: any;
+      expect(() => {
+        root = render(
+          <LabelsProvider>
+            <LoginTitleProbe />
+          </LabelsProvider>,
+        );
+      }).not.toThrow();
 
-    expect(texts(root)).toEqual([FALLBACK_LABELS['mob.login.title']]);
-  });
+      await act(async () => {
+        await flush();
+      });
+
+      // (i) & (ii) No throw reached UI and previously cached labels are still displayed
+      expect(texts(root)).toEqual(['Cached Login Title']);
+      // (iii) The cache in AsyncStorage is NOT overwritten
+      expect(await AsyncStorage.getItem(LABELS_CACHE_KEY)).toBe(JSON.stringify(cached));
+    },
+  );
+
+  it.each(malformedCases)(
+    'when fetch fails due to %s with no cache: (i) no throw reaches UI, (iv) bundled defaults render from fallback, (iii) AsyncStorage is not overwritten',
+    async (_label, error) => {
+      await AsyncStorage.clear();
+      mockGetLabels.mockRejectedValue(error);
+
+      let root: any;
+      expect(() => {
+        root = render(
+          <LabelsProvider>
+            <LoginTitleProbe />
+          </LabelsProvider>,
+        );
+      }).not.toThrow();
+
+      await act(async () => {
+        await flush();
+      });
+
+      // (i) & (iv) No throw reached UI and bundled defaults render (fallback)
+      expect(texts(root)).toEqual([FALLBACK_LABELS['mob.login.title']]);
+      // (iii) AsyncStorage has no cache written
+      expect(await AsyncStorage.getItem(LABELS_CACHE_KEY)).toBeNull();
+    },
+  );
 
   it('getLabel safely falls back to FALLBACK_LABELS when labels map is undefined or null', () => {
     expect(getLabel(undefined as unknown as Record<string, string>, 'mob.login.title')).toBe(

@@ -35,11 +35,12 @@ export async function getLabels(options?: RequestOptions): Promise<LabelMap> {
   if (
     data &&
     typeof data === 'object' &&
+    !Array.isArray(data) &&
     data.labels &&
     typeof data.labels === 'object' &&
     !Array.isArray(data.labels)
   ) {
     return data.labels;
   }
-  return {};
+  throw new Error('Malformed labels response from /api/labels');
 }

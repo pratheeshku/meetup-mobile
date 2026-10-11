@@ -53,12 +53,12 @@ describe('getLabels', () => {
     ['a string HTML body', '<!DOCTYPE html><html><body>502 Bad Gateway</body></html>'],
     ['null', null],
     ['labels: null', { labels: null }],
-  ])('returns an empty object when the response is %s without throwing', async (_label, responseData) => {
+    ['an array', []],
+    ['labels: array', { labels: [] }],
+  ])('throws an Error when the response is %s', async (_label, responseData) => {
     mockedGet.mockResolvedValueOnce({ data: responseData });
 
-    const labels = await getLabels();
-
-    expect(labels).toEqual({});
+    await expect(getLabels()).rejects.toThrow('Malformed labels response from /api/labels');
   });
 });
 
