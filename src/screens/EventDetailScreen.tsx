@@ -9,7 +9,6 @@ import {
   PermissionsAndroid,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -41,6 +40,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import NumberField from '../components/NumberField';
 import ScreenContainer from '../components/ScreenContainer';
 import WizardFooter from '../components/WizardFooter';
@@ -466,7 +466,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           onBack={handleBackEditStep}
         />
 
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScreen contentContainerStyle={styles.scrollContent}>
           {editStep === 1 && (
             <View style={styles.stepContent}>
               <Text style={styles.stepHeading}>{t('mob.edit_game.step_details')}</Text>
@@ -741,7 +741,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           )}
 
           {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
-        </ScrollView>
+        </KeyboardAwareScreen>
 
         {editStep === 4 ? (
           <View style={styles.footerContainer}>
@@ -779,7 +779,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.detailScroll} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScreen contentContainerStyle={styles.detailScroll}>
         {/* Blue Header Banner */}
         <View style={styles.detailHeaderBanner}>
           <View style={styles.bannerTopNav}>
@@ -928,7 +928,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
           {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
         </View>
-      </ScrollView>
+      </KeyboardAwareScreen>
 
       {/* Delete Game Bottom Sheet (DeleteGame.png) */}
       <Modal visible={isDeleteModalOpen} transparent animationType="slide">
