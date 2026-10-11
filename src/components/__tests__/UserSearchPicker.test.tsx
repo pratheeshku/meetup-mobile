@@ -58,6 +58,14 @@ afterEach(() => {
 });
 
 describe('query threshold and debounce', () => {
+  it('searches for suggestions on mount with empty query', () => {
+    render(<UserSearchPicker onSelect={jest.fn()} />);
+    expect(mockSearchUsers).toHaveBeenCalledWith(
+      { q: '', excludeGroupId: undefined, excludeEventId: undefined, excludeTeamId: undefined },
+      expect.anything(),
+    );
+  });
+
   it('searches a one-character query after the debounce', async () => {
     const root = render(<UserSearchPicker onSelect={jest.fn()} />);
     await act(async () => {});
