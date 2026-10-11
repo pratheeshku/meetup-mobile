@@ -103,6 +103,7 @@ describe('RegisterScreen', () => {
       password: 'password123',
       display_name: 'John Doe',
       nickname: 'johndoe',
+      terms_version: expect.any(String),
     });
 
     const sentBody = (apiClient.post as jest.Mock).mock.calls[0][1];
@@ -111,6 +112,7 @@ describe('RegisterScreen', () => {
       'email',
       'nickname',
       'password',
+      'terms_version',
     ]);
     expect(sentBody).not.toHaveProperty('mobile_number');
     expect(sentBody).not.toHaveProperty('mobile_consent_version');

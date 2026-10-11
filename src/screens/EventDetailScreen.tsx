@@ -41,6 +41,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import NumberField from '../components/NumberField';
 import ScreenContainer from '../components/ScreenContainer';
 import WizardFooter from '../components/WizardFooter';
@@ -154,7 +155,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         getEventParticipants(eventId).catch(() => []),
       ]);
       setEvent(data);
-      setParticipants(parts);
+      setParticipants(Array.isArray(parts) ? parts : []);
     } catch {
       setLoadError(t('mob.game_detail.load_error'));
     } finally {
@@ -526,7 +527,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           onBack={handleBackEditStep}
         />
 
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScreen contentContainerStyle={styles.scrollContent}>
           {editStep === 1 && (
             <View style={styles.stepContent}>
               <Text style={styles.stepHeading}>{t('mob.edit_game.step_details')}</Text>
@@ -801,7 +802,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           )}
 
           {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
-        </ScrollView>
+        </KeyboardAwareScreen>
 
         {editStep === 4 ? (
           <View style={styles.footerContainer}>

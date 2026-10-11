@@ -49,7 +49,7 @@ describe('getProfile', () => {
       nickname: 'pat',
       display_name: 'Pat H',
       is_admin: false,
-      skill_levels: [{ sport: 'football', skill_level: 'Intermediate' }],
+      skill_levels: [{ sport: 'football', skill_level: 'intermediate' }],
     });
     // avatar_url is resolved from avatar_storage_key via getAvatarUrl()
     // (DES-MEETUP-ADDENDUM-profile-photo §5, §10.1 — UNBLOCKED).

@@ -107,7 +107,8 @@ describe('NotificationBanner', () => {
       node => StyleSheet.flatten(node.props.style).color as string,
     );
 
-    expect(textColors.length).toBeGreaterThanOrEqual(3);
+    // Title and body. Dismiss is a CloseIcon, not a third text node.
+    expect(textColors).toHaveLength(2);
     textColors.forEach(color => {
       expect(contrastRatio(color, colors.textPrimary)).toBeGreaterThanOrEqual(4.5);
     });

@@ -15,6 +15,7 @@ import type { FakeBackend } from '../../test-utils/apiHarness';
 import { apiClient, endSession, refreshAccessToken, SessionEndedError } from '../client';
 import { authEvents } from '../authEvents';
 import { clearCookieJar } from '../cookies';
+import { clearTokens } from '../../storage/tokens';
 
 jest.mock('../cookies', () => ({ clearCookieJar: jest.fn() }));
 
@@ -50,11 +51,12 @@ async function until(condition: () => boolean, tries = 100): Promise<void> {
   }
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
   jest.spyOn(console, 'log').mockImplementation(() => {});
   mockClearCookieJar.mockResolvedValue(true);
   backend = installFakeBackend();
+  await clearTokens();
   backend.stored[ACCESS_SERVICE] = 'old';
   expired = jest.fn();
   unsubscribe = authEvents.on('auth-expired', expired);

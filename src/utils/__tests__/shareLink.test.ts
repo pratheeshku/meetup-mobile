@@ -4,10 +4,11 @@
 import { Clipboard, Linking, Share } from 'react-native';
 
 import { ENV } from '../../../config/env';
+import { FALLBACK_LABELS } from '../../labels/fallbackLabels';
+import { getLabel } from '../../labels/LabelsContext';
 import {
-  composeShareMessage,
   copyLinkToClipboard,
-  getEventShareUrl,
+  getShareUrl,
   shareGeneric,
   shareToWhatsApp,
 } from '../shareLink';
@@ -17,51 +18,32 @@ describe('shareLink utilities', () => {
     jest.clearAllMocks();
   });
 
-  describe('getEventShareUrl', () => {
-    it('appends ?ref=<user_id> when currentUserId is provided', () => {
-      const url = getEventShareUrl('event-123', 'user-abc');
+  describe('getShareUrl', () => {
+    it('returns the API base URL plus the literal /public/share path', () => {
+      const url = getShareUrl();
       const expectedBase = ENV.API_BASE_URL.replace(/\/+$/, '');
-      expect(url).toBe(`${expectedBase}/#event-detail/event-123?ref=user-abc`);
+      expect(url).toBe(`${expectedBase}/public/share`);
     });
 
-    it('returns canonical event URL without ?ref= when currentUserId is omitted', () => {
-      const url = getEventShareUrl('event-123');
-      const expectedBase = ENV.API_BASE_URL.replace(/\/+$/, '');
-      expect(url).toBe(`${expectedBase}/#event-detail/event-123`);
-    });
-
-    it('URL-encodes user_id in the ?ref= query parameter', () => {
-      const url = getEventShareUrl('event-123', 'user with spaces&symbols');
-      const expectedBase = ENV.API_BASE_URL.replace(/\/+$/, '');
-      expect(url).toBe(`${expectedBase}/#event-detail/event-123?ref=user%20with%20spaces%26symbols`);
-    });
-  });
-
-  describe('composeShareMessage', () => {
-    it('formats default copy matching Decision 7 template verbatim', () => {
-      const msg = composeShareMessage(
-        'Pratheesh',
-        'Sunday Badminton',
-        'https://meetups.duckdns.org/#event-detail/ev-1?ref=u-1',
+    it('builds the share message from the mob.share.message label (FEEDBACK-001 AD-6)', () => {
+      const url = getShareUrl();
+      expect(FALLBACK_LABELS['mob.share.message']).toBe(
+        'Join me on Shuttlr! Download the app: {link}',
       );
-      expect(msg).toBe(
-        'Pratheesh invited you to Sunday Badminton on Shuttlr — https://meetups.duckdns.org/#event-detail/ev-1?ref=u-1',
+      expect(getLabel(FALLBACK_LABELS, 'mob.share.message', { link: url })).toBe(
+        `Join me on Shuttlr! Download the app: ${url}`,
       );
-      // Explicitly check for the em-dash (\u2014)
-      expect(msg).toContain(' \u2014 ');
     });
   });
 
   describe('shareGeneric', () => {
-    it('calls Share.share with message and url', async () => {
+    it('calls Share.share with message only', async () => {
       const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
       await shareGeneric({
         message: 'Join us!',
-        url: 'https://meetups.duckdns.org/#event-detail/1?ref=u-1',
       });
       expect(spy).toHaveBeenCalledWith({
         message: 'Join us!',
-        url: 'https://meetups.duckdns.org/#event-detail/1?ref=u-1',
       });
     });
   });

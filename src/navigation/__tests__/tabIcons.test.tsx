@@ -9,7 +9,7 @@ import { StyleSheet } from 'react-native';
 import { GamesIcon, GroupsIcon, HomeIcon, ProfileIcon } from '../../components/icons/DashboardIcons';
 import { render, texts } from '../../test-utils/render';
 import { dash, dashSize } from '../../theme/dashboardTheme';
-import { TAB_ICONS, TAB_LABELS, TabIcon, TabLabel } from '../tabIcons';
+import { TAB_ICONS, TAB_LABEL_KEYS, TabIcon, TabLabel } from '../tabIcons';
 
 describe('tab icon and label tables', () => {
   it('maps each tab to its Appendix A icon, with the gamepad for the Games tab', () => {
@@ -21,14 +21,14 @@ describe('tab icon and label tables', () => {
     });
   });
 
-  it('renames the Tournaments tab to "Games" and keeps the other labels', () => {
-    expect(TAB_LABELS).toEqual({
-      Home: 'Home',
-      Groups: 'Groups',
-      Tournaments: 'Games',
-      Profile: 'Profile',
+  it('maps the Tournaments route to the Games label key', () => {
+    expect(TAB_LABEL_KEYS).toEqual({
+      Home: 'mob.tabs.home',
+      Groups: 'mob.tabs.groups',
+      Tournaments: 'mob.tabs.games',
+      Profile: 'mob.tabs.profile',
     });
-    expect(Object.values(TAB_LABELS)).not.toContain('Tournaments');
+    expect(Object.values(TAB_LABEL_KEYS)).not.toContain('Tournaments');
   });
 });
 

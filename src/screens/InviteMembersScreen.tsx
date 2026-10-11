@@ -18,6 +18,7 @@ import { withCorrelationId } from '../api/correlationId';
 import { inviteMember } from '../api/groups';
 import { searchUsers } from '../api/users';
 import { SearchIcon } from '../components/icons/ActionIcons';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
 import { useT } from '../labels/LabelsContext';
@@ -149,9 +150,8 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView
+      <KeyboardAwareScreen
         contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.searchContainer}>
           <SearchIcon size={20} color={colors.textMuted} />
@@ -247,7 +247,7 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
         <Text style={styles.helperText}>{t('mob.invite.suggested_players_hint')}</Text>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      </ScrollView>
+      </KeyboardAwareScreen>
 
       <WizardFooter
         nextLabel={t('mob.invite.create_group_button')}

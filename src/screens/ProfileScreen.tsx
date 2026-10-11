@@ -221,9 +221,9 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           },
         });
       }
-      Alert.alert(`Diagnostics is ${enabled ? 'ON' : 'OFF'}`, '', buttons);
+      Alert.alert(t(enabled ? 'mob.diagnostics.title_on' : 'mob.diagnostics.title_off'), '', buttons);
     }
-  }, []);
+  }, [t]);
 
   const loadData = useCallback(async () => {
     try {

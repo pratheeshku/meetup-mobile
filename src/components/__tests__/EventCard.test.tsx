@@ -15,6 +15,7 @@ import ReactTestRenderer from 'react-test-renderer';
 import { getSports } from '../../api/sports';
 import EventCard from '../EventCard';
 import type { Event } from '../../types/event';
+import { colors } from '../../theme/tokens';
 
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 
@@ -88,7 +89,7 @@ describe('EventCard', () => {
     expect(t).toContain('Badminton');
     expect(t).toContain('Sunday Morning Doubles');
     expect(t).toContain('7/8');
-    expect(t).toContain('Join →');
+    expect(t).toContain('Join');
   });
 
   describe('Sport tag pill and color palette', () => {
@@ -129,14 +130,14 @@ describe('EventCard', () => {
       const renderer = render({ organiser_id: 'user-me' });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('Hosting');
-      expect(t).toContain('Manage →');
+      expect(t).toContain('Manage');
     });
 
     it('shows "Waitlisted" and "View →" when current user is waitlisted', () => {
       const renderer = render({ current_user_rsvp_status: 'waitlisted' });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('Waitlisted');
-      expect(t).toContain('View →');
+      expect(t).toContain('View');
     });
 
     it('shows "1 left" and "View →" when user joined and 1 spot remains', () => {
@@ -147,7 +148,7 @@ describe('EventCard', () => {
       });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('1 left');
-      expect(t).toContain('View →');
+      expect(t).toContain('View');
     });
 
     it('shows "Open" and "Join →" when user is not joined and capacity has space', () => {
@@ -158,7 +159,7 @@ describe('EventCard', () => {
       });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('Open');
-      expect(t).toContain('Join →');
+      expect(t).toContain('Join');
     });
   });
 
@@ -190,6 +191,37 @@ describe('EventCard', () => {
           StyleSheet.flatten(node.props.style)?.width === '50%',
       );
       expect(fills.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('contrast (WCAG AA 4.5:1)', () => {
+    function contrastRatio(a: string, b: string): number {
+      const channel = (hex: string, start: number): number => {
+        const value = parseInt(hex.slice(start, start + 2), 16) / 255;
+        return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+      };
+      const lum = (hex: string): number =>
+        0.2126 * channel(hex, 1) + 0.7152 * channel(hex, 3) + 0.0722 * channel(hex, 5);
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    // The artboard card no longer paints the old primary/success/warningLight
+    // pills. These are the pairs it paints now; each measured >= 4.5:1.
+    const PAIRS: Array<[string, string, string]> = [
+      ['sport label on badminton', colors.white, '#2A7B72'],
+      ['sport label on football', colors.white, '#835C2B'],
+      ['sport label on basketball', colors.white, '#67509B'],
+      ['sport label on tennis', colors.white, '#A54362'],
+      ['title on the card', colors.textPrimary, colors.surface],
+      ['date on the card', colors.textMuted, colors.surface],
+      ['initials on the avatar', colors.textSecondary, '#EBE7E0'],
+      ['action on the card', colors.accent, colors.surface],
+      ['waitlisted status on the card', '#67509B', colors.surface],
+    ];
+
+    it.each(PAIRS)('%s', (_name, text, background) => {
+      expect(contrastRatio(text, background)).toBeGreaterThanOrEqual(4.5);
     });
   });
 

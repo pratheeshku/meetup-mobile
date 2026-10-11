@@ -46,6 +46,8 @@ const USER: UserSearchResult = {
 beforeEach(() => {
   jest.useFakeTimers();
   mockSearchUsers.mockReset();
+  // Empty text loads the default list on mount (FEEDBACK-001 invite search).
+  mockSearchUsers.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -56,16 +58,31 @@ afterEach(() => {
 });
 
 describe('query threshold and debounce', () => {
-  it('does not search below 2 characters', () => {
+  it('searches for suggestions on mount with empty query', () => {
+    render(<UserSearchPicker onSelect={jest.fn()} />);
+    expect(mockSearchUsers).toHaveBeenCalledWith(
+      { q: '', excludeGroupId: undefined, excludeEventId: undefined, excludeTeamId: undefined },
+      expect.anything(),
+    );
+  });
+
+  it('searches a one-character query after the debounce', async () => {
     const root = render(<UserSearchPicker onSelect={jest.fn()} />);
+    await act(async () => {});
+    mockSearchUsers.mockClear();
     type(root, 'a');
-    act(() => jest.advanceTimersByTime(DEBOUNCE_MS));
-    expect(mockSearchUsers).not.toHaveBeenCalled();
+    await settle();
+    expect(mockSearchUsers).toHaveBeenCalledTimes(1);
+    expect(mockSearchUsers).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'a' }),
+      expect.anything(),
+    );
   });
 
   it('searches once 300ms after typing stops, not on every keystroke', async () => {
-    mockSearchUsers.mockResolvedValue([]);
     const root = render(<UserSearchPicker onSelect={jest.fn()} />);
+    await act(async () => {});
+    mockSearchUsers.mockClear();
     type(root, 'sa');
     act(() => jest.advanceTimersByTime(DEBOUNCE_MS - 50));
     type(root, 'sam');
@@ -100,12 +117,12 @@ describe('results', () => {
     expect(texts(root)).toEqual(expect.arrayContaining(['sam99', 'Sam Smith']));
   });
 
-  it('shows "No users found." when the search comes back empty', async () => {
+  it('shows "No matches" when the search comes back empty', async () => {
     mockSearchUsers.mockResolvedValue([]);
     const root = render(<UserSearchPicker onSelect={jest.fn()} />);
     type(root, 'zzz');
     await settle();
-    expect(texts(root)).toContain('No users found.');
+    expect(texts(root)).toContain('No matches');
   });
 
   it('shows an error message when the search fails', async () => {
@@ -147,7 +164,7 @@ describe('results', () => {
         node.props.accessibilityRole === 'button' &&
         node.props.accessibilityLabel === 'sam99, Sam Smith, already invited',
     );
-    expect(row.props.accessibilityState).toEqual({ disabled: true });
+    expect(row.props.accessibilityState).toEqual({ disabled: true, busy: false });
     act(() => row.props.onPress());
     expect(onSelect).not.toHaveBeenCalled();
   });
@@ -156,8 +173,9 @@ describe('results', () => {
 describe('stale-response guard', () => {
   it('a slow earlier search can never overwrite a newer one’s results', async () => {
     let resolveFirst!: (value: UserSearchResult[]) => void;
-    mockSearchUsers.mockReturnValueOnce(new Promise(resolve => (resolveFirst = resolve)));
     const root = render(<UserSearchPicker onSelect={jest.fn()} />);
+    await act(async () => {});
+    mockSearchUsers.mockReturnValueOnce(new Promise(resolve => (resolveFirst = resolve)));
 
     type(root, 'aa');
     await act(async () => {
@@ -186,14 +204,14 @@ describe('email invite affordance (Decision 22 & 23)', () => {
     type(root, 'newuser@example.com');
     await settle();
 
-    expect(texts(root)).not.toContain('No users found.');
-    expect(texts(root)).toContain('✉️ Invite newuser@example.com as new member');
+    expect(texts(root)).not.toContain('No matches');
+    expect(texts(root)).toContain('Invite newuser@example.com as new group member');
     expect(texts(root)).toContain('Send an email invitation to join');
 
     const emailRow = root.find(
       node =>
         node.props.accessibilityRole === 'button' &&
-        node.props.accessibilityLabel === 'Invite newuser@example.com as new member',
+        node.props.accessibilityLabel === 'Invite newuser@example.com as new group member',
     );
     act(() => emailRow.props.onPress());
 
@@ -214,7 +232,7 @@ describe('email invite affordance (Decision 22 & 23)', () => {
     type(root, 'player@example.com');
     await settle();
 
-    expect(texts(root)).toContain('✉️ Invite player@example.com as new participant');
+    expect(texts(root)).toContain('Invite player@example.com as new participant');
   });
 
   it('does NOT show affordance when query is an invalid email address', async () => {
@@ -224,8 +242,8 @@ describe('email invite affordance (Decision 22 & 23)', () => {
     type(root, 'not-an-email');
     await settle();
 
-    expect(texts(root)).toContain('No users found.');
-    expect(texts(root)).not.toContain('Invite not-an-email as new member');
+    expect(texts(root)).toContain('No matches');
+    expect(texts(root)).not.toContain('Invite not-an-email as new group member');
   });
 
   it('does NOT show affordance when search returns matches (Decision 22: email not displayed in results)', async () => {
@@ -238,7 +256,7 @@ describe('email invite affordance (Decision 22 & 23)', () => {
     // Matching user is shown with nickname and display name
     expect(texts(root)).toEqual(expect.arrayContaining(['sam99', 'Sam Smith']));
     // Affordance is NOT shown
-    expect(texts(root)).not.toContain('Invite sam@example.com as new member');
+    expect(texts(root)).not.toContain('Invite sam@example.com as new group member');
     // Matched email is NEVER displayed in results (Decision 22)
     expect(texts(root)).not.toContain('sam@example.com');
   });
@@ -250,7 +268,18 @@ describe('email invite affordance (Decision 22 & 23)', () => {
     type(root, 'alone@example.com');
     await settle();
 
-    expect(texts(root)).toContain('No users found.');
-    expect(texts(root)).not.toContain('Invite alone@example.com as new member');
+    expect(texts(root)).toContain('No matches');
+    expect(texts(root)).not.toContain('Invite alone@example.com as new group member');
+  });
+
+  it('renders without throwing when searchUsers resolves undefined', async () => {
+    mockSearchUsers.mockResolvedValue(undefined as unknown as UserSearchResult[]);
+    const root = render(<UserSearchPicker onSelect={jest.fn()} />);
+
+    type(root, 'alex');
+    await settle();
+
+    expect(root).toBeDefined();
   });
 });
+

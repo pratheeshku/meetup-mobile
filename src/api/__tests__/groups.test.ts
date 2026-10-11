@@ -64,7 +64,7 @@ describe('getMyGroups', () => {
     });
     // Real GroupResponse has no member_count/owner_nickname — must not
     // be fabricated for list items (flagged as a gap, not guessed).
-    expect(result.items[0].member_count).toBeUndefined();
+    expect(result.items[0].member_count).toBeNull();
     expect(result.items[0].owner_nickname).toBeUndefined();
   });
 

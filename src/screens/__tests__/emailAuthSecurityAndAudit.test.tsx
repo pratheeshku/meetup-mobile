@@ -100,6 +100,7 @@ describe('Email Auth Security & Audit (DES-MEETUP-ADDENDUM-email-auth AD-5, R-11
       password: 'password123',
       display_name: 'Bob',
       nickname: 'bobbie',
+      terms_version: expect.any(String),
     });
 
     // verifyEmail

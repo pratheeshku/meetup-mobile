@@ -94,7 +94,12 @@ function rawEvent(overrides: Record<string, unknown> = {}): Record<string, unkno
 }
 
 async function mount(raw: Record<string, unknown>): Promise<Instance> {
-  mockGet.mockResolvedValue({ data: raw });
+  mockGet.mockImplementation((url: string) => {
+    if (url.includes('/participants')) {
+      return Promise.resolve({ data: [] });
+    }
+    return Promise.resolve({ data: raw });
+  });
   const props = {
     route: { key: 'k', name: 'EventDetail', params: { eventId: 'evt-1' } },
     navigation: { goBack },
@@ -143,6 +148,21 @@ it('does not render Cost row when estimated_cost_cents and cost are null', async
     rawEvent({ estimated_cost_cents: null, cost: null }),
   );
   expect(has(root, 'Cost')).toBe(false);
+});
+
+it('renders without throwing when the participants endpoint resolves with a non-array', async () => {
+  mockGet.mockImplementation((url: string) => {
+    if (url.includes('/participants')) {
+      return Promise.resolve({ data: { notAnArray: true } });
+    }
+    return Promise.resolve({ data: rawEvent() });
+  });
+  const props = {
+    route: { key: 'k', name: 'EventDetail', params: { eventId: 'evt-1' } },
+    navigation: { goBack },
+  } as unknown as React.ComponentProps<typeof EventDetailScreen>;
+  const root = await renderAsync(<EventDetailScreen {...props} />);
+  expect(root).toBeDefined();
 });
 
 describe('organiser (organizer_id === signed-in user id)', () => {
@@ -304,7 +324,12 @@ describe('BUILD 1: Event Cancel Flow', () => {
     const cancelledRaw = rawEvent({ organizer_id: 'user-me', status: 'cancelled' });
     mockPost.mockResolvedValueOnce({ data: cancelledRaw });
     // Next GET returns cancelled event
-    mockGet.mockResolvedValue({ data: cancelledRaw });
+    mockGet.mockImplementation((url: string) => {
+      if (url.includes('/participants')) {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: cancelledRaw });
+    });
 
     await act(async () => {
       pressableLabelled(root, 'Cancel Event').props.onPress();

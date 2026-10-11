@@ -394,7 +394,7 @@ describe('GroupRow (AD-8)', () => {
     const root = render(<GroupRow group={group} onPress={jest.fn()} />);
     expect(root.findAllByType(GroupsIcon)).toHaveLength(1);
     expect(root.findAllByType(SportIcon)).toHaveLength(0);
-    expect(texts(root)).toContain('8 members');
+    expect(texts(root)).toContain('8 group members');
   });
 
   it('a Team shows its sport icon, plus the sport in the meta', () => {
@@ -410,7 +410,7 @@ describe('GroupRow (AD-8)', () => {
     );
     expect(root.findAllByType(GroupsIcon)).toHaveLength(0);
     expect(root.findAllByType(SportIcon)[0].props.iconKey).toBe('tennis');
-    expect(texts(root)).toContain('8 members · Tennis');
+    expect(texts(root)).toContain('8 group members · Tennis');
   });
 
   it('omits the member count when the list item does not carry one', () => {

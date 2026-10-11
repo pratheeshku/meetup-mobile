@@ -38,7 +38,17 @@ describe('searchUsers', () => {
       correlationId: 'cid',
     });
     expect(results).toEqual([
-      { id: 'u-1', display_name: 'Sam Smith', nickname: 'sam99', pending: false },
+      {
+        id: 'u-1',
+        display_name: 'Sam Smith',
+        nickname: 'sam99',
+        pending: false,
+        image_url: null,
+        has_group_info: false,
+        in_my_groups: false,
+        shared_group: null,
+        shared_group_count: 0,
+      },
     ]);
   });
 

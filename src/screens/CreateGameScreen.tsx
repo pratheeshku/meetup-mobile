@@ -7,7 +7,6 @@ import {
   Image,
   PermissionsAndroid,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -53,6 +52,7 @@ import {
   TargetIcon,
   TrophyIcon,
 } from '../components/icons/SharedIcons';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import NumberField from '../components/NumberField';
 import SelectableCard from '../components/SelectableCard';
 import WizardFooter from '../components/WizardFooter';
@@ -993,9 +993,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         onClose={step === 1 ? handleBack : undefined}
       />
 
-      <ScrollView
+      <KeyboardAwareScreen
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
       >
         {sportsError ? (
           <InlineError message={t('mob.common.sports_load_error')} onRetry={reloadSports} />
@@ -1008,7 +1007,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         {step === 6 && renderStep6()}
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      </ScrollView>
+      </KeyboardAwareScreen>
 
       {step === 6 ? (
         <View style={styles.footerContainer}>

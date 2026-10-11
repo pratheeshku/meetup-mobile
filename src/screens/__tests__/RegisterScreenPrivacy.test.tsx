@@ -19,6 +19,7 @@ jest.mock('../../../config/appConfig.json', () => ({
   default: { privacyPolicyUrl: '' },
 }));
 jest.mock('../../api/client', () => ({ apiClient: { post: jest.fn() } }));
+jest.mock('../../components/auth/SocialTermsNotice', () => () => null);
 
 const mount = (): Promise<Instance> =>
   renderAsync(
