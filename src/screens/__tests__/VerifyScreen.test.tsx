@@ -12,12 +12,32 @@ jest.mock('../../api/client', () => ({
   },
 }));
 
+const mockShowCompletion = jest.fn();
+jest.mock('../../navigation/showCompletion', () => ({
+  showCompletion: (...args: unknown[]) => mockShowCompletion(...args),
+}));
+
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 const mockNavigation = {
   navigate: mockNavigate,
   goBack: mockGoBack,
   canGoBack: jest.fn(() => true),
+};
+
+// Literal expected payload (labels from the completion-screen spec), not built from label keys.
+const expectAccountCreatedSummary = (email: string): void => {
+  expect(mockShowCompletion).toHaveBeenCalledTimes(1);
+  expect(mockShowCompletion).toHaveBeenCalledWith({
+    flow: 'account_created',
+    rows: [
+      { label: 'Email', value: email },
+      { label: 'Status', value: 'Verified' },
+    ],
+    primary: 'signin',
+  });
+  // No auto-login and no direct hop to Login: the completion screen owns the handoff.
+  expect(mockNavigate).not.toHaveBeenCalled();
 };
 
 const mount = (params: { email?: string; explanation?: string } = {}): Promise<Instance> =>
@@ -83,7 +103,7 @@ describe('VerifyScreen', () => {
     expect(texts(root)).toContain('Please verify your email before signing in.');
   });
 
-  it('[Execute] the Verify flow ends on the login screen with success message and without auto-login', async () => {
+  it('[Execute] the Verify flow ends on the completion summary (account_created) with a Sign in button, without auto-login', async () => {
     (apiClient.post as jest.Mock).mockResolvedValueOnce({ data: {} });
     const root = await mount({ email: 'target@example.com' });
 
@@ -97,9 +117,7 @@ describe('VerifyScreen', () => {
       email: 'target@example.com',
       code: '123456',
     });
-    expect(mockNavigate).toHaveBeenCalledWith('Login', {
-      successMessage: 'Email verified. Sign in.',
-    });
+    expectAccountCreatedSummary('target@example.com');
   });
 
   it('[Execute] failed code shows "That code didn\'t work. Check it or request a new one."', async () => {
@@ -167,9 +185,7 @@ describe('VerifyScreen', () => {
       pressableWithText(root, 'Retry').props.onPress();
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith('Login', {
-      successMessage: 'Email verified. Sign in.',
-    });
+    expectAccountCreatedSummary('target@example.com');
   });
 
   it('[Execute] Resend is always enabled and calls the resend endpoint', async () => {
@@ -312,9 +328,7 @@ describe('VerifyScreen', () => {
       pressableWithText(root, 'Retry').props.onPress();
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith('Login', {
-      successMessage: 'Email verified. Sign in.',
-    });
+    expectAccountCreatedSummary('target@example.com');
   });
 
   it('[Execute] unreachable server during resend shows inline error with Retry and does not start cooldown', async () => {
