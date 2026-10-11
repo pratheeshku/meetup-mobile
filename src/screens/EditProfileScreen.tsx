@@ -315,11 +315,15 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
           value: nextMobile ? maskMobileLast4(nextMobile) : t('mob.done.v_removed'),
         });
       }
-      showCompletion({
-        flow: 'profile_updated',
-        rows,
-        primary: 'profile',
-      });
+      if (rows.length === 0) {
+        navigation.goBack();
+      } else {
+        showCompletion({
+          flow: 'profile_updated',
+          rows,
+          primary: 'profile',
+        });
+      }
     } catch (e: any) {
       setSaveError(getApiErrorMessage(e, t('mob.profile.save_error')));
     } finally {

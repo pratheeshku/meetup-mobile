@@ -31,6 +31,12 @@ import type { LabelKey } from '../labels/fallbackLabels';
 type StepOutcome = 'saved' | 'skipped';
 type TrackedStep = 'skills' | 'notifications' | 'mobile';
 
+const STEP_ROW_LABEL: Record<TrackedStep, LabelKey> = {
+  skills: 'mob.done.f_skills',
+  notifications: 'mob.done.f_notifications',
+  mobile: 'mob.done.f_mobile',
+};
+
 const STEP_TITLE_KEYS: Record<OnboardingStepId, LabelKey> = {
   skills: 'mob.onboarding.title_skills',
   notifications: 'mob.onboarding.title_notifications',
@@ -58,6 +64,7 @@ export default function OnboardingScreen({
   const [index, setIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [stepOutcomes, setStepOutcomes] = useState<Partial<Record<TrackedStep, StepOutcome>> | null>(null);
+  const [presentedSteps, setPresentedSteps] = useState<TrackedStep[]>([]);
   const outcomesRef = useRef<Partial<Record<TrackedStep, StepOutcome>>>({});
   const finished = useRef(false);
 
@@ -92,7 +99,10 @@ export default function OnboardingScreen({
     [stepFlags, hasMobileNumber, mobileConfig.status],
   );
 
-  const finish = useCallback(async (outcomes: Partial<Record<TrackedStep, StepOutcome>>) => {
+  const finish = useCallback(async (
+    outcomes: Partial<Record<TrackedStep, StepOutcome>>,
+    presented: TrackedStep[],
+  ) => {
     setFinishing(true);
     try {
       await withCorrelationId(correlationId => completeOnboarding({ correlationId }));
@@ -101,6 +111,7 @@ export default function OnboardingScreen({
       // for this session; the server flag stays unset so the flow returns
       // on the next launch.
     }
+    setPresentedSteps(presented);
     setStepOutcomes(outcomes);
     setFinishing(false);
   }, []);
@@ -113,7 +124,11 @@ export default function OnboardingScreen({
     }
     outcomesRef.current = next;
     if (index + 1 >= steps.length) {
-      finish(next);
+      const presented = steps.filter(
+        (stepId): stepId is TrackedStep =>
+          stepId === 'skills' || stepId === 'notifications' || stepId === 'mobile',
+      );
+      finish(next, presented);
     } else {
       setIndex(index + 1);
     }
@@ -121,8 +136,6 @@ export default function OnboardingScreen({
 
   // The mobile step needs the config settled so the step list is stable.
   if (stepOutcomes) {
-    const outcomeValue = (step: TrackedStep): string =>
-      t(stepOutcomes[step] === 'saved' ? 'mob.done.v_saved' : 'mob.done.v_skipped');
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]} testID="onboarding-screen">
         <CompletionScreen
@@ -130,11 +143,10 @@ export default function OnboardingScreen({
           flow="onboarding_done"
           onPrimary={complete}
           primary="get_started"
-          rows={[
-            { label: t('mob.done.f_skills'), value: outcomeValue('skills') },
-            { label: t('mob.done.f_notifications'), value: outcomeValue('notifications') },
-            { label: t('mob.done.f_mobile'), value: outcomeValue('mobile') },
-          ]}
+          rows={presentedSteps.map(step => ({
+            label: t(STEP_ROW_LABEL[step]),
+            value: t(stepOutcomes[step] === 'saved' ? 'mob.done.v_saved' : 'mob.done.v_skipped'),
+          }))}
         />
       </View>
     );

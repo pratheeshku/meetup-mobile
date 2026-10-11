@@ -159,11 +159,15 @@ export default function EditSkillLevelsScreen({ navigation }: Props): React.JSX.
           rows.push({ label: sport.display_name, value: t('mob.done.v_removed') });
         }
       }
-      showCompletion({
-        flow: 'skills_updated',
-        rows,
-        primary: 'profile',
-      });
+      if (rows.length === 0) {
+        navigation.goBack();
+      } else {
+        showCompletion({
+          flow: 'skills_updated',
+          rows,
+          primary: 'profile',
+        });
+      }
     } catch (error) {
       setSaveError(getApiErrorMessage(error, t('mob.profile.skill_save_error')));
     } finally {

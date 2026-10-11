@@ -51,6 +51,7 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
   const [submitted, setSubmitted] = useState(false);
   const [sentToEmail, setSentToEmail] = useState('');
   const [isOAuthOnly, setIsOAuthOnly] = useState(false);
+  const [oauthOnlyMessage, setOAuthOnlyMessage] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
@@ -73,9 +74,13 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
     setIsSubmitting(true);
     try {
       const response = await requestPasswordReset(trimmedEmail);
-      // Same copy for every outcome, including oauth_only, so the message
-      // does not reveal whether an account exists.
-      setIsOAuthOnly(response?.code === 'oauth_only');
+      if (response?.code === 'oauth_only') {
+        setIsOAuthOnly(true);
+        setOAuthOnlyMessage(response.detail ? response.detail : null);
+      } else {
+        setIsOAuthOnly(false);
+        setOAuthOnlyMessage(null);
+      }
       setSentToEmail(trimmedEmail);
       setSubmitted(true);
     } catch (err) {
@@ -131,11 +136,11 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
 
       {submitted ? (
         <View style={styles.confirmationContainer}>
-          <Text style={styles.confirmationText}>
-            {t('mob.forgot.sent_to', { email: sentToEmail })}
-          </Text>
           {isOAuthOnly ? (
             <>
+              <Text style={styles.confirmationText}>
+                {oauthOnlyMessage ?? t('mob.forgot.oauth_only')}
+              </Text>
               {googleError ? <Text style={styles.error}>{googleError}</Text> : null}
 
               {retryError && retryAction ? (
@@ -162,11 +167,16 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
               />
             </>
           ) : (
-            <Button
-              label={t('mob.forgot.back_to_sign_in')}
-              onPress={() => navigation.navigate('Login')}
-              style={styles.button}
-            />
+            <>
+              <Text style={styles.confirmationText}>
+                {t('mob.forgot.sent_to', { email: sentToEmail })}
+              </Text>
+              <Button
+                label={t('mob.forgot.back_to_sign_in')}
+                onPress={() => navigation.navigate('Login')}
+                style={styles.button}
+              />
+            </>
           )}
         </View>
       ) : (

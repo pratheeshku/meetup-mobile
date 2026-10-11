@@ -13,7 +13,6 @@ import { CommonActions } from '@react-navigation/native';
 
 import { navigationRef } from '../notifications/notificationRouting';
 import { clearGroupCreateDraft } from './groupCreateDraft';
-import { rootNavigationRef } from './rootNavigationRef';
 
 export type CompletionFlow =
   | 'game_created'
@@ -55,13 +54,6 @@ export interface CompletionRequest {
   onPrimary?: () => void;
 }
 
-type TabName = 'Home' | 'Groups' | 'Tournaments' | 'Profile';
-
-interface StackRoute {
-  name: string;
-  params?: object;
-}
-
 type Action =
   | { button: CompletionPrimary }
   | { button: CompletionSecondaryButton; id?: string };
@@ -96,8 +88,8 @@ export function showCompletion(request: CompletionRequest): void {
     authHandoffClaimed = false;
   }
   emit();
-  if (rootNavigationRef.isReady()) {
-    rootNavigationRef.navigate('Completion');
+  if (navigationRef.isReady()) {
+    navigationRef.navigate('Completion' as never);
   }
 }
 
@@ -119,113 +111,131 @@ export function clearCompletion(): void {
   emit();
 }
 
-function listRoute(name: string, refreshKey?: number): StackRoute {
-  if (refreshKey === undefined) {
-    return { name };
-  }
-  return { name, params: { refreshKey } };
-}
-
-function applyTabStacks(focus: TabName, updates: Partial<Record<TabName, StackRoute[]>>): void {
+function dismissCompletionRoute(): void {
   if (!navigationRef.isReady()) {
     return;
   }
-  const state = navigationRef.getRootState();
-  if (!state) {
+  const routeName = navigationRef.getCurrentRoute()?.name as string | undefined;
+  if (routeName !== 'Completion') {
     return;
   }
-  const focusIndex = state.routes.findIndex(route => route.name === focus);
-  navigationRef.reset({
-    index: focusIndex >= 0 ? focusIndex : state.index ?? 0,
-    routes: state.routes.map(route => {
-      const next = updates[route.name as TabName];
-      if (!next) {
-        return route;
-      }
-      return {
-        ...route,
-        state: {
-          index: next.length - 1,
-          routes: next.map(item => ({ name: item.name, params: item.params })),
-        },
-      };
-    }),
-  } as never);
-}
-
-function focusTab(button: Action['button']): TabName {
-  switch (button) {
-    case 'groups':
-    case 'view_group':
-      return 'Groups';
-    case 'profile':
-      return 'Profile';
-    case 'view_tournament':
-      return 'Tournaments';
-    case 'dashboard':
-    case 'view_game':
-    case 'signin':
-    case 'get_started':
-      return 'Home';
-    default:
-      return 'Home';
+  if (navigationRef.canGoBack()) {
+    navigationRef.goBack();
   }
 }
 
-function stacksFor(flow: CompletionFlow, action: Action): Partial<Record<TabName, StackRoute[]>> {
-  const refreshKey = Date.now();
-  const home = [listRoute('EventsList', refreshKey)];
-  const groups = [listRoute('GroupsList', refreshKey)];
-  const tournaments = [listRoute('TournamentsList', refreshKey)];
-  const profile = [listRoute('ProfileHome')];
+/**
+ * `pop: true` unwinds to a screen already in that stack (same as
+ * `goToDashboard`). The detail is opened on the next turn, after that
+ * pop, so Back from the detail does not return to the form.
+ */
+function openGame(eventId: string): void {
+  navigationRef.navigate('Home', {
+    screen: 'EventsList',
+    params: { refreshKey: Date.now() },
+    pop: true,
+  });
+  setTimeout(() => {
+    if (!navigationRef.isReady()) {
+      return;
+    }
+    navigationRef.navigate('Home', {
+      screen: 'EventDetail',
+      params: { eventId },
+      pop: true,
+    });
+  }, 0);
+}
 
+function openGroup(groupId: string): void {
+  navigationRef.navigate('Groups', {
+    screen: 'GroupsList',
+    params: { refreshKey: Date.now() },
+    pop: true,
+  });
+  setTimeout(() => {
+    if (!navigationRef.isReady()) {
+      return;
+    }
+    navigationRef.navigate('Groups', {
+      screen: 'GroupDetail',
+      params: { groupId },
+      pop: true,
+    });
+  }, 0);
+}
+
+function goToTarget(flow: CompletionFlow, action: Action): void {
+  if (!navigationRef.isReady()) {
+    return;
+  }
+  const refreshKey = Date.now();
   switch (action.button) {
     case 'dashboard':
-      return {
-        Home: home,
-        ...(flow === 'team_created' || flow === 'group_created' ? { Groups: groups } : {}),
-        ...(flow === 'tournament_cancelled' ? { Tournaments: tournaments } : {}),
-      };
+      if (flow === 'team_created' || flow === 'group_created') {
+        navigationRef.navigate('Groups', {
+          screen: 'GroupsList',
+          params: { refreshKey },
+          pop: true,
+        });
+      }
+      if (flow === 'tournament_cancelled') {
+        navigationRef.navigate('Tournaments', {
+          screen: 'TournamentsList',
+          params: { refreshKey },
+          pop: true,
+        });
+      }
+      navigationRef.navigate('Home', {
+        screen: 'EventsList',
+        params: { refreshKey },
+        pop: true,
+      });
+      return;
     case 'groups':
-      return { Groups: groups };
+      navigationRef.navigate('Groups', {
+        screen: 'GroupsList',
+        params: { refreshKey },
+        pop: true,
+      });
+      return;
     case 'profile':
-      return { Profile: profile };
+      navigationRef.navigate('Profile', {
+        screen: 'ProfileHome',
+        pop: true,
+      });
+      return;
     case 'view_game':
-      return {
-        Home: action.id
-          ? [...home, { name: 'EventDetail', params: { eventId: action.id } }]
-          : home,
-      };
+      if (action.id) {
+        openGame(action.id);
+      }
+      return;
     case 'view_group':
-      return {
-        Groups: action.id
-          ? [...groups, { name: 'GroupDetail', params: { groupId: action.id } }]
-          : groups,
-      };
+      if (action.id) {
+        openGroup(action.id);
+      }
+      return;
     case 'view_tournament':
-      return {
-        Tournaments: action.id
-          ? [...tournaments, { name: 'TournamentDetail', params: { tournamentId: action.id } }]
-          : tournaments,
-        ...(flow === 'tournament_created' ? { Home: home } : {}),
-      };
+      if (flow === 'tournament_created') {
+        navigationRef.navigate('Home', {
+          screen: 'EventsList',
+          params: { refreshKey },
+          pop: true,
+        });
+      }
+      if (action.id) {
+        navigationRef.navigate('Tournaments', {
+          screen: 'TournamentDetail',
+          params: { tournamentId: action.id },
+          pop: true,
+        });
+      }
+      return;
     case 'signin':
     case 'get_started':
-      return {};
+      return;
     default:
-      return {};
-  }
-}
-
-function dismissCompletionRoute(): void {
-  if (!rootNavigationRef.isReady()) {
-    return;
-  }
-  if (rootNavigationRef.getCurrentRoute()?.name !== 'Completion') {
-    return;
-  }
-  if (rootNavigationRef.canGoBack()) {
-    rootNavigationRef.goBack();
+      return;
   }
 }
 
@@ -252,20 +262,24 @@ export function leaveCompletion(request: CompletionRequest, which: 'primary' | '
 
   if (action.button === 'signin') {
     clearCompletion();
-    if (rootNavigationRef.isReady()) {
-      const names = rootNavigationRef.getRootState()?.routeNames ?? [];
+    if (navigationRef.isReady()) {
+      const state = navigationRef.getRootState();
+      const names = (state?.routeNames ?? []) as readonly string[];
       if (names.includes('Login')) {
-        rootNavigationRef.dispatch(
-          CommonActions.reset({ index: 0, routes: [{ name: 'Login' }] }),
-        );
+        const loginInStack = state?.routes.some(route => route.name === 'Login') ?? false;
+        if (loginInStack) {
+          navigationRef.dispatch(CommonActions.navigate('Login', undefined, { pop: true }));
+        } else {
+          navigationRef.dispatch(
+            CommonActions.reset({ index: 0, routes: [{ name: 'Login' }] }),
+          );
+        }
       }
     }
     return;
   }
 
-  if (navigationRef.isReady()) {
-    applyTabStacks(focusTab(action.button), stacksFor(request.flow, action));
-  }
   clearCompletion();
+  goToTarget(request.flow, action);
   dismissCompletionRoute();
 }
