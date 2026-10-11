@@ -5,9 +5,9 @@ import { Clipboard, Linking, Share } from 'react-native';
 
 import { ENV } from '../../../config/env';
 import {
-  composeShareMessage,
   copyLinkToClipboard,
-  getEventShareUrl,
+  getShareUrl,
+  SHARE_PATH,
   shareGeneric,
   shareToWhatsApp,
 } from '../shareLink';
@@ -17,51 +17,22 @@ describe('shareLink utilities', () => {
     jest.clearAllMocks();
   });
 
-  describe('getEventShareUrl', () => {
-    it('appends ?ref=<user_id> when currentUserId is provided', () => {
-      const url = getEventShareUrl('event-123', 'user-abc');
+  describe('getShareUrl', () => {
+    it('returns API base URL plus /public/share', () => {
+      const url = getShareUrl();
       const expectedBase = ENV.API_BASE_URL.replace(/\/+$/, '');
-      expect(url).toBe(`${expectedBase}/#event-detail/event-123?ref=user-abc`);
-    });
-
-    it('returns canonical event URL without ?ref= when currentUserId is omitted', () => {
-      const url = getEventShareUrl('event-123');
-      const expectedBase = ENV.API_BASE_URL.replace(/\/+$/, '');
-      expect(url).toBe(`${expectedBase}/#event-detail/event-123`);
-    });
-
-    it('URL-encodes user_id in the ?ref= query parameter', () => {
-      const url = getEventShareUrl('event-123', 'user with spaces&symbols');
-      const expectedBase = ENV.API_BASE_URL.replace(/\/+$/, '');
-      expect(url).toBe(`${expectedBase}/#event-detail/event-123?ref=user%20with%20spaces%26symbols`);
-    });
-  });
-
-  describe('composeShareMessage', () => {
-    it('formats default copy matching Decision 7 template verbatim', () => {
-      const msg = composeShareMessage(
-        'Pratheesh',
-        'Sunday Badminton',
-        'https://meetups.duckdns.org/#event-detail/ev-1?ref=u-1',
-      );
-      expect(msg).toBe(
-        'Pratheesh invited you to Sunday Badminton on Shuttlr — https://meetups.duckdns.org/#event-detail/ev-1?ref=u-1',
-      );
-      // Explicitly check for the em-dash (\u2014)
-      expect(msg).toContain(' \u2014 ');
+      expect(url).toBe(`${expectedBase}${SHARE_PATH}`);
     });
   });
 
   describe('shareGeneric', () => {
-    it('calls Share.share with message and url', async () => {
+    it('calls Share.share with message only', async () => {
       const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
       await shareGeneric({
         message: 'Join us!',
-        url: 'https://meetups.duckdns.org/#event-detail/1?ref=u-1',
       });
       expect(spy).toHaveBeenCalledWith({
         message: 'Join us!',
-        url: 'https://meetups.duckdns.org/#event-detail/1?ref=u-1',
       });
     });
   });
