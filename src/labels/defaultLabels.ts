@@ -819,4 +819,6 @@ export const DEFAULT_LABELS = {
   'mob.notif_history.toast_marked_unread': 'Marked as unread',
   'mob.notif_history.toast_all_marked_read': 'Marked all as read',
   'mob.common.undo': 'Undo',
+  'mob.diagnostics.title_on': 'Diagnostics is ON',
+  'mob.diagnostics.title_off': 'Diagnostics is OFF',
 } as const;
