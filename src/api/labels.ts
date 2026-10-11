@@ -32,5 +32,14 @@ export async function getLabels(options?: RequestOptions): Promise<LabelMap> {
   });
   // Shape-correction: the endpoint nests the map under `labels` — unwrap
   // here, once, so every caller gets the flat map directly.
-  return data.labels;
+  if (
+    data &&
+    typeof data === 'object' &&
+    data.labels &&
+    typeof data.labels === 'object' &&
+    !Array.isArray(data.labels)
+  ) {
+    return data.labels;
+  }
+  return {};
 }

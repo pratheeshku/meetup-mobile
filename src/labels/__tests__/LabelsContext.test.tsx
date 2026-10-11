@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLabels } from '../../api/labels';
 import { act, render, renderAsync, texts } from '../../test-utils/render';
 import { FALLBACK_LABELS } from '../fallbackLabels';
-import { getLabel, LABELS_CACHE_KEY, LabelsProvider, useLabels } from '../LabelsContext';
+import { getLabel, LABELS_CACHE_KEY, LabelsProvider, useLabels, useT } from '../LabelsContext';
 
 jest.mock('../../api/labels', () => ({ getLabels: jest.fn() }));
 
@@ -133,3 +133,40 @@ describe('LabelsProvider — network fetch fails', () => {
     expect(texts(root)).toEqual([FALLBACK_LABELS['skill_level.beginner']]);
   });
 });
+
+function LoginTitleProbe(): React.JSX.Element {
+  const t = useT();
+  return <Text>{t('mob.login.title')}</Text>;
+}
+
+describe('LabelsProvider — fallback resilience on empty or invalid fetched map', () => {
+  it.each([
+    ['empty object', {}],
+    ['non-object (undefined cast)', undefined as unknown as Record<string, string>],
+    ['null', null as unknown as Record<string, string>],
+  ])('renders t("mob.login.title") from fallback with no throw when fetch resolves %s', async (_label, fetched) => {
+    mockGetLabels.mockResolvedValue(fetched);
+
+    const root = render(
+      <LabelsProvider>
+        <LoginTitleProbe />
+      </LabelsProvider>,
+    );
+
+    await act(async () => {
+      await flush();
+    });
+
+    expect(texts(root)).toEqual([FALLBACK_LABELS['mob.login.title']]);
+  });
+
+  it('getLabel safely falls back to FALLBACK_LABELS when labels map is undefined or null', () => {
+    expect(getLabel(undefined as unknown as Record<string, string>, 'mob.login.title')).toBe(
+      FALLBACK_LABELS['mob.login.title'],
+    );
+    expect(getLabel(null as unknown as Record<string, string>, 'mob.login.title')).toBe(
+      FALLBACK_LABELS['mob.login.title'],
+    );
+  });
+});
+

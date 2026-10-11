@@ -65,14 +65,14 @@ export function LabelsProvider({ children }: { children: React.ReactNode }): Rea
     try {
       const fetched = await getLabels();
       fetchedAt.current = Date.now();
-      if (mounted.current) {
+      if (mounted.current && fetched && typeof fetched === 'object' && !Array.isArray(fetched)) {
         // Keep the same object when nothing changed, so consumers don't re-render.
         setLabels(current =>
           JSON.stringify(current) === JSON.stringify(fetched) ? current : fetched,
         );
+        await AsyncStorage.setItem(LABELS_CACHE_KEY, JSON.stringify(fetched));
+        await AsyncStorage.setItem(LABELS_FETCHED_AT_KEY, String(fetchedAt.current));
       }
-      await AsyncStorage.setItem(LABELS_CACHE_KEY, JSON.stringify(fetched));
-      await AsyncStorage.setItem(LABELS_FETCHED_AT_KEY, String(fetchedAt.current));
     } catch {
       // Fetch/cache failure: keep what is showing (cache or bundled
       // defaults); never surface as a screen-level error.
@@ -89,8 +89,11 @@ export function LabelsProvider({ children }: { children: React.ReactNode }): Rea
         const cachedRaw = await AsyncStorage.getItem(LABELS_CACHE_KEY);
         const cachedAt = await AsyncStorage.getItem(LABELS_FETCHED_AT_KEY);
         if (cachedRaw && mounted.current) {
-          setLabels(JSON.parse(cachedRaw) as LabelMap);
-          fetchedAt.current = Math.max(fetchedAt.current, Number(cachedAt) || 0);
+          const parsed = JSON.parse(cachedRaw);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            setLabels(parsed as LabelMap);
+            fetchedAt.current = Math.max(fetchedAt.current, Number(cachedAt) || 0);
+          }
         }
       } catch {
         // Corrupt/unavailable cache — bundled defaults stay in place.
@@ -149,7 +152,7 @@ function placeholdersResolvable(template: string, params?: LabelParams): boolean
  * unregistered key (not reachable for typed `LabelKey`s).
  */
 export function getLabel(labels: LabelMap, key: string, params?: LabelParams): string {
-  const remote = labels[key];
+  const remote = labels?.[key];
   const fallback = FALLBACK_LABELS[key];
   let template: string | undefined;
   if (typeof remote === 'string' && remote.trim() !== '' && placeholdersResolvable(remote, params)) {

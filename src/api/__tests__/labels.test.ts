@@ -47,4 +47,18 @@ describe('getLabels', () => {
     expect(labels).not.toHaveProperty('labels');
     expect(labels).toEqual({ 'skill_level.beginner': 'Beginner' });
   });
+
+  it.each([
+    ['an empty object ({})', {}],
+    ['a string HTML body', '<!DOCTYPE html><html><body>502 Bad Gateway</body></html>'],
+    ['null', null],
+    ['labels: null', { labels: null }],
+  ])('returns an empty object when the response is %s without throwing', async (_label, responseData) => {
+    mockedGet.mockResolvedValueOnce({ data: responseData });
+
+    const labels = await getLabels();
+
+    expect(labels).toEqual({});
+  });
 });
+
