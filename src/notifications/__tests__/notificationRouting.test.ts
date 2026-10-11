@@ -16,13 +16,20 @@ import {
 
 const PARTICIPANT_TYPES = ['event_participant_added', 'event_participant_removed'] as const;
 
+/** Types added after the original 12. The last two landed with group delete and ownership transfer. */
+const ADDED_TYPES = [
+  ...PARTICIPANT_TYPES,
+  'group_event_created',
+  'event_reminder',
+  'group_deleted',
+  'group_ownership_transferred',
+] as const;
+
 describe('type list', () => {
-  it('contains both participant types, group_event_created, and event_reminder, alongside the original 12 (16 total, no duplicates)', () => {
-    expect(NOTIFICATION_TYPES).toEqual(
-      expect.arrayContaining([...PARTICIPANT_TYPES, 'group_event_created', 'event_reminder']),
-    );
-    expect(NOTIFICATION_TYPES).toHaveLength(16);
-    expect(new Set(NOTIFICATION_TYPES).size).toBe(16);
+  it('contains the added types alongside the original 12 (18 total, no duplicates)', () => {
+    expect(NOTIFICATION_TYPES).toEqual(expect.arrayContaining([...ADDED_TYPES]));
+    expect(NOTIFICATION_TYPES).toHaveLength(18);
+    expect(new Set(NOTIFICATION_TYPES).size).toBe(18);
   });
 
   it('resolves every listed type without throwing (list and switch cannot drift)', () => {

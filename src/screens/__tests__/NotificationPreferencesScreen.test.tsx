@@ -31,12 +31,17 @@ it('shows a row for every known type, with the two participant labels', async ()
   const root = await renderAsync(<NotificationPreferencesScreen />);
 
   const labels = texts(root);
-  expect(labels).toContain('Added to an event');
-  expect(labels).toContain('Removed from an event');
-  expect(labels).toContain('Event reminders');
+  expect(labels).toContain('Added to a game');
+  expect(labels).toContain('Removed from a game');
+  expect(labels).toContain('Game reminders');
+  expect(labels).toContain('Group deleted');
+  expect(labels).toContain('Group ownership transferred');
   const switches = root.findAllByType(Switch);
   expect(switches).toHaveLength(NOTIFICATION_TYPES.length);
-  expect(NOTIFICATION_TYPES.length).toBe(16);
+  expect(NOTIFICATION_TYPES).toHaveLength(18);
+  expect(NOTIFICATION_TYPES).toEqual(
+    expect.arrayContaining(['group_deleted', 'group_ownership_transferred']),
+  );
 
   // Unlisted types default to on; a listed one keeps the server value.
   const added = NOTIFICATION_TYPES.indexOf('event_participant_added');

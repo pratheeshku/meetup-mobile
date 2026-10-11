@@ -25,7 +25,7 @@ describe('useResource', () => {
     });
     expect(ref.current?.status).toBe('ready');
     expect(ref.current?.data).toBe('v1');
-    expect(fetcher).toHaveBeenCalledWith({ correlationId: 'cid' });
+    expect(fetcher).toHaveBeenCalledWith({ correlationId: 'cid', resourceName: 'resource' });
   });
 
   it('reports an error, then recovers on retry', async () => {

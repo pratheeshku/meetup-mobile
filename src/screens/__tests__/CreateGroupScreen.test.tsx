@@ -8,6 +8,7 @@ import React from 'react';
 import { createGroup } from '../../api/groups';
 import { getSports } from '../../api/sports';
 import { createTeam } from '../../api/teams';
+import { goToDashboard } from '../../navigation/goToDashboard';
 import { act, pressableLabelled, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import CreateGroupScreen from '../CreateGroupScreen';
@@ -17,11 +18,12 @@ type Props = React.ComponentProps<typeof CreateGroupScreen>;
 jest.mock('../../api/groups', () => ({ createGroup: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 jest.mock('../../api/teams', () => ({ createTeam: jest.fn() }));
+jest.mock('../../navigation/goToDashboard', () => ({ goToDashboard: jest.fn() }));
 
 const mockCreateGroup = createGroup as jest.MockedFunction<typeof createGroup>;
 const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
 const mockCreateTeam = createTeam as jest.MockedFunction<typeof createTeam>;
-const popTo = jest.fn();
+const mockGoToDashboard = goToDashboard as jest.MockedFunction<typeof goToDashboard>;
 const replace = jest.fn();
 
 const MOCK_SPORTS = [
@@ -30,7 +32,7 @@ const MOCK_SPORTS = [
 ];
 
 async function mount(): Promise<Instance> {
-  const props = { navigation: { popTo, replace }, route: { params: undefined } };
+  const props = { navigation: { replace }, route: { params: undefined } };
   return renderAsync(<CreateGroupScreen {...(props as unknown as Props)} />);
 }
 
@@ -51,7 +53,7 @@ const submitGroup = async (root: Instance): Promise<void> => {
 
 const submitTeam = async (root: Instance): Promise<void> => {
   await act(async () => {
-    pressableLabelled(root, 'Create Team').props.onPress();
+    pressableLabelled(root, 'Create tournament team').props.onPress();
   });
 };
 
@@ -65,8 +67,8 @@ beforeEach(() => {
   mockCreateGroup.mockReset();
   mockGetSports.mockReset();
   mockCreateTeam.mockReset();
-  popTo.mockReset();
   replace.mockReset();
+  mockGoToDashboard.mockReset();
   mockGetSports.mockResolvedValue(MOCK_SPORTS);
 });
 
@@ -94,7 +96,7 @@ describe('CreateGroupScreen — Players Group mode (default)', () => {
     expect(input(root, 'e.g. Sunday Footballers').props.maxLength).toBe(100);
   });
 
-  it('submits the trimmed values with one correlation id, then navigates to GroupDetail', async () => {
+  it('submits the trimmed values with one correlation id, then opens invite members', async () => {
     mockCreateGroup.mockResolvedValueOnce({ id: 'group-123' } as never);
     const root = await mount();
     type(root, 'e.g. Sunday Footballers', '  Sunday Footballers ');
@@ -107,7 +109,9 @@ describe('CreateGroupScreen — Players Group mode (default)', () => {
       { correlationId: expect.any(String) },
     );
     expect(replace).toHaveBeenCalledTimes(1);
-    expect(replace).toHaveBeenCalledWith('GroupDetail', { groupId: 'group-123' });
+    // Step 1 is the C4 exception: invite members, not the dashboard.
+    expect(replace).toHaveBeenCalledWith('InviteMembers', { groupId: 'group-123' });
+    expect(mockGoToDashboard).not.toHaveBeenCalled();
   });
 
   it('shows the server message inline on failure', async () => {
@@ -148,9 +152,9 @@ describe('CreateGroupScreen — Players Group mode (default)', () => {
 describe('CreateGroupScreen — Tournament Team mode', () => {
   it('shows team fields when toggled to Tournament Team', async () => {
     const root = await mount();
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     const t = texts(root);
-    expect(t).toContain('Team Name');
+    expect(t).toContain('Tournament team name');
     expect(t).toContain('Sport');
     expect(t).toContain('Visibility');
     // Group fields should NOT be visible in team mode.
@@ -159,7 +163,7 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
 
   it('renders the sport dropdown from GET /admin/sports/public', async () => {
     const root = await mount();
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     const t = texts(root);
     expect(t).toContain('Football');
     expect(t).toContain('Basketball');
@@ -167,16 +171,16 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
 
   it('rejects empty team name locally', async () => {
     const root = await mount();
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     type(root, 'e.g. Real Madrid FC', '   ');
     await submitTeam(root);
-    expect(texts(root)).toContain('Enter a team name.');
+    expect(texts(root)).toContain('Enter a tournament team name.');
     expect(mockCreateTeam).not.toHaveBeenCalled();
   });
 
   it('rejects missing sport', async () => {
     const root = await mount();
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     type(root, 'e.g. Real Madrid FC', 'Test Team');
     // No sport selected.
     await submitTeam(root);
@@ -184,7 +188,7 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
     expect(mockCreateTeam).not.toHaveBeenCalled();
   });
 
-  it('submits team with name, sport and visibility, then navigates to the groups list', async () => {
+  it('submits team with name, sport and visibility, then returns to the dashboard', async () => {
     mockCreateTeam.mockResolvedValueOnce({
       id: 'team-456',
       name: 'Test FC',
@@ -194,7 +198,7 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
       created_at: '2026-01-01T00:00:00Z',
     });
     const root = await mount();
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     type(root, 'e.g. Real Madrid FC', '  Test FC  ');
     selectChip(root, 'Football');
     // Default visibility is public, so no extra chip select needed.
@@ -205,15 +209,15 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
       { name: 'Test FC', sport: 'football', visibility: 'public' },
       { correlationId: expect.any(String) },
     );
-    // TeamDetailScreen does not exist — falls back to groups list.
-    expect(popTo).toHaveBeenCalledTimes(1);
-    expect(popTo).toHaveBeenCalledWith('GroupsList', { refreshKey: expect.any(Number) });
+    expect(mockGoToDashboard).toHaveBeenCalledTimes(1);
+    expect(mockGoToDashboard).toHaveBeenCalledWith('Tournament team created');
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it('sends the selected visibility when changed from the default', async () => {
     mockCreateTeam.mockResolvedValueOnce({} as never);
     const root = await mount();
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     type(root, 'e.g. Real Madrid FC', 'Test FC');
     selectChip(root, 'Football');
     selectChip(root, 'Private');
@@ -230,17 +234,18 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
       response: { status: 400, data: { detail: 'Sport does not exist' } },
     });
     const root = await mount();
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     type(root, 'e.g. Real Madrid FC', 'Test');
     selectChip(root, 'Football');
     await submitTeam(root);
 
     expect(texts(root)).toContain('Sport does not exist');
+    expect(mockGoToDashboard).not.toHaveBeenCalled();
   });
 
   it('does NOT have a Captain field', async () => {
     const root = await mount();
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     const t = texts(root);
     expect(t.every(text => !/captain/i.test(text))).toBe(true);
   });
@@ -252,14 +257,14 @@ describe('CreateGroupScreen — mode toggle preservation', () => {
     // Type in Group mode.
     type(root, 'e.g. Sunday Footballers', 'My Group');
     // Switch to Team.
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     type(root, 'e.g. Real Madrid FC', 'My Team');
     // Switch back to Group.
-    selectChip(root, '👥 Players Group');
+    selectChip(root, 'Group');
     // Group name should be preserved.
     expect(input(root, 'e.g. Sunday Footballers').props.value).toBe('My Group');
     // Switch back to Team.
-    selectChip(root, '🛡️ Tournament Team');
+    selectChip(root, 'Tournament team');
     // Team name should be preserved.
     expect(input(root, 'e.g. Real Madrid FC').props.value).toBe('My Team');
   });
