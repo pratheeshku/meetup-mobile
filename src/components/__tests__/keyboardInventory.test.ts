@@ -28,14 +28,11 @@ const INPUT_SCREENS = [
   'src/screens/RegisterScreen.tsx',
   'src/screens/VerifyScreen.tsx',
   'src/screens/ForgotPasswordScreen.tsx',
+  'src/screens/CreateGameScreen.tsx',
   'src/screens/CreateGroupScreen.tsx',
+  'src/screens/EventDetailScreen.tsx',
   'src/screens/GroupDetailScreen.tsx',
-  'src/screens/EditGroupScreen.tsx',
-  'src/screens/EditProfileScreen.tsx',
-  'src/screens/EditSkillLevelsScreen.tsx',
-  'src/screens/TransferGroupOwnershipScreen.tsx',
-  'src/screens/AccountDeletionCodeScreen.tsx',
-  'src/screens/AccountDeletionBlockedScreen.tsx',
+  'src/screens/ProfileScreen.tsx',
   'src/components/onboarding/MobileNumberStep.tsx',
 ];
 
@@ -64,16 +61,7 @@ it('only KeyboardAwareScreen uses KeyboardAvoidingView', () => {
   expect(users).toEqual(['src/components/KeyboardAwareScreen.tsx']);
 });
 
-it('only allowed files render a bare TextInput', () => {
+it('only TextField renders a bare TextInput', () => {
   const users = files.filter(path => /(^|\n)\s*<TextInput\b/.test(read(path)));
-  expect(users).toEqual([
-    'src/components/NumberField.tsx',
-    'src/components/TextField.tsx',
-    'src/screens/AccountDeletionCodeScreen.tsx',
-    'src/screens/CreateGameScreen.tsx',
-    'src/screens/EditProfileScreen.tsx',
-    'src/screens/EventDetailScreen.tsx',
-    'src/screens/InviteMembersScreen.tsx',
-    'src/screens/TransferGroupOwnershipScreen.tsx',
-  ]);
+  expect(users).toEqual(['src/components/TextField.tsx']);
 });

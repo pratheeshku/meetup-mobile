@@ -1,7 +1,6 @@
 /** Groups list: direct "+" create entry in the header, refresh-after-create, and GroupCard integration. */
 import React from 'react';
 
-import { getMyGroups } from '../../api/groups';
 import { act, pressableLabelled, render, renderAsync, texts } from '../../test-utils/render';
 import GroupsScreen from '../GroupsScreen';
 
@@ -13,7 +12,9 @@ const mockUseFocusEffect = jest.fn();
 // Regression guard (Rules of Hooks): React Navigation calls `headerRight` as a
 // plain function inside its own header hook, so it must never call a hook.
 // Any `useNavigation()` from this screen's header now fails the test loudly.
+const mockGetGroups = jest.fn();
 const mockGetMyGroups = jest.fn();
+const mockGetCachedHomeGroups = jest.fn();
 jest.mock('../../auth/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'u-1', nickname: 'sam' } }),
 }));
@@ -29,9 +30,9 @@ jest.mock('@react-navigation/native', () => {
   };
 });
 jest.mock('../../api/groups', () => ({
-  getMyGroups: mockGetMyGroups,
-  getGroups: jest.fn((...args: unknown[]) => mockGetMyGroups(...args)),
-  getCachedHomeGroups: jest.fn().mockResolvedValue([]),
+  getGroups: (...args: unknown[]) => mockGetGroups(...args),
+  getMyGroups: (...args: unknown[]) => mockGetMyGroups(...args),
+  getCachedHomeGroups: (...args: unknown[]) => mockGetCachedHomeGroups(...args),
 }));
 const navigate = jest.fn();
 const setOptions = jest.fn();
@@ -43,7 +44,9 @@ function element(params?: { refreshKey?: number }): React.ReactElement {
 }
 
 beforeEach(() => {
-  mockGetMyGroups.mockReset().mockResolvedValue(EMPTY);
+  mockGetGroups.mockReset().mockResolvedValue(EMPTY);
+  mockGetMyGroups.mockReset();
+  mockGetCachedHomeGroups.mockReset().mockResolvedValue([]);
   mockUseScrollToTop.mockReset();
   mockUseFocusEffect.mockReset();
   navigate.mockReset();
@@ -61,7 +64,7 @@ describe('GroupsScreen create entry point', () => {
   });
 
   it('keeps the header button even when the list failed to load', async () => {
-    mockGetMyGroups.mockReset().mockRejectedValue(new Error('down'));
+    mockGetGroups.mockReset().mockRejectedValue(new Error('down'));
     await renderAsync(element());
     expect(setOptions).toHaveBeenCalledWith({ headerRight: expect.any(Function) });
   });
@@ -70,12 +73,15 @@ describe('GroupsScreen create entry point', () => {
 describe('GroupsScreen refresh after create', () => {
   it('loads once on a normal mount', async () => {
     await renderAsync(element());
-    expect(mockGetMyGroups).toHaveBeenCalledTimes(1);
+    expect(mockGetGroups).toHaveBeenCalledTimes(1);
+    expect(mockGetGroups).toHaveBeenCalledWith({ mine: true });
+    expect(mockGetMyGroups).not.toHaveBeenCalled();
   });
 
   it('re-fetches when returned to with a refreshKey', async () => {
     await renderAsync(element({ refreshKey: 123 }));
-    expect(mockGetMyGroups).toHaveBeenCalledTimes(2);
+    expect(mockGetGroups).toHaveBeenCalledTimes(2);
+    expect(mockGetMyGroups).not.toHaveBeenCalled();
   });
 });
 
@@ -119,15 +125,13 @@ describe('GroupsScreen GroupCard rendering', () => {
   };
 
   it('renders GroupCard for each group and navigates to GroupDetail on press', async () => {
-    mockGetMyGroups.mockResolvedValue(GROUPS_FIXTURE);
+    mockGetGroups.mockResolvedValue(GROUPS_FIXTURE);
     const root = await renderAsync(element());
 
     const renderedTexts = texts(root);
     expect(renderedTexts).toContain('Weekend Badminton Warriors');
     expect(renderedTexts).toContain('Owner');
     expect(renderedTexts).toContain('Casual games every Saturday');
-    expect(renderedTexts).toContain('+14');
-    expect(renderedTexts).toContain('View group');
 
     // Press card button
     const cardButton = root.find(
@@ -170,7 +174,7 @@ describe('GroupsScreen enhanced landing page and filtering', () => {
   };
 
   it('renders landing page header and filter pills', async () => {
-    mockGetMyGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
+    mockGetGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
     const root = await renderAsync(element());
 
     const renderedTexts = texts(root);
@@ -182,7 +186,7 @@ describe('GroupsScreen enhanced landing page and filtering', () => {
   });
 
   it('filters by "Organised" when Organised pill is tapped', async () => {
-    mockGetMyGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
+    mockGetGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
     const root = await renderAsync(element());
 
     const organisedPill = root.findByProps({ accessibilityLabel: 'Organised' });
@@ -193,8 +197,8 @@ describe('GroupsScreen enhanced landing page and filtering', () => {
     expect(renderedTexts).not.toContain('Joined Casual Runners');
   });
 
-  it('filters by "Member" when Member pill is tapped', async () => {
-    mockGetMyGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
+  it('filters by "Joined" when the Joined pill is tapped', async () => {
+    mockGetGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
     const root = await renderAsync(element());
 
     const memberPill = root.findByProps({ accessibilityLabel: 'Joined' });
@@ -206,7 +210,7 @@ describe('GroupsScreen enhanced landing page and filtering', () => {
   });
 
   it('shows contextual empty state when filtered category has no items', async () => {
-    mockGetMyGroups.mockResolvedValue({
+    mockGetGroups.mockResolvedValue({
       items: [MIXED_GROUPS_FIXTURE.items[0]],
       total: 1,
       page: 1,

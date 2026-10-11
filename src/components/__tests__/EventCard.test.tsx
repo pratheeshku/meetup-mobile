@@ -15,6 +15,7 @@ import ReactTestRenderer from 'react-test-renderer';
 import { getSports } from '../../api/sports';
 import EventCard from '../EventCard';
 import type { Event } from '../../types/event';
+import { colors } from '../../theme/tokens';
 
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 
@@ -190,6 +191,37 @@ describe('EventCard', () => {
           StyleSheet.flatten(node.props.style)?.width === '50%',
       );
       expect(fills.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('contrast (WCAG AA 4.5:1)', () => {
+    function contrastRatio(a: string, b: string): number {
+      const channel = (hex: string, start: number): number => {
+        const value = parseInt(hex.slice(start, start + 2), 16) / 255;
+        return value <= 0.03928 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+      };
+      const lum = (hex: string): number =>
+        0.2126 * channel(hex, 1) + 0.7152 * channel(hex, 3) + 0.0722 * channel(hex, 5);
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    }
+
+    // The artboard card no longer paints the old primary/success/warningLight
+    // pills. These are the pairs it paints now; each measured >= 4.5:1.
+    const PAIRS: Array<[string, string, string]> = [
+      ['sport label on badminton', colors.white, '#2A7B72'],
+      ['sport label on football', colors.white, '#835C2B'],
+      ['sport label on basketball', colors.white, '#67509B'],
+      ['sport label on tennis', colors.white, '#A54362'],
+      ['title on the card', colors.textPrimary, colors.surface],
+      ['date on the card', colors.textMuted, colors.surface],
+      ['initials on the avatar', colors.textSecondary, '#EBE7E0'],
+      ['action on the card', colors.accent, colors.surface],
+      ['waitlisted status on the card', '#67509B', colors.surface],
+    ];
+
+    it.each(PAIRS)('%s', (_name, text, background) => {
+      expect(contrastRatio(text, background)).toBeGreaterThanOrEqual(4.5);
     });
   });
 

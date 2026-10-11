@@ -1,10 +1,10 @@
 /**
  * Unit tests for `GroupCard` (Item 1 — visual parity with EventCard):
- * - Row 1: Role pill (Owner/Admin/Member) with rounded/colored-bg/white-text
+ * - Row 1: Role pill (Owner / Admin / Group member) with rounded/colored-bg/white-text
  *   reusing ROLE_BADGE_VARIANT mapping (primary -> colors.primary, neutral -> colors.textSecondary)
  * - Row 2: Group name (h3/700)
  * - Row 3: Description (1 line, textMuted; if empty, fall back to blank)
- * - Row 4: "{member_count} members" left, "View →" action link right (accent, 700)
+ * - Row 4: "{count} group member(s)" left, "View" action link right (accent, 700)
  * - No progress-bar row
  */
 import React from 'react';
@@ -48,7 +48,7 @@ function textOf(node: ReactTestRenderer.ReactTestInstance): string {
 }
 
 describe('GroupCard', () => {
-  it('renders role pill, group name, description, member count, and View action link', () => {
+  it('renders the role pill, group name, description, group member count, and View link', () => {
     const renderer = renderCard();
     const t = texts(renderer).map(textOf);
     expect(t).toContain('Group member');
@@ -87,7 +87,7 @@ describe('GroupCard', () => {
       expect(t).toContain('Admin');
     });
 
-    it('maps member to neutral variant and colors.textSecondary background', () => {
+    it('maps the group member role to the neutral variant and colors.textSecondary background', () => {
       expect(ROLE_BADGE_VARIANT.member).toBe('neutral');
       expect(ROLE_BADGE_LABEL_KEY.member).toBe('mob.group_role.member');
       expect(getRolePillColor('member')).toBe(colors.textSecondary);
@@ -155,14 +155,14 @@ describe('GroupCard', () => {
     });
   });
 
-  describe('Row 4: Member count and Action link', () => {
-    it('formats singular member count as "1 member"', () => {
+  describe('Row 4: group member count and action link', () => {
+    it('formats a count of one as "1 group member"', () => {
       const renderer = renderCard({ member_count: 1 });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('1 group member');
     });
 
-    it('formats plural member count as "N members"', () => {
+    it('formats a count above one as "N group members"', () => {
       const renderer = renderCard({ member_count: 25 });
       const t = texts(renderer).map(textOf);
       expect(t).toContain('25 group members');
@@ -238,7 +238,7 @@ describe('GroupCard', () => {
       expect(t).toContain('Owner: Alex');
     });
 
-    it('displays both member count and owner separated by middle dot', () => {
+    it('displays both the group member count and the owner, separated by a middle dot', () => {
       const renderer = renderCard({
         member_count: 8,
         current_user_role: 'owner',

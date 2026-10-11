@@ -4,10 +4,11 @@
 import { Clipboard, Linking, Share } from 'react-native';
 
 import { ENV } from '../../../config/env';
+import { FALLBACK_LABELS } from '../../labels/fallbackLabels';
+import { getLabel } from '../../labels/LabelsContext';
 import {
   copyLinkToClipboard,
   getShareUrl,
-  SHARE_PATH,
   shareGeneric,
   shareToWhatsApp,
 } from '../shareLink';
@@ -18,10 +19,20 @@ describe('shareLink utilities', () => {
   });
 
   describe('getShareUrl', () => {
-    it('returns API base URL plus /public/share', () => {
+    it('returns the API base URL plus the literal /public/share path', () => {
       const url = getShareUrl();
       const expectedBase = ENV.API_BASE_URL.replace(/\/+$/, '');
-      expect(url).toBe(`${expectedBase}${SHARE_PATH}`);
+      expect(url).toBe(`${expectedBase}/public/share`);
+    });
+
+    it('builds the share message from the mob.share.message label (FEEDBACK-001 AD-6)', () => {
+      const url = getShareUrl();
+      expect(FALLBACK_LABELS['mob.share.message']).toBe(
+        'Join me on Shuttlr! Download the app: {link}',
+      );
+      expect(getLabel(FALLBACK_LABELS, 'mob.share.message', { link: url })).toBe(
+        `Join me on Shuttlr! Download the app: ${url}`,
+      );
     });
   });
 

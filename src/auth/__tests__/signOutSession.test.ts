@@ -12,7 +12,6 @@ import { clearCookieJar } from '../../api/cookies';
 import { deregisterDeviceToken } from '../../notifications/fcm';
 import { ACCESS_SERVICE, installFakeBackend } from '../../test-utils/apiHarness';
 import type { FakeBackend } from '../../test-utils/apiHarness';
-import { clearTokens } from '../../storage/tokens';
 import { signOut } from '../googleAuth';
 
 jest.mock('../../api/cookies', () => ({ clearCookieJar: jest.fn() }));
