@@ -28,12 +28,19 @@ import type { UserProfile } from '../../types/user';
 import HomeScreen from '../HomeScreen';
 
 const mockUseScrollToTop = jest.fn();
-jest.mock('@react-navigation/native', () => ({
-  ...jest.requireActual('@react-navigation/native'),
-  useScrollToTop: (...args: unknown[]) => mockUseScrollToTop(...args),
-}));
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  return {
+    ...actual,
+    useScrollToTop: (...args: unknown[]) => mockUseScrollToTop(...args),
+    useFocusEffect: jest.fn(),
+  };
+});
 jest.mock('../../api/events', () => ({ getEvents: jest.fn() }));
-jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn() }));
+jest.mock('../../api/groups', () => ({
+  getMyGroups: jest.fn(),
+  getCachedHomeGroups: jest.fn().mockResolvedValue([]),
+}));
 jest.mock('../../api/profile', () => ({ getProfile: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 const mockUnread = { count: 0 };

@@ -302,4 +302,21 @@ jest.mock('@react-native-community/geolocation', () => ({
     stopObserving: jest.fn(),
   },
 }));
+
+// react-native-safe-area-context mock
+jest.mock('react-native-safe-area-context', () =>
+  require('react-native-safe-area-context/jest/mock').default,
+);
+
+// @react-navigation/native mock with jest.requireActual spread and useFocusEffect
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  const React = require('react');
+  return {
+    ...actual,
+    useFocusEffect: jest.fn(effect => {
+      React.useEffect(effect, []);
+    }),
+  };
+});
 /* eslint-enable no-undef */

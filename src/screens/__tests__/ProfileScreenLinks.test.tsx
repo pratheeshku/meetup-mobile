@@ -32,6 +32,7 @@ jest.mock('../../auth/AuthContext', () => ({
 }));
 jest.mock('../../api/profile', () => ({
   getProfile: jest.fn(),
+  getProfileSummary: jest.fn().mockResolvedValue({ games_played: 0, games_hosted: 0, groups_count: 0, recent_games: [] }),
   updateProfile: jest.fn(),
   updateSkillLevel: jest.fn(),
   deleteSkillLevel: jest.fn(),
@@ -39,6 +40,12 @@ jest.mock('../../api/profile', () => ({
   confirmDeletion: jest.fn(),
   uploadAvatar: jest.fn(),
   deleteAvatar: jest.fn(),
+}));
+jest.mock('../../api/groups', () => ({
+  getMyGroups: jest.fn().mockResolvedValue({ items: [], total: 0 }),
+}));
+jest.mock('../../api/home', () => ({
+  getCachedBanners: jest.fn().mockResolvedValue(null),
 }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 

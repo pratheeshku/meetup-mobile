@@ -9,6 +9,7 @@
 import { ENV } from '../../../config/env';
 import { installFakeBackend } from '../../test-utils/apiHarness';
 import type { FakeBackend, FakeReply } from '../../test-utils/apiHarness';
+import { clearTokens } from '../../storage/tokens';
 import { fetchVersionPolicy, parseVersionPolicy } from '../versionPolicy';
 
 const STORE = 'https://play.google.com/store/apps/details?id=org.duckdns.meetups';
@@ -22,8 +23,9 @@ const serve = (reply: FakeReply): void => {
 };
 const logged = (): string => log.mock.calls.map(call => call.join(' ')).join('\n');
 
-beforeEach(() => {
+beforeEach(async () => {
   backend = installFakeBackend();
+  await clearTokens();
   log = jest.spyOn(console, 'log').mockImplementation(() => {});
 });
 

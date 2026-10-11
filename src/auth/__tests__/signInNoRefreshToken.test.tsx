@@ -93,7 +93,10 @@ describe('Google sign-in without a refresh token', () => {
       await auth.signInWithGoogle();
     });
 
-    expect(mockPost).toHaveBeenCalledWith('/auth/oauth/google/callback', { id_token: 'google-id-token' });
+    expect(mockPost).toHaveBeenCalledWith('/auth/oauth/google/callback', {
+      id_token: 'google-id-token',
+      terms_version: expect.any(String),
+    });
     expect(auth.user).toEqual(USER);
     expect(auth.sessionExpired).toBe(false);
     expect(writtenServices()).toEqual([ACCESS_SERVICE]);
