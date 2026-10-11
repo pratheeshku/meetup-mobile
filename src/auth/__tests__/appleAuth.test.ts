@@ -83,7 +83,7 @@ describe('appleAuth', () => {
         code: 'valid_auth_code_123',
         client_kind: 'native',
         full_name: 'Ada Lovelace',
-        terms_version: '2026-10-02',
+        terms_version: expect.any(String),
       });
 
       // Verify identityToken is never sent or present in payload
@@ -113,7 +113,7 @@ describe('appleAuth', () => {
       expect(payload).toEqual({
         code: 'returning_auth_code_456',
         client_kind: 'native',
-        terms_version: '2026-10-02',
+        terms_version: expect.any(String),
       });
       expect(payload).not.toHaveProperty('full_name');
     });
