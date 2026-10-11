@@ -24,14 +24,13 @@ const mockGoogleSignOut = GoogleSignin.signOut as jest.Mock;
 
 let backend: FakeBackend;
 
-beforeEach(async () => {
-  backend = installFakeBackend();
-  await clearTokens();
+beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(console, 'log').mockImplementation(() => {});
   mockClearCookieJar.mockResolvedValue(true);
   (deregisterDeviceToken as jest.Mock).mockResolvedValue(undefined);
   mockGoogleSignOut.mockResolvedValue(null);
+  backend = installFakeBackend();
   backend.stored[ACCESS_SERVICE] = 'live-access';
 });
 

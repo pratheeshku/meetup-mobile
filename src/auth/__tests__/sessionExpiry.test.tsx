@@ -15,6 +15,7 @@ import ReactTestRenderer from 'react-test-renderer';
 import { apiClient } from '../../api/client';
 import { authEvents } from '../../api/authEvents';
 import { clearCookieJar } from '../../api/cookies';
+import { clearTokens } from '../../storage/tokens';
 import { ACCESS_SERVICE, installFakeBackend } from '../../test-utils/apiHarness';
 import type { FakeBackend, FakeReply } from '../../test-utils/apiHarness';
 import { act } from '../../test-utils/render';
@@ -97,11 +98,12 @@ const signInByEmail = async (): Promise<void> => {
   });
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
   jest.spyOn(console, 'log').mockImplementation(() => {});
   mockClearCookieJar.mockResolvedValue(true);
   backend = installFakeBackend();
+  await clearTokens();
 });
 
 afterEach(() => {
