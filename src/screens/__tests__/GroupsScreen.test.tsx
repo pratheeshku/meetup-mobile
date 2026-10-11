@@ -13,13 +13,17 @@ const mockUseFocusEffect = jest.fn();
 // Regression guard (Rules of Hooks): React Navigation calls `headerRight` as a
 // plain function inside its own header hook, so it must never call a hook.
 // Any `useNavigation()` from this screen's header now fails the test loudly.
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => {
-    throw new Error('headerRight must not call hooks such as useNavigation');
-  },
-  useScrollToTop: (...args: unknown[]) => mockUseScrollToTop(...args),
-  useFocusEffect: (cb: () => void) => mockUseFocusEffect(cb),
-}));
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  return {
+    ...actual,
+    useNavigation: () => {
+      throw new Error('headerRight must not call hooks such as useNavigation');
+    },
+    useScrollToTop: (...args: unknown[]) => mockUseScrollToTop(...args),
+    useFocusEffect: (cb: () => void) => mockUseFocusEffect(cb),
+  };
+});
 jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn() }));
 
 const mockGetMyGroups = getMyGroups as jest.MockedFunction<typeof getMyGroups>;
