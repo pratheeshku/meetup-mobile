@@ -125,9 +125,9 @@ export default function UserSearchPicker({
             return;
           }
           if (isDefault) {
-            defaultCache.current = found;
+            defaultCache.current = Array.isArray(found) ? found : [];
           }
-          setResults(found);
+          setResults(Array.isArray(found) ? found : []);
           setHasSearched(true);
           setIsSearching(false);
         },

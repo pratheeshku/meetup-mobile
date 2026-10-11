@@ -253,4 +253,15 @@ describe('email invite affordance (Decision 22 & 23)', () => {
     expect(texts(root)).toContain('No users found.');
     expect(texts(root)).not.toContain('Invite alone@example.com as new member');
   });
+
+  it('renders without throwing when searchUsers resolves undefined', async () => {
+    mockSearchUsers.mockResolvedValue(undefined as unknown as UserSearchResult[]);
+    const root = render(<UserSearchPicker onSelect={jest.fn()} />);
+
+    type(root, 'alex');
+    await settle();
+
+    expect(root).toBeDefined();
+  });
 });
+
