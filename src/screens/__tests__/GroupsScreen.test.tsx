@@ -13,6 +13,10 @@ const mockUseFocusEffect = jest.fn();
 // Regression guard (Rules of Hooks): React Navigation calls `headerRight` as a
 // plain function inside its own header hook, so it must never call a hook.
 // Any `useNavigation()` from this screen's header now fails the test loudly.
+const mockGetMyGroups = jest.fn();
+jest.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'u-1', nickname: 'sam' } }),
+}));
 jest.mock('@react-navigation/native', () => {
   const actual = jest.requireActual('@react-navigation/native');
   return {
@@ -24,9 +28,11 @@ jest.mock('@react-navigation/native', () => {
     useFocusEffect: (cb: () => void) => mockUseFocusEffect(cb),
   };
 });
-jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn() }));
-
-const mockGetMyGroups = getMyGroups as jest.MockedFunction<typeof getMyGroups>;
+jest.mock('../../api/groups', () => ({
+  getMyGroups: mockGetMyGroups,
+  getGroups: jest.fn((...args: unknown[]) => mockGetMyGroups(...args)),
+  getCachedHomeGroups: jest.fn().mockResolvedValue([]),
+}));
 const navigate = jest.fn();
 const setOptions = jest.fn();
 const EMPTY = { items: [], total: 0, page: 1, page_size: 0 };
@@ -120,11 +126,15 @@ describe('GroupsScreen GroupCard rendering', () => {
     expect(renderedTexts).toContain('Weekend Badminton Warriors');
     expect(renderedTexts).toContain('Owner');
     expect(renderedTexts).toContain('Casual games every Saturday');
-    expect(renderedTexts).toContain('14 members');
-    expect(renderedTexts).toContain('View →');
+    expect(renderedTexts).toContain('+14');
+    expect(renderedTexts).toContain('View group');
 
     // Press card button
-    const cardButton = root.findByProps({ accessibilityLabel: 'Weekend Badminton Warriors' });
+    const cardButton = root.find(
+      node =>
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.accessibilityLabel.startsWith('Weekend Badminton Warriors'),
+    );
     act(() => cardButton.props.onPress());
     expect(navigate).toHaveBeenCalledWith('GroupDetail', { groupId: 'grp-42' });
   });
@@ -165,10 +175,10 @@ describe('GroupsScreen enhanced landing page and filtering', () => {
 
     const renderedTexts = texts(root);
     expect(renderedTexts).toContain('My Groups');
-    expect(renderedTexts).toContain('Communities and clubs you organise and belong to.');
+    expect(renderedTexts).toContain('Groups you organise and belong to.');
     expect(renderedTexts).toContain('All');
     expect(renderedTexts).toContain('Organised');
-    expect(renderedTexts).toContain('Member');
+    expect(renderedTexts).toContain('Joined');
   });
 
   it('filters by "Organised" when Organised pill is tapped', async () => {
@@ -187,7 +197,7 @@ describe('GroupsScreen enhanced landing page and filtering', () => {
     mockGetMyGroups.mockResolvedValue(MIXED_GROUPS_FIXTURE);
     const root = await renderAsync(element());
 
-    const memberPill = root.findByProps({ accessibilityLabel: 'Member' });
+    const memberPill = root.findByProps({ accessibilityLabel: 'Joined' });
     act(() => memberPill.props.onPress());
 
     const renderedTexts = texts(root);
@@ -204,11 +214,11 @@ describe('GroupsScreen enhanced landing page and filtering', () => {
     });
     const root = await renderAsync(element());
 
-    const memberPill = root.findByProps({ accessibilityLabel: 'Member' });
+    const memberPill = root.findByProps({ accessibilityLabel: 'Joined' });
     act(() => memberPill.props.onPress());
 
     const renderedTexts = texts(root);
-    expect(renderedTexts).toContain('No member groups.');
+    expect(renderedTexts).toContain('No joined groups.');
   });
 });
 

@@ -3,7 +3,14 @@ import { getMyGroups } from '../../api/groups';
 import { describeHeaderAction } from '../../test-utils/headerActionHarness';
 import GroupsScreen from '../GroupsScreen';
 
-jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn() }));
+jest.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'u-1', nickname: 'sam' } }),
+}));
+jest.mock('../../api/groups', () => ({
+  getMyGroups: jest.fn(),
+  getGroups: jest.fn().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 0 }),
+  getCachedHomeGroups: jest.fn().mockResolvedValue([]),
+}));
 (getMyGroups as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, page_size: 0 });
 
 describeHeaderAction({
