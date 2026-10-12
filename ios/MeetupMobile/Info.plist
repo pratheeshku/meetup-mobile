@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>$(APP_DISPLAY_NAME)</string>
+	<string>GameOn SG</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -49,7 +49,7 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Shuttlr uses the camera to take your profile photo and to scan event QR codes.</string>
+	<string>GameOn SG uses the camera to take your profile photo and to scan event QR codes.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Meetup only uses your location while the app is open and only when you choose the location option. It does not track you in the background.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
@@ -57,7 +57,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Meetup uses your location only when you choose to, so it can use your current position in the game or venue you are setting up.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Shuttlr needs access to your photos so you can choose a profile picture.</string>
+	<string>GameOn SG needs access to your photos so you can choose a profile picture.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIBackgroundModes</key>
