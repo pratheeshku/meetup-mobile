@@ -8,8 +8,6 @@
  * screen (out of scope — display-only change on Home/Games).
  */
 
-import appConfig from '../../config/appConfig.json';
-
 export const dash = {
   brand: '#1E5BD6',
   brandDeep: '#0B3FA8',
@@ -69,9 +67,9 @@ export const dashSize = {
  * by `wordmarkAccent` in `accent`.
  */
 export const brandBlock = {
-  accessibilityLabel: appConfig.appName,
-  wordmarkLead: 'GameOn',
-  wordmarkAccent: ' SG',
+  accessibilityLabel: 'Shuttlr',
+  wordmarkLead: 'Shuttl',
+  wordmarkAccent: 'r',
   tagline: 'PLAY TOGETHER',
   accent: '#FDE68A',
   taglineColor: '#DBEAFE',

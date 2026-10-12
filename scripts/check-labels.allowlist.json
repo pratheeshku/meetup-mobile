@@ -18,6 +18,12 @@
       "file": "src/components/EventCard.tsx",
       "match": "RS",
       "reason": "Decorative placeholder initials inside the second avatar circle of the participant stack; not copy, not translatable."
+    },
+    {
+      "kind": "hardcoded-string",
+      "file": "src/theme/dashboardTheme.ts",
+      "match": "Shuttlr",
+      "reason": "Brand name (the app name, identity not copy) used as the wordmark accessibility label; same brand exclusion as docs/label-inventory-mobile.json."
     }
   ]
 }

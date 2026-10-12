@@ -3,9 +3,8 @@
  * brand-blue, height 208 (plus the status-bar inset), bottom corners radius
  * 32, decorative SVG background (Appendix B).
  *
- * - Left (AD-17 brand block): the Shuttlr app icon (`src/assets/shuttlr-icon-header.png`, AD-18 variant)
- *   at 52x52 with a 12px radius straight on the blue (no tile), then the
- *   two-tone "Shuttlr" wordmark and the "PLAY TOGETHER" tagline. Not interactive.
+ * - Left (AD-17 brand block): the full GameOn SG logo with "Create. Connect. Play."
+ *   tagline (`src/assets/gameonsg-logo-full.png`), non-interactive.
  * - Right: bell (44px target, red count badge hidden at zero) and the
  *   profile picture (48px circle, 2px white ring) — the uploaded photo,
  *   falling back to the letter avatar when there is none or it fails to load.
@@ -18,12 +17,13 @@ import React, { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import appConfig from '../../../config/appConfig.json';
 import { BannerBackground } from '../icons/DashboardIcons';
-import { brandBlock, dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
+import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
 import { useT } from '../../labels/LabelsContext';
 
-const APP_ICON = require('../../assets/shuttlr-icon-header.png');
+const FULL_LOGO = require('../../assets/gameonsg-logo-full.png');
 
 const MAX_BADGE_COUNT = 99;
 
@@ -73,29 +73,15 @@ export default function DashboardBanner({
           style={styles.brand}
           testID="banner-brand-block"
           accessible
-          accessibilityLabel={brandBlock.accessibilityLabel}
+          accessibilityLabel={appConfig.appName}
           pointerEvents="none"
         >
-          <Image testID="banner-app-icon" source={APP_ICON} style={styles.brandIcon} />
-          <View style={styles.brandText}>
-            <Text
-              style={styles.wordmark}
-              numberOfLines={1}
-              allowFontScaling={false}
-              maxFontSizeMultiplier={1}
-            >
-              {brandBlock.wordmarkLead}
-              <Text style={styles.wordmarkAccent}>{brandBlock.wordmarkAccent}</Text>
-            </Text>
-            <Text
-              style={styles.tagline}
-              numberOfLines={1}
-              allowFontScaling={false}
-              maxFontSizeMultiplier={1}
-            >
-              {t('mob.brand.tagline')}
-            </Text>
-          </View>
+          <Image
+            testID="banner-app-icon"
+            source={FULL_LOGO}
+            style={styles.brandLogo}
+            resizeMode="contain"
+          />
         </View>
         <View style={styles.topRight}>
           <Pressable
@@ -180,27 +166,10 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   brand: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
-  brandIcon: {
-    width: dashSize.brandIcon,
-    height: dashSize.brandIcon,
-    borderRadius: dashRadius.brandIcon,
-    overflow: 'hidden',
-  },
-  brandText: { marginLeft: 12, flexShrink: 1 },
-  wordmark: {
-    color: dash.white,
-    fontSize: 26,
-    lineHeight: 28,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
-  wordmarkAccent: { color: brandBlock.accent },
-  tagline: {
-    color: brandBlock.taglineColor,
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 2.5,
-    marginTop: 2,
+  brandLogo: {
+    height: 48,
+    width: 140,
+    maxWidth: '100%',
   },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   pressed: { opacity: 0.8 },
