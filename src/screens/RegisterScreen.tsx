@@ -13,8 +13,10 @@
  * - 400 errors: inline mappings for duplicate email/nickname and password length.
  */
 import React, { useContext, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppleButton } from '@invertase/react-native-apple-authentication';
+
+const FULL_LOGO = require('../assets/gameonsg-logo-full.png');
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AxiosError } from 'axios';
 
@@ -180,6 +182,14 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   return (
     <ScreenContainer edges="bottom">
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
+      <View style={styles.logoContainer}>
+        <Image
+          source={FULL_LOGO}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel={t('mob.brand.name')}
+        />
+      </View>
       <Text style={styles.title}>{t('mob.register.title')}</Text>
 
       {Platform.OS === 'ios' ? (
@@ -338,6 +348,15 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  logo: {
+    width: '70%',
+    maxWidth: 280,
+    height: 135,
+  },
   title: {
     ...typography.h1,
     color: colors.textPrimary,

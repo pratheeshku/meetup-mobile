@@ -34,7 +34,7 @@ import { radius, spacing, typography } from '../../theme/tokens';
 import { toHttpsUrl } from '../../utils/httpsUrl';
 import { perfImageError, perfImageLoad, perfImageLoadStart } from '../../diagnostics/perfLog';
 
-const SHUTTLR_ICON = require('../../assets/shuttlr-icon.png');
+const FULL_LOGO = require('../../assets/gameonsg-logo-full.png');
 
 const GAP = 12;
 
@@ -219,7 +219,7 @@ export default function BannerCarousel({
         ) : (
           <View style={styles.fallbackStaticAsset}>
             <Image
-              source={SHUTTLR_ICON}
+              source={FULL_LOGO}
               style={styles.fallbackLogo}
               resizeMode="contain"
             />

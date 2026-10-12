@@ -486,7 +486,7 @@ export default function RootNavigator(): React.JSX.Element {
   if (isLoading) {
     return (
       <ScreenContainer edges="both">
-        <LoadingView />
+        <LoadingView showLogo />
       </ScreenContainer>
     );
   }
