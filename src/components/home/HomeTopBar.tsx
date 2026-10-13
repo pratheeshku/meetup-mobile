@@ -97,8 +97,6 @@ export default function HomeTopBar({
             style={styles.brandTagline}
             numberOfLines={1}
             allowFontScaling={false}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
           >
             {t('mob.brand.tagline')}
           </Text>
@@ -227,8 +225,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   brandCenter: {
-    flex: 1,
-    flexShrink: 1,
+    flexGrow: 1,
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xs,
@@ -238,11 +236,12 @@ const styles = StyleSheet.create({
     width: 107,
   },
   brandTagline: {
-    width: 107,
+    alignSelf: 'center',
+    flexShrink: 0,
     marginTop: 2,
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     color: dash.text,
     textAlign: 'center',
   },

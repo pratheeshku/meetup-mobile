@@ -86,8 +86,6 @@ export default function DashboardBanner({
             style={styles.brandTagline}
             numberOfLines={1}
             allowFontScaling={false}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
           >
             {t('mob.brand.tagline')}
           </Text>
@@ -175,7 +173,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   brandPill: {
-    flexShrink: 1,
+    flexShrink: 0,
     alignItems: 'center',
     backgroundColor: dash.white,
     borderRadius: 14,
@@ -187,11 +185,12 @@ const styles = StyleSheet.create({
     height: 36,
   },
   brandTagline: {
-    width: 96,
+    alignSelf: 'center',
+    flexShrink: 0,
     marginTop: 2,
     fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     color: dash.text,
     textAlign: 'center',
   },
