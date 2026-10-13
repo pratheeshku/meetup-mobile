@@ -14,9 +14,11 @@
  * - 401 or other 4xx: "Invalid email or password."
  */
 import React, { useEffect, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { AppleButton } from '@invertase/react-native-apple-authentication';
 import { GoogleSigninButton } from '@react-native-google-signin/google-signin';
+
+const FULL_LOGO = require('../assets/gameonsg-logo-full.png');
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AxiosError } from 'axios';
 
@@ -171,6 +173,14 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
   return (
     <ScreenContainer edges="bottom">
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
+      <View style={styles.logoContainer}>
+        <Image
+          source={FULL_LOGO}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel={t('mob.brand.name')}
+        />
+      </View>
       <Text style={styles.title}>{t('mob.login.title')}</Text>
 
       {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
@@ -262,6 +272,15 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  logo: {
+    width: '70%',
+    maxWidth: 280,
+    height: 135,
+  },
   title: {
     ...typography.h1,
     color: colors.textPrimary,

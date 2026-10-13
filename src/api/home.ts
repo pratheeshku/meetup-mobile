@@ -74,7 +74,7 @@ export const BUNDLED_FALLBACK_BANNER: HomeBannersResponse = {
   banners: [],
   fallback: {
     image_url: null,
-    alt_text: 'Welcome to Shuttlr — Play together',
+    alt_text: `Welcome to ${appConfig.appName} — Play together`,
     click_url: null,
     is_sponsored: false,
   },

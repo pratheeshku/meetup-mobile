@@ -13,7 +13,6 @@ import React from 'react';
 import {
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -24,11 +23,11 @@ import { SportIcon, AllSportsIcon } from '../icons/DashboardIcons';
 import { BellGoldIcon } from '../icons/HomeV2Icons';
 import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
-import { dash, dashRadius } from '../../theme/dashboardTheme';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { dashRadius } from '../../theme/dashboardTheme';
+import { colors, spacing, typography } from '../../theme/tokens';
 import type { SportOption } from '../../utils/gameLists';
 
-const SHUTTLR_ICON = require('../../assets/shuttlr-icon.png');
+const WORDMARK_ASSET = require('../../assets/gameonsg-wordmark.png');
 
 interface HomeTopBarProps {
   name: string;
@@ -87,15 +86,15 @@ export default function HomeTopBar({
           </Pressable>
         </View>
 
-        {/* Center: Brand (App Icon + Shuttlr) centred between hamburger and bell */}
+        {/* Center: Brand (GameOn SG Wordmark) centred between hamburger and bell */}
         <View style={styles.brandCenter}>
           <Image
             testID="home-app-icon"
-            source={SHUTTLR_ICON}
-            style={styles.brandIcon}
+            accessibilityLabel={t('mob.brand.name')}
+            source={WORDMARK_ASSET}
+            style={styles.brandWordmark}
             resizeMode="contain"
           />
-          <Text style={styles.brandTitle}>{t('mob.brand.name')}</Text>
         </View>
 
         {/* Right: Bell & Profile */}
@@ -226,16 +225,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandIcon: {
-    width: 30,
-    height: 30,
-    marginRight: spacing.xs + 2,
-  },
-  brandTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: dash.brand,
-    letterSpacing: -0.5,
+  brandWordmark: {
+    height: 40,
+    width: 107,
   },
   topRight: {
     flexDirection: 'row',

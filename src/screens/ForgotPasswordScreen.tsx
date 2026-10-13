@@ -14,8 +14,10 @@
  *   do not show the "link sent" text.
  */
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
+const FULL_LOGO = require('../assets/gameonsg-logo-full.png');
 
 import { useAuth } from '../auth/AuthContext';
 import { GoogleSignInCancelledError } from '../auth/googleAuth';
@@ -132,6 +134,14 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
   return (
     <ScreenContainer edges="bottom">
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
+      <View style={styles.logoContainer}>
+        <Image
+          source={FULL_LOGO}
+          style={styles.logo}
+          resizeMode="contain"
+          accessibilityLabel={t('mob.brand.name')}
+        />
+      </View>
       <Text style={styles.title}>{t('mob.forgot.title')}</Text>
 
       {submitted ? (
@@ -229,6 +239,15 @@ export default function ForgotPasswordScreen({ navigation, route }: Props): Reac
 
 const styles = StyleSheet.create({
   container: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  logo: {
+    width: '70%',
+    maxWidth: 280,
+    height: 135,
+  },
   title: {
     ...typography.h1,
     color: colors.textPrimary,
