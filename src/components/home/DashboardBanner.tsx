@@ -3,8 +3,8 @@
  * brand-blue, height 208 (plus the status-bar inset), bottom corners radius
  * 32, decorative SVG background (Appendix B).
  *
- * - Left (AD-17 brand block): the full GameOn SG logo with "Create. Connect. Play."
- *   tagline (`src/assets/gameonsg-logo-full.png`), non-interactive.
+ * - Left (AD-17 brand block): a white pill with the GameOn SG wordmark and the
+ *   tagline from `mob.brand.tagline`, non-interactive.
  * - Right: bell (44px target, red count badge hidden at zero) and the
  *   profile picture (48px circle, 2px white ring) — the uploaded photo,
  *   falling back to the letter avatar when there is none or it fails to load.
@@ -23,7 +23,7 @@ import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
 import { useT } from '../../labels/LabelsContext';
 
-const FULL_LOGO = require('../../assets/gameonsg-logo-full.png');
+const WORDMARK = require('../../assets/gameonsg-wordmark.png');
 
 const MAX_BADGE_COUNT = 99;
 
@@ -70,7 +70,7 @@ export default function DashboardBanner({
 
       <View style={styles.topRow}>
         <View
-          style={styles.brand}
+          style={styles.brandPill}
           testID="banner-brand-block"
           accessible
           accessibilityLabel={appConfig.appName}
@@ -78,10 +78,17 @@ export default function DashboardBanner({
         >
           <Image
             testID="banner-app-icon"
-            source={FULL_LOGO}
-            style={styles.brandLogo}
+            source={WORDMARK}
+            style={styles.brandWordmark}
             resizeMode="contain"
           />
+          <Text
+            style={styles.brandTagline}
+            numberOfLines={1}
+            allowFontScaling={false}
+          >
+            {t('mob.brand.tagline')}
+          </Text>
         </View>
         <View style={styles.topRight}>
           <Pressable
@@ -165,13 +172,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: spacing.md,
   },
-  brand: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
-  brandLogo: {
-    height: 48,
-    width: 140,
-    maxWidth: '100%',
+  brandPill: {
+    flexShrink: 0,
+    alignItems: 'center',
+    backgroundColor: dash.white,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  brandWordmark: {
+    width: 96,
+    height: 36,
+  },
+  brandTagline: {
+    alignSelf: 'center',
+    flexShrink: 0,
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: dash.text,
+    textAlign: 'center',
+  },
+  topRight: { flexDirection: 'row', alignItems: 'center', flexShrink: 0, gap: spacing.sm },
   pressed: { opacity: 0.8 },
   bell: {
     width: dashSize.touchTarget,

@@ -100,7 +100,7 @@ export const DEFAULT_LABELS = {
   'mob.force_update.message': 'Please update GameOn SG to continue.',
   'mob.force_update.action': 'Update',
   'mob.brand.name': 'GameOn SG',
-  'mob.brand.tagline': 'PLAY TOGETHER',
+  'mob.brand.tagline': 'Create. Connect. Play.',
   'mob.tabs.home': 'Home',
   'mob.tabs.groups': 'Groups',
   'mob.tabs.games': 'Games',

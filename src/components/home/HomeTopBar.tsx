@@ -1,13 +1,10 @@
 /**
- * Home Top Bar & Greeting Header (Shuttlr Home v2).
+ * Home top bar and greeting.
  *
- * Requirements:
- * - Top bar: hamburger, app icon + "Shuttlr", bell with unread dot, profile photo.
- * - Greeting on the left;
- * - The sport selector at top right BELOW the profile photo at reduced size
- *   (existing behaviour kept: multi-select, filters content, defaults to sports
- *   the user has a skill level for).
- * - App icon: shuttlr-icon.png (512x512 transparent PNG) at ~30px.
+ * - Top bar: hamburger, wordmark and tagline, bell with unread dot, profile photo.
+ * - Greeting on the left.
+ * - Sport selector at top right below the profile photo (multi-select, filters
+ *   content, defaults to sports the user has a skill level for).
  */
 import React from 'react';
 import {
@@ -19,11 +16,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import appConfig from '../../../config/appConfig.json';
 import { SportIcon, AllSportsIcon } from '../icons/DashboardIcons';
 import { BellGoldIcon } from '../icons/HomeV2Icons';
 import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
-import { dashRadius } from '../../theme/dashboardTheme';
+import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, spacing, typography } from '../../theme/tokens';
 import type { SportOption } from '../../utils/gameLists';
 
@@ -68,7 +66,7 @@ export default function HomeTopBar({
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + spacing.xs }]}>
-      {/* Row 1: Hamburger, App Icon + Shuttlr, Bell with dot, Profile Avatar */}
+      {/* Row 1: hamburger, wordmark, bell, profile */}
       <View style={styles.topRow}>
         {/* Left: Hamburger */}
         <View style={styles.topLeft}>
@@ -87,14 +85,21 @@ export default function HomeTopBar({
         </View>
 
         {/* Center: Brand (GameOn SG Wordmark) centred between hamburger and bell */}
-        <View style={styles.brandCenter}>
+        <View style={styles.brandCenter} pointerEvents="none">
           <Image
             testID="home-app-icon"
-            accessibilityLabel={t('mob.brand.name')}
+            accessibilityLabel={appConfig.appName}
             source={WORDMARK_ASSET}
             style={styles.brandWordmark}
             resizeMode="contain"
           />
+          <Text
+            style={styles.brandTagline}
+            numberOfLines={1}
+            allowFontScaling={false}
+          >
+            {t('mob.brand.tagline')}
+          </Text>
         </View>
 
         {/* Right: Bell & Profile */}
@@ -196,7 +201,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 48,
+    minHeight: 48,
   },
   topLeft: {
     flexDirection: 'row',
@@ -220,18 +225,30 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   brandCenter: {
-    flex: 1,
-    flexDirection: 'row',
+    flexGrow: 1,
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
   },
   brandWordmark: {
     height: 40,
     width: 107,
   },
+  brandTagline: {
+    alignSelf: 'center',
+    flexShrink: 0,
+    marginTop: 2,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: dash.text,
+    textAlign: 'center',
+  },
   topRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
     gap: spacing.sm,
   },
   bellTouch: {
