@@ -292,7 +292,9 @@ Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__
 
 **Git evidence**:
 ```
-9371831 (HEAD -> feat/venue-catalogue-mobile) fix(venues): omit venue_name when venue_id or others is present, correct report endpoints, and note missing board
+4f5de59 (HEAD -> feat/venue-catalogue-mobile) docs(venues): add baseline test failure comparison proving 180 pre-existing failures
+5363820 docs(venues): update report completion proof with commit 9371831
+9371831 fix(venues): omit venue_name when venue_id or others is present, correct report endpoints, and note missing board
 3096773 docs(venues): finalize completion proof in implementation report
 875bb1c fix(venues): remove EditMatchModal, enforce venue payload contracts, and update report
 834fbe8 docs(venues): update report with mock removal deviation, OI statuses, and contract verification
