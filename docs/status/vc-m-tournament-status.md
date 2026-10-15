@@ -14,7 +14,7 @@ Missing: Tournament schedule and match edit screens/endpoints. Per-match catalog
 Investigated:
 - `src/screens/TournamentDetailScreen.tsx` — only displays tournament details, registrations, and read-only fixtures; has no tournament edit screen or per-fixture edit mutation endpoint.
 - `src/screens/CreateGameScreen.tsx` — tournament creation exists (`POST /tournaments`), wired with 46px compact tournament `VenuePicker` (`variant="tournament"`).
-- Backend API contract in `DES-MEETUP-ADDENDUM-VENUE-CATALOGUE` §4 defines `GET /venues`, `GET /venues/{id}`, `GET /venues/{id}/photos`, `POST /venues/{id}/photos`, etc. No per-match fixture venue endpoint exists in §4 or backend API.
+- Backend API contract in `DES-MEETUP-ADDENDUM-VENUE-CATALOGUE` §4 defines `GET /venues`, `GET /venues/{id}` (shared images), `GET /venues/postal/{code}`, `POST /games/{id}/venue-images`, `POST /tournaments/{id}/venue-images`, `DELETE /venue-images/{id}`, and `POST /venue-images/{id}/report`. There is no `/venues/{id}/photos`. No per-match fixture venue endpoint exists in §4 or backend API.
 Required to unblock: Implementation of Tournament Lifecycle mobile work (`DES-MEETUP-ADDENDUM-tournament-lifecycle`) defining tournament schedule editing (`TournSched*`) and match editing (`FXEdit*`) along with corresponding backend endpoints.
 
 ## Files touched

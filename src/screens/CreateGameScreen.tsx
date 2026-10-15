@@ -446,11 +446,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           ...(venueCatalogueEnabled && catalogueVenue
             ? catalogueVenue.isOthers && catalogueVenue.othersInput
               ? {
-                  venue_name: fullVenueName,
                   others: catalogueVenue.othersInput,
                 }
               : {
-                  venue_name: fullVenueName,
                   venue_id: catalogueVenue.venueId || undefined,
                 }
             : {
@@ -500,11 +498,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           ...(venueCatalogueEnabled && catalogueVenue
             ? catalogueVenue.isOthers && catalogueVenue.othersInput
               ? {
-                  venue_name: fullVenueName,
                   others: catalogueVenue.othersInput,
                 }
               : {
-                  venue_name: fullVenueName,
                   venue_id: catalogueVenue.venueId || undefined,
                 }
             : {

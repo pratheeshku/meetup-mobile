@@ -299,39 +299,35 @@ describe('updateEvent (PATCH /events/{id})', () => {
     expect(result.estimated_cost_currency).toBe('USD');
   });
 
-  it('forwards venue_id and never sends venue_snapshot, address, lat, or lng', async () => {
+  it('forwards venue_id and never sends venue_name, venue_snapshot, address, lat, or lng', async () => {
     mockedPatch.mockResolvedValueOnce({
       data: {
         id: 'evt-1',
         title: 'Catalogue Venue Game',
         sport: 'badminton',
-        venue_name: 'Bishan Sports Centre',
         venue_id: 'v-101',
       },
     });
 
     await updateEvent('evt-1', {
-      venue_name: 'Bishan Sports Centre',
       venue_id: 'v-101',
     });
 
     expect(mockedPatch).toHaveBeenCalledWith(
       '/events/evt-1',
       {
-        venue_name: 'Bishan Sports Centre',
         venue_id: 'v-101',
       },
       { correlationId: undefined },
     );
   });
 
-  it('forwards others and never sends venue_id, venue_snapshot, address, lat, or lng', async () => {
+  it('forwards others and never sends venue_name, venue_id, venue_snapshot, address, lat, or lng', async () => {
     mockedPatch.mockResolvedValueOnce({
       data: {
         id: 'evt-1',
         title: 'Others Game',
         sport: 'badminton',
-        venue_name: 'Custom Court',
       },
     });
 
@@ -342,14 +338,12 @@ describe('updateEvent (PATCH /events/{id})', () => {
     };
 
     await updateEvent('evt-1', {
-      venue_name: 'Custom Court',
       others: othersInput,
     });
 
     expect(mockedPatch).toHaveBeenCalledWith(
       '/events/evt-1',
       {
-        venue_name: 'Custom Court',
         others: othersInput,
       },
       { correlationId: undefined },

@@ -44,27 +44,27 @@ All runtime mock fallbacks have been removed from `src/api/venues.ts`.
 - **Screen**: `src/screens/CreateGameScreen.tsx` (Step 3: When and where)
 - **API Call**: `createEvent(input, { correlationId })` -> calls `POST /events` (`src/api/events.ts`, DES-MEETUP.md §5.5)
 - **Payload Contract**:
-  - When catalogue venue chosen: `{ title, ..., venue_name, venue_id }`
-  - When Others chosen: `{ title, ..., venue_name, others: { name, postal_code, facilities, operating_hours, info_url } }`
-  - **Negative assertion**: `venue_snapshot`, `address`, `venue_address`, `lat`, `lng`, `venue_lat`, and `venue_lng` are **NEVER sent**.
+  - When catalogue venue chosen: `{ title, ..., venue_id }`
+  - When Others chosen: `{ title, ..., others: { name, postal_code, facilities, operating_hours, info_url } }`
+  - **Negative assertion**: `venue_name`, `venue_snapshot`, `address`, `venue_address`, `lat`, `lng`, `venue_lat`, and `venue_lng` are **NEVER sent**.
 - **Tests**: Asserted in `src/screens/__tests__/VenuePayloadContracts.test.tsx`.
 
 #### 2. Edit Game
 - **Screen**: `src/screens/EventDetailScreen.tsx` (Step 2: Venue)
 - **API Call**: `updateEvent(eventId, payload, { correlationId })` -> calls `PATCH /events/{id}` (`src/api/events.ts`, DES-MEETUP.md §5.5)
 - **Payload Contract**:
-  - When catalogue venue chosen: `{ venue_name, venue_id }`
-  - When Others chosen: `{ venue_name, others: { name, postal_code, facilities, operating_hours, info_url } }`
-  - **Negative assertion**: `venue_snapshot`, `address`, `venue_address`, `lat`, `lng`, `venue_lat`, and `venue_lng` are **NEVER sent**.
+  - When catalogue venue chosen: `{ venue_id }`
+  - When Others chosen: `{ others: { name, postal_code, facilities, operating_hours, info_url } }`
+  - **Negative assertion**: `venue_name`, `venue_snapshot`, `address`, `venue_address`, `lat`, `lng`, `venue_lat`, and `venue_lng` are **NEVER sent**.
 - **Tests**: Asserted in `src/screens/__tests__/VenuePayloadContracts.test.tsx` and `src/api/__tests__/events.test.ts`.
 
 #### 3. Create Tournament
 - **Screen**: `src/screens/CreateGameScreen.tsx` (`mode === 'tournament'`, Step 3: Venue picker with `variant="tournament"`)
 - **API Call**: `createTournament(input, { correlationId })` -> calls `POST /tournaments` (`src/api/tournaments.ts`, DES-MEETUP.md §5.20)
 - **Payload Contract**:
-  - When catalogue venue chosen: `{ title, sport, format, ..., venue_name, venue_id }`
-  - When Others chosen: `{ title, sport, format, ..., venue_name, others: { name, postal_code, facilities, operating_hours, info_url } }`
-  - **Negative assertion**: `venue_snapshot`, `address`, `venue_address`, `lat`, `lng`, `venue_lat`, and `venue_lng` are **NEVER sent**.
+  - When catalogue venue chosen: `{ title, sport, format, ..., venue_id }`
+  - When Others chosen: `{ title, sport, format, ..., others: { name, postal_code, facilities, operating_hours, info_url } }`
+  - **Negative assertion**: `venue_name`, `venue_snapshot`, `address`, `venue_address`, `lat`, `lng`, `venue_lat`, and `venue_lng` are **NEVER sent**.
 - **Tests**: Asserted in `src/screens/__tests__/VenuePayloadContracts.test.tsx` and `src/api/__tests__/tournaments.test.ts`.
 
 #### 4. Tournament Edit and Fixtures Status
@@ -83,8 +83,8 @@ BLOCKED — cannot proceed safely.
 Missing: Tournament schedule and match edit screens/endpoints. Per-match catalogue venue editing is not in DES-MEETUP-ADDENDUM-VENUE-CATALOGUE §4 or the backend API. Boards TournSched* and FXEdit* belong to the Tournament Lifecycle mobile work (DES-MEETUP-ADDENDUM-tournament-lifecycle), which has not been implemented in the mobile app yet.
 Investigated:
 - src/screens/TournamentDetailScreen.tsx — only displays tournament details, registrations, and read-only fixtures; has no tournament edit screen or per-fixture edit mutation endpoint.
-- src/screens/CreateGameScreen.tsx — tournament creation exists (POST /tournaments), wired with 46px compact tournament VenuePicker (variant="tournament").
-- Backend API contract in DES-MEETUP-ADDENDUM-VENUE-CATALOGUE §4 defines GET /venues, GET /venues/{id}, GET /venues/{id}/photos, POST /venues/{id}/photos, etc. No per-match fixture venue endpoint exists in §4 or backend API.
+- src/screens/CreateGameScreen.tsx — tournament creation exists (POST /tournaments), wired with 46px compact tournament VenuePicker (variant="tournament"). Note: the tournament-mode venue picker in CreateGameScreen has no matching board on the visual canvas.
+- Backend API contract in DES-MEETUP-ADDENDUM-VENUE-CATALOGUE §4 defines GET /venues, GET /venues/{id} (returns venue details and shared images), GET /venues/postal/{code}, POST /games/{id}/venue-images, POST /tournaments/{id}/venue-images, DELETE /venue-images/{id}, and POST /venue-images/{id}/report. There is no /venues/{id}/photos. No per-match fixture venue endpoint exists in §4 or the backend API.
 Required to unblock: Implementation of Tournament Lifecycle mobile work (DES-MEETUP-ADDENDUM-tournament-lifecycle) defining tournament schedule editing (TournSched*) and match editing (FXEdit*) along with corresponding backend endpoints.
 ```
 
@@ -141,10 +141,10 @@ This confirms that 100% of the new and modified venue catalogue code is complete
 
 ### Screen Verification & Screenshots
 - Reference boards from `docs/design-ref-venue/png/`:
-  - `Game3When.png` ↔ `CreateGameScreen` Step 3 (Catalogue VenuePicker + map pin card)
+  - `Game3When.png` ↔ `CreateGameScreen` Step 3 (Casual Game mode: Catalogue VenuePicker + map pin card)
   - `EditGame2.png` ↔ `EventDetailScreen` Step 2 (Catalogue VenuePicker + map pin card)
   - `GameDetail.png` ↔ `EventDetailScreen` (VenueDetailCard with snapshot, listed hours, info link, uncached photo strip)
-  - `TournSched.png`, `TournSchedErr.png`, `TournSchedWarn.png` ↔ `CreateGameScreen` Step 3 (Compact 46px venue box `variant="tournament"`)
+  - **Tournament-mode Venue Picker**: Note that the tournament-mode venue picker in `CreateGameScreen` (Step 3 when `mode === 'tournament'`) has **no matching board** on the visual canvas. It renders a 46px compact selected box with source tag, matching the design specification of the tournament picker.
 - **Screenshot Notice**: Direct live device screenshot capture is unavailable in this headless execution environment because no Android emulator or iOS simulator is booted (`adb devices` lists 0 attached devices; `xcrun simctl list devices` shows no booted simulators). All visual styling, dimensions, tokens, colors, typography, and layout were verified directly against the reference HTML boards in `docs/design-ref-venue/html/` and verified by unit test suites.
 
 ### Files Added Under `docs/`

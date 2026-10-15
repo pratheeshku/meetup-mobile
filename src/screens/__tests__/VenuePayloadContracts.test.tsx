@@ -226,7 +226,7 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
   });
 
   describe('1. Create Game (POST /events via createEvent)', () => {
-    it('sends venue_id and NEVER sends venue_snapshot, address, lat, or lng when catalogue venue is chosen', async () => {
+    it('sends venue_id and NEVER sends venue_name, venue_snapshot, address, lat, or lng when catalogue venue is chosen', async () => {
       const root = await renderAsync(
         <CreateGameScreen
           navigation={{ popTo: jest.fn(), navigate: jest.fn() } as any}
@@ -262,14 +262,14 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
       expect(mockCreateEvent).toHaveBeenCalledTimes(1);
       const payload = mockCreateEvent.mock.calls[0][0];
 
-      // Exact assertion: contains venue_id and full venue_name
+      // Exact assertion: contains venue_id
       expect(payload).toMatchObject({
         title: 'Friday Badminton',
         venue_id: 'v-cat-101',
-        venue_name: 'ActiveSG Bishan Sports Centre, Court 2',
       });
 
-      // Strict negative assertions: MUST NEVER send venue_snapshot, address, lat, or lng
+      // Strict negative assertions: MUST NEVER send venue_name, venue_snapshot, address, lat, or lng
+      expect(payload).not.toHaveProperty('venue_name');
       expect(payload).not.toHaveProperty('venue_snapshot');
       expect(payload).not.toHaveProperty('address');
       expect(payload).not.toHaveProperty('venue_address');
@@ -280,7 +280,7 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
       expect(payload).not.toHaveProperty('others');
     });
 
-    it('sends others{name,postal_code,facilities,operating_hours,info_url} and NEVER sends venue_id, venue_snapshot, address, lat, or lng', async () => {
+    it('sends others{name,postal_code,facilities,operating_hours,info_url} and NEVER sends venue_name, venue_id, venue_snapshot, address, lat, or lng', async () => {
       const root = await renderAsync(
         <CreateGameScreen
           navigation={{ popTo: jest.fn(), navigate: jest.fn() } as any}
@@ -316,10 +316,9 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
       expect(mockCreateEvent).toHaveBeenCalledTimes(1);
       const payload = mockCreateEvent.mock.calls[0][0];
 
-      // Exact assertion: contains others object and full venue_name
+      // Exact assertion: contains others object
       expect(payload).toMatchObject({
         title: 'Custom Court Game',
-        venue_name: 'Jurong West Community Arena, Court 2',
         others: {
           name: 'Jurong West Community Arena',
           postal_code: '649832',
@@ -329,7 +328,8 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
         },
       });
 
-      // Strict negative assertions: MUST NEVER send venue_id, venue_snapshot, address, lat, or lng
+      // Strict negative assertions: MUST NEVER send venue_name, venue_id, venue_snapshot, address, lat, or lng
+      expect(payload).not.toHaveProperty('venue_name');
       expect(payload.venue_id).toBeUndefined();
       expect(payload).not.toHaveProperty('venue_snapshot');
       expect(payload).not.toHaveProperty('address');
@@ -342,7 +342,7 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
   });
 
   describe('2. Create Tournament (POST /tournaments via createTournament)', () => {
-    it('sends venue_id and NEVER sends venue_snapshot, address, lat, or lng when catalogue venue is chosen', async () => {
+    it('sends venue_id and NEVER sends venue_name, venue_snapshot, address, lat, or lng when catalogue venue is chosen', async () => {
       const root = await renderAsync(
         <CreateGameScreen
           navigation={{ popTo: jest.fn(), navigate: jest.fn() } as any}
@@ -378,14 +378,14 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
       expect(mockCreateTournament).toHaveBeenCalledTimes(1);
       const payload = mockCreateTournament.mock.calls[0][0];
 
-      // Exact assertion: contains venue_id and venue_name
+      // Exact assertion: contains venue_id
       expect(payload).toMatchObject({
         title: 'Autumn Open Tournament',
         venue_id: 'v-cat-101',
-        venue_name: 'ActiveSG Bishan Sports Centre, Court 2',
       });
 
-      // Strict negative assertions: MUST NEVER send venue_snapshot, address, lat, or lng
+      // Strict negative assertions: MUST NEVER send venue_name, venue_snapshot, address, lat, or lng
+      expect(payload).not.toHaveProperty('venue_name');
       expect(payload).not.toHaveProperty('venue_snapshot');
       expect(payload).not.toHaveProperty('address');
       expect(payload).not.toHaveProperty('venue_address');
@@ -396,7 +396,7 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
       expect(payload).not.toHaveProperty('others');
     });
 
-    it('sends others{name,postal_code,facilities,operating_hours,info_url} and NEVER sends venue_id, venue_snapshot, address, lat, or lng', async () => {
+    it('sends others{name,postal_code,facilities,operating_hours,info_url} and NEVER sends venue_name, venue_id, venue_snapshot, address, lat, or lng', async () => {
       const root = await renderAsync(
         <CreateGameScreen
           navigation={{ popTo: jest.fn(), navigate: jest.fn() } as any}
@@ -432,10 +432,9 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
       expect(mockCreateTournament).toHaveBeenCalledTimes(1);
       const payload = mockCreateTournament.mock.calls[0][0];
 
-      // Exact assertion: contains others and venue_name
+      // Exact assertion: contains others
       expect(payload).toMatchObject({
         title: 'Others Venue Tourney',
-        venue_name: 'Jurong West Community Arena, Court 2',
         others: {
           name: 'Jurong West Community Arena',
           postal_code: '649832',
@@ -445,7 +444,8 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
         },
       });
 
-      // Strict negative assertions: MUST NEVER send venue_id, venue_snapshot, address, lat, or lng
+      // Strict negative assertions: MUST NEVER send venue_name, venue_id, venue_snapshot, address, lat, or lng
+      expect(payload).not.toHaveProperty('venue_name');
       expect(payload.venue_id).toBeUndefined();
       expect(payload).not.toHaveProperty('venue_snapshot');
       expect(payload).not.toHaveProperty('address');
@@ -458,7 +458,7 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
   });
 
   describe('3. Edit Game (PATCH /events/{id} via updateEvent)', () => {
-    it('sends venue_id and NEVER sends venue_snapshot, address, lat, or lng when catalogue venue is chosen', async () => {
+    it('sends venue_id and NEVER sends venue_name, venue_snapshot, address, lat, or lng when catalogue venue is chosen', async () => {
       const root = await renderAsync(
         <EventDetailScreen
           navigation={{ goBack: jest.fn() } as any}
@@ -494,13 +494,13 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
 
       const patchPayload = mockPatch.mock.calls[0][1];
 
-      // Exact assertion: contains venue_id and venue_name
+      // Exact assertion: contains venue_id
       expect(patchPayload).toMatchObject({
         venue_id: 'v-cat-101',
-        venue_name: 'ActiveSG Bishan Sports Centre',
       });
 
-      // Strict negative assertions: MUST NEVER send venue_snapshot, address, lat, or lng
+      // Strict negative assertions: MUST NEVER send venue_name, venue_snapshot, address, lat, or lng
+      expect(patchPayload).not.toHaveProperty('venue_name');
       expect(patchPayload).not.toHaveProperty('venue_snapshot');
       expect(patchPayload).not.toHaveProperty('address');
       expect(patchPayload).not.toHaveProperty('venue_address');
@@ -511,7 +511,7 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
       expect(patchPayload).not.toHaveProperty('others');
     });
 
-    it('sends others{name,postal_code,facilities,operating_hours,info_url} and NEVER sends venue_id, venue_snapshot, address, lat, or lng', async () => {
+    it('sends others{name,postal_code,facilities,operating_hours,info_url} and NEVER sends venue_name, venue_id, venue_snapshot, address, lat, or lng', async () => {
       const root = await renderAsync(
         <EventDetailScreen
           navigation={{ goBack: jest.fn() } as any}
@@ -547,9 +547,8 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
 
       const patchPayload = mockPatch.mock.calls[0][1];
 
-      // Exact assertion: contains others and venue_name
+      // Exact assertion: contains others
       expect(patchPayload).toMatchObject({
-        venue_name: 'Jurong West Community Arena',
         others: {
           name: 'Jurong West Community Arena',
           postal_code: '649832',
@@ -559,7 +558,8 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
         },
       });
 
-      // Strict negative assertions: MUST NEVER send venue_id, venue_snapshot, address, lat, or lng
+      // Strict negative assertions: MUST NEVER send venue_name, venue_id, venue_snapshot, address, lat, or lng
+      expect(patchPayload).not.toHaveProperty('venue_name');
       expect(patchPayload.venue_id).toBeUndefined();
       expect(patchPayload).not.toHaveProperty('venue_snapshot');
       expect(patchPayload).not.toHaveProperty('address');

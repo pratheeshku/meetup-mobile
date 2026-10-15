@@ -413,11 +413,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         ...(venueCatalogueEnabled && editCatalogueVenue
           ? editCatalogueVenue.isOthers && editCatalogueVenue.othersInput
             ? {
-                venue_name: fullVenueName || null,
                 others: editCatalogueVenue.othersInput,
               }
             : {
-                venue_name: fullVenueName || null,
                 venue_id: editCatalogueVenue.venueId || null,
               }
           : {
