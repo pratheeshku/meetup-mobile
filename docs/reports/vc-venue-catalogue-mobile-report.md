@@ -179,7 +179,9 @@ Time:        1.244 s
 
 **Git evidence**:
 ```
-875bb1c (HEAD -> feat/venue-catalogue-mobile) fix(venues): remove EditMatchModal, enforce venue payload contracts, and update report
+9371831 (HEAD -> feat/venue-catalogue-mobile) fix(venues): omit venue_name when venue_id or others is present, correct report endpoints, and note missing board
+3096773 docs(venues): finalize completion proof in implementation report
+875bb1c fix(venues): remove EditMatchModal, enforce venue payload contracts, and update report
 834fbe8 docs(venues): update report with mock removal deviation, OI statuses, and contract verification
 5c6575f fix(venues): remove runtime mock fallbacks, add failure path tests, and add UI error states
 813ad22 docs(venues): update implementation report with audit evidence, mock gating, and deviations
@@ -194,7 +196,7 @@ ecae74b feat(venues): vc-m-picker and vc-m-others venue picker and others entry
 ```
 ```
 On branch feat/venue-catalogue-mobile
-Your branch is ahead of 'origin/feat/venue-catalogue-mobile' by 5 commits.
+Your branch is ahead of 'origin/feat/venue-catalogue-mobile' by 7 commits.
   (use "git push" to publish your local commits)
 
 nothing to commit, working tree clean
