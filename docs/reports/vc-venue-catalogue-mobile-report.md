@@ -139,6 +139,108 @@ HEAD is now at 9accfd1 chore(android): record versionCode 70
 ```
 This confirms that 100% of the new and modified venue catalogue code is completely lint-clean (0 errors), and the 4 errors exist on `origin/main`.
 
+### Full Jest Test Suite Analysis & Baseline Comparison (Pre-Existing Failure Proof)
+
+To verify whether the 15 failing test suites (180 tests) were introduced by this feature or were pre-existing, a clean worktree of `origin/main` (`../mm-base`) was created and initialized via `npm ci`. The full Jest test suite was run with `--json` output on both `origin/main` and `feat/venue-catalogue-mobile`.
+
+#### Summary Comparison:
+
+| Metric | `origin/main` (Baseline) | `feat/venue-catalogue-mobile` (Branch) | Delta |
+|---|---|---|---|
+| **Total Test Suites** | 122 | 128 | +6 suites (venue catalogue) |
+| **Passed Test Suites** | 107 | 113 | +6 suites |
+| **Failed Test Suites** | **15** | **15** | **0 (Identical)** |
+| **Total Tests** | 1503 | 1560 | +57 tests (venue catalogue) |
+| **Passed Tests** | 1323 | 1380 | +57 tests |
+| **Failed Tests** | **180** | **180** | **0 (Identical)** |
+
+#### Difference Analysis:
+- **Suites failed ONLY on branch**: `0` (`[]`)
+- **Suites failed ONLY on baseline**: `0` (`[]`)
+- **Tests failed ONLY on branch**: `0` (`[]`)
+- **Tests failed ONLY on baseline**: `0` (`[]`)
+
+Every single failing test suite and individual failing test on `feat/venue-catalogue-mobile` is **100% pre-existing on `origin/main`**.
+
+#### Complete List of the 15 Shared Failing Suites:
+
+| Suite Path | Baseline Failed Tests | Branch Failed Tests | Notes / Root Cause |
+|---|---|---|---|
+| `__tests__/AppForceUpdate.test.tsx` | 1 | 1 | App rebranded from "Shuttlr" to "GameOn SG"; test expects "Shuttlr" |
+| `config/__tests__/appConfig.test.ts` | 1 | 1 | Base config branding expectation mismatch |
+| `src/assets/__tests__/headerIcon.test.ts` | 0 (suite failed) | 0 (suite failed) | `ENOENT: shuttlr-icon.png` (renamed on base) |
+| `src/components/__tests__/ForceUpdateGate.test.tsx` | 2 | 2 | Branding copy expectation mismatch |
+| `src/components/__tests__/keyboardInventory.test.ts` | 3 | 3 | Keyboard inventory baseline mismatch |
+| `src/components/home/__tests__/homeComponents.test.tsx` | 7 | 7 | Home component testID / accessibility copy changes on base |
+| `src/screens/__tests__/CreateGameScreen.test.tsx` | 37 | 37 | Expects `"🎮 Casual Game"` (with emoji); UI on base removed emoji |
+| `src/screens/__tests__/EventDetailScreen.test.tsx` | 43 | 43 | Pre-existing contract/render mismatches on base |
+| `src/screens/__tests__/GroupDetailScreen.test.tsx` | 7 | 7 | Pre-existing group detail test expectation mismatches |
+| `src/screens/__tests__/HomeScreen.test.tsx` | 31 | 31 | Dashboard banner/section ordering testID mismatch |
+| `src/screens/__tests__/ProfileScreen.test.tsx` | 31 | 31 | Pre-existing profile screen test expectation mismatches |
+| `src/screens/__tests__/ProfileScreenLinks.test.tsx` | 8 | 8 | Pre-existing link list mismatches on base |
+| `src/screens/__tests__/ProfileScreenReportRow.test.tsx` | 4 | 4 | Pre-existing report row test expectation mismatches |
+| `src/screens/__tests__/ProfileScreenTerms.test.tsx` | 4 | 4 | Pre-existing terms modal test expectation mismatches |
+| `src/utils/__tests__/shareLink.test.ts` | 1 | 1 | Pre-existing share link domain mismatch on base |
+| **Total** | **180** | **180** | |
+
+#### Representative Error Messages from Shared Failures:
+
+1. **Representative Suite 1**: `__tests__/AppForceUpdate.test.tsx`
+   - **Test**: `App with the force-update gate > below the minimum: the blocking screen replaces the login screen and all navigation`
+   - **Error**:
+     ```
+     Error: expect(received).toEqual(expected) // deep equality
+
+     Expected: ArrayContaining ["Update required", "Please update Shuttlr to continue.", "Update"]
+     Received: ["Update required", "Please update GameOn SG to continue.", "Update"]
+         at Object.toEqual (/Users/pratheesh/Developer/mm-base/__tests__/AppForceUpdate.test.tsx:80:21)
+     ```
+   - **Cause**: The application was rebranded from "Shuttlr" to "GameOn SG" on `origin/main`, but the test assertion still expects the legacy string "Shuttlr".
+
+2. **Representative Suite 2**: `src/screens/__tests__/HomeScreen.test.tsx`
+   - **Test**: `layout and order (AD-1) > renders banner, next game, sports, My games, My groups, Recommended, shortcut tiles — in that order`
+   - **Error**:
+     ```
+     Error: expect(received).toEqual(expected) // deep equality
+
+     - Expected  - 9
+     + Received  + 1
+
+     - Array [
+     -   "dashboard-banner",
+     -   "next-game-section",
+     -   "sports-section",
+     -   "my-games-section",
+     -   "my-groups-section",
+     -   "recommended-section",
+     -   "shortcut-tiles",
+     - ]
+     + Array []
+         at Object.toEqual (/Users/pratheesh/Developer/mm-base/src/screens/__tests__/HomeScreen.test.tsx:154:32)
+     ```
+   - **Cause**: Dashboard test IDs and layout ordering expectations in `HomeScreen.test.tsx` diverged during prior dashboard refactoring on `origin/main`.
+
+3. **Representative Error on Touched Screen**: `src/screens/__tests__/CreateGameScreen.test.tsx`
+   - **Test**: `CreateGameScreen — toggle > defaults to Casual Game and offers a Tournament toggle`
+   - **Error**:
+     ```
+     Error: Expected exactly one pressable labelled "🎮 Casual Game", found 0
+         at pressableLabelled (/Users/pratheesh/Developer/mm-base/src/test-utils/render.ts:88:11)
+         at Object.<anonymous> (/Users/pratheesh/Developer/mm-base/src/screens/__tests__/CreateGameScreen.test.tsx:97:29)
+     ```
+   - **Cause**: On `origin/main`, the button label was updated to "Casual Game" (removing the emoji), but the pre-existing test suite in `CreateGameScreen.test.tsx` was not updated and fails identically (37 failures) on both base and branch.
+
+#### Venue Catalogue Test Suites (Branch Exclusive - 100% Passing):
+All 7 test suites created/extended for venue catalogue pass with zero errors:
+1. `src/api/__tests__/venues.test.ts` (15 passed)
+2. `src/api/__tests__/events.test.ts` (15 passed)
+3. `src/api/__tests__/tournaments.test.ts` (14 passed)
+4. `src/components/venue/__tests__/VenuePicker.test.tsx` (11 passed)
+5. `src/components/venue/__tests__/OthersVenueModal.test.tsx` (8 passed)
+6. `src/components/venue/__tests__/VenueDetailCard.test.tsx` (5 passed)
+7. `src/screens/__tests__/VenuePayloadContracts.test.tsx` (6 passed)
+**Total: 7 suites, 74 tests passed, 0 failed.**
+
 ### Screen Verification & Screenshots
 - Reference boards from `docs/design-ref-venue/png/`:
   - `Game3When.png` ↔ `CreateGameScreen` Step 3 (Casual Game mode: Catalogue VenuePicker + map pin card)
@@ -161,21 +263,32 @@ This confirms that 100% of the new and modified venue catalogue code is complete
 
 ### Completion Proof
 
-**Test evidence** (raw output across 3 consecutive runs):
+**Test evidence** (raw output across 3 consecutive runs of venue catalogue test suites):
 ```
-Tests:       47 passed, 47 total
+Test Suites: 7 passed, 7 total
+Tests:       74 passed, 74 total
 Snapshots:   0 total
-Time:        1.325 s
+Time:        1.471 s, estimated 2 s
+Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__tests__\/VenuePayloadContracts.test.tsx|src\/api\/__tests__\/venues.test.ts|src\/api\/__tests__\/events.test.ts|src\/api\/__tests__\/tournaments.test.ts/i.
 --- Run 1 ---
-Tests:       47 passed, 47 total
+Test Suites: 7 passed, 7 total
+Tests:       74 passed, 74 total
 Snapshots:   0 total
-Time:        1.258 s
+Time:        1.251 s, estimated 2 s
+Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__tests__\/VenuePayloadContracts.test.tsx|src\/api\/__tests__\/venues.test.ts|src\/api\/__tests__\/events.test.ts|src\/api\/__tests__\/tournaments.test.ts/i.
 --- Run 2 ---
-Tests:       47 passed, 47 total
+Test Suites: 7 passed, 7 total
+Tests:       74 passed, 74 total
 Snapshots:   0 total
-Time:        1.244 s
+Time:        1.283 s, estimated 2 s
+Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__tests__\/VenuePayloadContracts.test.tsx|src\/api\/__tests__\/venues.test.ts|src\/api\/__tests__\/events.test.ts|src\/api\/__tests__\/tournaments.test.ts/i.
 --- Run 3 ---
 ```
+
+**Full suite test summary** (proving identical 180 pre-existing baseline failures):
+- `feat/venue-catalogue-mobile`: Test Suites: 15 failed, 113 passed, 128 total. Tests: 180 failed, 1380 passed, 1560 total.
+- `origin/main` (`../mm-base`): Test Suites: 15 failed, 107 passed, 122 total. Tests: 180 failed, 1323 passed, 1503 total.
+- Suites/tests failing only on branch: `0`.
 
 **Git evidence**:
 ```
