@@ -1,36 +1,28 @@
 # Status: vc-m-tournament
 
 **Started**: 2026-10-15T20:41:00+08:00
-**Last updated**: 2026-10-15T20:46:00+08:00
-**Last updated by**: agy (Senior Full-Stack Developer)
+**Last updated**: 2026-10-15T21:40:00+08:00
+**Last updated by**: Senior Full-Stack Developer
 **Design doc reference**: DES-MEETUP-ADDENDUM-VENUE-CATALOGUE v1.0, §4, §5; Boards: `TournSched`, `TournSchedErr`, `TournSchedWarn`, `FXEdit*`
 
 ## Current step
-4 of 4 — Task complete: 46px compact tournament VenuePicker variant built, wired into CreateGameScreen (tournament mode) and EditMatchModal on TournamentDetailScreen, unit tests passing. Built against spec, integration pending.
+BLOCKED-pending-lifecycle-mobile
 
-## Files touched so far
+## Status
+BLOCKED — cannot proceed safely.
+Missing: Tournament schedule and match edit screens/endpoints. Per-match catalogue venue editing is not in DES-MEETUP-ADDENDUM-VENUE-CATALOGUE §4 or the backend API. Boards `TournSched*` and `FXEdit*` belong to the Tournament Lifecycle mobile work (`DES-MEETUP-ADDENDUM-tournament-lifecycle`), which has not been implemented in the mobile app yet.
+Investigated:
+- `src/screens/TournamentDetailScreen.tsx` — only displays tournament details, registrations, and read-only fixtures; has no tournament edit screen or per-fixture edit mutation endpoint.
+- `src/screens/CreateGameScreen.tsx` — tournament creation exists (`POST /tournaments`), wired with 46px compact tournament `VenuePicker` (`variant="tournament"`).
+- Backend API contract in `DES-MEETUP-ADDENDUM-VENUE-CATALOGUE` §4 defines `GET /venues`, `GET /venues/{id}`, `GET /venues/{id}/photos`, `POST /venues/{id}/photos`, etc. No per-match fixture venue endpoint exists in §4 or backend API.
+Required to unblock: Implementation of Tournament Lifecycle mobile work (`DES-MEETUP-ADDENDUM-tournament-lifecycle`) defining tournament schedule editing (`TournSched*`) and match editing (`FXEdit*`) along with corresponding backend endpoints.
+
+## Files touched
 | File | Action | Status |
 |---|---|---|
-| src/components/venue/VenuePicker.tsx | modified | done and verified |
-| src/components/tournament/EditMatchModal.tsx | created | done and verified |
-| src/components/tournament/__tests__/EditMatchModal.test.tsx | created | done and verified |
-| src/screens/CreateGameScreen.tsx | modified | done and verified |
-| src/screens/TournamentDetailScreen.tsx | modified | done and verified |
-| docs/status/vc-m-tournament-status.md | created | done and verified |
-
-## Blockers / open questions
-None. Task built against spec and boards `TournSched*` and `FXEdit*`. Built against spec, integration pending.
-
-## Handoff notes
-vc-m-tournament acceptance met:
-- Tournament boards (`TournSched*`, `FXEdit*`) require a 46px selected-state venue field with name, source tag, and chevron down.
-- Added `variant="tournament"` and `helperText` props to `VenuePicker`:
-  - Renders 46px compact selected box with name, tag, and chevron.
-  - Omit map preview in tournament variant (matching canvas boards).
-  - Tapping opens the catalogue search list/modal to pick a venue.
-  - Courts and match length stay organizer-entered; the catalogue never fills them.
-- Wired into `CreateGameScreen.tsx` step 3 when `mode === 'tournament'`.
-- Built `EditMatchModal` matching `FXEdit.html` (and variants `FXEditCourt`, `FXEditPlayer`, `FXEditRest`, `FXEditRound`, `FXEditWindow`):
-  - Displays match participants, round, date, start time, 46px compact venue picker, court input, and court clash warnings.
-  - Wired into `TournamentDetailScreen.tsx` for organizers on the Fixtures tab.
-- All unit tests in `EditMatchModal.test.tsx` and `VenuePicker.test.tsx` pass.
+| src/components/venue/VenuePicker.tsx | modified | 46px compact tournament variant built |
+| src/screens/CreateGameScreen.tsx | modified | Tournament creation wired with tournament VenuePicker |
+| src/components/tournament/EditMatchModal.tsx | deleted | Removed (per-match edit belongs to lifecycle mobile work) |
+| src/components/tournament/__tests__/EditMatchModal.test.tsx | deleted | Removed |
+| src/screens/TournamentDetailScreen.tsx | modified | Reverted placeholder fixture editing wiring |
+| docs/status/vc-m-tournament-status.md | modified | BLOCKED-pending-lifecycle-mobile |

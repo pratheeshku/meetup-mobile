@@ -194,6 +194,5 @@ export interface CreateTournamentInput {
   registration_closes_at?: string;
   venue_name?: string;
   venue_id?: string;
-  venue_snapshot?: VenueSnapshot;
   others?: OthersVenueInput;
 }

@@ -83,7 +83,6 @@ export interface UpdateEventInput {
   venue_name?: string | null;
   venue_address?: string | null;
   venue_id?: string | null;
-  venue_snapshot?: VenueSnapshot | null;
   others?: OthersVenueInput | null;
   skill_level_requirement?: EventSkillLevel | string | null;
   capacity?: number;
@@ -165,7 +164,6 @@ export interface CreateEventInput {
   venue_lat?: number | null;
   venue_lng?: number | null;
   venue_id?: string;
-  venue_snapshot?: VenueSnapshot;
   others?: OthersVenueInput;
   description?: string;
   /**

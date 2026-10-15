@@ -189,6 +189,57 @@ describe('createTournament', () => {
     expect(created).toMatchObject({ id: 't-new', name: 'Summer Cup', max_participants: 8 });
   });
 
+  it('forwards venue_id and never sends venue_snapshot, address, lat, or lng', async () => {
+    mockedPost.mockResolvedValueOnce({ data: response });
+    const input = {
+      title: 'Summer Cup',
+      sport: 'football',
+      visibility: 'public' as const,
+      participation_mode: 'team' as const,
+      format: 'knockout' as const,
+      capacity: 8,
+      starts_at: '2026-10-01T10:00:00.000Z',
+      venue_name: 'Bishan Sports Centre',
+      venue_id: 'v-101',
+    };
+
+    await createTournament(input, { correlationId: 'cid-venue' });
+
+    expect(mockedPost).toHaveBeenCalledWith('/tournaments', input, { correlationId: 'cid-venue' });
+    expect(input).not.toHaveProperty('venue_snapshot');
+    expect(input).not.toHaveProperty('address');
+    expect(input).not.toHaveProperty('lat');
+    expect(input).not.toHaveProperty('lng');
+  });
+
+  it('forwards others and never sends venue_id, venue_snapshot, address, lat, or lng', async () => {
+    mockedPost.mockResolvedValueOnce({ data: response });
+    const input = {
+      title: 'Summer Cup',
+      sport: 'football',
+      visibility: 'public' as const,
+      participation_mode: 'team' as const,
+      format: 'knockout' as const,
+      capacity: 8,
+      starts_at: '2026-10-01T10:00:00.000Z',
+      venue_name: 'Custom Court',
+      others: {
+        name: 'Custom Court',
+        postal_code: '123456',
+        facilities: ['Field 1'],
+      },
+    };
+
+    await createTournament(input, { correlationId: 'cid-others' });
+
+    expect(mockedPost).toHaveBeenCalledWith('/tournaments', input, { correlationId: 'cid-others' });
+    expect(input).not.toHaveProperty('venue_id');
+    expect(input).not.toHaveProperty('venue_snapshot');
+    expect(input).not.toHaveProperty('address');
+    expect(input).not.toHaveProperty('lat');
+    expect(input).not.toHaveProperty('lng');
+  });
+
   it('propagates a failed request to the caller', async () => {
     mockedPost.mockRejectedValueOnce(new Error('boom'));
     await expect(
