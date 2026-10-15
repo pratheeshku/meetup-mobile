@@ -51,6 +51,7 @@ import { getClientConfig } from '../api/config';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import EditMatchModal from '../components/tournament/EditMatchModal';
+import VenueDetailCard from '../components/venue/VenueDetailCard';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
@@ -259,6 +260,15 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         </Text>
         <Text style={styles.description}>{tournament.description}</Text>
       </Card>
+
+      {venueCatalogueEnabled ? (
+        <VenueDetailCard
+          snapshot={tournament.venue_snapshot}
+          fallbackText={tournament.venue_label || tournament.name}
+          tournamentId={tournament.id}
+          isOrganiser={isOrganiser}
+        />
+      ) : null}
 
       {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
       {withdrawError ? <Text style={styles.errorText}>{withdrawError}</Text> : null}

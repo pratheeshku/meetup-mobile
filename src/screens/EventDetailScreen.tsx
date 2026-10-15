@@ -42,6 +42,7 @@ import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
+import VenueDetailCard from '../components/venue/VenueDetailCard';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import NumberField from '../components/NumberField';
 import ScreenContainer from '../components/ScreenContainer';
@@ -1037,12 +1038,23 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               </Text>
             </View>
 
-            <View style={styles.infoRow}>
-              <View style={[styles.infoIconBox, { backgroundColor: colors.accent }]}>
-                <PinIcon size={18} />
+            {venueCatalogueEnabled ? (
+              <VenueDetailCard
+                snapshot={event.venue_snapshot}
+                fallbackText={venueText}
+                courtDetails={null}
+                mapsApiKey={mapsApiKey}
+                eventId={event.id}
+                isOrganiser={isOrganiser}
+              />
+            ) : (
+              <View style={styles.infoRow}>
+                <View style={[styles.infoIconBox, { backgroundColor: colors.accent }]}>
+                  <PinIcon size={18} />
+                </View>
+                <Text style={styles.infoText}>{venueText || t('mob.create_game.venue_label')}</Text>
               </View>
-              <Text style={styles.infoText}>{venueText || t('mob.create_game.venue_label')}</Text>
-            </View>
+            )}
 
             <View style={styles.infoRow}>
               <View style={[styles.infoIconBox, { backgroundColor: colors.success }]}>
