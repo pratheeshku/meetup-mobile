@@ -74,6 +74,67 @@ All runtime mock fallbacks have been removed from `src/api/venues.ts`.
 - **Action Taken**: Removed `EditMatchModal` and fixture edit pressable wiring from `TournamentDetailScreen.tsx`. No placeholder screens built.
 - **Task Status**: `vc-m-tournament` marked `BLOCKED-pending-lifecycle-mobile`.
 
+#### 5. Legacy Venue Flow Protection & Verification (Flag Off & Absent)
+Because the pre-existing test suites for `CreateGameScreen` (37 failures) and `EventDetailScreen` (43 failures) fail on `origin/main` due to unrelated baseline drift, an isolated contract test suite was created in `src/screens/__tests__/LegacyVenuePayloadContracts.test.tsx` to protect the legacy flow.
+
+The test suite exercises both:
+- **Condition 1**: `venue_catalogue_enabled = false`
+- **Condition 2**: `venue_catalogue_enabled` absent (`undefined`)
+
+**Assertions Proved**:
+1. **Free-text fields & No VenuePicker**: Step 3 (when/where in game/tournament creation) and Step 2 (venue in game edit) render the original free-text venue search (`placeholder="Search venue"`) and court details (`placeholder="e.g. Court 2"`), and assert that `VenuePicker` is **NOT** rendered (`mock-venue-picker` count is 0).
+2. **Payload Identity with origin/main**: The payloads sent to `createEvent`, `createTournament`, and `updateEvent` match byte-for-byte what `origin/main` sends (`venue_name`, `venue_address`, `venue_place_id`, `venue_lat`, `venue_lng`).
+   - **Negative assertions**: `venue_id`, `others`, and `venue_snapshot` are strictly `undefined`.
+3. **Draggable Pin & Current Location Link**: The `"Use my current location"` interactive row and the location badge with `PinIcon` (and the static map preview when lat/lng are set) are strictly verified present in all legacy flows.
+
+**Worktree Verification Methodology**:
+To guarantee zero regression against `origin/main`, a separate git worktree was created at `origin/main` (`../meetup-mobile-main`, commit `9accfd1`). A test runner executed the identical user inputs through `origin/main`'s code, logging the exact payloads emitted:
+- **origin/main Create Game**:
+  ```json
+  {
+    "title": "Friday Badminton",
+    "sport": "badminton",
+    "visibility": "group",
+    "skill_level_requirement": "intermediate",
+    "capacity": 4,
+    "starts_at": "<ISO-timestamp>",
+    "ends_at": null,
+    "venue_name": "Bishan Sports Hall, Court 3",
+    "venue_address": "Bishan St 14, Singapore",
+    "venue_place_id": "pid-123",
+    "venue_lat": 1.354,
+    "venue_lng": 103.851
+  }
+  ```
+- **origin/main Create Tournament**:
+  ```json
+  {
+    "title": "Autumn Open Tournament",
+    "sport": "badminton",
+    "visibility": "group",
+    "participation_mode": "individual",
+    "format": "knockout",
+    "capacity": 4,
+    "starts_at": "<Date-string>",
+    "venue_name": "Bishan Sports Hall, Hall A"
+  }
+  ```
+- **origin/main Edit Game**:
+  ```json
+  {
+    "title": "Existing Badminton Game",
+    "venue_name": "Bishan Sports Hall, Court 5",
+    "venue_address": "Bishan St 14, Singapore",
+    "venue_place_id": "pid-123",
+    "venue_lat": 1.354,
+    "venue_lng": 103.851,
+    "skill_level_requirement": "intermediate",
+    "capacity": 8,
+    "starts_at": "2026-11-20T10:00:00.000Z"
+  }
+  ```
+The branch's test suite asserts deep equality against these exact payload structures, confirming that the legacy path on `feat/venue-catalogue-mobile` is 100% bug-for-bug and field-for-field identical to `origin/main`.
+
 ---
 
 ### Blocked Report: vc-m-tournament
@@ -147,11 +208,11 @@ To verify whether the 15 failing test suites (180 tests) were introduced by this
 
 | Metric | `origin/main` (Baseline) | `feat/venue-catalogue-mobile` (Branch) | Delta |
 |---|---|---|---|
-| **Total Test Suites** | 122 | 128 | +6 suites (venue catalogue) |
-| **Passed Test Suites** | 107 | 113 | +6 suites |
+| **Total Test Suites** | 122 | 129 | +7 suites (venue catalogue & legacy flow) |
+| **Passed Test Suites** | 107 | 114 | +7 suites |
 | **Failed Test Suites** | **15** | **15** | **0 (Identical)** |
-| **Total Tests** | 1503 | 1560 | +57 tests (venue catalogue) |
-| **Passed Tests** | 1323 | 1380 | +57 tests |
+| **Total Tests** | 1503 | 1566 | +63 tests (venue catalogue & legacy flow) |
+| **Passed Tests** | 1323 | 1386 | +63 tests |
 | **Failed Tests** | **180** | **180** | **0 (Identical)** |
 
 #### Difference Analysis:
@@ -230,8 +291,8 @@ Every single failing test suite and individual failing test on `feat/venue-catal
      ```
    - **Cause**: On `origin/main`, the button label was updated to "Casual Game" (removing the emoji), but the pre-existing test suite in `CreateGameScreen.test.tsx` was not updated and fails identically (37 failures) on both base and branch.
 
-#### Venue Catalogue Test Suites (Branch Exclusive - 100% Passing):
-All 7 test suites created/extended for venue catalogue pass with zero errors:
+#### Venue Catalogue & Contract Test Suites (Branch Exclusive - 100% Passing):
+All 8 test suites created/extended for venue catalogue pass with zero errors:
 1. `src/api/__tests__/venues.test.ts` (15 passed)
 2. `src/api/__tests__/events.test.ts` (15 passed)
 3. `src/api/__tests__/tournaments.test.ts` (14 passed)
@@ -239,7 +300,8 @@ All 7 test suites created/extended for venue catalogue pass with zero errors:
 5. `src/components/venue/__tests__/OthersVenueModal.test.tsx` (8 passed)
 6. `src/components/venue/__tests__/VenueDetailCard.test.tsx` (5 passed)
 7. `src/screens/__tests__/VenuePayloadContracts.test.tsx` (6 passed)
-**Total: 7 suites, 74 tests passed, 0 failed.**
+8. `src/screens/__tests__/LegacyVenuePayloadContracts.test.tsx` (6 passed)
+**Total: 8 suites, 80 tests passed, 0 failed.**
 
 ### Screen Verification & Screenshots
 - Reference boards from `docs/design-ref-venue/png/`:
@@ -263,36 +325,40 @@ All 7 test suites created/extended for venue catalogue pass with zero errors:
 
 ### Completion Proof
 
-**Test evidence** (raw output across 3 consecutive runs of venue catalogue test suites):
+**Test evidence** (raw output across 3 consecutive runs of venue catalogue and contract test suites):
 ```
-Test Suites: 7 passed, 7 total
-Tests:       74 passed, 74 total
+Test Suites: 8 passed, 8 total
+Tests:       80 passed, 80 total
 Snapshots:   0 total
-Time:        1.471 s, estimated 2 s
-Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__tests__\/VenuePayloadContracts.test.tsx|src\/api\/__tests__\/venues.test.ts|src\/api\/__tests__\/events.test.ts|src\/api\/__tests__\/tournaments.test.ts/i.
+Time:        1.63 s, estimated 3 s
+Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__tests__\/VenuePayloadContracts.test.tsx|src\/screens\/__tests__\/LegacyVenuePayloadContracts.test.tsx|src\/api\/__tests__\/venues.test.ts|src\/api\/__tests__\/events.test.ts|src\/api\/__tests__\/tournaments.test.ts/i.
 --- Run 1 ---
-Test Suites: 7 passed, 7 total
-Tests:       74 passed, 74 total
+
+Test Suites: 8 passed, 8 total
+Tests:       80 passed, 80 total
 Snapshots:   0 total
-Time:        1.251 s, estimated 2 s
-Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__tests__\/VenuePayloadContracts.test.tsx|src\/api\/__tests__\/venues.test.ts|src\/api\/__tests__\/events.test.ts|src\/api\/__tests__\/tournaments.test.ts/i.
+Time:        1.431 s, estimated 2 s
+Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__tests__\/VenuePayloadContracts.test.tsx|src\/screens\/__tests__\/LegacyVenuePayloadContracts.test.tsx|src\/api\/__tests__\/venues.test.ts|src\/api\/__tests__\/events.test.ts|src\/api\/__tests__\/tournaments.test.ts/i.
 --- Run 2 ---
-Test Suites: 7 passed, 7 total
-Tests:       74 passed, 74 total
+
+Test Suites: 8 passed, 8 total
+Tests:       80 passed, 80 total
 Snapshots:   0 total
-Time:        1.283 s, estimated 2 s
-Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__tests__\/VenuePayloadContracts.test.tsx|src\/api\/__tests__\/venues.test.ts|src\/api\/__tests__\/events.test.ts|src\/api\/__tests__\/tournaments.test.ts/i.
+Time:        1.407 s, estimated 2 s
+Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__tests__\/VenuePayloadContracts.test.tsx|src\/screens\/__tests__\/LegacyVenuePayloadContracts.test.tsx|src\/api\/__tests__\/venues.test.ts|src\/api\/__tests__\/events.test.ts|src\/api\/__tests__\/tournaments.test.ts/i.
 --- Run 3 ---
 ```
 
 **Full suite test summary** (proving identical 180 pre-existing baseline failures):
-- `feat/venue-catalogue-mobile`: Test Suites: 15 failed, 113 passed, 128 total. Tests: 180 failed, 1380 passed, 1560 total.
+- `feat/venue-catalogue-mobile`: Test Suites: 15 failed, 114 passed, 129 total. Tests: 180 failed, 1386 passed, 1566 total.
 - `origin/main` (`../mm-base`): Test Suites: 15 failed, 107 passed, 122 total. Tests: 180 failed, 1323 passed, 1503 total.
 - Suites/tests failing only on branch: `0`.
 
 **Git evidence**:
 ```
-4f5de59 (HEAD -> feat/venue-catalogue-mobile) docs(venues): add baseline test failure comparison proving 180 pre-existing failures
+cc8cb1a (HEAD -> feat/venue-catalogue-mobile) test(venues): add legacy venue flow contract tests for flag off and absent
+0f7ce8b (origin/feat/venue-catalogue-mobile) docs(venues): finalize git evidence in completion proof
+4f5de59 docs(venues): add baseline test failure comparison proving 180 pre-existing failures
 5363820 docs(venues): update report completion proof with commit 9371831
 9371831 fix(venues): omit venue_name when venue_id or others is present, correct report endpoints, and note missing board
 3096773 docs(venues): finalize completion proof in implementation report
@@ -301,7 +367,7 @@ Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__
 5c6575f fix(venues): remove runtime mock fallbacks, add failure path tests, and add UI error states
 813ad22 docs(venues): update implementation report with audit evidence, mock gating, and deviations
 227db77 fix(venues): add label inventory keys, resolve ESLint unused vars, and decouple hardcoded ActiveSG
-33debea (origin/feat/venue-catalogue-mobile) chore: remove session reflection from repo
+33debea chore: remove session reflection from repo
 907db4a docs(venues): add implementation report and agent enhancement for venue catalogue
 341dd9e feat(venues): vc-m-detail venue snapshot display and vc-m-photos organizer upload
 2013374 feat(venues): vc-m-tournament compact venue picker for tournament schedule and edit match
@@ -311,7 +377,7 @@ ecae74b feat(venues): vc-m-picker and vc-m-others venue picker and others entry
 ```
 ```
 On branch feat/venue-catalogue-mobile
-Your branch is ahead of 'origin/feat/venue-catalogue-mobile' by 7 commits.
+Your branch is ahead of 'origin/feat/venue-catalogue-mobile' by 8 commits.
   (use "git push" to publish your local commits)
 
 nothing to commit, working tree clean
@@ -319,13 +385,11 @@ nothing to commit, working tree clean
 
 **File evidence** (grep showing key change exists on disk):
 ```
-src/components/venue/VenueDetailCard.tsx:2: * VenueDetailCard component for GameDetail and TournamentDetail.
-src/components/venue/VenueDetailCard.tsx:42:interface VenueDetailCardProps {
+src/screens/__tests__/LegacyVenuePayloadContracts.test.tsx:1:import React from 'react';
+src/screens/__tests__/LegacyVenuePayloadContracts.test.tsx:129:describe('Legacy Venue Flow Verification (Isolated Suite)', () => {
+src/screens/__tests__/VenuePayloadContracts.test.tsx:182:describe('Venue Catalogue Payload Contract Assertions', () => {
 src/components/venue/VenueDetailCard.tsx:55:export default function VenueDetailCard({
-src/components/venue/VenueDetailCard.tsx:64:}: VenueDetailCardProps): React.JSX.Element {
-src/components/venue/__tests__/VenueDetailCard.test.tsx:4:import VenueDetailCard from '../VenueDetailCard';
-src/screens/EventDetailScreen.tsx:45:import VenueDetailCard from '../components/venue/VenueDetailCard';
-src/screens/EventDetailScreen.tsx:1042:              <VenueDetailCard
-src/screens/TournamentDetailScreen.tsx:54:import VenueDetailCard from '../components/venue/VenueDetailCard';
-src/screens/TournamentDetailScreen.tsx:265:        <VenueDetailCard
+src/components/venue/VenuePicker.tsx:162:export default function VenuePicker({
+src/screens/CreateGameScreen.tsx:446:          ...(venueCatalogueEnabled && catalogueVenue
+src/screens/EventDetailScreen.tsx:413:        ...(venueCatalogueEnabled && editCatalogueVenue
 ```
