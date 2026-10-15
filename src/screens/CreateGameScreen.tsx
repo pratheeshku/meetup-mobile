@@ -32,6 +32,7 @@ import {
 import { getSports } from '../api/sports';
 import { createTournament } from '../api/tournaments';
 import { searchUsers } from '../api/users';
+import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import Button from '../components/Button';
 import IconBadge from '../components/IconBadge';
 import {
@@ -179,9 +180,16 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   const tFormat: TournamentFormat = 'knockout';
   const tParticipation: TournamentParticipationMode = 'individual';
 
+  // Venue catalogue state
+  const [venueCatalogueEnabled, setVenueCatalogueEnabled] = useState(false);
+  const [catalogueVenue, setCatalogueVenue] = useState<SelectedVenueState | null>(null);
+
   useEffect(() => {
     getGameLimits().then(setGameLimits).catch(() => {});
-    getClientConfig().then(cfg => setMapsApiKey(cfg.google_maps_api_key)).catch(() => {});
+    getClientConfig().then(cfg => {
+      setMapsApiKey(cfg.google_maps_api_key);
+      setVenueCatalogueEnabled(Boolean(cfg.venue_catalogue_enabled));
+    }).catch(() => {});
     getSports()
       .then(list => {
         setSports(list);
@@ -345,6 +353,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       return;
     }
     if (step === 3) {
+      if (venueCatalogueEnabled && (!catalogueVenue || !catalogueVenue.name)) {
+        setError(t('mob.create_game.venue_label'));
+        return;
+      }
       setStep(4);
       return;
     }
@@ -431,15 +443,27 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           capacity: capacity,
           starts_at: startsAtIso,
           ends_at: null,
-          venue_name: fullVenueName,
-          venue_address: selectedVenue.address,
-          ...(mapsApiKey && selectedVenue.place_id
-            ? {
-                venue_place_id: selectedVenue.place_id,
-                venue_lat: selectedVenue.lat,
-                venue_lng: selectedVenue.lng,
-              }
-            : {}),
+          ...(venueCatalogueEnabled && catalogueVenue
+            ? catalogueVenue.isOthers && catalogueVenue.othersInput
+              ? {
+                  venue_name: fullVenueName,
+                  others: catalogueVenue.othersInput,
+                }
+              : {
+                  venue_name: fullVenueName,
+                  venue_id: catalogueVenue.venueId || undefined,
+                }
+            : {
+                venue_name: fullVenueName,
+                venue_address: selectedVenue.address,
+                ...(mapsApiKey && selectedVenue.place_id
+                  ? {
+                      venue_place_id: selectedVenue.place_id,
+                      venue_lat: selectedVenue.lat,
+                      venue_lng: selectedVenue.lng,
+                    }
+                  : {}),
+              }),
         };
 
         const created = await withCorrelationId(async correlationId =>
@@ -473,7 +497,19 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           format: tFormat,
           capacity: capacity,
           starts_at: dateValue.toISOString().slice(0, 10),
-          venue_name: fullVenueName,
+          ...(venueCatalogueEnabled && catalogueVenue
+            ? catalogueVenue.isOthers && catalogueVenue.othersInput
+              ? {
+                  venue_name: fullVenueName,
+                  others: catalogueVenue.othersInput,
+                }
+              : {
+                  venue_name: fullVenueName,
+                  venue_id: catalogueVenue.venueId || undefined,
+                }
+            : {
+                venue_name: fullVenueName,
+              }),
         };
 
         const created = await withCorrelationId(async correlationId =>
@@ -560,6 +596,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
                 style={[styles.sportTile, isSelected && { borderColor: palette.tint, backgroundColor: palette.chip }]}
                 onPress={() => {
                   setGSport(item.name);
+                  if (catalogueVenue && !catalogueVenue.isOthers) {
+                    setCatalogueVenue(null);
+                  }
                   if (gTitle === 'Sunday Doubles' || gTitle.includes('Game')) {
                     setGTitle(`${item.display_name} Game`);
                   }
@@ -648,74 +687,131 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             />
           )}
 
-          <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
-            {t('mob.create_game.venue_label')}
-          </Text>
-          <View style={styles.searchBox}>
-            <SearchIcon size={18} color={colors.textMuted} />
-            <TextInput
-              style={styles.searchInput}
-              value={venueQuery}
-              onChangeText={handleVenueSearch}
-              placeholder={t('mob.create_game.venue_search_placeholder')}
-              placeholderTextColor={colors.textMuted}
+          {venueCatalogueEnabled ? (
+            <VenuePicker
+              sportId={gSport}
+              sportDisplayName={sports.find(item => item.name === gSport)?.display_name || gSport}
+              selectedVenue={catalogueVenue}
+              onSelectVenue={venue => {
+                const addr =
+                  [venue.block, venue.street].filter(Boolean).join(' ') ||
+                  venue.street ||
+                  '';
+                setCatalogueVenue({
+                  venueId: venue.id,
+                  name: venue.name,
+                  address: addr,
+                  lat: venue.lat,
+                  lng: venue.lng,
+                  source: venue.source || 'ActiveSG',
+                  isOthers: false,
+                });
+                setSelectedVenue({
+                  name: venue.name,
+                  address: addr,
+                  place_id: null,
+                  lat: venue.lat ?? null,
+                  lng: venue.lng ?? null,
+                });
+              }}
+              onSaveOthersVenue={others => {
+                setCatalogueVenue({
+                  venueId: null,
+                  name: others.othersInput.name,
+                  address: others.address,
+                  lat: others.lat,
+                  lng: others.lng,
+                  source: 'Others',
+                  isOthers: true,
+                  geocoding_status: others.geocoding_status,
+                  othersInput: others.othersInput,
+                });
+                setSelectedVenue({
+                  name: others.othersInput.name,
+                  address: others.address || `Singapore ${others.othersInput.postal_code}`,
+                  place_id: null,
+                  lat: others.lat ?? null,
+                  lng: others.lng ?? null,
+                });
+              }}
+              onClearVenue={() => {
+                setCatalogueVenue(null);
+                setSelectedVenue({ name: '', address: '', place_id: null, lat: null, lng: null });
+              }}
+              mapsApiKey={mapsApiKey}
             />
-            {venueQuery ? (
-              <TouchableOpacity onPress={() => handleVenueSearch('')}>
-                <CrossIcon size={16} color={colors.textMuted} />
+          ) : (
+            <>
+              <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
+                {t('mob.create_game.venue_label')}
+              </Text>
+              <View style={styles.searchBox}>
+                <SearchIcon size={18} color={colors.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  value={venueQuery}
+                  onChangeText={handleVenueSearch}
+                  placeholder={t('mob.create_game.venue_search_placeholder')}
+                  placeholderTextColor={colors.textMuted}
+                />
+                {venueQuery ? (
+                  <TouchableOpacity onPress={() => handleVenueSearch('')}>
+                    <CrossIcon size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {venuePredictions.length > 0 ? (
+                <View style={styles.predictionsList}>
+                  {venuePredictions.map(p => (
+                    <TouchableOpacity
+                      key={p.place_id}
+                      style={styles.predictionRow}
+                      onPress={() => handleSelectPrediction(p)}
+                    >
+                      <Text style={styles.predictionMain}>{p.main_text}</Text>
+                      {p.secondary_text ? (
+                        <Text style={styles.predictionSecondary}>{p.secondary_text}</Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                style={styles.currentLocationRow}
+                onPress={handleUseCurrentLocation}
+              >
+                <TargetIcon size={18} />
+                <Text style={styles.currentLocationText}>
+                  {t('mob.create_game.use_current_location')}
+                </Text>
               </TouchableOpacity>
-            ) : null}
-          </View>
 
-          {venuePredictions.length > 0 ? (
-            <View style={styles.predictionsList}>
-              {venuePredictions.map(p => (
-                <TouchableOpacity
-                  key={p.place_id}
-                  style={styles.predictionRow}
-                  onPress={() => handleSelectPrediction(p)}
-                >
-                  <Text style={styles.predictionMain}>{p.main_text}</Text>
-                  {p.secondary_text ? (
-                    <Text style={styles.predictionSecondary}>{p.secondary_text}</Text>
-                  ) : null}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
+              {mapsApiKey && selectedVenue.lat != null && selectedVenue.lng != null ? (
+                <View style={styles.mapPreviewBox}>
+                  <Image
+                    style={styles.mapImage}
+                    source={{
+                      uri: `https://maps.googleapis.com/maps/api/staticmap?center=${selectedVenue.lat},${selectedVenue.lng}&zoom=15&size=600x300&markers=color:red%7C${selectedVenue.lat},${selectedVenue.lng}&key=${mapsApiKey}`,
+                    }}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : null}
 
-          <TouchableOpacity
-            style={styles.currentLocationRow}
-            onPress={handleUseCurrentLocation}
-          >
-            <TargetIcon size={18} />
-            <Text style={styles.currentLocationText}>
-              {t('mob.create_game.use_current_location')}
-            </Text>
-          </TouchableOpacity>
-
-          {mapsApiKey && selectedVenue.lat != null && selectedVenue.lng != null ? (
-            <View style={styles.mapPreviewBox}>
-              <Image
-                style={styles.mapImage}
-                source={{
-                  uri: `https://maps.googleapis.com/maps/api/staticmap?center=${selectedVenue.lat},${selectedVenue.lng}&zoom=15&size=600x300&markers=color:red%7C${selectedVenue.lat},${selectedVenue.lng}&key=${mapsApiKey}`,
-                }}
-                resizeMode="cover"
-              />
-            </View>
-          ) : null}
-
-          {/* Selected Location Row */}
-          <View style={styles.selectedLocationRow}>
-            <View style={styles.pinBadge}>
-              <PinIcon size={20} />
-            </View>
-            <View style={styles.locationTextContainer}>
-              <Text style={styles.locationName}>{selectedVenue.name}</Text>
-              <Text style={styles.locationAddress}>{selectedVenue.address}</Text>
-            </View>
-          </View>
+              {/* Selected Location Row */}
+              <View style={styles.selectedLocationRow}>
+                <View style={styles.pinBadge}>
+                  <PinIcon size={20} />
+                </View>
+                <View style={styles.locationTextContainer}>
+                  <Text style={styles.locationName}>{selectedVenue.name}</Text>
+                  <Text style={styles.locationAddress}>{selectedVenue.address}</Text>
+                </View>
+              </View>
+            </>
+          )}
 
           <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
             {t('mob.create_game.court_details_label')}

@@ -90,7 +90,7 @@ async function search(root: Instance, query: string): Promise<void> {
 beforeEach(() => {
   jest.useFakeTimers();
   mockGetGroup.mockReset().mockResolvedValue(GROUP);
-  mockInviteMember.mockReset().mockResolvedValue(undefined);
+  mockInviteMember.mockReset().mockResolvedValue({ nextCandidate: null });
   mockSearchUsers.mockReset().mockResolvedValue([FOUND_USER]);
   mockCreateGroupInvitation.mockReset().mockResolvedValue({
     token: 'tok-1',

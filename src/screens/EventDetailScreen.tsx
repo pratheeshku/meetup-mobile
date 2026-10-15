@@ -41,6 +41,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
+import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import NumberField from '../components/NumberField';
 import ScreenContainer from '../components/ScreenContainer';
@@ -145,6 +146,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [mapsApiKey, setMapsApiKey] = useState<string | null>(null);
+  const [venueCatalogueEnabled, setVenueCatalogueEnabled] = useState(false);
+  const [editCatalogueVenue, setEditCatalogueVenue] = useState<SelectedVenueState | null>(null);
 
   const loadEvent = useCallback(async () => {
     setIsLoading(true);
@@ -165,7 +168,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   useEffect(() => {
     loadEvent();
-    getClientConfig().then(cfg => setMapsApiKey(cfg.google_maps_api_key)).catch(() => {});
+    getClientConfig().then(cfg => {
+      setMapsApiKey(cfg.google_maps_api_key);
+      setVenueCatalogueEnabled(Boolean(cfg.venue_catalogue_enabled));
+    }).catch(() => {});
   }, [loadEvent]);
 
   const sportLabel = useSportDisplayName(event?.sport ?? '');
@@ -186,6 +192,45 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       lat: event.venue_lat ?? null,
       lng: event.venue_lng ?? null,
     });
+    if (event.venue_snapshot) {
+      const isOthers = event.venue_snapshot.source === 'user';
+      setEditCatalogueVenue({
+        venueId: event.venue_id ?? null,
+        name: event.venue_snapshot.name,
+        address:
+          event.venue_snapshot.address ||
+          [event.venue_snapshot.block, event.venue_snapshot.street].filter(Boolean).join(' ') ||
+          null,
+        lat: event.venue_snapshot.lat ?? null,
+        lng: event.venue_snapshot.lng ?? null,
+        source: isOthers ? 'Others' : 'ActiveSG',
+        isOthers,
+        geocoding_status: event.venue_snapshot.geocoding_status ?? null,
+        snapshot: event.venue_snapshot,
+      });
+    } else if (event.venue_id) {
+      setEditCatalogueVenue({
+        venueId: event.venue_id,
+        name: venueName,
+        address: event.venue_address || null,
+        lat: event.venue_lat ?? null,
+        lng: event.venue_lng ?? null,
+        source: 'ActiveSG',
+        isOthers: false,
+      });
+    } else if (venueName) {
+      setEditCatalogueVenue({
+        venueId: null,
+        name: venueName,
+        address: event.venue_address || null,
+        lat: event.venue_lat ?? null,
+        lng: event.venue_lng ?? null,
+        source: 'ActiveSG',
+        isOthers: false,
+      });
+    } else {
+      setEditCatalogueVenue(null);
+    }
     setEditCourtDetails('');
     setEditCapacity(event.capacity || 4);
     setIsCapacityValid(true);
@@ -321,6 +366,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       return;
     }
     if (editStep === 2) {
+      if (venueCatalogueEnabled && (!editCatalogueVenue || !editCatalogueVenue.name)) {
+        setEditError(t('mob.create_game.venue_label'));
+        return;
+      }
       setEditStep(3);
       return;
     }
@@ -357,18 +406,30 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
       const payload: UpdateEventInput = {
         title: editTitle.trim(),
-        venue_name: fullVenueName || null,
-        venue_address: editSelectedVenue.address || null,
         skill_level_requirement: editSkillLevel,
         capacity: editCapacity,
         starts_at: editDateValue.toISOString(),
-        ...(venueChanged && mapsApiKey && editSelectedVenue.place_id
-          ? {
-              venue_place_id: editSelectedVenue.place_id,
-              venue_lat: editSelectedVenue.lat,
-              venue_lng: editSelectedVenue.lng,
-            }
-          : {}),
+        ...(venueCatalogueEnabled && editCatalogueVenue
+          ? editCatalogueVenue.isOthers && editCatalogueVenue.othersInput
+            ? {
+                venue_name: fullVenueName || null,
+                others: editCatalogueVenue.othersInput,
+              }
+            : {
+                venue_name: fullVenueName || null,
+                venue_id: editCatalogueVenue.venueId || null,
+              }
+          : {
+              venue_name: fullVenueName || null,
+              venue_address: editSelectedVenue.address || null,
+              ...(venueChanged && mapsApiKey && editSelectedVenue.place_id
+                ? {
+                    venue_place_id: editSelectedVenue.place_id,
+                    venue_lat: editSelectedVenue.lat,
+                    venue_lng: editSelectedVenue.lng,
+                  }
+                : {}),
+            }),
       };
 
       await withCorrelationId(async correlationId => {
@@ -618,74 +679,137 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                   />
                 )}
 
-                <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
-                  {t('mob.create_game.venue_label')}
-                </Text>
-                <View style={styles.searchBox}>
-                  <SearchIcon size={18} color={colors.textMuted} />
-                  <TextInput
-                    style={styles.searchInput}
-                    value={editVenueQuery}
-                    onChangeText={handleVenueSearch}
-                    placeholder={t('mob.create_game.venue_search_placeholder')}
-                    placeholderTextColor={colors.textMuted}
+                {venueCatalogueEnabled ? (
+                  <VenuePicker
+                    sportId={event.sport}
+                    sportDisplayName={sportLabel}
+                    selectedVenue={editCatalogueVenue}
+                    onSelectVenue={venue => {
+                      const addr =
+                        [venue.block, venue.street].filter(Boolean).join(' ') ||
+                        venue.street ||
+                        '';
+                      setEditCatalogueVenue({
+                        venueId: venue.id,
+                        name: venue.name,
+                        address: addr,
+                        lat: venue.lat,
+                        lng: venue.lng,
+                        source: venue.source || 'ActiveSG',
+                        isOthers: false,
+                      });
+                      setEditSelectedVenue({
+                        name: venue.name,
+                        address: addr,
+                        place_id: null,
+                        lat: venue.lat ?? null,
+                        lng: venue.lng ?? null,
+                      });
+                    }}
+                    onSaveOthersVenue={others => {
+                      setEditCatalogueVenue({
+                        venueId: null,
+                        name: others.othersInput.name,
+                        address: others.address,
+                        lat: others.lat,
+                        lng: others.lng,
+                        source: 'Others',
+                        isOthers: true,
+                        geocoding_status: others.geocoding_status,
+                        othersInput: others.othersInput,
+                      });
+                      setEditSelectedVenue({
+                        name: others.othersInput.name,
+                        address: others.address || '',
+                        place_id: null,
+                        lat: others.lat ?? null,
+                        lng: others.lng ?? null,
+                      });
+                    }}
+                    onClearVenue={() => {
+                      setEditCatalogueVenue(null);
+                      setEditSelectedVenue({
+                        name: '',
+                        address: '',
+                        place_id: null,
+                        lat: null,
+                        lng: null,
+                      });
+                    }}
+                    mapsApiKey={mapsApiKey}
                   />
-                  {editVenueQuery ? (
-                    <TouchableOpacity onPress={() => handleVenueSearch('')}>
-                      <CrossIcon size={16} color={colors.textMuted} />
+                ) : (
+                  <>
+                    <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
+                      {t('mob.create_game.venue_label')}
+                    </Text>
+                    <View style={styles.searchBox}>
+                      <SearchIcon size={18} color={colors.textMuted} />
+                      <TextInput
+                        style={styles.searchInput}
+                        value={editVenueQuery}
+                        onChangeText={handleVenueSearch}
+                        placeholder={t('mob.create_game.venue_search_placeholder')}
+                        placeholderTextColor={colors.textMuted}
+                      />
+                      {editVenueQuery ? (
+                        <TouchableOpacity onPress={() => handleVenueSearch('')}>
+                          <CrossIcon size={16} color={colors.textMuted} />
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+
+                    {venuePredictions.length > 0 ? (
+                      <View style={styles.predictionsList}>
+                        {venuePredictions.map(p => (
+                          <TouchableOpacity
+                            key={p.place_id}
+                            style={styles.predictionRow}
+                            onPress={() => handleSelectPrediction(p)}
+                          >
+                            <Text style={styles.predictionMain}>{p.main_text}</Text>
+                            {p.secondary_text ? (
+                              <Text style={styles.predictionSecondary}>{p.secondary_text}</Text>
+                            ) : null}
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    <TouchableOpacity
+                      style={styles.currentLocationRow}
+                      onPress={handleUseCurrentLocation}
+                    >
+                      <TargetIcon size={18} />
+                      <Text style={styles.currentLocationText}>
+                        {t('mob.create_game.use_current_location')}
+                      </Text>
                     </TouchableOpacity>
-                  ) : null}
-                </View>
 
-                {venuePredictions.length > 0 ? (
-                  <View style={styles.predictionsList}>
-                    {venuePredictions.map(p => (
-                      <TouchableOpacity
-                        key={p.place_id}
-                        style={styles.predictionRow}
-                        onPress={() => handleSelectPrediction(p)}
-                      >
-                        <Text style={styles.predictionMain}>{p.main_text}</Text>
-                        {p.secondary_text ? (
-                          <Text style={styles.predictionSecondary}>{p.secondary_text}</Text>
-                        ) : null}
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                ) : null}
+                    {mapsApiKey && editSelectedVenue.lat != null && editSelectedVenue.lng != null ? (
+                      <View style={styles.mapPreviewBox}>
+                        <Image
+                          style={styles.mapImage}
+                          source={{
+                            uri: `https://maps.googleapis.com/maps/api/staticmap?center=${editSelectedVenue.lat},${editSelectedVenue.lng}&zoom=15&size=600x300&markers=color:red%7C${editSelectedVenue.lat},${editSelectedVenue.lng}&key=${mapsApiKey}`,
+                          }}
+                          resizeMode="cover"
+                        />
+                      </View>
+                    ) : null}
 
-                <TouchableOpacity
-                  style={styles.currentLocationRow}
-                  onPress={handleUseCurrentLocation}
-                >
-                  <TargetIcon size={18} />
-                  <Text style={styles.currentLocationText}>
-                    {t('mob.create_game.use_current_location')}
-                  </Text>
-                </TouchableOpacity>
-
-                {mapsApiKey && editSelectedVenue.lat != null && editSelectedVenue.lng != null ? (
-                  <View style={styles.mapPreviewBox}>
-                    <Image
-                      style={styles.mapImage}
-                      source={{
-                        uri: `https://maps.googleapis.com/maps/api/staticmap?center=${editSelectedVenue.lat},${editSelectedVenue.lng}&zoom=15&size=600x300&markers=color:red%7C${editSelectedVenue.lat},${editSelectedVenue.lng}&key=${mapsApiKey}`,
-                      }}
-                      resizeMode="cover"
-                    />
-                  </View>
-                ) : null}
-
-                {/* Selected Location Row */}
-                <View style={styles.selectedLocationRow}>
-                  <View style={styles.pinBadge}>
-                    <PinIcon size={20} />
-                  </View>
-                  <View style={styles.locationTextContainer}>
-                    <Text style={styles.locationName}>{editSelectedVenue.name}</Text>
-                    <Text style={styles.locationAddress}>{editSelectedVenue.address}</Text>
-                  </View>
-                </View>
+                    {/* Selected Location Row */}
+                    <View style={styles.selectedLocationRow}>
+                      <View style={styles.pinBadge}>
+                        <PinIcon size={20} />
+                      </View>
+                      <View style={styles.locationTextContainer}>
+                        <Text style={styles.locationName}>{editSelectedVenue.name}</Text>
+                        <Text style={styles.locationAddress}>{editSelectedVenue.address}</Text>
+                      </View>
+                    </View>
+                  </>
+                )}
 
                 <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
                   {t('mob.create_game.court_details_label')}

@@ -33,6 +33,14 @@ const BASE_LABELS = {
   'skill_level.intermediate.desc': 'Play regularly, comfortable with the basics',
   'skill_level.expert.desc': 'Competitive, strong technique and match experience',
 
+  'venue.source.catalogue': 'ActiveSG',
+  'venue.source.user': 'Others',
+  'venue.search_placeholder': 'Search venues',
+  'venue.showing_for_sport': 'Showing venues for {sport}',
+  'venue.not_listed_subtitle': 'Not listed? Enter the name and postal code',
+  'venue.pin_caption': 'Pin set from the venue address',
+  'venue.reselect_prompt': 'Sport changed. Please select a venue again.',
+
   mob_skill_sports_title: 'What do you play?',
   mob_skill_sports_subtitle: 'Select all that apply. Level comes next.',
   mob_skill_level_title: 'How good are you?',
