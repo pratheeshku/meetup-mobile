@@ -179,7 +179,10 @@ Time:        1.244 s
 
 **Git evidence**:
 ```
-5c6575f (HEAD -> feat/venue-catalogue-mobile) fix(venues): remove runtime mock fallbacks, add failure path tests, and add UI error states
+875bb1c (HEAD -> feat/venue-catalogue-mobile) fix(venues): remove EditMatchModal, enforce venue payload contracts, and update report
+834fbe8 docs(venues): update report with mock removal deviation, OI statuses, and contract verification
+5c6575f fix(venues): remove runtime mock fallbacks, add failure path tests, and add UI error states
+813ad22 docs(venues): update implementation report with audit evidence, mock gating, and deviations
 227db77 fix(venues): add label inventory keys, resolve ESLint unused vars, and decouple hardcoded ActiveSG
 33debea (origin/feat/venue-catalogue-mobile) chore: remove session reflection from repo
 907db4a docs(venues): add implementation report and agent enhancement for venue catalogue
@@ -188,6 +191,13 @@ Time:        1.244 s
 ecae74b feat(venues): vc-m-picker and vc-m-others venue picker and others entry
 6afa185 feat(venues): vc-m-config types, config flag gate, and API client with typed mocks
 9accfd1 (origin/main, origin/HEAD) chore(android): record versionCode 70
+```
+```
+On branch feat/venue-catalogue-mobile
+Your branch is ahead of 'origin/feat/venue-catalogue-mobile' by 5 commits.
+  (use "git push" to publish your local commits)
+
+nothing to commit, working tree clean
 ```
 
 **File evidence** (grep showing key change exists on disk):
