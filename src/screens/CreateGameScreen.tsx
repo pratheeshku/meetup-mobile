@@ -692,6 +692,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               sportId={gSport}
               sportDisplayName={sports.find(item => item.name === gSport)?.display_name || gSport}
               selectedVenue={catalogueVenue}
+              variant={mode === 'tournament' ? 'tournament' : 'standard'}
               onSelectVenue={venue => {
                 const addr =
                   [venue.block, venue.street].filter(Boolean).join(' ') ||

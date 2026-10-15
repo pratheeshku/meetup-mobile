@@ -87,7 +87,7 @@ describe('OthersVenueModal', () => {
       postal_code: '654321',
       block: null,
       street: null,
-      address: null,
+      address: undefined,
       lat: null,
       lng: null,
       geocoding_status: 'pending',

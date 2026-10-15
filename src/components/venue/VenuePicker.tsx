@@ -56,6 +56,8 @@ interface VenuePickerProps {
   }) => void;
   onClearVenue?: () => void;
   mapsApiKey?: string | null;
+  variant?: 'standard' | 'tournament';
+  helperText?: string;
 }
 
 export default function VenuePicker({
@@ -67,6 +69,8 @@ export default function VenuePicker({
   onSaveOthersVenue,
   onClearVenue,
   mapsApiKey,
+  variant = 'standard',
+  helperText,
 }: VenuePickerProps): React.JSX.Element {
   const t = useT();
   const [isOpen, setIsOpen] = useState(!selectedVenue || !selectedVenue.name);
@@ -179,66 +183,91 @@ export default function VenuePicker({
       ) : null}
 
       {!isOpen && selectedVenue && selectedVenue.name ? (
-        /* Selected State (EditGame2 board) */
-        <View style={styles.selectedWrapper}>
-          <Pressable
-            style={styles.selectedBox}
-            onPress={handleOpenPicker}
-            accessibilityRole="button"
-            accessibilityLabel={`${selectedVenue.name}, ${selectedVenue.address || ''}`}
-          >
-            <View style={styles.selectedInfo}>
-              <Text style={styles.selectedName} numberOfLines={1}>
+        variant === 'tournament' ? (
+          /* Tournament Selected State (TournSched & FXEdit boards: 46px compact field) */
+          <View style={styles.tournamentSelectedWrapper}>
+            <Pressable
+              style={styles.tournamentSelectedBox}
+              onPress={handleOpenPicker}
+              accessibilityRole="button"
+              accessibilityLabel={`${selectedVenue.name}, ${selectedVenue.address || ''}`}
+            >
+              <Text style={styles.tournamentVenueName} numberOfLines={1}>
                 {selectedVenue.name}
               </Text>
-              {selectedVenue.address ? (
-                <Text style={styles.selectedAddress} numberOfLines={1}>
-                  {selectedVenue.address}
+              <View style={styles.sourceTag}>
+                <Text style={styles.sourceTagText}>
+                  {selectedVenue.isOthers ? userSourceLabel : catalogueSourceLabel}
                 </Text>
-              ) : null}
-            </View>
-            <View style={styles.sourceTag}>
-              <Text style={styles.sourceTagText}>
-                {selectedVenue.isOthers ? userSourceLabel : catalogueSourceLabel}
-              </Text>
-            </View>
-            <VenueChevronDownIcon size={16} color={colors.venueOthersIcon} />
-          </Pressable>
-
-          {/* Map Card */}
-          {selectedVenue.lat != null && selectedVenue.lng != null ? (
-            <View style={styles.mapCard}>
-              {mapsApiKey ? (
-                <Image
-                  style={styles.mapImage}
-                  source={{
-                    uri: `https://maps.googleapis.com/maps/api/staticmap?center=${selectedVenue.lat},${selectedVenue.lng}&zoom=15&size=600x300&markers=color:red%7C${selectedVenue.lat},${selectedVenue.lng}&key=${mapsApiKey}`,
-                  }}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.mapPattern}>
-                  <View style={styles.mapPatternPatch1} />
-                  <View style={styles.mapPatternPatch2} />
-                  <View style={styles.mapPatternRoadH} />
-                  <View style={styles.mapPatternRoadV} />
-                  <View style={styles.mapPinPlacement}>
-                    <VenuePinBadgeIcon size={28} color={colors.venuePinIcon} />
-                  </View>
-                </View>
-              )}
-              <View style={styles.pinCaptionBox}>
-                <Text style={styles.pinCaptionText}>{t('venue.pin_caption')}</Text>
               </View>
-            </View>
-          ) : selectedVenue.geocoding_status === 'pending' ? (
-            <View style={styles.pendingGeocodeBox}>
-              <Text style={styles.pendingGeocodeText}>
-                Address lookup will complete shortly
-              </Text>
-            </View>
-          ) : null}
-        </View>
+              <VenueChevronDownIcon size={16} color={colors.venueOthersIcon} />
+            </Pressable>
+            {helperText ? (
+              <Text style={styles.helperText}>{helperText}</Text>
+            ) : null}
+          </View>
+        ) : (
+          /* Standard Selected State (EditGame2 board with Map Card) */
+          <View style={styles.selectedWrapper}>
+            <Pressable
+              style={styles.selectedBox}
+              onPress={handleOpenPicker}
+              accessibilityRole="button"
+              accessibilityLabel={`${selectedVenue.name}, ${selectedVenue.address || ''}`}
+            >
+              <View style={styles.selectedInfo}>
+                <Text style={styles.selectedName} numberOfLines={1}>
+                  {selectedVenue.name}
+                </Text>
+                {selectedVenue.address ? (
+                  <Text style={styles.selectedAddress} numberOfLines={1}>
+                    {selectedVenue.address}
+                  </Text>
+                ) : null}
+              </View>
+              <View style={styles.sourceTag}>
+                <Text style={styles.sourceTagText}>
+                  {selectedVenue.isOthers ? userSourceLabel : catalogueSourceLabel}
+                </Text>
+              </View>
+              <VenueChevronDownIcon size={16} color={colors.venueOthersIcon} />
+            </Pressable>
+
+            {/* Map Card */}
+            {selectedVenue.lat != null && selectedVenue.lng != null ? (
+              <View style={styles.mapCard}>
+                {mapsApiKey ? (
+                  <Image
+                    style={styles.mapImage}
+                    source={{
+                      uri: `https://maps.googleapis.com/maps/api/staticmap?center=${selectedVenue.lat},${selectedVenue.lng}&zoom=15&size=600x300&markers=color:red%7C${selectedVenue.lat},${selectedVenue.lng}&key=${mapsApiKey}`,
+                    }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.mapPattern}>
+                    <View style={styles.mapPatternPatch1} />
+                    <View style={styles.mapPatternPatch2} />
+                    <View style={styles.mapPatternRoadH} />
+                    <View style={styles.mapPatternRoadV} />
+                    <View style={styles.mapPinPlacement}>
+                      <VenuePinBadgeIcon size={28} color={colors.venuePinIcon} />
+                    </View>
+                  </View>
+                )}
+                <View style={styles.pinCaptionBox}>
+                  <Text style={styles.pinCaptionText}>{t('venue.pin_caption')}</Text>
+                </View>
+              </View>
+            ) : selectedVenue.geocoding_status === 'pending' ? (
+              <View style={styles.pendingGeocodeBox}>
+                <Text style={styles.pendingGeocodeText}>
+                  Address lookup will complete shortly
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        )
       ) : (
         /* Open / Search State (Game3When board) */
         <View style={styles.searchWrapper}>
@@ -371,6 +400,31 @@ const styles = StyleSheet.create({
   },
   selectedWrapper: {
     gap: 12,
+  },
+  tournamentSelectedWrapper: {
+    gap: 6,
+  },
+  tournamentSelectedBox: {
+    height: 46,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
+  },
+  tournamentVenueName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: colors.textPrimary,
+  },
+  helperText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   selectedBox: {
     minHeight: 50,

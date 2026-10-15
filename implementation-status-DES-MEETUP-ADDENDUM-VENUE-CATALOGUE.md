@@ -1,4 +1,4 @@
-## Status — 2026-10-15T20:40:00+08:00
+## Status — 2026-10-15T20:47:00+08:00
 ### Completed
 - Task vc-m-config: API client types for venues, snapshot, and venue_catalogue_enabled; flag gate [built against spec, integration pending]
   - `src/types/venue.ts` created
@@ -19,12 +19,17 @@
 - Task vc-m-others: Others entry (postal code resolves; pending state shown) [built against spec, integration pending]
   - `src/components/venue/OthersVenueModal.tsx` created with 6-digit postal code validation, facility chips, and pending geocode display
   - `src/components/venue/__tests__/OthersVenueModal.test.tsx` (4 tests passing)
+- Task vc-m-tournament: Venue picker on tournament Schedule (`TournSched*`) and Edit match (`FXEdit*`) [built against spec, integration pending]
+  - `src/components/venue/VenuePicker.tsx` updated with 46px compact tournament variant
+  - `src/components/tournament/EditMatchModal.tsx` created matching FXEdit* boards
+  - `src/components/tournament/__tests__/EditMatchModal.test.tsx` (3 tests passing)
+  - `src/screens/CreateGameScreen.tsx` step 3 wired with variant="tournament" when mode is tournament
+  - `src/screens/TournamentDetailScreen.tsx` wired with EditMatchModal for organizers
 
 ### In Progress
-- Task vc-m-tournament: Venue picker on tournament Schedule (`TournSched`, `TournSchedErr`, `TournSchedWarn`) and Edit match (`FXEdit*`)
+- Task vc-m-detail: Show venue from snapshot on game and tournament detail; photo strip on `GameDetail`; legacy fallback
 
 ### Pending
-- Task vc-m-detail: Show venue from snapshot on game and tournament detail; photo strip on `GameDetail`; legacy fallback
 - Task vc-m-photos: Organizer photo upload, delete and report
 
 ### Blocked

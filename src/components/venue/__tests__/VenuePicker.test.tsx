@@ -19,6 +19,7 @@ const sampleVenues: VenueItem[] = [
   {
     id: 'venue-1',
     provider: 'activesg',
+    provider_venue_key: 'activesg:1',
     name: 'Hougang Sport Centre',
     block: '93',
     street: 'Hougang Avenue 4',
@@ -32,6 +33,7 @@ const sampleVenues: VenueItem[] = [
   {
     id: 'venue-2',
     provider: 'activesg',
+    provider_venue_key: 'activesg:2',
     name: 'Pasir Ris Sport Centre',
     block: '120',
     street: 'Pasir Ris Central',

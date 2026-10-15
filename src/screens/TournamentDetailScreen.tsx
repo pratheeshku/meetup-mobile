@@ -47,8 +47,10 @@ import {
   registerForTournament,
   withdrawFromTournament,
 } from '../api/tournaments';
+import { getClientConfig } from '../api/config';
 import Button from '../components/Button';
 import Card from '../components/Card';
+import EditMatchModal from '../components/tournament/EditMatchModal';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
@@ -97,6 +99,17 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
 
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const [venueCatalogueEnabled, setVenueCatalogueEnabled] = useState(false);
+  const [editingFixture, setEditingFixture] = useState<TournamentFixture | null>(null);
+
+  useEffect(() => {
+    getClientConfig()
+      .then(cfg => {
+        setVenueCatalogueEnabled(Boolean(cfg.venue_catalogue_enabled));
+      })
+      .catch(() => setVenueCatalogueEnabled(false));
+  }, []);
 
   const loadAll = useCallback(async () => {
     setIsLoading(true);
@@ -309,8 +322,21 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
             <Text style={styles.emptyText}>{t('mob.tournament.no_matches')}</Text>
           ) : (
             fixtures.map(fixture => (
-              <View key={fixture.id} style={styles.listRow}>
-                <Text style={styles.fixtureRound}>{fixture.round}</Text>
+              <Pressable
+                key={fixture.id}
+                style={styles.listRow}
+                onPress={isOrganiser ? () => setEditingFixture(fixture) : undefined}
+                accessibilityRole={isOrganiser ? 'button' : undefined}
+                accessibilityLabel={
+                  isOrganiser
+                    ? `Edit match ${fixture.home_team || 'Home'} vs ${fixture.away_team || 'Away'}`
+                    : undefined
+                }
+              >
+                <View style={styles.fixtureHeaderRow}>
+                  <Text style={styles.fixtureRound}>{fixture.round}</Text>
+                  {isOrganiser ? <Text style={styles.editActionText}>Edit</Text> : null}
+                </View>
                 <Text style={styles.fixtureTeams}>
                   {fixture.home_team} {fixture.home_score ?? '-'} : {fixture.away_score ?? '-'}{' '}
                   {fixture.away_team}
@@ -318,7 +344,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
                 <Text style={styles.fixtureMeta}>
                   {formatDateTime(fixture.scheduled_at)} · {fixture.status}
                 </Text>
-              </View>
+              </Pressable>
             ))
           )
         ) : registrations.length === 0 ? (
@@ -348,11 +374,43 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
           />
         </View>
       ) : null}
+
+      <EditMatchModal
+        visible={Boolean(editingFixture)}
+        onClose={() => setEditingFixture(null)}
+        fixture={editingFixture}
+        sportId={tournament.sport}
+        sportDisplayName={sportLabel}
+        venueCatalogueEnabled={venueCatalogueEnabled}
+        onSave={updated => {
+          if (editingFixture) {
+            setFixtures(prev =>
+              prev.map(f =>
+                f.id === editingFixture.id
+                  ? { ...f, scheduled_at: updated.scheduled_at || f.scheduled_at }
+                  : f,
+              ),
+            );
+          }
+          setEditingFixture(null);
+        }}
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  fixtureHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  editActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
   container: { padding: spacing.md },
   infoCard: { marginBottom: spacing.md },
   title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.sm },
