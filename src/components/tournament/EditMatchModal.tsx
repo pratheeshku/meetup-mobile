@@ -16,7 +16,8 @@ import {
 
 import VenuePicker, { type SelectedVenueState } from '../venue/VenuePicker';
 import { BackArrowIcon } from '../icons/ActionIcons';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { useT } from '../../labels/LabelsContext';
+import { colors } from '../../theme/tokens';
 import type { TournamentFixture } from '../../types/tournament';
 import type { OthersVenueInput, VenueItem, VenueSnapshot } from '../../types/venue';
 
@@ -47,6 +48,7 @@ export default function EditMatchModal({
   defaultVenue,
   onSave,
 }: EditMatchModalProps): React.JSX.Element {
+  const t = useT();
   const [dateText, setDateText] = useState('Sat 14 Nov');
   const [timeText, setTimeText] = useState('9:45 AM');
   const [court, setCourt] = useState('Court 1');
@@ -157,7 +159,7 @@ export default function EditMatchModal({
                     address: [v.block, v.street].filter(Boolean).join(' ') || v.street || '',
                     lat: v.lat,
                     lng: v.lng,
-                    source: v.source || 'ActiveSG',
+                    source: v.source || t('venue.source.catalogue'),
                     isOthers: false,
                   });
                 }}

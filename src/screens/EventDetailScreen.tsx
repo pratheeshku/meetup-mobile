@@ -204,7 +204,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           null,
         lat: event.venue_snapshot.lat ?? null,
         lng: event.venue_snapshot.lng ?? null,
-        source: isOthers ? 'Others' : 'ActiveSG',
+        source: isOthers ? t('venue.source.user') : (event.venue_snapshot.source || t('venue.source.catalogue')),
         isOthers,
         geocoding_status: event.venue_snapshot.geocoding_status ?? null,
         snapshot: event.venue_snapshot,
@@ -216,7 +216,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         address: event.venue_address || null,
         lat: event.venue_lat ?? null,
         lng: event.venue_lng ?? null,
-        source: 'ActiveSG',
+        source: t('venue.source.catalogue'),
         isOthers: false,
       });
     } else if (venueName) {
@@ -226,7 +226,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         address: event.venue_address || null,
         lat: event.venue_lat ?? null,
         lng: event.venue_lng ?? null,
-        source: 'ActiveSG',
+        source: t('venue.source.catalogue'),
         isOthers: false,
       });
     } else {
@@ -696,7 +696,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                         address: addr,
                         lat: venue.lat,
                         lng: venue.lng,
-                        source: venue.source || 'ActiveSG',
+                        source: venue.source || t('venue.source.catalogue'),
                         isOthers: false,
                       });
                       setEditSelectedVenue({

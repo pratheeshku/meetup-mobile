@@ -11,7 +11,6 @@
 
 import React, { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,

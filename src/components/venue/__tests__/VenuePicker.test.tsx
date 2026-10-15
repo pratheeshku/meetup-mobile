@@ -6,7 +6,6 @@ import type { VenueItem } from '../../../types/venue';
 import {
   act,
   pressableLabelled,
-  pressables,
   renderAsync,
   texts,
 } from '../../../test-utils/render';

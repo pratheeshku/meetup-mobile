@@ -24,7 +24,7 @@ import {
 } from './VenueIcons';
 import OthersVenueModal from './OthersVenueModal';
 import { useT } from '../../labels/LabelsContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { colors, radius, spacing } from '../../theme/tokens';
 import type { OthersVenueInput, VenueItem, VenueSnapshot } from '../../types/venue';
 
 export interface SelectedVenueState {

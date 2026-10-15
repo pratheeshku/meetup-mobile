@@ -5,7 +5,6 @@ import type { TournamentFixture } from '../../../types/tournament';
 import {
   act,
   pressableLabelled,
-  pressableWithText,
   renderAsync,
   texts,
 } from '../../../test-utils/render';

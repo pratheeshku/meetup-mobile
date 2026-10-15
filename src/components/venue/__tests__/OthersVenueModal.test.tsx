@@ -4,7 +4,6 @@ import OthersVenueModal from '../OthersVenueModal';
 import * as venuesApi from '../../../api/venues';
 import {
   act,
-  pressableLabelled,
   pressableWithText,
   renderAsync,
   texts,

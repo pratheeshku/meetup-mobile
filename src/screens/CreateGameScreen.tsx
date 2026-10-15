@@ -704,7 +704,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
                   address: addr,
                   lat: venue.lat,
                   lng: venue.lng,
-                  source: venue.source || 'ActiveSG',
+                  source: venue.source || t('venue.source.catalogue'),
                   isOthers: false,
                 });
                 setSelectedVenue({
