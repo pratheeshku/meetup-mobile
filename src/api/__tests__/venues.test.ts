@@ -132,6 +132,22 @@ describe('Venues API Client', () => {
       expect(res).toEqual(mockPostal);
     });
 
+    it('defaults geocoding_status to pending when backend returns only postal_code, address, block, street without geocoding_status', async () => {
+      const mockRawBackend = {
+        postal_code: '579780',
+        block: '5',
+        street: 'Bishan Street 14',
+        address: '5 Bishan Street 14 Singapore 579780',
+      };
+      mockedGet.mockResolvedValueOnce({ data: mockRawBackend });
+
+      const res = await getPostalVenue('579780');
+      expect(res.geocoding_status).toBe('pending');
+      expect(res.name).toBeUndefined();
+      expect(res.lat).toBeUndefined();
+      expect(res.lng).toBeUndefined();
+    });
+
     it('propagates 404 error and does not return mock data', async () => {
       mockedGet.mockRejectedValueOnce({ response: { status: 404 } });
       await expect(getPostalVenue('579780')).rejects.toEqual({ response: { status: 404 } });
@@ -149,7 +165,7 @@ describe('Venues API Client', () => {
   });
 
   describe('uploadGameVenueImage & uploadTournamentVenueImage', () => {
-    it('uploads game venue image via POST /games/{id}/venue-images', async () => {
+    it('uploads game venue image via POST /games/{id}/venue-images with ownership_accepted field', async () => {
       mockedPost.mockResolvedValueOnce({
         data: {
           id: 'img-1',
@@ -173,6 +189,11 @@ describe('Venues API Client', () => {
           correlationId: 'cid-up',
         }),
       );
+      const passedFormData = mockedPost.mock.calls[0][1] as any;
+      if (passedFormData._parts) {
+        expect(passedFormData._parts).toContainEqual(['ownership_accepted', 'true']);
+        expect(passedFormData._parts.some(([k]: [string]) => k === 'accepted_statement')).toBe(false);
+      }
       expect(res.id).toBe('img-1');
     });
 
@@ -187,7 +208,7 @@ describe('Venues API Client', () => {
       ).rejects.toEqual({ response: { status: 404, data: { message: 'Not found' } } });
     });
 
-    it('uploads tournament venue image via POST /tournaments/{id}/venue-images', async () => {
+    it('uploads tournament venue image via POST /tournaments/{id}/venue-images with ownership_accepted field', async () => {
       mockedPost.mockResolvedValueOnce({
         data: {
           id: 'img-tourn-1',
@@ -209,6 +230,11 @@ describe('Venues API Client', () => {
           headers: { 'Content-Type': 'multipart/form-data' },
         }),
       );
+      const passedFormData = mockedPost.mock.calls[0][1] as any;
+      if (passedFormData._parts) {
+        expect(passedFormData._parts).toContainEqual(['ownership_accepted', 'true']);
+        expect(passedFormData._parts.some(([k]: [string]) => k === 'accepted_statement')).toBe(false);
+      }
       expect(res.id).toBe('img-tourn-1');
     });
 

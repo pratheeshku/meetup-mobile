@@ -172,7 +172,7 @@ export default function OthersVenueModal({
         address: resolvedAddress,
         lat: lookup.lat ?? null,
         lng: lookup.lng ?? null,
-        geocoding_status: lookup.geocoding_status,
+        geocoding_status: lookup.geocoding_status || 'pending',
       });
 
       // Reset

@@ -1,12 +1,11 @@
 import React from 'react';
 import { Linking } from 'react-native';
 
-import VenueDetailCard from '../VenueDetailCard';
+import VenueDetailCard, { VENUE_ORGANIZER_PHOTOS_ENABLED } from '../VenueDetailCard';
 import * as venuesApi from '../../../api/venues';
 import type { VenueImage, VenueSnapshot } from '../../../types/venue';
 import {
   act,
-  pressableLabelled,
   pressables,
   renderAsync,
   texts,
@@ -15,18 +14,6 @@ import {
 jest.mock('../../../api/venues');
 
 const mockGetVenue = venuesApi.getVenue as jest.MockedFunction<typeof venuesApi.getVenue>;
-const mockUploadGameVenueImage = venuesApi.uploadGameVenueImage as jest.MockedFunction<
-  typeof venuesApi.uploadGameVenueImage
->;
-const mockUploadTournamentVenueImage = venuesApi.uploadTournamentVenueImage as jest.MockedFunction<
-  typeof venuesApi.uploadTournamentVenueImage
->;
-const mockDeleteVenueImage = venuesApi.deleteVenueImage as jest.MockedFunction<
-  typeof venuesApi.deleteVenueImage
->;
-const mockReportVenueImage = venuesApi.reportVenueImage as jest.MockedFunction<
-  typeof venuesApi.reportVenueImage
->;
 
 const sampleSnapshot: VenueSnapshot = {
   name: 'Bishan Sports Hall',
@@ -155,8 +142,12 @@ describe('VenueDetailCard (vc-m-detail & vc-m-photos)', () => {
     });
   });
 
-  describe('vc-m-photos: Organizer upload, delete, and neutral viewer report', () => {
-    it('shows "Add venue photos" button for organizers only', async () => {
+  describe('vc-m-photos: Feature gating behind VENUE_ORGANIZER_PHOTOS_ENABLED = false', () => {
+    it('confirms VENUE_ORGANIZER_PHOTOS_ENABLED constant is false by default', () => {
+      expect(VENUE_ORGANIZER_PHOTOS_ENABLED).toBe(false);
+    });
+
+    it('hides "Add venue photos" button even for organizers when photo feature is disabled', async () => {
       const memberRoot = await renderAsync(
         <VenueDetailCard
           snapshot={sampleSnapshot}
@@ -173,49 +164,10 @@ describe('VenueDetailCard (vc-m-detail & vc-m-photos)', () => {
           isOrganiser={true}
         />,
       );
-      expect(texts(orgRoot)).toContain('Add venue photos');
+      expect(texts(orgRoot)).not.toContain('Add venue photos');
     });
 
-    it('allows viewer to open photo modal and report with neutral confirmation message without identity', async () => {
-      mockReportVenueImage.mockResolvedValue();
-
-      const root = await renderAsync(
-        <VenueDetailCard
-          snapshot={sampleSnapshot}
-          venueId="venue-1"
-          isOrganiser={false}
-        />,
-      );
-
-      const photoButtons = root.findAll(
-        node => node.props.accessibilityRole === 'button' && node.props.accessibilityLabel === 'View venue photo',
-      );
-      expect(photoButtons.length).toBeGreaterThan(0);
-
-      // Open first photo
-      await act(async () => {
-        photoButtons[0].props.onPress();
-      });
-
-      // Report button should be present
-      const reportBtn = pressableLabelled(root, 'Report photo');
-      expect(reportBtn).toBeTruthy();
-
-      // Submit report
-      await act(async () => {
-        reportBtn.props.onPress();
-      });
-
-      expect(mockReportVenueImage).toHaveBeenCalledWith('img-1', 'Reported by user');
-      const updatedTexts = texts(root);
-      expect(
-        updatedTexts.some(t => t.includes('Photo reported. Our moderation team will review it.')),
-      ).toBe(true);
-    });
-
-    it('allows organizer to delete a photo', async () => {
-      mockDeleteVenueImage.mockResolvedValue();
-
+    it('keeps shared admin photos visible but hides report and delete buttons in viewer modal', async () => {
       const root = await renderAsync(
         <VenueDetailCard
           snapshot={sampleSnapshot}
@@ -224,26 +176,30 @@ describe('VenueDetailCard (vc-m-detail & vc-m-photos)', () => {
         />,
       );
 
-      const photoButtons = root.findAll(
-        node => node.props.accessibilityRole === 'button' && node.props.accessibilityLabel === 'View venue photo',
+      // Shared admin photos are visible in the photo strip
+      const photoButtons = pressables(root).filter(
+        node => node.props.accessibilityLabel === 'View venue photo',
       );
+      expect(photoButtons.length).toBe(2);
 
       // Open first photo
       await act(async () => {
         photoButtons[0].props.onPress();
       });
 
-      const deleteBtn = pressableLabelled(root, 'Delete photo');
-      expect(deleteBtn).toBeTruthy();
+      // Report and Delete buttons must NOT be present
+      const reportBtnMatches = root.findAll(
+        node => node.props.accessibilityLabel === 'Report photo',
+      );
+      expect(reportBtnMatches).toHaveLength(0);
 
-      await act(async () => {
-        deleteBtn.props.onPress();
-      });
-
-      expect(mockDeleteVenueImage).toHaveBeenCalledWith('img-1');
+      const deleteBtnMatches = root.findAll(
+        node => node.props.accessibilityLabel === 'Delete photo',
+      );
+      expect(deleteBtnMatches).toHaveLength(0);
     });
 
-    it('requires ownership statement checkbox before uploading a photo', async () => {
+    it('keeps upload modal hidden when feature is disabled', async () => {
       const root = await renderAsync(
         <VenueDetailCard
           snapshot={sampleSnapshot}
@@ -253,137 +209,8 @@ describe('VenueDetailCard (vc-m-detail & vc-m-photos)', () => {
         />,
       );
 
-      const addBtn = pressableLabelled(root, 'Add venue photos');
-      await act(async () => {
-        addBtn.props.onPress();
-      });
-
-      expect(texts(root)).toContain('Add Venue Photo');
-      expect(texts(root)).toContain('I confirm that I own or have permission to upload this photo.');
-
-      const checkbox = root.find(node => node.props.accessibilityRole === 'checkbox');
-      expect(checkbox.props.accessibilityState.checked).toBe(false);
-
-      const uploadBtn = pressableLabelled(root, 'Confirm upload');
-      expect(uploadBtn.props.disabled).toBe(true);
-
-      // Check the statement
-      await act(async () => {
-        checkbox.props.onPress();
-      });
-
-      expect(checkbox.props.accessibilityState.checked).toBe(true);
-      expect(uploadBtn.props.disabled).toBe(false);
-    });
-
-    it('successfully uploads photo for game when accepted statement is checked', async () => {
-      const uploadedImage: VenueImage = {
-        id: 'img-new',
-        venue_id: 'venue-1',
-        game_id: 'event-123',
-        url: 'https://example.com/new-photo.jpg',
-        content_type: 'image/jpeg',
-        bytes: 5000,
-        sha256: 'sha-new',
-        status: 'active',
-        created_at: '2026-10-15T02:00:00Z',
-      };
-      mockUploadGameVenueImage.mockResolvedValue(uploadedImage);
-
-      const root = await renderAsync(
-        <VenueDetailCard
-          snapshot={sampleSnapshot}
-          venueId="venue-1"
-          eventId="event-123"
-          isOrganiser={true}
-        />,
-      );
-
-      // Open modal
-      const addBtn = pressableLabelled(root, 'Add venue photos');
-      await act(async () => {
-        addBtn.props.onPress();
-      });
-
-      // Enter URL
-      const textInput = root.find(node => (node.type as any) === 'TextInput');
-      await act(async () => {
-        textInput.props.onChangeText('https://example.com/new-photo.jpg');
-      });
-
-      // Check ownership
-      const checkbox = root.find(node => node.props.accessibilityRole === 'checkbox');
-      await act(async () => {
-        checkbox.props.onPress();
-      });
-
-      // Click upload
-      const uploadBtn = pressableLabelled(root, 'Confirm upload');
-      await act(async () => {
-        await uploadBtn.props.onPress();
-      });
-
-      expect(mockUploadGameVenueImage).toHaveBeenCalledWith(
-        'event-123',
-        expect.objectContaining({
-          uri: 'https://example.com/new-photo.jpg',
-          type: 'image/jpeg',
-        }),
-        true,
-      );
-    });
-
-    it('successfully uploads photo for tournament', async () => {
-      const uploadedImage: VenueImage = {
-        id: 'img-tourn',
-        venue_id: 'venue-1',
-        tournament_id: 'tourn-456',
-        url: 'https://example.com/tourn-photo.jpg',
-        content_type: 'image/jpeg',
-        bytes: 5000,
-        sha256: 'sha-tourn',
-        status: 'active',
-        created_at: '2026-10-15T02:00:00Z',
-      };
-      mockUploadTournamentVenueImage.mockResolvedValue(uploadedImage);
-
-      const root = await renderAsync(
-        <VenueDetailCard
-          snapshot={sampleSnapshot}
-          venueId="venue-1"
-          tournamentId="tourn-456"
-          isOrganiser={true}
-        />,
-      );
-
-      const addBtn = pressableLabelled(root, 'Add venue photos');
-      await act(async () => {
-        addBtn.props.onPress();
-      });
-
-      const textInput = root.find(node => (node.type as any) === 'TextInput');
-      await act(async () => {
-        textInput.props.onChangeText('https://example.com/tourn-photo.jpg');
-      });
-
-      const checkbox = root.find(node => node.props.accessibilityRole === 'checkbox');
-      await act(async () => {
-        checkbox.props.onPress();
-      });
-
-      const uploadBtn = pressableLabelled(root, 'Confirm upload');
-      await act(async () => {
-        await uploadBtn.props.onPress();
-      });
-
-      expect(mockUploadTournamentVenueImage).toHaveBeenCalledWith(
-        'tourn-456',
-        expect.objectContaining({
-          uri: 'https://example.com/tourn-photo.jpg',
-          type: 'image/jpeg',
-        }),
-        true,
-      );
+      expect(texts(root)).not.toContain('Add Venue Photo');
+      expect(texts(root)).not.toContain('I confirm that I own or have permission to upload this photo.');
     });
   });
 });

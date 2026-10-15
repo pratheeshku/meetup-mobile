@@ -82,7 +82,10 @@ export async function getPostalVenue(
       correlationId: options?.correlationId,
     },
   );
-  return data;
+  return {
+    ...data,
+    geocoding_status: data.geocoding_status || 'pending',
+  };
 }
 
 /**
@@ -101,7 +104,7 @@ export async function uploadGameVenueImage(
     type: image.type,
     name: image.name,
   } as any);
-  formData.append('accepted_statement', String(acceptedStatement));
+  formData.append('ownership_accepted', String(acceptedStatement));
 
   const { data } = await apiClient.post<VenueImage>(
     `/games/${gameId}/venue-images`,
@@ -130,7 +133,7 @@ export async function uploadTournamentVenueImage(
     type: image.type,
     name: image.name,
   } as any);
-  formData.append('accepted_statement', String(acceptedStatement));
+  formData.append('ownership_accepted', String(acceptedStatement));
 
   const { data } = await apiClient.post<VenueImage>(
     `/tournaments/${tournamentId}/venue-images`,

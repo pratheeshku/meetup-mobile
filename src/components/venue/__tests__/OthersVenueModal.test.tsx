@@ -133,6 +133,51 @@ describe('OthersVenueModal', () => {
     );
   });
 
+  it('treats absent geocoding_status after successful lookup as pending', async () => {
+    mockGetPostalVenue.mockResolvedValue({
+      postal_code: '538832',
+      block: '93',
+      street: 'Hougang Avenue 4',
+      address: '93 Hougang Avenue 4',
+    });
+
+    const onSave = jest.fn();
+    const root = await renderAsync(
+      <OthersVenueModal visible={true} onClose={jest.fn()} onSaveOthers={onSave} />,
+    );
+
+    const nameInput = root.find(
+      n => (n.type as unknown) === 'TextInput' && n.props.placeholder === 'e.g. Club House Hall',
+    );
+    const postalInput = root.find(
+      n => (n.type as unknown) === 'TextInput' && n.props.placeholder === 'e.g. 579780',
+    );
+
+    await act(async () => {
+      nameInput.props.onChangeText('Hougang Court');
+      postalInput.props.onChangeText('538832');
+    });
+
+    const saveBtn = pressableWithText(root, 'Save Venue');
+    await act(async () => {
+      saveBtn.props.onPress();
+    });
+
+    expect(mockGetPostalVenue).toHaveBeenCalledWith('538832');
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        geocoding_status: 'pending',
+        lat: null,
+        lng: null,
+        address: '93 Hougang Avenue 4',
+        othersInput: expect.objectContaining({
+          name: 'Hougang Court',
+          postal_code: '538832',
+        }),
+      }),
+    );
+  });
+
   it('resolves coordinates and address when OneMap lookup succeeds', async () => {
     mockGetPostalVenue.mockResolvedValue({
       postal_code: '538832',

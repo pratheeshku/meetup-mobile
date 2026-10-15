@@ -37,7 +37,13 @@ import { PinIcon } from '../icons/SharedIcons';
 import { VenuePinBadgeIcon, VenuePlusIcon } from './VenueIcons';
 import { useT } from '../../labels/LabelsContext';
 import { colors } from '../../theme/tokens';
-import type { VenueImage, VenueSnapshot } from '../../types/venue';
+import {
+  VENUE_ORGANIZER_PHOTOS_ENABLED,
+  type VenueImage,
+  type VenueSnapshot,
+} from '../../types/venue';
+
+export { VENUE_ORGANIZER_PHOTOS_ENABLED };
 
 interface VenueDetailCardProps {
   snapshot?: VenueSnapshot | null;
@@ -245,7 +251,7 @@ export default function VenueDetailCard({
       ) : null}
 
       {/* Venue Photos Strip (GameDetail.html) */}
-      {(photos.length > 0 || isOrganiser) && (
+      {(photos.length > 0 || (VENUE_ORGANIZER_PHOTOS_ENABLED && isOrganiser)) && (
         <View style={styles.photosCard}>
           <View style={styles.photosHeader}>
             <Text style={styles.photosTitle}>Venue photos</Text>
@@ -298,7 +304,7 @@ export default function VenueDetailCard({
           )}
 
           {/* Organizer Add Photos entry point (vc-m-photos) */}
-          {isOrganiser ? (
+          {VENUE_ORGANIZER_PHOTOS_ENABLED && isOrganiser ? (
             <Pressable
               style={styles.addPhotosRow}
               onPress={() => setIsUploadModalOpen(true)}
@@ -344,7 +350,7 @@ export default function VenueDetailCard({
               </View>
             ) : (
               <View style={styles.photoActionsRow}>
-                {selectedPhoto ? (
+                {VENUE_ORGANIZER_PHOTOS_ENABLED && selectedPhoto ? (
                   <Pressable
                     style={styles.reportButton}
                     onPress={() => handleReportPhoto(selectedPhoto)}
@@ -355,7 +361,7 @@ export default function VenueDetailCard({
                   </Pressable>
                 ) : null}
 
-                {isOrganiser && selectedPhoto ? (
+                {VENUE_ORGANIZER_PHOTOS_ENABLED && isOrganiser && selectedPhoto ? (
                   <Pressable
                     style={styles.deletePhotoButton}
                     onPress={() => handleDeletePhoto(selectedPhoto)}
@@ -373,7 +379,7 @@ export default function VenueDetailCard({
 
       {/* Upload Photo Modal */}
       <Modal
-        visible={isUploadModalOpen}
+        visible={VENUE_ORGANIZER_PHOTOS_ENABLED && isUploadModalOpen}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setIsUploadModalOpen(false)}

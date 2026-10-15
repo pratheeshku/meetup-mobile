@@ -76,11 +76,18 @@ export interface VenuesListResponse {
 
 export interface PostalLookupResponse {
   postal_code: string;
-  name?: string;
+  name?: string | null;
   block?: string | null;
   street?: string | null;
-  address?: string;
+  address?: string | null;
   lat?: number | null;
   lng?: number | null;
-  geocoding_status: 'resolved' | 'pending' | 'failed';
+  geocoding_status?: 'resolved' | 'pending' | 'failed' | null;
 }
+
+/**
+ * Feature flag constant to hide organizer venue photo upload, delete, and report
+ * controls until the S3 backend ships. Shared admin photos in the detail card stay visible.
+ */
+export const VENUE_ORGANIZER_PHOTOS_ENABLED = false;
+
