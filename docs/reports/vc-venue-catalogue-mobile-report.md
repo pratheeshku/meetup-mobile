@@ -356,7 +356,8 @@ Ran all test suites matching /src\/components\/venue\/__tests__|src\/screens\/__
 
 **Git evidence**:
 ```
-cc8cb1a (HEAD -> feat/venue-catalogue-mobile) test(venues): add legacy venue flow contract tests for flag off and absent
+c7eb481 (HEAD -> feat/venue-catalogue-mobile) docs(venues): update report with legacy venue flow verification and evidence
+cc8cb1a test(venues): add legacy venue flow contract tests for flag off and absent
 0f7ce8b (origin/feat/venue-catalogue-mobile) docs(venues): finalize git evidence in completion proof
 4f5de59 docs(venues): add baseline test failure comparison proving 180 pre-existing failures
 5363820 docs(venues): update report completion proof with commit 9371831
