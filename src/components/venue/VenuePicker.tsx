@@ -82,6 +82,8 @@ export default function VenuePicker({
   const [loadingMore, setLoadingMore] = useState(false);
   const [sportChangeNotice, setSportChangeNotice] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const prevSportRef = useRef(sportId);
 
   // When sport changes after catalogue venue was selected, clear venue (Others survives)
@@ -98,6 +100,7 @@ export default function VenuePicker({
 
   const fetchVenues = useCallback(
     async (searchText: string, cursor?: string, isAppend = false) => {
+      setLoadError(null);
       if (!isAppend) {
         setLoading(true);
       } else {
@@ -119,6 +122,7 @@ export default function VenuePicker({
         if (!isAppend) {
           setVenues([]);
         }
+        setLoadError('Unable to load venues. Please try again.');
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -297,7 +301,19 @@ export default function VenuePicker({
           </Text>
 
           <View style={styles.listContainer}>
-            {loading && venues.length === 0 ? (
+            {loadError ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{loadError}</Text>
+                <Pressable
+                  style={styles.retryButton}
+                  onPress={() => fetchVenues(query)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading venues"
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : loading && venues.length === 0 ? (
               <View style={styles.loadingBox}>
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
@@ -639,5 +655,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  errorBox: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  errorText: {
+    fontSize: 13,
+    color: colors.error,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    backgroundColor: colors.primary,
+  },
+  retryButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

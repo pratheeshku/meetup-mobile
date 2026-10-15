@@ -4,11 +4,11 @@ import {
   getPostalVenue,
   getVenue,
   getVenues,
-  MOCK_VENUES,
   reportVenueImage,
   uploadGameVenueImage,
   uploadTournamentVenueImage,
 } from '../venues';
+import type { VenueDetail, VenueItem, VenuesListResponse } from '../../types/venue';
 
 jest.mock('../client', () => ({
   apiClient: {
@@ -22,6 +22,14 @@ const mockedGet = apiClient.get as jest.Mock;
 const mockedPost = apiClient.post as jest.Mock;
 const mockedDelete = apiClient.delete as jest.Mock;
 
+const sampleVenue: VenueItem = {
+  id: 'venue-1',
+  provider: 'sportsg',
+  provider_venue_key: 'sportsg:579780:bishan',
+  name: 'Bishan Sports Hall',
+  status: 'active',
+};
+
 describe('Venues API Client', () => {
   beforeEach(() => {
     mockedGet.mockReset();
@@ -31,8 +39,8 @@ describe('Venues API Client', () => {
 
   describe('getVenues', () => {
     it('calls GET /venues with sport_id, query, and cursor', async () => {
-      const mockResponse = {
-        items: [MOCK_VENUES[0]],
+      const mockResponse: VenuesListResponse = {
+        items: [sampleVenue],
         next_cursor: 'cursor-2',
       };
       mockedGet.mockResolvedValueOnce({ data: mockResponse });
@@ -53,19 +61,31 @@ describe('Venues API Client', () => {
       expect(res).toEqual(mockResponse);
     });
 
-    it('falls back to typed mock venues on 404 without crashing', async () => {
+    it('propagates 404 error and does not return mock data', async () => {
       mockedGet.mockRejectedValueOnce({ response: { status: 404 } });
+      await expect(getVenues({ sport_id: 'badminton', q: 'bishan' })).rejects.toEqual({
+        response: { status: 404 },
+      });
+    });
 
-      const res = await getVenues({ sport_id: 'badminton', q: 'bishan' });
-      expect(res.items.length).toBeGreaterThan(0);
-      expect(res.items[0].name).toContain('Bishan');
+    it('propagates network error and does not return mock data', async () => {
+      const netError = new Error('Network Error');
+      mockedGet.mockRejectedValueOnce(netError);
+      await expect(getVenues({ sport_id: 'badminton' })).rejects.toThrow('Network Error');
+    });
+
+    it('propagates 5xx server error', async () => {
+      mockedGet.mockRejectedValueOnce({ response: { status: 500, data: 'Server Error' } });
+      await expect(getVenues({ sport_id: 'badminton' })).rejects.toEqual({
+        response: { status: 500, data: 'Server Error' },
+      });
     });
   });
 
   describe('getVenue', () => {
     it('calls GET /venues/{id}', async () => {
-      const mockDetail = {
-        venue: MOCK_VENUES[0],
+      const mockDetail: VenueDetail = {
+        venue: sampleVenue,
         images: [],
       };
       mockedGet.mockResolvedValueOnce({ data: mockDetail });
@@ -77,11 +97,19 @@ describe('Venues API Client', () => {
       expect(res).toEqual(mockDetail);
     });
 
-    it('falls back to mock venue on 404', async () => {
+    it('propagates 404 error and does not return mock data', async () => {
       mockedGet.mockRejectedValueOnce({ response: { status: 404 } });
+      await expect(getVenue('venue-1')).rejects.toEqual({ response: { status: 404 } });
+    });
 
-      const res = await getVenue(MOCK_VENUES[0].id);
-      expect(res.venue.id).toBe(MOCK_VENUES[0].id);
+    it('propagates network error and does not return mock data', async () => {
+      mockedGet.mockRejectedValueOnce(new Error('Network offline'));
+      await expect(getVenue('venue-1')).rejects.toThrow('Network offline');
+    });
+
+    it('propagates 5xx server error', async () => {
+      mockedGet.mockRejectedValueOnce({ response: { status: 502 } });
+      await expect(getVenue('venue-1')).rejects.toEqual({ response: { status: 502 } });
     });
   });
 
@@ -104,13 +132,19 @@ describe('Venues API Client', () => {
       expect(res).toEqual(mockPostal);
     });
 
-    it('falls back to mock postal resolution on 404 for valid 6-digit code', async () => {
+    it('propagates 404 error and does not return mock data', async () => {
       mockedGet.mockRejectedValueOnce({ response: { status: 404 } });
+      await expect(getPostalVenue('579780')).rejects.toEqual({ response: { status: 404 } });
+    });
 
-      const res = await getPostalVenue('579780');
-      expect(res.postal_code).toBe('579780');
-      expect(res.geocoding_status).toBe('resolved');
-      expect(res.lat).toBeDefined();
+    it('propagates network error and does not return mock data', async () => {
+      mockedGet.mockRejectedValueOnce(new Error('Timeout'));
+      await expect(getPostalVenue('579780')).rejects.toThrow('Timeout');
+    });
+
+    it('propagates 5xx server error', async () => {
+      mockedGet.mockRejectedValueOnce({ response: { status: 503 } });
+      await expect(getPostalVenue('579780')).rejects.toEqual({ response: { status: 503 } });
     });
   });
 
@@ -142,6 +176,17 @@ describe('Venues API Client', () => {
       expect(res.id).toBe('img-1');
     });
 
+    it('fails upload when server returns error (404, 5xx, or network) and does not mock success', async () => {
+      mockedPost.mockRejectedValueOnce({ response: { status: 404, data: { message: 'Not found' } } });
+      await expect(
+        uploadGameVenueImage(
+          'game-123',
+          { uri: 'file:///path/to/img.jpg', type: 'image/jpeg', name: 'photo.jpg' },
+          true,
+        ),
+      ).rejects.toEqual({ response: { status: 404, data: { message: 'Not found' } } });
+    });
+
     it('uploads tournament venue image via POST /tournaments/{id}/venue-images', async () => {
       mockedPost.mockResolvedValueOnce({
         data: {
@@ -166,6 +211,17 @@ describe('Venues API Client', () => {
       );
       expect(res.id).toBe('img-tourn-1');
     });
+
+    it('fails tournament upload when server returns error and does not mock success', async () => {
+      mockedPost.mockRejectedValueOnce({ response: { status: 500 } });
+      await expect(
+        uploadTournamentVenueImage(
+          'tourn-123',
+          { uri: 'file:///path/to/tourn.jpg', type: 'image/jpeg', name: 'tourn.jpg' },
+          true,
+        ),
+      ).rejects.toEqual({ response: { status: 500 } });
+    });
   });
 
   describe('deleteVenueImage & reportVenueImage', () => {
@@ -176,6 +232,11 @@ describe('Venues API Client', () => {
       expect(mockedDelete).toHaveBeenCalledWith('/venue-images/img-999', {
         correlationId: 'cid-del',
       });
+    });
+
+    it('fails delete on 404 or server failure and throws error', async () => {
+      mockedDelete.mockRejectedValueOnce({ response: { status: 404 } });
+      await expect(deleteVenueImage('img-999')).rejects.toEqual({ response: { status: 404 } });
     });
 
     it('reports venue image via POST /venue-images/{id}/report', async () => {
@@ -189,6 +250,11 @@ describe('Venues API Client', () => {
         { reason: 'Inappropriate picture' },
         { correlationId: 'cid-rep' },
       );
+    });
+
+    it('fails report on server failure and throws error', async () => {
+      mockedPost.mockRejectedValueOnce(new Error('Network error'));
+      await expect(reportVenueImage('img-999', 'reason')).rejects.toThrow('Network error');
     });
   });
 });

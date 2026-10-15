@@ -78,17 +78,20 @@ export default function VenueDetailCard({
   // Report state
   const [reportedMessage, setReportedMessage] = useState<string | null>(null);
 
+  const [photoLoadError, setPhotoLoadError] = useState<string | null>(null);
+
   // Load photos (fresh signed URLs on each load, never cached)
   const loadPhotos = useCallback(async () => {
     if (venueId) {
       setLoadingPhotos(true);
+      setPhotoLoadError(null);
       try {
         const res = await getVenue(venueId);
         if (res.images) {
           setPhotos(res.images);
         }
       } catch {
-        // Safe degrade
+        setPhotoLoadError('Unable to load photos');
       } finally {
         setLoadingPhotos(false);
       }
@@ -180,7 +183,7 @@ export default function VenueDetailCard({
       await reportVenueImage(photo.id, 'Reported by user');
       setReportedMessage('Photo reported. Our moderation team will review it.');
     } catch {
-      setReportedMessage('Photo reported. Thank you for your feedback.');
+      Alert.alert('Error', 'Unable to submit report. Please try again.');
     }
   };
 
@@ -251,7 +254,19 @@ export default function VenueDetailCard({
             ) : null}
           </View>
 
-          {loadingPhotos ? (
+          {photoLoadError ? (
+            <View style={styles.photoErrorBox}>
+              <Text style={styles.photoErrorText}>{photoLoadError}</Text>
+              <Pressable
+                style={styles.photoRetryBtn}
+                onPress={loadPhotos}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading photos"
+              >
+                <Text style={styles.photoRetryText}>Retry</Text>
+              </Pressable>
+            </View>
+          ) : loadingPhotos ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : photos.length > 0 ? (
             <ScrollView
@@ -747,5 +762,26 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
+  },
+  photoErrorBox: {
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  photoErrorText: {
+    fontSize: 12,
+    color: colors.error,
+  },
+  photoRetryBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: colors.primary,
+  },
+  photoRetryText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
