@@ -34,6 +34,7 @@ import { createTournament } from '../api/tournaments';
 import { searchUsers } from '../api/users';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import Button from '../components/Button';
+import DropdownField from '../components/DropdownField';
 import IconBadge from '../components/IconBadge';
 import {
   CheckIcon,
@@ -82,6 +83,11 @@ import type {
 import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
+import {
+  computeEndsAtIso,
+  DEFAULT_GAME_DURATION_HOURS,
+  GAME_DURATION_HOURS,
+} from '../utils/gameDuration';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'CreateGame'>,
@@ -139,6 +145,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     d.setHours(19, 30, 0, 0);
     return d;
   });
+  const [durationHours, setDurationHours] = useState<number>(DEFAULT_GAME_DURATION_HOURS);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [venueQuery, setVenueQuery] = useState('Community Hall');
@@ -387,11 +394,12 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     setIsSubmitting(true);
     try {
       const startsAtIso = dateValue.toISOString();
+      const endsAtIso = computeEndsAtIso(dateValue, durationHours);
       const fullVenueName = courtDetails.trim()
         ? `${selectedVenue.name}, ${courtDetails.trim()}`
         : selectedVenue.name;
       const sportName = sports.find(item => item.name === gSport)?.display_name || gSport;
-      const submittedWhen = `${formatEventDate(startsAtIso)}, ${formatEventTimeRange(startsAtIso, null)}`;
+      const submittedWhen = `${formatEventDate(startsAtIso)}, ${formatEventTimeRange(startsAtIso, mode === 'game' ? endsAtIso : null)}`;
       const submittedDate = formatEventDate(startsAtIso);
       const selectedGroupName = groups.find(item => item.id === selectedGroupId)?.name;
       const skillKey: LabelKey =
@@ -436,7 +444,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           skill_level_requirement: skillLevel,
           capacity: capacity,
           starts_at: startsAtIso,
-          ends_at: null,
+          ends_at: endsAtIso,
           ...(venueCatalogueEnabled && catalogueVenue
             ? catalogueVenue.isOthers && catalogueVenue.othersInput
               ? {
@@ -617,6 +625,13 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     );
   };
 
+  const durationOptions = GAME_DURATION_HOURS.map(hours => ({
+    value: String(hours),
+    label: t(hours === 1 ? 'mob.create_game.duration_hours_one' : 'mob.create_game.duration_hours_other', {
+      count: hours,
+    }),
+  }));
+
   // Step 3: When and where?
   const renderStep3 = () => {
     const formattedDate = dateValue.toLocaleDateString('en-US', {
@@ -676,6 +691,19 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               onChange={handleTimeChange}
             />
           )}
+
+          {mode === 'game' ? (
+            <View style={styles.durationField}>
+              <Text style={styles.fieldLabel}>{t('mob.create_game.duration_label')}</Text>
+              <DropdownField
+                options={durationOptions}
+                value={String(durationHours)}
+                onChange={value => setDurationHours(Number(value))}
+                placeholder={t('mob.create_game.duration_label')}
+                accessibilityLabel={t('mob.create_game.duration_label')}
+              />
+            </View>
+          ) : null}
 
           {venueCatalogueEnabled ? (
             <VenuePicker
@@ -1027,7 +1055,12 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               <ClockIcon size={16} />
             </View>
             <Text style={styles.reviewDetailText}>
-              {formattedDate}, {formattedTime}
+              {mode === 'game'
+                ? `${formattedDate}, ${formatEventTimeRange(
+                    dateValue.toISOString(),
+                    computeEndsAtIso(dateValue, durationHours),
+                  )}`
+                : `${formattedDate}, ${formattedTime}`}
             </Text>
           </View>
 
@@ -1209,6 +1242,9 @@ const styles = StyleSheet.create({
   },
   halfField: {
     flex: 1,
+  },
+  durationField: {
+    marginTop: spacing.md,
   },
   fieldLabel: {
     ...typography.caption,

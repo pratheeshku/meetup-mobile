@@ -182,7 +182,7 @@ export async function getEvent(id: string, options?: RequestOptions): Promise<Ev
  * `POST /events` (Create Flow Amendment, §4.3; `EventCreate` schema). Body
  * is a subset of the live schema (see `CreateEventInput`) — a direct port
  * of the web app's Casual Game submit handler (`frontend/app.js`,
- * `submitCreateEvent`), including always sending `ends_at: null`.
+ * `submitCreateEvent`), (`ends_at` is now start + the chosen duration).
  */
 export async function createEvent(
   input: CreateEventInput,

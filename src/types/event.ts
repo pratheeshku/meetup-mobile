@@ -157,7 +157,7 @@ export interface CreateEventInput {
   capacity: number;
   /** ISO 8601 date-time. */
   starts_at: string;
-  ends_at: null;
+  ends_at: string | null;
   venue_name?: string;
   venue_address?: string;
   venue_place_id?: string | null;
