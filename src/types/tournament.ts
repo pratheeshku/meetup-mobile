@@ -68,11 +68,14 @@ export interface Tournament {
   format: string;
   status: TournamentStatus;
   registration_open: boolean;
-  participant_count: number;
+  /** `GET /tournaments` list only (`registered_count`). `null` = unknown: hide the count, never show 0. */
+  participant_count: number | null;
   max_participants: number;
   starts_at: string;
+  registration_closes_at?: string | null;
   created_at: string;
-  current_user_registration_status: TournamentRegistrationStatus;
+  /** `GET /tournaments` list only (`my_registration_status`). `null` = unknown: hide the text, never show "Not Registered". */
+  current_user_registration_status: TournamentRegistrationStatus | null;
   is_organiser: boolean;
   venue_name?: string | null;
   venue_label?: string | null;

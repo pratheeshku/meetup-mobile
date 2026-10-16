@@ -20,6 +20,7 @@
  * an endpoint the design itself specifies, not inventing one.
  */
 import { apiClient } from './client';
+import type { VenueSnapshot } from '../types/venue';
 import type {
   CreateTournamentInput,
   Tournament,
@@ -53,11 +54,18 @@ interface TournamentApiItem {
   starts_at: string;
   status: string;
   created_at: string;
+  /** List endpoint only; null/absent = unknown. */
+  registered_count?: number | null;
+  my_registration_status?: TournamentRegistrationStatus | null;
+  venue_name?: string | null;
+  venue_label?: string | null;
+  venue_id?: string | null;
+  venue_snapshot?: VenueSnapshot | null;
 }
 
 /** See the `Tournament` type's own header comment for the numbered,
  * per-field Proposed Assumptions and flagged gaps this mapper carries. */
-function mapTournamentApiItem(raw: TournamentApiItem): Tournament {
+function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): Tournament {
   return {
     id: raw.id,
     name: raw.title,
@@ -69,20 +77,27 @@ function mapTournamentApiItem(raw: TournamentApiItem): Tournament {
     status: raw.status as TournamentStatus,
     registration_open:
       raw.registration_closes_at === null || Date.parse(raw.registration_closes_at) > Date.now(),
-    participant_count: 0,
+    participant_count: raw.registered_count ?? null,
     max_participants: raw.capacity,
     starts_at: raw.starts_at,
+    registration_closes_at: raw.registration_closes_at,
     created_at: raw.created_at,
-    current_user_registration_status: 'none',
-    is_organiser: false,
+    current_user_registration_status: raw.my_registration_status ?? null,
+    is_organiser: Boolean(currentUserId) && raw.organizer_id === currentUserId,
+    venue_name: raw.venue_name ?? null,
+    venue_label: raw.venue_label ?? null,
+    venue_id: raw.venue_id ?? null,
+    venue_snapshot: raw.venue_snapshot ?? null,
   };
 }
 
-export async function getTournaments(options?: RequestOptions): Promise<TournamentsListResponse> {
+export async function getTournaments(
+  options?: RequestOptions & { currentUserId?: string },
+): Promise<TournamentsListResponse> {
   const { data } = await apiClient.get<TournamentApiItem[]>('/tournaments', {
     correlationId: options?.correlationId,
   });
-  const items = data.map(mapTournamentApiItem);
+  const items = data.map(raw => mapTournamentApiItem(raw, options?.currentUserId));
   return { items, total: items.length, page: 1, page_size: items.length };
 }
 

@@ -5,20 +5,17 @@
  * It loads, empties and fails on its own (`getTournaments()`).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 
 import { getTournaments } from '../api/tournaments';
-import Badge from './Badge';
-import type { BadgeVariant } from './Badge';
-import Card from './Card';
 import EmptyState from './EmptyState';
 import ErrorView from './ErrorView';
 import LoadingView from './LoadingView';
-import { colors, spacing, typography } from '../theme/tokens';
-import type { Tournament, TournamentRegistrationStatus } from '../types/tournament';
-import { useSportDisplayName } from '../utils/labels';
+import { useAuth } from '../auth/AuthContext';
+import { UnifiedTournamentCard } from './home/UnifiedCard';
+import { colors, spacing } from '../theme/tokens';
+import type { Tournament } from '../types/tournament';
 import { useT } from '../labels/LabelsContext';
-import type { LabelKey } from '../labels/fallbackLabels';
 
 interface Props {
   onOpenTournament: (tournamentId: string) => void;
@@ -28,67 +25,15 @@ interface Props {
   onLoadingChange?: (loading: boolean) => void;
 }
 
-const REGISTRATION_BADGE_LABEL_KEY: Record<TournamentRegistrationStatus, LabelKey> = {
-  none: 'mob.tournament.reg_none',
-  registered: 'mob.tournament.reg_registered',
-  withdrawn: 'mob.tournament.reg_withdrawn',
-};
-
-const REGISTRATION_BADGE_VARIANT: Record<TournamentRegistrationStatus, BadgeVariant> = {
-  none: 'neutral',
-  registered: 'success',
-  withdrawn: 'warning',
-};
-
-/**
- * A `FlatList` `renderItem` callback isn't itself a component React tracks
- * hook state for, so `useSportDisplayName` (BUG-M02) can't be called
- * directly inside one — extracted into its own component instead, one per
- * row, which `renderItem` just instantiates.
- */
-function TournamentRow({
-  tournament,
-  onPress,
-}: {
-  tournament: Tournament;
-  onPress: () => void;
-}): React.JSX.Element {
-  const sportLabel = useSportDisplayName(tournament.sport);
-  const t = useT();
-  return (
-    <Card style={styles.card} onPress={onPress}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.cardTitle} numberOfLines={1}>
-          {tournament.name}
-        </Text>
-        <Badge
-          label={t(REGISTRATION_BADGE_LABEL_KEY[tournament.current_user_registration_status])}
-          variant={REGISTRATION_BADGE_VARIANT[tournament.current_user_registration_status]}
-          style={styles.badge}
-        />
-      </View>
-      <Text style={styles.cardMeta}>
-        {sportLabel} · {tournament.format}
-      </Text>
-      <Text style={styles.cardMeta}>
-        {t('mob.tournament.status_line', { status: tournament.status })}
-      </Text>
-      <Text style={styles.cardMeta}>
-        {t('mob.tournament.registered_line', {
-          count: tournament.participant_count,
-          max: tournament.max_participants,
-        })}
-      </Text>
-    </Card>
-  );
-}
-
 export default function TournamentsListContent({
   onOpenTournament,
   refreshKey,
   onLoadingChange,
 }: Props): React.JSX.Element {
   const t = useT();
+  const { user } = useAuth();
+  const userIdRef = useRef(user?.id);
+  userIdRef.current = user?.id;
   const tRef = useRef(t);
   tRef.current = t;
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -104,7 +49,7 @@ export default function TournamentsListContent({
     }
     setError(null);
     try {
-      const response = await getTournaments();
+      const response = await getTournaments({ currentUserId: userIdRef.current });
       setTournaments(response.items);
     } catch {
       setError(tRef.current('mob.tournament.list_error'));
@@ -167,7 +112,7 @@ export default function TournamentsListContent({
         />
       }
       renderItem={({ item }) => (
-        <TournamentRow
+        <UnifiedTournamentCard
           tournament={item}
           onPress={() => onOpenTournament(item.id)}
         />
@@ -179,14 +124,4 @@ export default function TournamentsListContent({
 const styles = StyleSheet.create({
   listContainer: { padding: spacing.md },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
-  card: { marginBottom: spacing.md },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  cardTitle: { ...typography.h3, color: colors.textPrimary, flexShrink: 1 },
-  cardMeta: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
-  badge: { marginLeft: spacing.sm },
 });
