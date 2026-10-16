@@ -28,16 +28,26 @@ it('invite-only shows the search, suggestions and email input', async () => {
 
 const GROUP = { id: 'g-1', name: 'Sunday Footballers', description: '', owner_id: 'me', created_at: '', current_user_role: 'owner' };
 
-it.each([['Public'], ['Sunday Footballers']])('%s hides the search, suggestions, email input and chips', async option => {
+it.each([
+  ['Public', '4 players · Public'],
+  ['Sunday Footballers', '4 players · Sunday Footballers'],
+])('%s hides the search, suggestions, email input and chips', async (option, reviewLine) => {
   const root = await mountCreateGame([ALEX], [GROUP]);
   await press(byLabel(root, 'Next')); // 1 -> 2
   await press(byLabel(root, 'Next')); // 2 -> 3 (default title)
   await press(byLabel(root, 'Next')); // 3 -> 4
-  const choice = root.findAll(n => typeof n.props.onPress === 'function' && texts(n).some(x => x.startsWith(option)))[0];
-  expect(choice).toBeDefined();
-  await press(choice);
+  const pick = (name: string): Instance =>
+    root.findAll(n => typeof n.props.onPress === 'function' && texts(n).some(x => x.startsWith(name)))[0];
+  // A group is pre-selected by default when the user has one, so move away first;
+  // the explicit group click below is then what selects it.
+  expect(pick('Public')).toBeDefined();
+  await press(pick('Public'));
+  expect(pick(option)).toBeDefined();
+  await press(pick(option));
   await press(byLabel(root, 'Next')); // 4 -> 5
   await press(byLabel(root, 'Next')); // 5 -> 6
+  // The visibility choice really took effect (review reflects the chosen audience).
+  expect(texts(root)).toContain(reviewLine);
   expect(hasSearch(root)).toBe(false);
   expect(hasSuggestion(root)).toBe(false);
   expect(hasEmail(root)).toBe(false);

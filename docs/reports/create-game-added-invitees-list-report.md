@@ -20,7 +20,7 @@ Tests: 6 passed, 6 total
 
 ## Follow-up fix: invite-only only
 - Step 6 now renders the heading, player search, added-invitees chips, suggestions and the "Invite by email" input **only when the game is invite-only**. Public and group games show just the review, so no one who will not be invited is displayed.
-- New test `src/screens/__tests__/CreateGameInviteeVisibility.test.tsx` (3): invite-only shows search, suggestions and email input; public and group hide search, suggestions, email input and chips. `createGameHarness` gained an optional `groups` argument.
+- New test `src/screens/__tests__/CreateGameInviteeVisibility.test.tsx` (3): invite-only shows search, suggestions and email input; public and group hide search, suggestions, email input and chips. `createGameHarness` gained an optional `groups` argument. The group case first switches to Public (a group is pre-selected by default when the user has one), then clicks the group, and asserts the review shows `4 players · Sunday Footballers` before asserting the invitee UI is hidden. Verified: with the group click commented out the group case fails (review shows `4 players · Public`); restored, all 3 pass.
 
 ## Checks
 - `npm run check:labels`: OK - 206 files scanned, 944 default labels checked.
