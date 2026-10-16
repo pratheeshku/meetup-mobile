@@ -197,3 +197,51 @@ describe('NotificationBanner — participant notifications', () => {
     expect(getBannerState()).toBeNull();
   });
 });
+
+describe('NotificationBanner — tournament_invited', () => {
+  let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+  let navigate: jest.SpyInstance;
+
+  beforeEach(() => {
+    jest.spyOn(navigationRef, 'isReady').mockReturnValue(true);
+    navigate = jest.spyOn(navigationRef, 'navigate').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    ReactTestRenderer.act(() => {
+      renderer?.unmount();
+      dismissBanner();
+    });
+    renderer = undefined;
+    jest.restoreAllMocks();
+  });
+
+  it('tapping opens Tournament Detail for that tournament and dismisses the banner', () => {
+    ReactTestRenderer.act(() => {
+      showBanner({
+        notification_type: 'tournament_invited',
+        entity_id: 't-9',
+        title: 'You are invited',
+        body: 'Summer Smash',
+      });
+    });
+    ReactTestRenderer.act(() => {
+      renderer = ReactTestRenderer.create(
+        <SafeAreaProvider initialMetrics={METRICS}>
+          <NotificationBanner />
+        </SafeAreaProvider>,
+      );
+    });
+    const tree = renderer as ReactTestRenderer.ReactTestRenderer;
+
+    ReactTestRenderer.act(() => {
+      pressableWithText(tree.root, 'You are invited').props.onPress();
+    });
+
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith('Tournaments', {
+      screen: 'TournamentDetail',
+      params: { tournamentId: 't-9' },
+    });
+  });
+});

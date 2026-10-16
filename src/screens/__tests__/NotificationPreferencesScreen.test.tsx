@@ -38,10 +38,11 @@ it('shows a row for every known type, with the two participant labels', async ()
   expect(labels).toContain('Group ownership transferred');
   const switches = root.findAllByType(Switch);
   expect(switches).toHaveLength(NOTIFICATION_TYPES.length);
-  expect(NOTIFICATION_TYPES).toHaveLength(18);
+  expect(NOTIFICATION_TYPES).toHaveLength(19);
   expect(NOTIFICATION_TYPES).toEqual(
-    expect.arrayContaining(['group_deleted', 'group_ownership_transferred']),
+    expect.arrayContaining(['group_deleted', 'group_ownership_transferred', 'tournament_invited']),
   );
+  expect(labels).toContain('Tournament invitations');
 
   // Unlisted types default to on; a listed one keeps the server value.
   const added = NOTIFICATION_TYPES.indexOf('event_participant_added');

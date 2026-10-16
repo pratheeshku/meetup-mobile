@@ -23,6 +23,9 @@ import { apiClient } from './client';
 import type { VenueSnapshot } from '../types/venue';
 import type {
   CreateTournamentInput,
+  TournamentInvitation,
+  TournamentInvitationStatus,
+  TournamentInviteAccess,
   Tournament,
   TournamentFixture,
   TournamentRegistration,
@@ -57,10 +60,23 @@ interface TournamentApiItem {
   /** List endpoint only; null/absent = unknown. */
   registered_count?: number | null;
   my_registration_status?: TournamentRegistrationStatus | null;
+  my_invite_access?: string | null;
+  my_invitation_status?: string | null;
   venue_name?: string | null;
   venue_label?: string | null;
   venue_id?: string | null;
   venue_snapshot?: VenueSnapshot | null;
+}
+
+/** Unknown, null or absent -> `'none'` (never a value that shows buttons). */
+function normaliseInviteAccess(value: string | null | undefined): TournamentInviteAccess {
+  return value === 'full' || value === 'individuals' ? value : 'none';
+}
+
+function normaliseInvitationStatus(
+  value: string | null | undefined,
+): TournamentInvitationStatus | null {
+  return value === 'pending' || value === 'accepted' ? value : null;
 }
 
 /** See the `Tournament` type's own header comment for the numbered,
@@ -84,6 +100,8 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     created_at: raw.created_at,
     current_user_registration_status: raw.my_registration_status ?? null,
     is_organiser: Boolean(currentUserId) && raw.organizer_id === currentUserId,
+    my_invite_access: normaliseInviteAccess(raw.my_invite_access),
+    my_invitation_status: normaliseInvitationStatus(raw.my_invitation_status),
     venue_name: raw.venue_name ?? null,
     venue_label: raw.venue_label ?? null,
     venue_id: raw.venue_id ?? null,
@@ -224,4 +242,62 @@ export async function createTournament(
     correlationId: options?.correlationId,
   });
   return mapTournamentApiItem(data);
+}
+
+/**
+ * Tournament invitations (tournament-lifecycle addendum v1.2.2, AD-4). All
+ * routes 404 while `meetup.tournament.invitations.enabled` is off, and
+ * `409 INVITES_CLOSED` after registration closes: callers show the server's
+ * message. One correlation id per user action is passed in by the caller.
+ */
+export async function inviteUserToTournament(
+  id: string,
+  userId: string,
+  options?: RequestOptions,
+): Promise<TournamentInvitation> {
+  const { data } = await apiClient.post<TournamentInvitation>(
+    `/tournaments/${id}/invite-user`,
+    { user_id: userId },
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+export async function inviteGroupToTournament(
+  id: string,
+  groupId: string,
+  options?: RequestOptions,
+): Promise<TournamentInvitation[]> {
+  const { data } = await apiClient.post<TournamentInvitation[]>(
+    `/tournaments/${id}/invite-group`,
+    { group_id: groupId },
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+export async function inviteEmailToTournament(
+  id: string,
+  email: string,
+  options?: RequestOptions,
+): Promise<TournamentInvitation> {
+  const { data } = await apiClient.post<TournamentInvitation>(
+    `/tournaments/${id}/invite-email`,
+    { email },
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+/** `POST /tournaments/{id}/invitations/respond` `{ accept }` (the invitee only). */
+export async function respondToTournamentInvitation(
+  id: string,
+  accept: boolean,
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.post(
+    `/tournaments/${id}/invitations/respond`,
+    { accept },
+    { correlationId: options?.correlationId },
+  );
 }

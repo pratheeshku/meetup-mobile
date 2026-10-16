@@ -51,6 +51,8 @@ import { getClientConfig } from '../api/config';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import VenueDetailCard from '../components/venue/VenueDetailCard';
+import TournamentInvitationBanner from '../components/tournament/TournamentInvitationBanner';
+import TournamentInvitePanel from '../components/tournament/TournamentInvitePanel';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
@@ -132,6 +134,12 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  /** Re-reads the tournament so access/invitation status reflect the server. */
+  const refreshTournament = useCallback(async (): Promise<void> => {
+    const fresh = await getTournament(tournamentId);
+    setTournament(fresh);
+  }, [tournamentId]);
 
   const handleRegister = async (): Promise<void> => {
     setRegisterError(null);
@@ -258,6 +266,14 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         </Text>
         <Text style={styles.description}>{tournament.description}</Text>
       </Card>
+
+      <TournamentInvitationBanner
+        tournamentId={tournament.id}
+        status={tournament.my_invitation_status}
+        onResponded={refreshTournament}
+      />
+
+      <TournamentInvitePanel tournamentId={tournament.id} access={tournament.my_invite_access} />
 
       {venueCatalogueEnabled ? (
         <VenueDetailCard

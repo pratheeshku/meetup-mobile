@@ -57,7 +57,7 @@ export type NotificationTarget =
 /**
  * Resolves a notification type + entity id to a concrete navigation
  * target. Exhaustive over `NotificationType` (the 12 from §4.8, the two
- * participant types, `group_event_created`, plus `event_reminder` — 16 total) —
+ * participant types, `group_event_created`, plus `event_reminder` and `tournament_invited`) —
  * the `never` fallthrough in `default` makes an unhandled type a compile
  * error, not a silent no-op, satisfying the task brief's "no unhandled types"
  * rule at the type-checker level.
@@ -114,6 +114,9 @@ export function resolveNotificationTarget(
         params: { groupId: entityId },
       };
 
+    // `tournament_invited` (addendum AD-4): entity_id = the tournament id; opens
+    // Tournament Detail, where the invitation banner (Accept / Decline) shows.
+    case 'tournament_invited':
     case 'tournament_match_scheduled':
     case 'tournament_result_posted':
     case 'tournament_cancelled':

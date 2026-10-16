@@ -23,13 +23,14 @@ const ADDED_TYPES = [
   'event_reminder',
   'group_deleted',
   'group_ownership_transferred',
+  'tournament_invited',
 ] as const;
 
 describe('type list', () => {
-  it('contains the added types alongside the original 12 (18 total, no duplicates)', () => {
+  it('contains the added types alongside the original 12 (19 total, no duplicates)', () => {
     expect(NOTIFICATION_TYPES).toEqual(expect.arrayContaining([...ADDED_TYPES]));
-    expect(NOTIFICATION_TYPES).toHaveLength(18);
-    expect(new Set(NOTIFICATION_TYPES).size).toBe(18);
+    expect(NOTIFICATION_TYPES).toHaveLength(19);
+    expect(new Set(NOTIFICATION_TYPES).size).toBe(19);
   });
 
   it('resolves every listed type without throwing (list and switch cannot drift)', () => {
@@ -135,5 +136,22 @@ describe('navigateToNotificationTarget for a participant notification', () => {
     navigateToNotificationTarget(resolveNotificationTarget('event_participant_removed', ''));
 
     expect(navigate).toHaveBeenCalledWith('Home', { screen: 'EventsList' });
+  });
+});
+
+describe('tournament_invited', () => {
+  it('opens Tournament Detail for the tournament id, like the other tournament types', () => {
+    expect(resolveNotificationTarget('tournament_invited', 't-9')).toEqual({
+      tab: 'Tournaments',
+      screen: 'TournamentDetail',
+      params: { tournamentId: 't-9' },
+    });
+    expect(resolveNotificationTarget('tournament_invited', 't-9')).toEqual(
+      resolveNotificationTarget('tournament_cancelled', 't-9'),
+    );
+  });
+
+  it('is a known notification type (so the push payload is accepted)', () => {
+    expect(NOTIFICATION_TYPES).toContain('tournament_invited');
   });
 });

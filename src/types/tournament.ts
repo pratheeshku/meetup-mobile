@@ -22,6 +22,24 @@ import type { OthersVenueInput, VenueSnapshot } from './venue';
  */
 export type TournamentStatus = 'upcoming' | 'active' | 'completed' | 'cancelled';
 
+/**
+ * `GET /tournaments/{id}` `my_invite_access` (tournament-lifecycle addendum
+ * AD-4). The only source for showing Share/Invite: committee membership is
+ * never derived on the client. `null`/absent from the server means `'none'`.
+ */
+export type TournamentInviteAccess = 'full' | 'individuals' | 'none';
+
+/** `GET /tournaments/{id}` `my_invitation_status`: the caller's own invitation only. */
+export type TournamentInvitationStatus = 'pending' | 'accepted';
+
+/** Subset of `TournamentInvitationResponse` the app reads (mirrors `event_invitations`). */
+export interface TournamentInvitation {
+  id: string;
+  status: string;
+  invitee_user_id?: string | null;
+  invited_email?: string | null;
+}
+
 /** Brief's literal enum. */
 export type TournamentRegistrationStatus = 'none' | 'registered' | 'withdrawn';
 
@@ -77,6 +95,9 @@ export interface Tournament {
   /** `GET /tournaments` list only (`my_registration_status`). `null` = unknown: hide the text, never show "Not Registered". */
   current_user_registration_status: TournamentRegistrationStatus | null;
   is_organiser: boolean;
+  /** Absent/undefined is treated as `'none'` everywhere; the mapper never defaults to a value that shows buttons. */
+  my_invite_access?: TournamentInviteAccess;
+  my_invitation_status?: TournamentInvitationStatus | null;
   venue_name?: string | null;
   venue_label?: string | null;
   venue_id?: string | null;

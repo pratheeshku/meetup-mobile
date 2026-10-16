@@ -5,7 +5,16 @@
  * (`TournamentResponse`, `TournamentRegistrationResponse`).
  */
 import { apiClient } from '../client';
-import { createTournament, getRegistrations, getTournament, getTournaments } from '../tournaments';
+import {
+  createTournament,
+  getRegistrations,
+  getTournament,
+  getTournaments,
+  inviteEmailToTournament,
+  inviteGroupToTournament,
+  inviteUserToTournament,
+  respondToTournamentInvitation,
+} from '../tournaments';
 
 jest.mock('../client', () => ({
   apiClient: { get: jest.fn(), post: jest.fn() },
@@ -306,5 +315,58 @@ describe('createTournament', () => {
         starts_at: '2026-10-01T10:00:00.000Z',
       }),
     ).rejects.toThrow('boom');
+  });
+});
+
+describe('invite capability and invitation status (my_invite_access / my_invitation_status)', () => {
+  const base = {
+    id: 't-9', organizer_id: 'org-1', sport: 'football', title: 'Cup', name: null, description: null,
+    format: 'knockout', capacity: 8, registration_closes_at: null,
+    starts_at: '2999-02-01T00:00:00Z', status: 'upcoming', created_at: '2026-01-01T00:00:00Z',
+  };
+
+  it.each([['full'], ['individuals'], ['none']])('maps my_invite_access %s', async access => {
+    mockedGet.mockResolvedValueOnce({ data: { ...base, my_invite_access: access } });
+    expect((await getTournament('t-9')).my_invite_access).toBe(access);
+  });
+
+  it.each([[null], [undefined], ['admin'], ['']])('treats %p as none (never shows buttons)', async access => {
+    mockedGet.mockResolvedValueOnce({ data: { ...base, my_invite_access: access } });
+    expect((await getTournament('t-9')).my_invite_access).toBe('none');
+  });
+
+  it.each([['pending'], ['accepted']])('maps my_invitation_status %s', async status => {
+    mockedGet.mockResolvedValueOnce({ data: { ...base, my_invitation_status: status } });
+    expect((await getTournament('t-9')).my_invitation_status).toBe(status);
+  });
+
+  it.each([[null], [undefined], ['declined'], ['revoked']])('treats %p as no invitation', async status => {
+    mockedGet.mockResolvedValueOnce({ data: { ...base, my_invitation_status: status } });
+    expect((await getTournament('t-9')).my_invitation_status).toBeNull();
+  });
+
+  it('list items without the fields map to none / null', async () => {
+    mockedGet.mockResolvedValueOnce({ data: [base] });
+    const [item] = (await getTournaments()).items;
+    expect(item.my_invite_access).toBe('none');
+    expect(item.my_invitation_status).toBeNull();
+  });
+});
+
+describe('invitation calls', () => {
+  it('post to the contract paths with the contract bodies and the correlation id', async () => {
+    mockedPost.mockReset().mockResolvedValue({ data: {} });
+    await inviteUserToTournament('t-1', 'u-1', { correlationId: 'c' });
+    await inviteGroupToTournament('t-1', 'g-1', { correlationId: 'c' });
+    await inviteEmailToTournament('t-1', 'a@b.co', { correlationId: 'c' });
+    await respondToTournamentInvitation('t-1', true, { correlationId: 'c' });
+    await respondToTournamentInvitation('t-1', false, { correlationId: 'c' });
+    expect(mockedPost.mock.calls).toEqual([
+      ['/tournaments/t-1/invite-user', { user_id: 'u-1' }, { correlationId: 'c' }],
+      ['/tournaments/t-1/invite-group', { group_id: 'g-1' }, { correlationId: 'c' }],
+      ['/tournaments/t-1/invite-email', { email: 'a@b.co' }, { correlationId: 'c' }],
+      ['/tournaments/t-1/invitations/respond', { accept: true }, { correlationId: 'c' }],
+      ['/tournaments/t-1/invitations/respond', { accept: false }, { correlationId: 'c' }],
+    ]);
   });
 });
