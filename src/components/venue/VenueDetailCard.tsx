@@ -35,6 +35,7 @@ import {
 import { CrossIcon } from '../icons/ActionIcons';
 import { PinIcon } from '../icons/SharedIcons';
 import { VenuePinBadgeIcon, VenuePlusIcon } from './VenueIcons';
+import { logMapFailureOnce } from './logMapFailure';
 import { useT } from '../../labels/LabelsContext';
 import { colors } from '../../theme/tokens';
 import {
@@ -70,6 +71,7 @@ export default function VenueDetailCard({
 }: VenueDetailCardProps): React.JSX.Element {
   const t = useT();
   const [photos, setPhotos] = useState<VenueImage[]>([]);
+  const [failedMapUri, setFailedMapUri] = useState<string | null>(null);
   const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<VenueImage | null>(null);
 
@@ -192,6 +194,8 @@ export default function VenueDetailCard({
       Alert.alert(t('venue.error'), t('venue.photo_report_failed'));
     }
   };
+  // URL format and key handling unchanged; the key must never be logged.
+  const staticMapUri = `https://maps.googleapis.com/maps/api/staticmap?center=${snapshot?.lat},${snapshot?.lng}&zoom=15&size=600x300&markers=color:red%7C${snapshot?.lat},${snapshot?.lng}&key=${mapsApiKey}`;
 
   return (
     <View style={styles.cardContainer}>
@@ -227,16 +231,18 @@ export default function VenueDetailCard({
       {/* Map Card if Coordinates exist */}
       {snapshot?.lat != null && snapshot?.lng != null ? (
         <View style={styles.mapCard}>
-          {mapsApiKey ? (
+          {mapsApiKey && failedMapUri !== staticMapUri ? (
             <Image
               style={styles.mapImage}
-              source={{
-                uri: `https://maps.googleapis.com/maps/api/staticmap?center=${snapshot.lat},${snapshot.lng}&zoom=15&size=600x300&markers=color:red%7C${snapshot.lat},${snapshot.lng}&key=${mapsApiKey}`,
-              }}
+              source={{ uri: staticMapUri }}
               resizeMode="cover"
+              onError={() => {
+                logMapFailureOnce();
+                setFailedMapUri(staticMapUri);
+              }}
             />
           ) : (
-            <View style={styles.mapPattern}>
+            <View style={styles.mapPattern} testID="venue-map-placeholder">
               <View style={styles.mapPatternPatch1} />
               <View style={styles.mapPatternPatch2} />
               <View style={styles.mapPinPlacement}>

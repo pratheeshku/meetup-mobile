@@ -23,6 +23,7 @@ import {
   VenuePlusIcon,
 } from './VenueIcons';
 import OthersVenueModal from './OthersVenueModal';
+import { logMapFailureOnce } from './logMapFailure';
 import { useT } from '../../labels/LabelsContext';
 import { colors, radius, spacing } from '../../theme/tokens';
 import type { OthersVenueInput, VenueItem, VenueSnapshot } from '../../types/venue';
@@ -85,6 +86,7 @@ export default function VenuePicker({
   const [sportChangeNotice, setSportChangeNotice] = useState<string | null>(null);
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [failedMapUri, setFailedMapUri] = useState<string | null>(null);
 
   const prevSportRef = useRef(sportId);
 
@@ -186,6 +188,8 @@ export default function VenuePicker({
 
   const catalogueSourceLabel = t('venue.source.catalogue');
   const userSourceLabel = t('venue.source.user');
+  // URL format and key handling unchanged; the key must never be logged.
+  const staticMapUri = `https://maps.googleapis.com/maps/api/staticmap?center=${selectedVenue?.lat},${selectedVenue?.lng}&zoom=15&size=600x300&markers=color:red%7C${selectedVenue?.lat},${selectedVenue?.lng}&key=${mapsApiKey}`;
 
   return (
     <View style={styles.container}>
@@ -249,16 +253,18 @@ export default function VenuePicker({
             {/* Map Card */}
             {selectedVenue.lat != null && selectedVenue.lng != null ? (
               <View style={styles.mapCard}>
-                {mapsApiKey ? (
+                {mapsApiKey && failedMapUri !== staticMapUri ? (
                   <Image
                     style={styles.mapImage}
-                    source={{
-                      uri: `https://maps.googleapis.com/maps/api/staticmap?center=${selectedVenue.lat},${selectedVenue.lng}&zoom=15&size=600x300&markers=color:red%7C${selectedVenue.lat},${selectedVenue.lng}&key=${mapsApiKey}`,
-                    }}
+                    source={{ uri: staticMapUri }}
                     resizeMode="cover"
+                    onError={() => {
+                      logMapFailureOnce();
+                      setFailedMapUri(staticMapUri);
+                    }}
                   />
                 ) : (
-                  <View style={styles.mapPattern}>
+                  <View style={styles.mapPattern} testID="venue-map-placeholder">
                     <View style={styles.mapPatternPatch1} />
                     <View style={styles.mapPatternPatch2} />
                     <View style={styles.mapPatternRoadH} />

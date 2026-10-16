@@ -425,18 +425,12 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       };
 
       if (mode === 'game') {
-        if (gVisibility === 'invite_only' && invitedPlayers.length < 1) {
-          setError(t('mob.create_game.step_invite_required'));
-          setIsSubmitting(false);
-          return;
-        }
-
         const input: CreateEventInput = {
           title: gTitle.trim(),
           sport: gSport,
           visibility: gVisibility,
           ...(gVisibility === 'group' && selectedGroupId ? { group_ids: [selectedGroupId] } : {}),
-          ...(gVisibility === 'invite_only'
+          ...(gVisibility === 'invite_only' && invitedPlayers.length > 0
             ? { invite_user_ids: invitedPlayers.map(p => p.id) }
             : {}),
           skill_level_requirement: skillLevel,
@@ -960,17 +954,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       <View style={styles.stepContent}>
         <View style={styles.stepHeaderRow}>
           <Text style={styles.stepHeading}>
-            {isInviteOnly ? (
-              <>
-                {t('mob.create_game.who_invited')}{' '}
-                <Text style={styles.requiredSubtitle}>{t('mob.create_game.at_least_one')}</Text>
-              </>
-            ) : (
-              <>
-                {t('mob.create_game.invite_players')}{' '}
-                <Text style={styles.optionalSubtitle}>{t('mob.create_game.optional_parentheses')}</Text>
-              </>
-            )}
+            {t('mob.create_game.invite_players')}{' '}
+            <Text style={styles.optionalSubtitle}>{t('mob.create_game.optional_parentheses')}</Text>
           </Text>
         </View>
 
@@ -1074,7 +1059,6 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   };
 
   const isStep5Disabled = step === 5 && (!isCapacityValid || capacity < gameLimits.players_min);
-  const isStep6Disabled = step === 6 && gVisibility === 'invite_only' && invitedPlayers.length < 1;
 
   return (
     <View style={styles.screen}>
@@ -1109,7 +1093,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             variant="cta"
             onPress={handleSubmit}
             loading={isSubmitting}
-            disabled={isStep6Disabled || isSubmitting}
+            disabled={isSubmitting}
           />
         </View>
       ) : (
