@@ -34,9 +34,11 @@ import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import type { Event } from '../../types/event';
 import type { Group, GroupRole } from '../../types/group';
+import type { Tournament, TournamentRegistrationStatus } from '../../types/tournament';
 import { perfImageError, perfImageLoad, perfImageLoadStart } from '../../diagnostics/perfLog';
 import { formatRowDate } from '../../utils/formatGameTime';
 import type { GameBadge } from '../../utils/gameLists';
+import { useSportDisplayName } from '../../utils/labels';
 import type { LabelKey } from '../../labels/fallbackLabels';
 
 interface AvatarItem {
@@ -300,6 +302,114 @@ export function UnifiedGameCard({
       accessibilityLabel={`${event.title}, ${timeLine}, ${venue}, ${countLabel}`}
       badge={badgeNode}
       perfScreen={perfScreen}
+    />
+  );
+}
+
+const TOURNAMENT_REG_LABEL_KEY: Record<TournamentRegistrationStatus, LabelKey> = {
+  none: 'mob.tournament.reg_none',
+  registered: 'mob.tournament.reg_registered',
+  withdrawn: 'mob.tournament.reg_withdrawn',
+};
+
+/**
+ * Registration badge using the game badge treatment: "not registered" takes
+ * the highlighted `Open` look (an action is available); the others take the
+ * default pill like Going/Waitlisted/Hosting.
+ */
+export function TournamentRegistrationBadge({
+  status,
+}: {
+  status: TournamentRegistrationStatus;
+}): React.JSX.Element {
+  const t = useT();
+  const isOpen = status === 'none';
+  return (
+    <View style={[styles.statusPill, isOpen ? styles.statusOpen : null]}>
+      <Text style={[styles.statusText, isOpen ? styles.statusOpenText : null]}>
+        {t(TOURNAMENT_REG_LABEL_KEY[status])}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Tournament Card using UnifiedCard. `participant_count` and
+ * `current_user_registration_status` are `null` when the backend did not
+ * supply them: the count and the registration badge are then hidden (never
+ * "0" or "Not Registered"). No avatars: the list response has no photos.
+ */
+export function UnifiedTournamentCard({
+  tournament,
+  onPress,
+}: {
+  tournament: Tournament;
+  onPress: () => void;
+}): React.JSX.Element {
+  const t = useT();
+  const sportLabel = useSportDisplayName(tournament.sport);
+
+  const venue =
+    tournament.venue_name ||
+    tournament.venue_label ||
+    tournament.venue_snapshot?.name ||
+    t('mob.home.card.location_tbc');
+  const dateFormatted = formatRowDate(tournament.starts_at);
+  const sportFormat = `${sportLabel} · ${tournament.format}`;
+
+  const countLabel =
+    tournament.participant_count != null
+      ? t('mob.tournament.registered_line', {
+          count: tournament.participant_count,
+          max: tournament.max_participants,
+        })
+      : null;
+
+  const badgeNode =
+    tournament.current_user_registration_status != null ? (
+      <TournamentRegistrationBadge status={tournament.current_user_registration_status} />
+    ) : null;
+
+  return (
+    <UnifiedCard
+      leftTile={<DateBlock dateString={tournament.starts_at} />}
+      title={tournament.name}
+      details={
+        <View>
+          <View style={styles.detailRow}>
+            <ClockIcon size={16} />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {dateFormatted}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <MapPinIcon size={16} />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {venue}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <PeopleGreenIcon size={16} />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {sportFormat}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.metaText} numberOfLines={1}>
+              {t('mob.tournament.status_line', { status: tournament.status })}
+            </Text>
+          </View>
+        </View>
+      }
+      avatars={[]}
+      moreCount={0}
+      countLabel={countLabel}
+      actionButtonLabel={t('mob.done.btn_view_tournament')}
+      onPress={onPress}
+      accessibilityLabel={[tournament.name, dateFormatted, venue, sportFormat, countLabel]
+        .filter(Boolean)
+        .join(', ')}
+      badge={badgeNode}
     />
   );
 }

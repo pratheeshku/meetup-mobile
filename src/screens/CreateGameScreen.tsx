@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Pressable,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -21,7 +22,7 @@ import Geolocation from '@react-native-community/geolocation';
 
 import { getClientConfig, getGameLimits, type GameLimits } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
-import { createEvent } from '../api/events';
+import { createEvent, inviteEmailToEvent } from '../api/events';
 import { getMyGroups } from '../api/groups';
 import {
   fetchPlaceDetails,
@@ -34,6 +35,7 @@ import { createTournament } from '../api/tournaments';
 import { searchUsers } from '../api/users';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import Button from '../components/Button';
+import DropdownField from '../components/DropdownField';
 import IconBadge from '../components/IconBadge';
 import {
   CheckIcon,
@@ -81,7 +83,13 @@ import type {
 } from '../types/tournament';
 import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
+import { addInviteEmail } from '../utils/inviteEmails';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
+import {
+  computeEndsAtIso,
+  DEFAULT_GAME_DURATION_HOURS,
+  GAME_DURATION_HOURS,
+} from '../utils/gameDuration';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'CreateGame'>,
@@ -139,6 +147,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     d.setHours(19, 30, 0, 0);
     return d;
   });
+  const [durationHours, setDurationHours] = useState<number>(DEFAULT_GAME_DURATION_HOURS);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [venueQuery, setVenueQuery] = useState('Community Hall');
@@ -171,6 +180,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   const [playerSearchQuery, setPlayerSearchQuery] = useState('');
   const [playerSuggestions, setPlayerSuggestions] = useState<UserSearchResult[]>([]);
   const [invitedPlayers, setInvitedPlayers] = useState<UserSearchResult[]>([]);
+  const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   // Submission & errors
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -320,6 +332,23 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     });
   };
 
+  const handleAddEmail = () => {
+    const result = addInviteEmail(invitedEmails, emailInput);
+    if (!result.ok) {
+      setEmailError(
+        t(result.reason === 'invalid' ? 'mob.create_game.invite_email_invalid' : 'mob.create_game.invite_email_duplicate'),
+      );
+      return;
+    }
+    setInvitedEmails(result.emails);
+    setEmailInput('');
+    setEmailError(null);
+  };
+
+  const removeInvitedEmail = (email: string) => {
+    setInvitedEmails(prev => prev.filter(item => item !== email));
+  };
+
   const handleDateChange = (_e: DateTimePickerEvent, selected?: Date) => {
     setShowDatePicker(false);
     if (selected) {
@@ -387,11 +416,12 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     setIsSubmitting(true);
     try {
       const startsAtIso = dateValue.toISOString();
+      const endsAtIso = computeEndsAtIso(dateValue, durationHours);
       const fullVenueName = courtDetails.trim()
         ? `${selectedVenue.name}, ${courtDetails.trim()}`
         : selectedVenue.name;
       const sportName = sports.find(item => item.name === gSport)?.display_name || gSport;
-      const submittedWhen = `${formatEventDate(startsAtIso)}, ${formatEventTimeRange(startsAtIso, null)}`;
+      const submittedWhen = `${formatEventDate(startsAtIso)}, ${formatEventTimeRange(startsAtIso, mode === 'game' ? endsAtIso : null)}`;
       const submittedDate = formatEventDate(startsAtIso);
       const selectedGroupName = groups.find(item => item.id === selectedGroupId)?.name;
       const skillKey: LabelKey =
@@ -436,7 +466,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           skill_level_requirement: skillLevel,
           capacity: capacity,
           starts_at: startsAtIso,
-          ends_at: null,
+          ends_at: endsAtIso,
           ...(venueCatalogueEnabled && catalogueVenue
             ? catalogueVenue.isOthers && catalogueVenue.othersInput
               ? {
@@ -458,9 +488,23 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               }),
         };
 
-        const created = await withCorrelationId(async correlationId =>
-          createEvent(input, { correlationId }),
-        );
+        const emailsToInvite = gVisibility === 'invite_only' ? invitedEmails : [];
+        const failedEmailInvites: string[] = [];
+        let emailsInvited = 0;
+        const created = await withCorrelationId(async correlationId => {
+          const event = await createEvent(input, { correlationId });
+          // One call per email, sequential, same correlation id. A failure never
+          // rolls back or blocks the created game; it is listed on completion.
+          for (const email of emailsToInvite) {
+            try {
+              await inviteEmailToEvent(event.id, email, { correlationId });
+              emailsInvited += 1;
+            } catch (e) {
+              failedEmailInvites.push(`${email}: ${getApiErrorMessage(e, t('mob.game_detail.invite_error'))}`);
+            }
+          }
+          return event;
+        });
         const rows: CompletionRow[] = [
           { label: t('mob.done.f_title'), value: input.title },
           { label: t('mob.done.f_sport'), value: sportName },
@@ -472,6 +516,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         ];
         if (gVisibility === 'invite_only') {
           rows.push({ label: t('mob.done.f_invited'), value: String(invitedPlayers.length) });
+          rows.push({ label: t('mob.done.f_invited_email'), value: String(emailsInvited) });
+        }
+        if (failedEmailInvites.length > 0) {
+          rows.push({ label: t('mob.done.f_invite_failed'), value: failedEmailInvites.join('\n') });
         }
         showCompletion({
           flow: 'game_created',
@@ -617,6 +665,13 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     );
   };
 
+  const durationOptions = GAME_DURATION_HOURS.map(hours => ({
+    value: String(hours),
+    label: t(hours === 1 ? 'mob.create_game.duration_hours_one' : 'mob.create_game.duration_hours_other', {
+      count: hours,
+    }),
+  }));
+
   // Step 3: When and where?
   const renderStep3 = () => {
     const formattedDate = dateValue.toLocaleDateString('en-US', {
@@ -676,6 +731,19 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               onChange={handleTimeChange}
             />
           )}
+
+          {mode === 'game' ? (
+            <View style={styles.durationField}>
+              <Text style={styles.fieldLabel}>{t('mob.create_game.duration_label')}</Text>
+              <DropdownField
+                options={durationOptions}
+                value={String(durationHours)}
+                onChange={value => setDurationHours(Number(value))}
+                placeholder={t('mob.create_game.duration_label')}
+                accessibilityLabel={t('mob.create_game.duration_label')}
+              />
+            </View>
+          ) : null}
 
           {venueCatalogueEnabled ? (
             <VenuePicker
@@ -952,6 +1020,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
     return (
       <View style={styles.stepContent}>
+        {/* Invitee UI only for invite-only games: nobody else is invited. */}
+        {isInviteOnly ? (
+        <>
         <View style={styles.stepHeaderRow}>
           <Text style={styles.stepHeading}>
             {t('mob.create_game.invite_players')}{' '}
@@ -969,6 +1040,58 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             placeholderTextColor={colors.textMuted}
           />
         </View>
+
+        {/* Everyone added so far (players and emails), directly under the search box */}
+        {invitedPlayers.length + invitedEmails.length > 0 ? (
+          <View style={styles.inviteeList} testID="invitee-list">
+            {invitedPlayers.map(person => {
+              const tint = getAvatarTint(person.display_name);
+              return (
+                <View key={`p-${person.id}`} style={styles.inviteeChip}>
+                  <View style={[styles.inviteeAvatar, { backgroundColor: tint.bg }]}>
+                    <Text style={[styles.inviteeAvatarText, { color: tint.text }]}>
+                      {getInitials(person.display_name)}
+                    </Text>
+                  </View>
+                  <Text style={styles.inviteeName} numberOfLines={1}>
+                    {person.display_name}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.create_game.invitee_remove_a11y', { name: person.display_name })}
+                    onPress={() => toggleInvitePlayer(person)}
+                    style={styles.inviteeRemove}
+                  >
+                    <CrossIcon size={14} color={colors.textSecondary} />
+                  </Pressable>
+                </View>
+              );
+            })}
+            {invitedEmails.map(email => {
+              const tint = getAvatarTint(email);
+              return (
+                <View key={`e-${email.toLowerCase()}`} style={styles.inviteeChip}>
+                  <View style={[styles.inviteeAvatar, { backgroundColor: tint.bg }]}>
+                    <Text style={[styles.inviteeAvatarText, { color: tint.text }]}>
+                      {email.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.inviteeName} numberOfLines={1}>
+                    {email}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.create_game.invitee_remove_a11y', { name: email })}
+                    onPress={() => removeInvitedEmail(email)}
+                    style={styles.inviteeRemove}
+                  >
+                    <CrossIcon size={14} color={colors.textSecondary} />
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
 
         {playerSuggestions.length > 0 ? (
           <View style={[styles.cardContainer, styles.playerSuggestionsCard]}>
@@ -992,6 +1115,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
                   <TouchableOpacity
                     style={[styles.inviteToggleBtn, isInvited && styles.inviteToggleBtnActive]}
                     onPress={() => toggleInvitePlayer(user)}
+                    testID={`invite-toggle-${user.id}`}
                   >
                     {isInvited ? (
                       <CheckIcon size={16} color={colors.white} />
@@ -1003,6 +1127,37 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               );
             })}
           </View>
+        ) : null}
+
+          <View style={styles.emailInviteBlock}>
+            <Text style={styles.fieldLabel}>{t('mob.create_game.invite_email_label')}</Text>
+            <View style={styles.emailInviteRow}>
+              <TextInput
+                style={styles.emailInviteInput}
+                value={emailInput}
+                onChangeText={text => {
+                  setEmailInput(text);
+                  setEmailError(null);
+                }}
+                onSubmitEditing={handleAddEmail}
+                placeholder={t('mob.create_game.invite_email_placeholder')}
+                placeholderTextColor={colors.textMuted}
+                accessibilityLabel={t('mob.create_game.invite_email_label')}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Button
+                label={t('mob.create_game.invite_email_add')}
+                variant="secondary"
+                onPress={handleAddEmail}
+                disabled={emailInput.trim().length === 0}
+                style={styles.emailInviteAdd}
+              />
+            </View>
+            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+          </View>
+        </>
         ) : null}
 
         {/* Review Card */}
@@ -1027,7 +1182,12 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               <ClockIcon size={16} />
             </View>
             <Text style={styles.reviewDetailText}>
-              {formattedDate}, {formattedTime}
+              {mode === 'game'
+                ? `${formattedDate}, ${formatEventTimeRange(
+                    dateValue.toISOString(),
+                    computeEndsAtIso(dateValue, durationHours),
+                  )}`
+                : `${formattedDate}, ${formattedTime}`}
             </Text>
           </View>
 
@@ -1049,7 +1209,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               {gVisibility === 'group' && selectedGroup
                 ? t('mob.create_game.review_players_group', { count: capacity, group: selectedGroup.name })
                 : isInviteOnly
-                ? t('mob.create_game.review_players_invite', { count: capacity, invited: invitedPlayers.length })
+                ? t('mob.create_game.review_players_invite', { count: capacity, invited: invitedPlayers.length + invitedEmails.length })
                 : t('mob.create_game.review_players_public', { count: capacity })}
             </Text>
           </View>
@@ -1210,6 +1370,9 @@ const styles = StyleSheet.create({
   halfField: {
     flex: 1,
   },
+  durationField: {
+    marginTop: spacing.md,
+  },
   fieldLabel: {
     ...typography.caption,
     fontWeight: '600',
@@ -1241,6 +1404,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     height: 48,
     backgroundColor: colors.surface,
+  },
+  inviteeList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  inviteeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+    maxWidth: '100%',
+    paddingLeft: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: radius.full,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+  },
+  inviteeAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inviteeAvatarText: {
+    ...typography.caption,
+    fontWeight: '700',
+  },
+  inviteeName: {
+    ...typography.caption,
+    color: colors.textPrimary,
+    marginHorizontal: spacing.sm,
+    flexShrink: 1,
+  },
+  inviteeRemove: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emailInviteBlock: {
+    marginTop: spacing.md,
+  },
+  emailInviteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  emailInviteInput: {
+    flex: 1,
+    height: 48,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    color: colors.textPrimary,
+  },
+  emailInviteAdd: {
+    marginBottom: 0,
   },
   searchInput: {
     flex: 1,

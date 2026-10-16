@@ -9,13 +9,14 @@ import React from 'react';
 
 import { getTournaments } from '../../api/tournaments';
 import { getSports } from '../../api/sports';
-import { renderAsync, texts } from '../../test-utils/render';
+import { act, renderAsync, texts } from '../../test-utils/render';
 import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import type { Tournament } from '../../types/tournament';
 import TournamentsListContent from '../TournamentsListContent';
 
 jest.mock('../../api/tournaments', () => ({ getTournaments: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
+jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ user: { id: 'me' } }) }));
 
 const mockGetTournaments = getTournaments as jest.MockedFunction<typeof getTournaments>;
 const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
@@ -78,5 +79,82 @@ describe('sport display name (BUG-M02)', () => {
     mockGetSports.mockResolvedValue([{ name: 'table_tennis', display_name: 'Table Tennis' }]);
     const root = await renderAsync(element());
     expect(texts(root)).toContain('Table Tennis · knockout');
+  });
+});
+
+const list = (...items: Tournament[]) => ({ items, total: items.length, page: 1, page_size: items.length });
+
+describe('tournament card (matches the game card)', () => {
+  it('renders every field: date tile, title, date, venue, sport/format, count, button', async () => {
+    mockGetTournaments.mockResolvedValue(
+      list({ ...TOURNAMENT, venue_name: 'Bishan Hall', current_user_registration_status: 'registered' }),
+    );
+    const root = await renderAsync(element());
+    const all = texts(root);
+    expect(root.findAll(n => n.props.testID === 'date-block').length).toBeGreaterThan(0);
+    expect(all).toEqual(
+      expect.arrayContaining([
+        'Summer Smash',
+        'Bishan Hall',
+        'table_tennis · knockout',
+        '4/8 registered',
+        'View tournament',
+        'Registered',
+      ]),
+    );
+  });
+
+  it.each([
+    ['none', 'Not Registered'],
+    ['registered', 'Registered'],
+    ['withdrawn', 'Withdrawn'],
+  ] as const)('shows the %s registration badge', async (status, label) => {
+    mockGetTournaments.mockResolvedValue(list({ ...TOURNAMENT, current_user_registration_status: status }));
+    expect(texts(await renderAsync(element()))).toContain(label);
+  });
+
+  it('hides the count and the registration text when unknown (null), never 0 or Not Registered', async () => {
+    mockGetTournaments.mockResolvedValue(
+      list({ ...TOURNAMENT, participant_count: null, current_user_registration_status: null }),
+    );
+    const all = texts(await renderAsync(element())).join(' | ');
+    expect(all).not.toMatch(/registered/i);
+    expect(all).not.toContain('0/8');
+    expect(all).not.toContain('Not Registered');
+    expect(all).toContain('Summer Smash');
+  });
+
+  it('shows a real zero count when the backend sends 0', async () => {
+    mockGetTournaments.mockResolvedValue(list({ ...TOURNAMENT, participant_count: 0 }));
+    expect(texts(await renderAsync(element()))).toContain('0/8 registered');
+  });
+
+  it('falls back to Location TBC with no venue and omits avatars', async () => {
+    mockGetTournaments.mockResolvedValue(list(TOURNAMENT));
+    const root = await renderAsync(element());
+    expect(texts(root)).toContain('Location TBC');
+    expect(root.findAll(n => n.props.accessibilityRole === 'image')).toHaveLength(0);
+  });
+
+  it('tapping a card opens that tournament', async () => {
+    mockGetTournaments.mockResolvedValue(list(TOURNAMENT));
+    const root = await renderAsync(element());
+    const card = root.find(n => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function');
+    await act(async () => card.props.onPress());
+    expect(onOpenTournament).toHaveBeenCalledWith('t-1');
+  });
+
+  it('shows the empty state for an empty list', async () => {
+    const all = texts(await renderAsync(element()));
+    expect(all).toContain('No tournaments yet');
+  });
+
+  it('makes no per-row network calls: one list call and at most one shared sports lookup for many rows', async () => {
+    mockGetTournaments.mockResolvedValue(
+      list(TOURNAMENT, { ...TOURNAMENT, id: 't-2' }, { ...TOURNAMENT, id: 't-3' }),
+    );
+    await renderAsync(element());
+    expect(mockGetTournaments).toHaveBeenCalledTimes(1);
+    expect(mockGetSports.mock.calls.length).toBeLessThanOrEqual(1);
   });
 });

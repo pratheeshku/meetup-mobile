@@ -18,6 +18,58 @@ afterEach(() => {
   mockedGet.mockReset();
 });
 
+describe('getTournaments list mapping (registered_count / my_registration_status)', () => {
+  const base = {
+    id: 't-9', organizer_id: 'org-1', sport: 'football', title: 'Cup', name: null, description: null,
+    format: 'knockout', capacity: 8, registration_closes_at: '2999-01-01T00:00:00Z',
+    starts_at: '2999-02-01T00:00:00Z', status: 'upcoming', created_at: '2026-01-01T00:00:00Z',
+  };
+
+  it('maps count, own status, venue fields and registration_closes_at; derives is_organiser', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: [{
+        ...base, registered_count: 5, my_registration_status: 'registered',
+        venue_name: 'Hall A', venue_label: 'Hall A, SG', venue_id: 'v-1',
+        venue_snapshot: { name: 'Hall A' },
+      }],
+    });
+    const [item] = (await getTournaments({ currentUserId: 'org-1' })).items;
+    expect(item).toMatchObject({
+      participant_count: 5,
+      current_user_registration_status: 'registered',
+      venue_name: 'Hall A',
+      venue_label: 'Hall A, SG',
+      venue_id: 'v-1',
+      registration_closes_at: '2999-01-01T00:00:00Z',
+      is_organiser: true,
+    });
+    expect(item.venue_snapshot).toEqual({ name: 'Hall A' });
+  });
+
+  it('keeps 0 as 0, but null or absent count/status stay null (unknown)', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: [
+        { ...base, registered_count: 0, my_registration_status: 'none' },
+        { ...base, id: 't-10', registered_count: null, my_registration_status: null },
+        { ...base, id: 't-11' },
+      ],
+    });
+    const items = (await getTournaments({ currentUserId: 'someone' })).items;
+    expect(items[0].participant_count).toBe(0);
+    expect(items[0].current_user_registration_status).toBe('none');
+    expect(items[1].participant_count).toBeNull();
+    expect(items[1].current_user_registration_status).toBeNull();
+    expect(items[2].participant_count).toBeNull();
+    expect(items[2].current_user_registration_status).toBeNull();
+    expect(items[0].is_organiser).toBe(false);
+  });
+
+  it('is_organiser is false when no current user is given', async () => {
+    mockedGet.mockResolvedValueOnce({ data: [base] });
+    expect((await getTournaments()).items[0].is_organiser).toBe(false);
+  });
+});
+
 describe('getTournaments', () => {
   it('wraps the backend\'s bare array response and maps title->name, capacity->max_participants', async () => {
     mockedGet.mockResolvedValueOnce({
@@ -52,7 +104,8 @@ describe('getTournaments', () => {
     // Not derivable without a per-tournament extra call — must be the
     // flagged placeholder, never a guessed real-looking value.
     expect(result.items[0].organiser_nickname).toBe('');
-    expect(result.items[0].current_user_registration_status).toBe('none');
+    expect(result.items[0].current_user_registration_status).toBeNull();
+    expect(result.items[0].participant_count).toBeNull();
   });
 
   it('derives registration_open=false once registration_closes_at is in the past', async () => {
