@@ -55,10 +55,11 @@ jest.mock('../../auth/AuthContext', () => ({
 // Mock VenuePicker so we can reliably trigger catalogue venue or Others venue selection in tests
 jest.mock('../../components/venue/VenuePicker', () => {
   const { Pressable, Text, View } = require('react-native');
-  return function MockVenuePicker({ onSelectVenue, onSaveOthersVenue, variant }: any) {
+  return function MockVenuePicker({ onSelectVenue, onSaveOthersVenue, variant, sportId }: any) {
     return (
       <View testID="mock-venue-picker">
         <Text testID="picker-variant">{variant || 'standard'}</Text>
+        <Text testID="picker-sport-id">{String(sportId)}</Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Pick Catalogue Venue"
@@ -112,9 +113,12 @@ const mockCreateTournament = createTournament as jest.Mock;
 const mockPatch = apiClient.patch as jest.Mock;
 const mockGet = apiClient.get as jest.Mock;
 
+const BADMINTON_ID = 'a9325056-87e0-4f3f-9087-96a1c0463e64';
+const FOOTBALL_ID = 'a3804a5d-ef0a-494b-99ec-6644971f3da0';
+
 const SPORTS = [
-  { name: 'badminton', display_name: 'Badminton', icon_key: 'badminton', color: '#2A7B72' },
-  { name: 'football', display_name: 'Football', icon_key: 'football', color: '#835C2B' },
+  { id: BADMINTON_ID, name: 'badminton', display_name: 'Badminton', icon_key: 'badminton', color: '#2A7B72' },
+  { id: FOOTBALL_ID, name: 'football', display_name: 'Football', icon_key: 'football', color: '#835C2B' },
 ];
 
 const GROUPS = {
@@ -568,6 +572,53 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
       expect(patchPayload).not.toHaveProperty('lng');
       expect(patchPayload).not.toHaveProperty('venue_lat');
       expect(patchPayload).not.toHaveProperty('venue_lng');
+    });
+  });
+  describe('4. GET /venues sport_id must be the sport UUID, never the sport name', () => {
+    const pickerSportId = (root: Instance): string =>
+      String(root.find(node => node.props.testID === 'picker-sport-id').props.children);
+
+    it('create game passes the selected sport UUID to the picker', async () => {
+      const root = await renderAsync(
+        <CreateGameScreen
+          navigation={{ popTo: jest.fn(), navigate: jest.fn() } as any}
+          route={{ params: undefined } as any}
+        />,
+      );
+      await pressNext(root);
+      typeText(inputByPlaceholder(root, 'e.g. Sunday 5-a-side Football'), 'Friday Badminton');
+      await pressNext(root);
+
+      expect(pickerSportId(root)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(pickerSportId(root)).not.toBe('badminton');
+    });
+
+    it('create tournament passes the selected sport UUID to the picker', async () => {
+      const root = await renderAsync(
+        <CreateGameScreen
+          navigation={{ popTo: jest.fn(), navigate: jest.fn() } as any}
+          route={{ params: undefined } as any}
+        />,
+      );
+      await selectTournamentMode(root);
+      await pressNext(root);
+      typeText(inputByPlaceholder(root, 'e.g. Sunday 5-a-side Football'), 'Autumn Open Tournament');
+      await pressNext(root);
+
+      expect(pickerSportId(root)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+
+    it('edit game passes the event sport UUID to the picker', async () => {
+      const root = await renderAsync(
+        <EventDetailScreen
+          navigation={{ goBack: jest.fn() } as any}
+          route={{ key: 'k', name: 'EventDetail', params: { eventId: 'evt-1' } } as any}
+        />,
+      );
+      await clickEditBannerButton(root);
+      await pressNext(root);
+
+      expect(pickerSportId(root)).toBe(BADMINTON_ID);
     });
   });
 });

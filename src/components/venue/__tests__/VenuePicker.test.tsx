@@ -12,6 +12,10 @@ import {
 
 jest.mock('../../../api/venues');
 
+const BADMINTON_ID = 'a9325056-87e0-4f3f-9087-96a1c0463e64';
+const TENNIS_ID = '80be6480-f5a1-4413-991b-58cc0d826665';
+const FOOTBALL_ID = 'a3804a5d-ef0a-494b-99ec-6644971f3da0';
+
 const mockGetVenues = venuesApi.getVenues as jest.MockedFunction<typeof venuesApi.getVenues>;
 
 const sampleVenues: VenueItem[] = [
@@ -58,7 +62,7 @@ describe('VenuePicker', () => {
     const onSelect = jest.fn();
     const root = await renderAsync(
       <VenuePicker
-        sportId="badminton"
+        sportId={BADMINTON_ID}
         sportDisplayName="Badminton"
         selectedVenue={null}
         onSelectVenue={onSelect}
@@ -73,7 +77,7 @@ describe('VenuePicker', () => {
     expect(allTexts).toContain('Not listed? Enter the name and postal code');
 
     expect(mockGetVenues).toHaveBeenCalledWith({
-      sport_id: 'badminton',
+      sport_id: BADMINTON_ID,
       q: '',
       cursor: undefined,
     });
@@ -83,7 +87,7 @@ describe('VenuePicker', () => {
     const onSelect = jest.fn();
     const root = await renderAsync(
       <VenuePicker
-        sportId="badminton"
+        sportId={BADMINTON_ID}
         sportDisplayName="Badminton"
         selectedVenue={null}
         onSelectVenue={onSelect}
@@ -98,7 +102,7 @@ describe('VenuePicker', () => {
     });
 
     expect(mockGetVenues).toHaveBeenCalledWith({
-      sport_id: 'badminton',
+      sport_id: BADMINTON_ID,
       q: 'Hougang',
       cursor: undefined,
     });
@@ -108,7 +112,7 @@ describe('VenuePicker', () => {
     const onSelect = jest.fn();
     const root = await renderAsync(
       <VenuePicker
-        sportId="badminton"
+        sportId={BADMINTON_ID}
         sportDisplayName="Badminton"
         selectedVenue={null}
         onSelectVenue={onSelect}
@@ -136,7 +140,7 @@ describe('VenuePicker', () => {
 
     const root = await renderAsync(
       <VenuePicker
-        sportId="badminton"
+        sportId={BADMINTON_ID}
         sportDisplayName="Badminton"
         selectedVenue={selected}
         onSelectVenue={jest.fn()}
@@ -165,7 +169,7 @@ describe('VenuePicker', () => {
 
     const root = await renderAsync(
       <VenuePicker
-        sportId="tennis"
+        sportId={TENNIS_ID}
         sportDisplayName="Tennis"
         selectedVenue={selected}
         onSelectVenue={jest.fn()}
@@ -193,7 +197,7 @@ describe('VenuePicker', () => {
     let setSportFn: (sport: string) => void = () => {};
 
     function TestHost() {
-      const [sport, setSport] = useState('badminton');
+      const [sport, setSport] = useState(BADMINTON_ID);
       setSportFn = setSport;
       return (
         <VenuePicker
@@ -209,7 +213,7 @@ describe('VenuePicker', () => {
     const root = await renderAsync(<TestHost />);
 
     await act(async () => {
-      setSportFn('tennis');
+      setSportFn(TENNIS_ID);
     });
 
     expect(onClear).toHaveBeenCalled();
@@ -232,7 +236,7 @@ describe('VenuePicker', () => {
     let setSportFn: (sport: string) => void = () => {};
 
     function TestHost() {
-      const [sport, setSport] = useState('badminton');
+      const [sport, setSport] = useState(BADMINTON_ID);
       setSportFn = setSport;
       return (
         <VenuePicker
@@ -248,9 +252,36 @@ describe('VenuePicker', () => {
     await renderAsync(<TestHost />);
 
     await act(async () => {
-      setSportFn('football');
+      setSportFn(FOOTBALL_ID);
     });
 
     expect(onClear).not.toHaveBeenCalled();
+  });
+  it('does not call the API and asks for a sport when sportId is not a UUID', async () => {
+    const root = await renderAsync(
+      <VenuePicker
+        sportId="badminton"
+        sportDisplayName="Badminton"
+        selectedVenue={null}
+        onSelectVenue={jest.fn()}
+      />,
+    );
+
+    expect(mockGetVenues).not.toHaveBeenCalled();
+    expect(texts(root)).toContain('Choose a sport first to see venues.');
+  });
+
+  it('does not call the API when sportId is empty', async () => {
+    const root = await renderAsync(
+      <VenuePicker
+        sportId=""
+        sportDisplayName=""
+        selectedVenue={null}
+        onSelectVenue={jest.fn()}
+      />,
+    );
+
+    expect(mockGetVenues).not.toHaveBeenCalled();
+    expect(texts(root)).toContain('Choose a sport first to see venues.');
   });
 });

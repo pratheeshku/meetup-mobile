@@ -57,7 +57,7 @@ import {
   TrashIcon,
 } from '../components/icons/ActionIcons';
 import { SportIcon } from '../components/icons/DashboardIcons';
-import { useSportVisual } from '../sports/catalog';
+import { useSportRecord, useSportVisual } from '../sports/catalog';
 import {
   CalendarIcon,
   ClockIcon,
@@ -176,6 +176,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   }, [loadEvent]);
 
   const sportLabel = useSportDisplayName(event?.sport ?? '');
+  const sportRecord = useSportRecord(event?.sport ?? '');
   const isOrganiser = event ? isOrganiserOf(event, user?.id) : false;
 
   // Start Edit Wizard
@@ -680,7 +681,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
                 {venueCatalogueEnabled ? (
                   <VenuePicker
-                    sportId={event.sport}
+                    sportId={sportRecord?.id ?? ''}
                     sportDisplayName={sportLabel}
                     selectedVenue={editCatalogueVenue}
                     onSelectVenue={venue => {

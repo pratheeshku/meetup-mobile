@@ -7,6 +7,8 @@
  * sports API sends them; the UI then uses a neutral icon and colour.
  */
 export interface Sport {
+  /** Sport UUID from the sports API. `GET /venues` takes this as `sport_id`. */
+  id?: string;
   /** The value sent as `sport` on create requests (see `api/sports.ts`). */
   name: string;
   display_name: string;

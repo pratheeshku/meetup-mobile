@@ -45,6 +45,7 @@ export async function getSports(options?: RequestOptions): Promise<Sport[]> {
   return data
     .filter(sport => sport.is_active)
     .map(sport => ({
+      id: sport.id,
       name: sport.name,
       display_name: sport.display_name,
       slug: sport.slug,
