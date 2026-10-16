@@ -13,7 +13,7 @@ Branch: `feat/create-game-duration-email-invites-tournament-card` (from `origin/
 ## Checks
 - `check:labels`: OK, 204 files, 933 default labels. `tsc`: clean. `eslint` on changed files: clean.
 - Targeted: `GamesScreen`, `TournamentsListContent`, `tournaments` api tests pass.
-- Full suite: branch `15 failed suites / 177 failed tests`; `origin/main` `15 failed suites / 177 failed tests`; identical failing-suite list (diff empty).
+- Full suite: branch `15 failed suites / 177 failed tests`; `origin/main` `15 failed suites / 177 failed tests`; identical failing-suite lists (diff empty).
 
 ## Deviations
 - The status line (`Status: upcoming`) is kept on every card, as before, so existing behaviour/test is unchanged.

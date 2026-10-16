@@ -260,6 +260,7 @@ describe('Legacy Venue Flow Verification (Isolated Suite)', () => {
         // (2) Payload is identical to origin/main output
         expect(mockCreateEvent).toHaveBeenCalledTimes(1);
         const payload = mockCreateEvent.mock.calls[0][0];
+        expect(Date.parse(payload.ends_at) - Date.parse(payload.starts_at)).toBe(2 * 3_600_000);
 
         expect(payload).toEqual({
           title: 'Friday Badminton',
@@ -268,7 +269,8 @@ describe('Legacy Venue Flow Verification (Isolated Suite)', () => {
           skill_level_requirement: 'intermediate',
           capacity: 4,
           starts_at: expect.any(String),
-          ends_at: null,
+          // Duration (default 2 hrs) replaced the old `ends_at: null`.
+          ends_at: expect.any(String),
           venue_name: 'Bishan Sports Hall, Court 3',
           venue_address: 'Bishan St 14, Singapore',
           venue_place_id: 'pid-123',
