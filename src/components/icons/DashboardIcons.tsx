@@ -15,6 +15,7 @@ import React from 'react';
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 
 import { SportMarkerIcon, SwimmingIcon, VolleyballIcon } from './SharedIcons';
+import { SPORT_GLYPHS } from './sportGlyphs';
 
 export interface IconProps {
   size?: number;
@@ -183,9 +184,12 @@ export function ProfileIcon({ size }: IconProps): React.JSX.Element {
 type IconComponent = (props: IconProps) => React.JSX.Element;
 
 /**
- * Bundled glyphs an admin `icon_key` can select. Not a catalogue of sports.
+ * Bundled glyphs an admin `icon_key` can select. The 7 below predate the shared
+ * icon library; every other sport key in the library manifest comes from
+ * `sportGlyphs.tsx` (`SPORT_GLYPHS`).
  */
 export const ICON_GLYPHS: Record<string, IconComponent> = {
+  ...SPORT_GLYPHS,
   badminton: BadmintonIcon,
   basketball: BasketballIcon,
   football: FootballIcon,
