@@ -275,7 +275,7 @@ export default function VenuePicker({
             ) : selectedVenue.geocoding_status === 'pending' ? (
               <View style={styles.pendingGeocodeBox}>
                 <Text style={styles.pendingGeocodeText}>
-                  Address lookup will complete shortly
+                  {t('venue.address_lookup_pending')}
                 </Text>
               </View>
             ) : null}
@@ -298,7 +298,7 @@ export default function VenuePicker({
               <Pressable
                 onPress={() => setQuery('')}
                 accessibilityRole="button"
-                accessibilityLabel="Clear venue search"
+                accessibilityLabel={t('venue.clear_search')}
               >
                 <CrossIcon size={16} color={colors.textMuted} />
               </Pressable>
@@ -321,9 +321,9 @@ export default function VenuePicker({
                   style={styles.retryButton}
                   onPress={() => fetchVenues(query)}
                   accessibilityRole="button"
-                  accessibilityLabel="Retry loading venues"
+                  accessibilityLabel={t('venue.retry_loading_venues')}
                 >
-                  <Text style={styles.retryButtonText}>Retry</Text>
+                  <Text style={styles.retryButtonText}>{t('venue.retry')}</Text>
                 </Pressable>
               </View>
             ) : loading && venues.length === 0 ? (
@@ -382,7 +382,7 @@ export default function VenuePicker({
                       style={styles.othersRow}
                       onPress={handlePressOthers}
                       accessibilityRole="button"
-                      accessibilityLabel="Others"
+                      accessibilityLabel={t('venue.source.user')}
                     >
                       <View style={styles.othersIconBadge}>
                         <VenuePlusIcon size={18} color={colors.venueOthersIcon} />
