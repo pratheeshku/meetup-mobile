@@ -471,6 +471,7 @@ export const DEFAULT_LABELS = {
   'mob.profile.stat_played': 'Played',
   'mob.profile.stat_hosted': 'Hosted',
   'mob.profile.stat_groups': 'Groups',
+  'mob.profile.stat_won': 'Won',
   'mob.profile.skills': 'Skills',
   'mob.profile.my_groups': 'My groups',
   'mob.profile.recent_games': 'Recent games',

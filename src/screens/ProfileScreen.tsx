@@ -4,7 +4,7 @@
  * Visual hierarchy:
  * - Top cover banner with semi-transparent Edit Profile and Settings buttons
  * - Centered overlapping avatar (88x88) with display name & @nickname
- * - 3-column stats strip (Played, Hosted, Groups) with IconBadge
+ * - (stats strip moved to the Home dashboard)
  * - Skills card with sport icon and colored level pills
  * - My groups card with squircle logos/initials and "View all" link
  * - Recent games card with sport icon, date/time, venue and "View all" link
@@ -43,12 +43,8 @@ import {
   ClockIcon,
   DoorIcon,
   GearIcon,
-  PeopleIcon,
   PinIcon,
-  StarIcon,
-  TrophyIcon,
 } from '../components/icons/SharedIcons';
-import IconBadge from '../components/IconBadge';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import ScreenContainer from '../components/ScreenContainer';
@@ -380,43 +376,6 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
       {/* Main cards */}
       <View style={styles.cardsContainer}>
-        {/* Stats strip */}
-        <View style={styles.statsCard}>
-          <View style={styles.statColumn}>
-            <IconBadge color="blue" size={36} borderRadius={18}>
-              <TrophyIcon size={18} />
-            </IconBadge>
-            <Text style={[styles.statNumber, { color: colors.primary }]}>
-              {profileSummary?.games_played ?? 0}
-            </Text>
-            <Text style={styles.statLabel}>{t('mob.profile.stat_played')}</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statColumn}>
-            <IconBadge color="amber" size={36} borderRadius={18}>
-              <StarIcon size={18} />
-            </IconBadge>
-            <Text style={[styles.statNumber, { color: colors.warning }]}>
-              {profileSummary?.games_hosted ?? 0}
-            </Text>
-            <Text style={styles.statLabel}>{t('mob.profile.stat_hosted')}</Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          <View style={styles.statColumn}>
-            <IconBadge color="green" size={36} borderRadius={18}>
-              <PeopleIcon size={18} />
-            </IconBadge>
-            <Text style={[styles.statNumber, { color: colors.success }]}>
-              {profileSummary?.groups_count ?? groups.length}
-            </Text>
-            <Text style={styles.statLabel}>{t('mob.profile.stat_groups')}</Text>
-          </View>
-        </View>
-
         {/* Skills card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{t('mob.profile.skills')}</Text>
@@ -698,35 +657,6 @@ const styles = StyleSheet.create({
   cardsContainer: {
     paddingHorizontal: spacing.md,
     gap: spacing.md,
-  },
-  statsCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: colors.border,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statColumn: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: 6,
-  },
-  statLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: borderWidth.thin,
-    height: 48,
-    backgroundColor: colors.border,
   },
   card: {
     backgroundColor: colors.surface,

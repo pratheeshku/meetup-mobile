@@ -50,12 +50,13 @@ import {
   type HomeMenuResponse,
   type HomeSummaryResponse,
 } from '../api/home';
-import { getProfile } from '../api/profile';
+import { getProfile, getProfileSummary, type ProfileSummary } from '../api/profile';
 import { getSports } from '../api/sports';
 import { useAuth } from '../auth/AuthContext';
 import BannerCarousel from '../components/home/BannerCarousel';
 import CreateGameCard from '../components/home/CreateGameCard';
 import DrawerMenu from '../components/home/DrawerMenu';
+import ProfileStatsStrip from '../components/ProfileStatsStrip';
 import HomeTabTiles, { type HomeTab } from '../components/home/HomeTabTiles';
 import HomeTopBar from '../components/home/HomeTopBar';
 import {
@@ -90,6 +91,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState<HomeTab>('upcoming');
   const [summaryData, setSummaryData] = useState<HomeSummaryResponse | null>(null);
+  const [statsSummary, setStatsSummary] = useState<ProfileSummary | null>(null);
   const [menuData, setMenuData] = useState<HomeMenuResponse | null>(null);
   const [persistedBanners, setPersistedBanners] = useState<HomeBannersResponse | null>(null);
 
@@ -250,6 +252,16 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     [],
   );
 
+  // Stats strip: GET /users/me/profile-summary. Never blocks Home; on failure the
+  // block is hidden silently (no banner).
+  const loadStats = useCallback(async (correlationId?: string) => {
+    try {
+      setStatsSummary(await getProfileSummary({ correlationId }));
+    } catch {
+      setStatsSummary(null);
+    }
+  }, []);
+
   // Sport filter
   const filter = useSportFilter(sports, profile.data?.skill_levels, profile.status !== 'loading');
   const isFiltered = filter.selected.length > 0;
@@ -269,8 +281,9 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
         loadLiveUpcoming(selectedSports, correlationId),
         loadLiveGroups(correlationId),
         loadSummary(selectedSports, correlationId),
+        loadStats(correlationId),
       ]).then(() => undefined),
-    [loadBanners, loadMenu, loadLiveUpcoming, loadLiveGroups, loadSummary],
+    [loadBanners, loadMenu, loadLiveUpcoming, loadLiveGroups, loadSummary, loadStats],
   );
 
   // Bootstrap shared endpoints loader (sports, profile)
@@ -492,6 +505,18 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
           intervalSeconds={intervalSec}
         />
 
+        {/* Profile stats strip (renders when data arrives; hidden on failure) */}
+        {statsSummary ? (
+          <View style={styles.statsSection}>
+            <ProfileStatsStrip
+              gamesPlayed={statsSummary.games_played ?? 0}
+              gamesHosted={statsSummary.games_hosted ?? 0}
+              groupsCount={statsSummary.groups_count ?? 0}
+              gamesWon={statsSummary.games_won}
+            />
+          </View>
+        ) : null}
+
         {/* Two Tab Tiles: Upcoming games & Your groups */}
         <HomeTabTiles
           selectedTab={selectedTab}
@@ -612,6 +637,10 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: spacing.lg,
+  },
+  statsSection: {
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
   },
   tabContentSection: {
     paddingHorizontal: spacing.md,
