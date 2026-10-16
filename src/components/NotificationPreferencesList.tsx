@@ -56,6 +56,7 @@ const NOTIFICATION_TYPE_LABEL_KEYS: Record<NotificationType, LabelKey> = {
   group_event_created: 'mob.notif_pref.type_group_event_created',
   waitlist_promoted: 'mob.notif_pref.type_waitlist_promoted',
   group_invite: 'mob.notif_pref.type_group_invite',
+  tournament_invited: 'mob.notif_pref.type_tournament_invited',
   tournament_match_scheduled: 'mob.notif_pref.type_tournament_match_scheduled',
   tournament_result_posted: 'mob.notif_pref.type_tournament_result_posted',
   tournament_cancelled: 'mob.notif_pref.type_tournament_cancelled',

@@ -34,6 +34,7 @@ export type NotificationType =
   | 'group_event_created'
   | 'waitlist_promoted'
   | 'group_invite'
+  | 'tournament_invited'
   | 'tournament_match_scheduled'
   | 'tournament_result_posted'
   | 'tournament_cancelled'
@@ -43,7 +44,7 @@ export type NotificationType =
   | 'group_deleted'
   | 'group_ownership_transferred';
 
-/** All 18 known notification types. */
+/** All 19 known notification types. */
 export const NOTIFICATION_TYPES: NotificationType[] = [
   'global',
   'event_invite',
@@ -55,6 +56,7 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   'group_event_created',
   'waitlist_promoted',
   'group_invite',
+  'tournament_invited',
   'tournament_match_scheduled',
   'tournament_result_posted',
   'tournament_cancelled',
