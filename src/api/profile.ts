@@ -314,6 +314,8 @@ export interface ProfileSummary {
   games_played: number;
   games_hosted: number;
   groups_count: number;
+  /** Optional; the dashboard shows a Won tile only when this is > 0. */
+  games_won?: number;
   recent_games: RecentGameItem[];
 }
 
