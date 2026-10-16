@@ -23,6 +23,7 @@ import {
 import { getPostalVenue } from '../../api/venues';
 import Button from '../Button';
 import { CrossIcon } from '../icons/ActionIcons';
+import { useT } from '../../labels/LabelsContext';
 import { colors, radius, spacing } from '../../theme/tokens';
 import type { OthersVenueInput, VenueItem } from '../../types/venue';
 
@@ -57,6 +58,7 @@ export default function OthersVenueModal({
   onClose,
   onSaveOthers,
 }: OthersVenueModalProps): React.JSX.Element {
+  const t = useT();
   const [name, setName] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [facilities, setFacilities] = useState<string[]>([]);
@@ -235,11 +237,11 @@ export default function OthersVenueModal({
         <View style={styles.modalCard}>
           {/* Header */}
           <View style={styles.headerRow}>
-            <Text style={styles.modalTitle}>Enter Other Venue</Text>
+            <Text style={styles.modalTitle}>{t('venue.others.title')}</Text>
             <Pressable
               onPress={onClose}
               accessibilityRole="button"
-              accessibilityLabel="Close"
+              accessibilityLabel={t('venue.close')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <CrossIcon size={20} color={colors.textSecondary} />
@@ -248,7 +250,7 @@ export default function OthersVenueModal({
 
           <ScrollView style={styles.scrollBody} keyboardShouldPersistTaps="handled">
             {/* Venue Name */}
-            <Text style={styles.fieldLabel}>Venue name *</Text>
+            <Text style={styles.fieldLabel}>{t('venue.others.name_label')}</Text>
             <TextInput
               style={[styles.input, nameError && styles.inputError]}
               value={name}
@@ -258,14 +260,14 @@ export default function OthersVenueModal({
                 if (nameError) validateName(val);
               }}
               onBlur={() => validateName(nameRef.current)}
-              placeholder="e.g. Club House Hall"
+              placeholder={t('venue.others.name_placeholder')}
               placeholderTextColor={colors.textMuted}
             />
             {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
 
             {/* Postal Code */}
             <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
-              Postal code * (6 digits)
+              {t('venue.others.postal_label')}
             </Text>
             <TextInput
               style={[styles.input, postalError && styles.inputError]}
@@ -276,7 +278,7 @@ export default function OthersVenueModal({
                 if (postalError) validatePostal(val);
               }}
               onBlur={() => validatePostal(postalCodeRef.current)}
-              placeholder="e.g. 579780"
+              placeholder={t('venue.others.postal_placeholder')}
               placeholderTextColor={colors.textMuted}
               keyboardType="number-pad"
               maxLength={6}
@@ -287,7 +289,7 @@ export default function OthersVenueModal({
 
             {/* Facility Types Multi-select Chips */}
             <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
-              Facility types
+              {t('venue.others.facility_types_label')}
             </Text>
             <View style={styles.chipsContainer}>
               {COMMON_FACILITIES.map(facility => {
@@ -315,19 +317,19 @@ export default function OthersVenueModal({
 
             {/* Operating Hours */}
             <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
-              Operating hours (optional)
+              {t('venue.others.operating_hours_label')}
             </Text>
             <TextInput
               style={styles.input}
               value={operatingHours}
               onChangeText={setOperatingHours}
-              placeholder="e.g. Mon-Fri 08:00 - 22:00"
+              placeholder={t('venue.others.operating_hours_placeholder')}
               placeholderTextColor={colors.textMuted}
             />
 
             {/* Info URL */}
             <Text style={[styles.fieldLabel, { marginTop: spacing.md }]}>
-              Information link (optional)
+              {t('venue.others.info_url_label')}
             </Text>
             <TextInput
               style={[styles.input, urlError && styles.inputError]}
@@ -347,7 +349,7 @@ export default function OthersVenueModal({
 
             <View style={styles.buttonRow}>
               <Button
-                label={resolving ? 'Looking up...' : 'Save Venue'}
+                label={resolving ? t('venue.others.looking_up') : t('venue.others.save_venue')}
                 onPress={handleSave}
                 loading={resolving}
                 disabled={resolving}

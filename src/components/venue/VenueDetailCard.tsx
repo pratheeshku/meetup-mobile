@@ -180,7 +180,7 @@ export default function VenueDetailCard({
       setPhotos(prev => prev.filter(p => p.id !== photo.id));
       setSelectedPhoto(null);
     } catch {
-      Alert.alert('Error', 'Unable to delete photo');
+      Alert.alert(t('venue.error'), t('venue.photo_delete_failed'));
     }
   };
 
@@ -189,7 +189,7 @@ export default function VenueDetailCard({
       await reportVenueImage(photo.id, 'Reported by user');
       setReportedMessage('Photo reported. Our moderation team will review it.');
     } catch {
-      Alert.alert('Error', 'Unable to submit report. Please try again.');
+      Alert.alert(t('venue.error'), t('venue.photo_report_failed'));
     }
   };
 
@@ -207,7 +207,7 @@ export default function VenueDetailCard({
           ) : null}
           {snapshot?.operating_hours ? (
             <Text style={styles.listedHoursText}>
-              Listed hours:{' '}
+              {t('venue.listed_hours')}{' '}
               {typeof snapshot.operating_hours === 'string'
                 ? snapshot.operating_hours
                 : JSON.stringify(snapshot.operating_hours)}
@@ -218,7 +218,7 @@ export default function VenueDetailCard({
               onPress={() => handleOpenLink(snapshot.info_url!)}
               accessibilityRole="link"
             >
-              <Text style={styles.linkText}>More information</Text>
+              <Text style={styles.linkText}>{t('venue.more_information')}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -254,7 +254,7 @@ export default function VenueDetailCard({
       {(photos.length > 0 || (VENUE_ORGANIZER_PHOTOS_ENABLED && isOrganiser)) && (
         <View style={styles.photosCard}>
           <View style={styles.photosHeader}>
-            <Text style={styles.photosTitle}>Venue photos</Text>
+            <Text style={styles.photosTitle}>{t('venue.photos_title')}</Text>
             {venueAddress ? (
               <Text style={styles.photosSubtitle}>{venueAddress}</Text>
             ) : null}
@@ -267,9 +267,9 @@ export default function VenueDetailCard({
                 style={styles.photoRetryBtn}
                 onPress={loadPhotos}
                 accessibilityRole="button"
-                accessibilityLabel="Retry loading photos"
+                accessibilityLabel={t('venue.retry_loading_photos')}
               >
-                <Text style={styles.photoRetryText}>Retry</Text>
+                <Text style={styles.photoRetryText}>{t('venue.retry')}</Text>
               </Pressable>
             </View>
           ) : loadingPhotos ? (
@@ -289,7 +289,7 @@ export default function VenueDetailCard({
                     setSelectedPhoto(photo);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel="View venue photo"
+                  accessibilityLabel={t('venue.view_photo')}
                 >
                   <Image
                     source={{ uri: photo.url }}
@@ -300,7 +300,7 @@ export default function VenueDetailCard({
               ))}
             </ScrollView>
           ) : (
-            <Text style={styles.noPhotosText}>No photos uploaded yet</Text>
+            <Text style={styles.noPhotosText}>{t('venue.no_photos')}</Text>
           )}
 
           {/* Organizer Add Photos entry point (vc-m-photos) */}
@@ -309,10 +309,10 @@ export default function VenueDetailCard({
               style={styles.addPhotosRow}
               onPress={() => setIsUploadModalOpen(true)}
               accessibilityRole="button"
-              accessibilityLabel="Add venue photos"
+              accessibilityLabel={t('venue.add_photos')}
             >
               <VenuePlusIcon size={16} color={colors.primary} />
-              <Text style={styles.addPhotosText}>Add venue photos</Text>
+              <Text style={styles.addPhotosText}>{t('venue.add_photos')}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -331,7 +331,7 @@ export default function VenueDetailCard({
               style={styles.modalCloseButton}
               onPress={() => setSelectedPhoto(null)}
               accessibilityRole="button"
-              accessibilityLabel="Close"
+              accessibilityLabel={t('venue.close')}
             >
               <CrossIcon size={22} color="#FFFFFF" />
             </Pressable>
@@ -355,9 +355,9 @@ export default function VenueDetailCard({
                     style={styles.reportButton}
                     onPress={() => handleReportPhoto(selectedPhoto)}
                     accessibilityRole="button"
-                    accessibilityLabel="Report photo"
+                    accessibilityLabel={t('venue.report_photo')}
                   >
-                    <Text style={styles.reportButtonText}>Report</Text>
+                    <Text style={styles.reportButtonText}>{t('venue.report')}</Text>
                   </Pressable>
                 ) : null}
 
@@ -366,9 +366,9 @@ export default function VenueDetailCard({
                     style={styles.deletePhotoButton}
                     onPress={() => handleDeletePhoto(selectedPhoto)}
                     accessibilityRole="button"
-                    accessibilityLabel="Delete photo"
+                    accessibilityLabel={t('venue.delete_photo')}
                   >
-                    <Text style={styles.deletePhotoText}>Delete</Text>
+                    <Text style={styles.deletePhotoText}>{t('venue.delete')}</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -387,17 +387,17 @@ export default function VenueDetailCard({
         <View style={styles.uploadModalBackdrop}>
           <View style={styles.uploadModalCard}>
             <View style={styles.uploadModalHeader}>
-              <Text style={styles.uploadModalTitle}>Add Venue Photo</Text>
+              <Text style={styles.uploadModalTitle}>{t('venue.add_photo_title')}</Text>
               <Pressable
                 onPress={() => setIsUploadModalOpen(false)}
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={t('venue.close')}
               >
                 <CrossIcon size={20} color={colors.textSecondary} />
               </Pressable>
             </View>
 
-            <Text style={styles.inputLabel}>Image URL (JPEG, PNG, WebP)</Text>
+            <Text style={styles.inputLabel}>{t('venue.image_url_label')}</Text>
             <TextInput
               style={styles.textInput}
               value={uploadUrl}
@@ -424,7 +424,7 @@ export default function VenueDetailCard({
                 {acceptedStatement ? <Text style={styles.checkMark}>✓</Text> : null}
               </View>
               <Text style={styles.ownershipText}>
-                I confirm that I own or have permission to upload this photo.
+                {t('venue.ownership_statement')}
               </Text>
             </Pressable>
 
@@ -441,12 +441,12 @@ export default function VenueDetailCard({
                 onPress={handleUpload}
                 disabled={!acceptedStatement || uploading}
                 accessibilityRole="button"
-                accessibilityLabel="Confirm upload"
+                accessibilityLabel={t('venue.confirm_upload')}
               >
                 {uploading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.uploadConfirmText}>Upload Photo</Text>
+                  <Text style={styles.uploadConfirmText}>{t('venue.upload_photo')}</Text>
                 )}
               </Pressable>
             </View>
