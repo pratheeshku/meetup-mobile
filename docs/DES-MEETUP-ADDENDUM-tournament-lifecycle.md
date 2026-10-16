@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-LIFECYCLE
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-LIFECYCLE
-**Version:** v1.2 (amends v1.1; review rounds 1–7: see §15)
-**Status:** v1.1 APPROVED (owner, 2026-10-14). **v1.2 APPROVED (owner, 2026-10-16).** Non-blocking open items remain in §14 (OI-5–OI-9, OI-12, OI-13).
+**Version:** v1.2.1 (amends v1.2; review rounds 1–8: see §15)
+**Status:** v1.1 APPROVED (owner, 2026-10-14). **v1.2 APPROVED (owner, 2026-10-16). v1.2.1 (`my_invitation_status`) APPROVED (owner, 2026-10-16).** Non-blocking open items remain in §14 (OI-5–OI-9, OI-12, OI-13).
 **Owner:** Pratheesh
 **Date:** 2026-10-16
 **Scale Tier:** T1
@@ -156,7 +156,7 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 - **Email invitation.** `invited_email` set, `invitee_user_id` NULL. The emailed link is `{origin}/#tournament-detail/{tournament_id}?invite={invitation_id}`. Sign-up and OAuth claim it atomically through the same `invite` field and the same two call sites as `claim_event_invitation` (`auth/router.py`, `auth/local.py`); the same UUID is tried against event then tournament invitations (v4 UUIDs do not collide); an already-claimed or unknown id is a no-op. The email uses the existing `ui_labels` template with `$entity_type = tournament` and `invite_email_allowed` unchanged. If the repository's sibling-import check rejects the new inline call, the agent STOPS and reports (D-4 precedent).
 - **Share is client-side.** The app link is the existing `/public/share` redirect (platform to store URL, admin-editable; DES-MEETUP-FEEDBACK-001 C5). Mobile reuses `useAppShare` and `getShareUrl()`; web uses the same URL its app-download links already use. No backend route, no tournament identity in the link, no access granted. TL-13 says who sees the button.
 - **Notifications.** `tournament_invited`, one per invitation, point-in-time like `event_invite`. No revoke notification (games send none).
-- **Capability field.** `GET /tournaments/{id}` gains an additive read-only field `my_invite_access`: `full` (organizer or active committee member), `individuals` (any other viewer of a public tournament while invites are open), otherwise `none`. Web and mobile show Invite and Share from this field, because mobile cannot derive committee membership. The server still enforces every rule (P9, P15). Additive only (P14).
+- **Capability field.** `GET /tournaments/{id}` gains an additive read-only field `my_invite_access`: `full` (organizer or active committee member), `individuals` (any other viewer of a public tournament while invites are open), otherwise `none`. Web and mobile show Invite and Share from this field, because mobile cannot derive committee membership. The server still enforces every rule (P9, P15). Additive only (P14). **v1.2.1:** the same response gains `my_invitation_status`: the caller's own invitation to this tournament, `pending` or `accepted`, otherwise null (none, declined, revoked or expired). It describes only the caller. Web and mobile show Accept and Decline when it is `pending`, and "You're invited" when it is `accepted`; the server still decides on respond (`409 INVITES_CLOSED` after registration closes, TL-73).
 - **Backfill.** None. `group`-visibility tournaments keep working through `group_id`.
 - Rejected (v1.2): per-tournament share token, access grants and rotation (the app link carries no tournament); live group-membership visibility for invited groups (the game model snapshots members); viewer invites on group and invite tournaments (owner decision, option B); a revoke notification (not in games).
 
@@ -502,6 +502,7 @@ Risk classification (blast × exploitability): committee flow v2 **High**, resul
 40. Group invite creates one invitation per current member, skips the organizer, is idempotent, and a later group joiner gets none. (v1.2)
 41. Invitations flag off → routes 404 and the v1 organizer-only `invite` rule holds; flag on → test 38 applies. (v1.2)
 42. Share (client tests): the Share action calls no tournament route; the shared URL equals the game share URL; the button visibility follows `my_invite_access` (`full` or `individuals` shows it, `none` hides it). (v1.2)
+42a. `my_invitation_status` is `pending` or `accepted` for the invitee, null for everyone else and for revoked, declined or expired rows; another user's status is never returned. Accept or decline buttons follow it on web and mobile. (v1.2.1)
 
 **Other:** generator determinism (same seed ⇒ identical draft), property tests (no rematch in round 1 of group, byes only top seeds, qualifiers ∈ {2,4,8,16}), template validation table tests, migration up/down tests on a copy, contract tests for AI response schema.
 
@@ -729,4 +730,10 @@ Status: v1.0 and v1.1 APPROVED by the owner on 2026-10-14. v1.2 APPROVED by the 
 | 4 D-7 duplication | Deviation challenge, defended | D-7 already carries a measurable gate; Part A changes `event_groups`, not `event_invitations`. No change. |
 | PDPA transfer | Informational | Already in AD-8 and OI-2; not needed for Release 1. |
 
-**v1.2 approved by the owner, 2026-10-16** (after review round 7).
+**Round 8 (2026-10-16, owner decision, v1.2 → v1.2.1)**
+
+| Decision or finding | Classification | Outcome |
+|---|---|---|
+| The app could not tell whether the viewer holds a pending invitation, so an app-only invitee on an `invite` tournament could not accept and therefore could not register | New gap (client contract), owner chose option A | Additive read-only field `my_invitation_status` on `GET /tournaments/{id}` (AD-4), test 42a. Accept and decline UI built on web and mobile. |
+
+**v1.2 approved by the owner, 2026-10-16** (after review round 7); **v1.2.1 approved the same day.**
