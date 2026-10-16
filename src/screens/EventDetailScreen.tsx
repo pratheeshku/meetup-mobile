@@ -24,6 +24,9 @@ import {
   cancelEvent,
   getEvent,
   getEventParticipants,
+  inviteEmailToEvent,
+  inviteGroupToEvent,
+  inviteUserToEvent,
   rsvpEvent,
   updateEvent,
   withdrawEvent,
@@ -35,12 +38,19 @@ import {
   type PlacePrediction,
 } from '../api/places';
 import { getClientConfig } from '../api/config';
+import { getMyGroups } from '../api/groups';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
+import OptionChips from '../components/OptionChips';
+import ShareActionSheet from '../components/ShareActionSheet';
+import TextLink from '../components/TextLink';
+import Toast from '../components/Toast';
+import UserSearchPicker from '../components/UserSearchPicker';
+import { useAppShare } from '../hooks/useAppShare';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import VenueDetailCard from '../components/venue/VenueDetailCard';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
@@ -61,7 +71,10 @@ import { useSportRecord, useSportVisual } from '../sports/catalog';
 import {
   CalendarIcon,
   ClockIcon,
+  GroupsIcon,
+  LinkIcon,
   PeopleIcon,
+  PersonIcon,
   PinIcon,
   TargetIcon,
 } from '../components/icons/SharedIcons';
@@ -74,14 +87,17 @@ import {
   borderWidth,
   colors,
   radius,
+  sizes,
   spacing,
   typography,
 } from '../theme/tokens';
 import type { Event, EventParticipant, EventSkillLevel, UpdateEventInput } from '../types/event';
+import type { Group } from '../types/group';
+import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import { isOrganiserOf } from '../utils/gameLists';
-import { useSportDisplayName } from '../utils/labels';
+import { stripIconGlyphs, useSportDisplayName } from '../utils/labels';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 
@@ -119,6 +135,23 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Share + invite state (restored; removed in 5f04b95)
+  const share = useAppShare();
+  const [isInviteGroupOpen, setIsInviteGroupOpen] = useState(false);
+  const [myGroups, setMyGroups] = useState<Group[]>([]);
+  const [isGroupsLoading, setIsGroupsLoading] = useState(false);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const [isInviteGroupSubmitting, setIsInviteGroupSubmitting] = useState(false);
+  const [inviteGroupError, setInviteGroupError] = useState<string | null>(null);
+  const [inviteGroupSuccess, setInviteGroupSuccess] = useState<string | null>(null);
+
+  const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
+  const [selectedInviteUser, setSelectedInviteUser] = useState<UserSearchResult | null>(null);
+  const [selectedInviteEmail, setSelectedInviteEmail] = useState<string | null>(null);
+  const [isInviteUserSubmitting, setIsInviteUserSubmitting] = useState(false);
+  const [inviteUserError, setInviteUserError] = useState<string | null>(null);
+  const [inviteUserSuccess, setInviteUserSuccess] = useState<string | null>(null);
 
   // Delete modal state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -179,9 +212,125 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const sportRecord = useSportRecord(event?.sport ?? '');
   const isOrganiser = event ? isOrganiserOf(event, user?.id) : false;
 
+  // Organiser action: Invite Group
+  const handleOpenInviteGroup = async (): Promise<void> => {
+    setInviteGroupError(null);
+    setInviteGroupSuccess(null);
+    setSelectedGroupIds([]);
+    setIsInviteUserOpen(false);
+    setIsInviteGroupOpen(true);
+    if (myGroups.length === 0) {
+      setIsGroupsLoading(true);
+      try {
+        const res = await getMyGroups();
+        setMyGroups(res.items);
+      } catch {
+        setMyGroups([]);
+      } finally {
+        setIsGroupsLoading(false);
+      }
+    }
+  };
+
+  const handleCloseInviteGroup = (): void => {
+    setIsInviteGroupOpen(false);
+    setInviteGroupError(null);
+    setInviteGroupSuccess(null);
+    setSelectedGroupIds([]);
+  };
+
+  const handleToggleGroup = (groupId: string): void => {
+    setSelectedGroupIds(prev =>
+      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId],
+    );
+  };
+
+  const handleSendGroupInvite = async (): Promise<void> => {
+    if (selectedGroupIds.length === 0) {
+      setInviteGroupError(t('mob.game_detail.invite_group_select'));
+      return;
+    }
+    setInviteGroupError(null);
+    setInviteGroupSuccess(null);
+    setIsInviteGroupSubmitting(true);
+    try {
+      await withCorrelationId(async correlationId => {
+        let totalInvites = 0;
+        for (const groupId of selectedGroupIds) {
+          const invites = await inviteGroupToEvent(eventId, groupId, { correlationId });
+          totalInvites += invites.length;
+        }
+        setInviteGroupSuccess(
+          totalInvites > 0
+            ? t(
+                totalInvites === 1
+                  ? 'mob.game_detail.invite_group_sent_one'
+                  : 'mob.game_detail.invite_group_sent_other',
+                { count: totalInvites },
+              )
+            : t('mob.game_detail.invite_group_done'),
+        );
+      });
+      setSelectedGroupIds([]);
+    } catch (e) {
+      setInviteGroupError(getApiErrorMessage(e, t('mob.game_detail.invite_group_error')));
+    } finally {
+      setIsInviteGroupSubmitting(false);
+    }
+  };
+
+  // Organiser action: Invite Individual (user or email)
+  const handleOpenInviteUser = (): void => {
+    setInviteUserError(null);
+    setInviteUserSuccess(null);
+    setSelectedInviteUser(null);
+    setSelectedInviteEmail(null);
+    setIsInviteGroupOpen(false);
+    setIsInviteUserOpen(true);
+  };
+
+  const handleCloseInviteUser = (): void => {
+    setIsInviteUserOpen(false);
+    setInviteUserError(null);
+    setInviteUserSuccess(null);
+    setSelectedInviteUser(null);
+    setSelectedInviteEmail(null);
+  };
+
+  const handleSendUserInvite = async (): Promise<void> => {
+    if (!selectedInviteUser && !selectedInviteEmail) {
+      setInviteUserError(t('mob.game_detail.invite_choose'));
+      return;
+    }
+    setInviteUserError(null);
+    setInviteUserSuccess(null);
+    setIsInviteUserSubmitting(true);
+    try {
+      await withCorrelationId(async correlationId => {
+        if (selectedInviteEmail) {
+          await inviteEmailToEvent(eventId, selectedInviteEmail, { correlationId });
+          setInviteUserSuccess(t('mob.game_detail.invite_sent', { name: selectedInviteEmail }));
+          setSelectedInviteEmail(null);
+        } else if (selectedInviteUser) {
+          await inviteUserToEvent(eventId, selectedInviteUser.id, { correlationId });
+          setInviteUserSuccess(
+            t('mob.game_detail.invite_sent', { name: selectedInviteUser.nickname }),
+          );
+          setSelectedInviteUser(null);
+        }
+      });
+    } catch (e) {
+      setInviteUserError(getApiErrorMessage(e, t('mob.game_detail.invite_error')));
+    } finally {
+      setIsInviteUserSubmitting(false);
+    }
+  };
+
   // Start Edit Wizard
   const handleStartEdit = () => {
     if (!event) return;
+    setIsInviteGroupOpen(false);
+    setIsInviteUserOpen(false);
     setEditTitle(event.title);
     const startDate = event.starts_at ? new Date(event.starts_at) : new Date();
     setEditDateValue(startDate);
@@ -958,6 +1107,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     .filter(Boolean)
     .join(', ');
 
+  const isOrganiserActionsVisible =
+    isOrganiser && event.status !== 'cancelled' && event.status !== 'completed';
   const totalCapacity = event.capacity || 4;
   const joinedCount = participants.length > 0 ? participants.length : event.participant_count;
   const emptySpotsCount = Math.max(0, totalCapacity - joinedCount);
@@ -1101,6 +1252,178 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             </View>
           </Card>
 
+          {/* Organiser actions: Invite Group, Invite Individual, Share (restored) */}
+          {isOrganiserActionsVisible && !isInviteGroupOpen && !isInviteUserOpen ? (
+            <Card style={styles.infoCard}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('mob.game_detail.invite_group')}
+                onPress={handleOpenInviteGroup}
+                style={[styles.actionBtn, styles.whiteActionBtn]}
+              >
+                <View style={styles.actionBtnContent}>
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    aria-hidden={true}
+                    style={styles.actionBtnIcon}
+                  >
+                    <GroupsIcon size={18} />
+                  </View>
+                  <Text style={styles.whiteActionBtnText}>
+                    {stripIconGlyphs(t('mob.game_detail.invite_group'))}
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('mob.game_detail.invite_player')}
+                onPress={handleOpenInviteUser}
+                style={[styles.actionBtn, styles.whiteActionBtn]}
+              >
+                <View style={styles.actionBtnContent}>
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    aria-hidden={true}
+                    style={styles.actionBtnIcon}
+                  >
+                    <PersonIcon size={18} />
+                  </View>
+                  <Text style={styles.whiteActionBtnText}>
+                    {stripIconGlyphs(t('mob.game_detail.invite_player'))}
+                  </Text>
+                </View>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('mob.game_detail.share')}
+                onPress={share.open}
+                style={[styles.actionBtn, styles.whiteActionBtn, styles.actionBtnLast]}
+              >
+                <View style={styles.actionBtnContent}>
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                    aria-hidden={true}
+                    style={styles.actionBtnIcon}
+                  >
+                    <LinkIcon size={18} />
+                  </View>
+                  <Text style={styles.whiteActionBtnText}>
+                    {stripIconGlyphs(t('mob.game_detail.share'))}
+                  </Text>
+                </View>
+              </Pressable>
+            </Card>
+          ) : null}
+
+          {/* Invite Group form */}
+          {isInviteGroupOpen ? (
+            <Card style={styles.infoCard}>
+              <Text style={styles.formTitle}>{t('mob.game_detail.invite_group')}</Text>
+              <Text style={styles.formHint}>{t('mob.game_detail.invite_group_hint')}</Text>
+              {isGroupsLoading ? (
+                <Text style={styles.formHint}>{t('mob.game_detail.groups_loading')}</Text>
+              ) : myGroups.length === 0 ? (
+                <Text style={styles.formHint}>{t('mob.create_game.no_groups')}</Text>
+              ) : (
+                <OptionChips
+                  options={myGroups.map(g => ({ value: g.id, label: g.name }))}
+                  value={selectedGroupIds}
+                  onChange={handleToggleGroup}
+                  disabled={isInviteGroupSubmitting}
+                />
+              )}
+              {inviteGroupError ? <Text style={styles.errorText}>{inviteGroupError}</Text> : null}
+              {inviteGroupSuccess ? (
+                <Text style={styles.successText}>{inviteGroupSuccess}</Text>
+              ) : null}
+              <View style={styles.formButtonsRow}>
+                <Button
+                  label={t('mob.game_detail.send_group_invite')}
+                  variant="primary"
+                  onPress={handleSendGroupInvite}
+                  loading={isInviteGroupSubmitting}
+                  disabled={selectedGroupIds.length === 0 || isInviteGroupSubmitting}
+                  style={styles.rowButton}
+                />
+                <Button
+                  label={t('mob.common.close')}
+                  variant="secondary"
+                  onPress={handleCloseInviteGroup}
+                  disabled={isInviteGroupSubmitting}
+                  style={styles.rowButton}
+                />
+              </View>
+            </Card>
+          ) : null}
+
+          {/* Invite Individual form (user search or email) */}
+          {isInviteUserOpen ? (
+            <Card style={styles.infoCard}>
+              <Text style={styles.formTitle}>{t('mob.game_detail.invite_player')}</Text>
+              <Text style={styles.formHint}>{t('mob.game_detail.invite_player_hint')}</Text>
+              {selectedInviteUser ? (
+                <View style={styles.selectedInviteRow}>
+                  <Text style={styles.selectedInviteText}>
+                    {t('mob.group_detail.invitee_line', {
+                      nickname: selectedInviteUser.nickname,
+                      name: selectedInviteUser.display_name,
+                    })}
+                  </Text>
+                  <TextLink
+                    label={t('mob.common.change')}
+                    onPress={() => setSelectedInviteUser(null)}
+                    disabled={isInviteUserSubmitting}
+                  />
+                </View>
+              ) : selectedInviteEmail ? (
+                <View style={styles.selectedInviteRow}>
+                  <Text style={styles.selectedInviteText}>
+                    {t('mob.group_detail.invite_by_email', { email: selectedInviteEmail })}
+                  </Text>
+                  <TextLink
+                    label={t('mob.common.change')}
+                    onPress={() => setSelectedInviteEmail(null)}
+                    disabled={isInviteUserSubmitting}
+                  />
+                </View>
+              ) : (
+                <UserSearchPicker
+                  onSelect={setSelectedInviteUser}
+                  onSelectEmail={setSelectedInviteEmail}
+                  entityLabel={t('mob.user_search.entity_player')}
+                  excludeEventId={eventId}
+                  disabled={isInviteUserSubmitting}
+                />
+              )}
+              {inviteUserError ? <Text style={styles.errorText}>{inviteUserError}</Text> : null}
+              {inviteUserSuccess ? (
+                <Text style={styles.successText}>{inviteUserSuccess}</Text>
+              ) : null}
+              <View style={styles.formButtonsRow}>
+                <Button
+                  label={t('mob.group_detail.send_invite')}
+                  variant="primary"
+                  onPress={handleSendUserInvite}
+                  loading={isInviteUserSubmitting}
+                  disabled={(!selectedInviteUser && !selectedInviteEmail) || isInviteUserSubmitting}
+                  style={styles.rowButton}
+                />
+                <Button
+                  label={t('mob.common.close')}
+                  variant="secondary"
+                  onPress={handleCloseInviteUser}
+                  disabled={isInviteUserSubmitting}
+                  style={styles.rowButton}
+                />
+              </View>
+            </Card>
+          ) : null}
+
           {/* Non-organiser RSVP Actions */}
           {!isOrganiser ? (
             <View style={styles.rsvpActionContainer}>
@@ -1125,6 +1448,17 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
         </View>
       </ScrollView>
+
+      <ShareActionSheet
+        visible={share.sheetVisible}
+        title={t('mob.game_detail.share_title')}
+        onShareGeneric={share.shareViaSystem}
+        onShareWhatsApp={share.shareViaWhatsApp}
+        onCopyLink={share.copyLink}
+        onClose={share.close}
+      />
+
+      <Toast message={share.toastMessage} onDismiss={share.clearToast} />
 
       {/* Delete Game Bottom Sheet (DeleteGame.png) */}
       <Modal visible={isDeleteModalOpen} transparent animationType="slide">
@@ -1328,6 +1662,76 @@ const styles = StyleSheet.create({
   emptyAvatarText: {
     ...typography.bodyBold,
     color: colors.textMuted,
+  },
+  actionBtn: {
+    minHeight: sizes.touchTarget,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    borderWidth: borderWidth.thin,
+  },
+  actionBtnLast: { marginBottom: 0 },
+  actionBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnIcon: {
+    width: spacing.lg,
+    height: spacing.lg,
+    marginRight: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  whiteActionBtn: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  },
+  whiteActionBtnText: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+  },
+  formTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  formHint: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginBottom: spacing.md,
+  },
+  successText: {
+    ...typography.body,
+    color: colors.success,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  formButtonsRow: {
+    flexDirection: 'row',
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  rowButton: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  selectedInviteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+  },
+  selectedInviteText: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
   },
   rsvpActionContainer: {
     marginTop: spacing.md,
