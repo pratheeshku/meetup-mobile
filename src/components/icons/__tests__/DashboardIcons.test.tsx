@@ -3,6 +3,9 @@ import React from 'react';
 import Svg from 'react-native-svg';
 
 import { render } from '../../../test-utils/render';
+import { SPORT_ICON_KEYS } from '../../../sports/iconKeys';
+import { dashSize } from '../../../theme/dashboardTheme';
+import { skillSizes } from '../../../theme/tokens';
 import { SportMarkerIcon } from '../SharedIcons';
 import {
   BannerBackground,
@@ -50,7 +53,7 @@ describe('sport icon lookup', () => {
   });
 
   it('uses the fallback ball for an unknown, empty or missing icon_key', () => {
-    for (const iconKey of ['curling', 'not-a-glyph', '', null, undefined]) {
+    for (const iconKey of ['not-a-glyph', 'curling-stone', '', null, undefined]) {
       expect(hasSportIcon(iconKey)).toBe(false);
       const rendered = render(<SportIcon iconKey={iconKey} size={24} />);
       expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(1);
@@ -82,5 +85,40 @@ describe('icon geometry', () => {
     const svg = hostSvg(<BannerBackground width="100%" height="100%" />);
     expect(svg.props.viewBox).toBe('0 0 390 208');
     expect(svg.props.preserveAspectRatio).toBe('xMidYMid slice');
+  });
+});
+
+describe('shared sport icon library', () => {
+  it('has the 84 manifest keys, all unique', () => {
+    expect(SPORT_ICON_KEYS).toHaveLength(84);
+    expect(new Set(SPORT_ICON_KEYS).size).toBe(84);
+  });
+
+  it.each([...SPORT_ICON_KEYS])('has a glyph for %s that renders at every size the app uses (not the fallback ball)', iconKey => {
+    expect(hasSportIcon(iconKey)).toBe(true);
+    expect(typeof ICON_GLYPHS[iconKey]).toBe('function');
+    // SportPicker, GameRow/GroupRow, HomeTopBar chips, NextGameCard/SportChipsRow, default.
+    for (const size of [skillSizes.sportIcon, dashSize.rowIcon, 20, dashSize.sportIcon, 24]) {
+      const rendered = render(<SportIcon iconKey={iconKey.toUpperCase()} size={size} />);
+      expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(0);
+      const svg = rendered.findByType(Svg);
+      expect(svg.props.viewBox).toBe('0 0 48 48');
+      expect(svg.props.width).toBe(size);
+      if (!(WHITELIST as readonly string[]).includes(iconKey)) {
+        expect(svg.props.accessibilityElementsHidden).toBe(true); // new glyphs are decorative
+      }
+    }
+  });
+
+  it('keeps the existing seven glyphs unchanged and registers nothing outside the manifest', () => {
+    for (const key of WHITELIST) {
+      expect(SPORT_ICON_KEYS).toContain(key);
+    }
+    expect(Object.keys(ICON_GLYPHS).sort()).toEqual([...SPORT_ICON_KEYS].sort());
+  });
+
+  it('an unknown key renders the neutral fallback ball (existing behaviour)', () => {
+    const rendered = render(<SportIcon iconKey="no-such-sport" size={24} />);
+    expect(rendered.findAllByType(FallbackBallIcon)).toHaveLength(1);
   });
 });
