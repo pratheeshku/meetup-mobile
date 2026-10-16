@@ -1020,6 +1020,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
     return (
       <View style={styles.stepContent}>
+        {/* Invitee UI only for invite-only games: nobody else is invited. */}
+        {isInviteOnly ? (
+        <>
         <View style={styles.stepHeaderRow}>
           <Text style={styles.stepHeading}>
             {t('mob.create_game.invite_players')}{' '}
@@ -1126,7 +1129,6 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           </View>
         ) : null}
 
-        {isInviteOnly ? (
           <View style={styles.emailInviteBlock}>
             <Text style={styles.fieldLabel}>{t('mob.create_game.invite_email_label')}</Text>
             <View style={styles.emailInviteRow}>
@@ -1155,6 +1157,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             </View>
             {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
           </View>
+        </>
         ) : null}
 
         {/* Review Card */}

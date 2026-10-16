@@ -13,11 +13,11 @@ type Props = React.ComponentProps<typeof CreateGameScreen>;
 export const ALEX = { id: 'u-1', nickname: 'alex', display_name: 'Alex Chen', pending: false };
 export const BO = { id: 'u-2', nickname: 'bo', display_name: 'Bo Lim', pending: false };
 
-export async function mountCreateGame(users: unknown[] = []): Promise<Instance> {
+export async function mountCreateGame(users: unknown[] = [], groups: unknown[] = []): Promise<Instance> {
   (getSports as jest.Mock).mockResolvedValue([
     { name: 'badminton', display_name: 'Badminton', icon_key: 'badminton', color: '#000' },
   ]);
-  (getMyGroups as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, page_size: 1 });
+  (getMyGroups as jest.Mock).mockResolvedValue({ items: groups, total: groups.length, page: 1, page_size: 1 });
   (searchUsers as jest.Mock).mockResolvedValue(users);
   const props = { navigation: { popTo: jest.fn(), navigate: jest.fn(), goBack: jest.fn() }, route: { params: undefined } };
   return renderAsync(<CreateGameScreen {...(props as unknown as Props)} />);

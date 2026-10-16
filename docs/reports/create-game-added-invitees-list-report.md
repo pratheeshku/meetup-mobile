@@ -18,10 +18,14 @@ Branch: `feat/create-game-duration-email-invites-tournament-card`.
 Tests: 6 passed, 6 total
 ```
 
+## Follow-up fix: invite-only only
+- Step 6 now renders the heading, player search, added-invitees chips, suggestions and the "Invite by email" input **only when the game is invite-only**. Public and group games show just the review, so no one who will not be invited is displayed.
+- New test `src/screens/__tests__/CreateGameInviteeVisibility.test.tsx` (3): invite-only shows search, suggestions and email input; public and group hide search, suggestions, email input and chips. `createGameHarness` gained an optional `groups` argument.
+
 ## Checks
 - `npm run check:labels`: OK - 206 files scanned, 944 default labels checked.
 - `npx tsc --noEmit`: clean. `npx eslint` on all changed files: clean.
-- Full suite on this branch: `Test Suites: 15 failed, 122 passed, 137 total` / `Tests: 177 failed, 1455 passed, 1632 total`. `origin/main`: `15 failed suites / 177 failed tests`. The failing-suite lists are identical (diff empty); the branch adds 7 passing suites and 40 passing tests across the four tasks.
+- Full suite on this branch: `Test Suites: 15 failed, 123 passed, 138 total` / `Tests: 177 failed, 1458 passed, 1635 total`. `origin/main`: 15 failed suites / 177 failed tests; failing-suite lists identical (diff empty).
 - No screenshots: no emulator/device in this container.
 
 ## Deviations
