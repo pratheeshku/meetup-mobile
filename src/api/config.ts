@@ -7,6 +7,7 @@ export interface GameLimits {
 
 export interface ClientConfig {
   google_maps_api_key: string | null;
+  venue_catalogue_enabled: boolean;
 }
 
 export async function getGameLimits(): Promise<GameLimits> {
@@ -20,9 +21,12 @@ export async function getGameLimits(): Promise<GameLimits> {
 
 export async function getClientConfig(): Promise<ClientConfig> {
   try {
-    const { data } = await apiClient.get<ClientConfig>('/config/client');
-    return data;
+    const { data } = await apiClient.get<Partial<ClientConfig>>('/config/client');
+    return {
+      google_maps_api_key: data?.google_maps_api_key ?? null,
+      venue_catalogue_enabled: Boolean(data?.venue_catalogue_enabled),
+    };
   } catch {
-    return { google_maps_api_key: null };
+    return { google_maps_api_key: null, venue_catalogue_enabled: false };
   }
 }

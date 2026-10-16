@@ -254,6 +254,8 @@ export async function updateEvent(
   if (input.description !== undefined) payload.description = input.description;
   if (input.venue_name !== undefined) payload.venue_name = input.venue_name;
   if (input.venue_address !== undefined) payload.venue_address = input.venue_address;
+  if (input.venue_id !== undefined) payload.venue_id = input.venue_id;
+  if (input.others !== undefined) payload.others = input.others;
   if (input.skill_level_requirement !== undefined) {
     payload.skill_level_requirement = input.skill_level_requirement;
   }

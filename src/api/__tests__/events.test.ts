@@ -299,6 +299,57 @@ describe('updateEvent (PATCH /events/{id})', () => {
     expect(result.estimated_cost_currency).toBe('USD');
   });
 
+  it('forwards venue_id and never sends venue_name, venue_snapshot, address, lat, or lng', async () => {
+    mockedPatch.mockResolvedValueOnce({
+      data: {
+        id: 'evt-1',
+        title: 'Catalogue Venue Game',
+        sport: 'badminton',
+        venue_id: 'v-101',
+      },
+    });
+
+    await updateEvent('evt-1', {
+      venue_id: 'v-101',
+    });
+
+    expect(mockedPatch).toHaveBeenCalledWith(
+      '/events/evt-1',
+      {
+        venue_id: 'v-101',
+      },
+      { correlationId: undefined },
+    );
+  });
+
+  it('forwards others and never sends venue_name, venue_id, venue_snapshot, address, lat, or lng', async () => {
+    mockedPatch.mockResolvedValueOnce({
+      data: {
+        id: 'evt-1',
+        title: 'Others Game',
+        sport: 'badminton',
+      },
+    });
+
+    const othersInput = {
+      name: 'Custom Court',
+      postal_code: '123456',
+      facilities: ['Court 1'],
+    };
+
+    await updateEvent('evt-1', {
+      others: othersInput,
+    });
+
+    expect(mockedPatch).toHaveBeenCalledWith(
+      '/events/evt-1',
+      {
+        others: othersInput,
+      },
+      { correlationId: undefined },
+    );
+  });
+
   it('propagates PATCH failures (e.g. 409 conflict)', async () => {
     mockedPatch.mockRejectedValueOnce(new Error('Visibility is immutable after creation'));
     await expect(

@@ -3830,6 +3830,20 @@
       "screen": "Global",
       "placeholders": [],
       "status": "new-label (was hardcoded)"
+    },
+    {
+      "key": "venue.source.catalogue",
+      "defaultText": "ActiveSG",
+      "screen": "Create Game / Edit Game / Tournaments / Details",
+      "placeholders": [],
+      "status": "new-label"
+    },
+    {
+      "key": "venue.source.user",
+      "defaultText": "Others",
+      "screen": "Create Game / Edit Game / Tournaments / Details",
+      "placeholders": [],
+      "status": "new-label"
     }
   ]
 }

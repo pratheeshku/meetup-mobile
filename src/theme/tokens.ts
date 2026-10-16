@@ -76,6 +76,17 @@ export const colors = {
   avatarTintText3: '#065F46',
   avatarTintText4: '#9D174D',
   avatarTintText5: '#5B21B6',
+  venueTagBg: '#E4EDFF',
+  venueTagText: '#1448B8',
+  venuePinBg: '#FDECEA',
+  venuePinIcon: '#E5484D',
+  venueOthersBg: '#F7F9FD',
+  venueOthersIconBg: '#EEF2FA',
+  venueOthersIcon: '#566684',
+  venueCardBorder: '#E3EAF7',
+  venueRowDivider: '#EEF2FA',
+  mapCaptionBg: 'rgba(255, 255, 255, 0.92)',
+  mapCaptionText: '#33426A',
 };
 
 export const spacing = {

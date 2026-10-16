@@ -20,6 +20,8 @@
  * old `'invite'` value on a create would have been rejected by the
  * backend's validator with a 422.
  */
+import type { OthersVenueInput, VenueSnapshot } from './venue';
+
 export type EventVisibility = 'public' | 'invite_only' | 'group';
 export type EventStatus = 'upcoming' | 'active' | 'cancelled' | 'completed';
 export type RsvpStatus = 'none' | 'going' | 'waitlisted' | 'withdrawn';
@@ -63,6 +65,8 @@ export interface Event {
   venue_place_id?: string | null;
   venue_lat?: number | null;
   venue_lng?: number | null;
+  venue_id?: string | null;
+  venue_snapshot?: VenueSnapshot | null;
   skill_level_requirement?: EventSkillLevel | null;
   allow_waitlist?: boolean;
   estimated_cost_cents?: number | null;
@@ -78,6 +82,8 @@ export interface UpdateEventInput {
   description?: string | null;
   venue_name?: string | null;
   venue_address?: string | null;
+  venue_id?: string | null;
+  others?: OthersVenueInput | null;
   skill_level_requirement?: EventSkillLevel | string | null;
   capacity?: number;
   starts_at?: string;
@@ -157,6 +163,8 @@ export interface CreateEventInput {
   venue_place_id?: string | null;
   venue_lat?: number | null;
   venue_lng?: number | null;
+  venue_id?: string;
+  others?: OthersVenueInput;
   description?: string;
   /**
    * Contract-verification finding (Create Game screen rebuild task):

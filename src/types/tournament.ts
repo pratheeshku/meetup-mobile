@@ -10,6 +10,8 @@
  * actual backend contract on conformance review.
  */
 
+import type { OthersVenueInput, VenueSnapshot } from './venue';
+
 /**
  * Proposed Assumption: not specified anywhere for Tournaments. Reused
  * the Events module's status vocabulary (same backend, same general
@@ -72,6 +74,10 @@ export interface Tournament {
   created_at: string;
   current_user_registration_status: TournamentRegistrationStatus;
   is_organiser: boolean;
+  venue_name?: string | null;
+  venue_label?: string | null;
+  venue_id?: string | null;
+  venue_snapshot?: VenueSnapshot | null;
 }
 
 export interface TournamentFixture {
@@ -187,4 +193,6 @@ export interface CreateTournamentInput {
   /** ISO 8601 date-time; optional/nullable in the schema. */
   registration_closes_at?: string;
   venue_name?: string;
+  venue_id?: string;
+  others?: OthersVenueInput;
 }
