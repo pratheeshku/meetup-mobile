@@ -60,6 +60,8 @@ interface VenuePickerProps {
   helperText?: string;
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function VenuePicker({
   sportId,
   sportDisplayName,
@@ -98,9 +100,16 @@ export default function VenuePicker({
     prevSportRef.current = sportId;
   }, [sportId, selectedVenue, onClearVenue, t]);
 
+  const sportIdValid = UUID_PATTERN.test(sportId);
+
   const fetchVenues = useCallback(
     async (searchText: string, cursor?: string, isAppend = false) => {
       setLoadError(null);
+      if (!UUID_PATTERN.test(sportId)) {
+        setVenues([]);
+        setNextCursor(null);
+        return;
+      }
       if (!isAppend) {
         setLoading(true);
       } else {
@@ -301,7 +310,11 @@ export default function VenuePicker({
           </Text>
 
           <View style={styles.listContainer}>
-            {loadError ? (
+            {!sportIdValid ? (
+              <View style={styles.loadingBox}>
+                <Text style={styles.errorText}>{t('venue.choose_sport_first')}</Text>
+              </View>
+            ) : loadError ? (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>{loadError}</Text>
                 <Pressable

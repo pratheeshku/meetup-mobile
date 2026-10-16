@@ -685,7 +685,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
           {venueCatalogueEnabled ? (
             <VenuePicker
-              sportId={gSport}
+              sportId={sports.find(item => item.name === gSport)?.id ?? ''}
               sportDisplayName={sports.find(item => item.name === gSport)?.display_name || gSport}
               selectedVenue={catalogueVenue}
               variant={mode === 'tournament' ? 'tournament' : 'standard'}

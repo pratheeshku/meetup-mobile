@@ -42,6 +42,7 @@ describe('getSports', () => {
     expect(mockedGet).toHaveBeenCalledWith('/admin/sports/public', { correlationId: 'cid' });
     expect(sports.map(sport => sport.name)).toEqual(['badminton', 'football', 'tennis']);
     expect(sports[0]).toEqual({
+      id: '1',
       name: 'badminton',
       display_name: 'Badminton',
       slug: 'badminton',

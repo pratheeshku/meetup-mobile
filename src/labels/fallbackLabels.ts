@@ -40,6 +40,7 @@ const BASE_LABELS = {
   'venue.not_listed_subtitle': 'Not listed? Enter the name and postal code',
   'venue.pin_caption': 'Pin set from the venue address',
   'venue.reselect_prompt': 'Sport changed. Please select a venue again.',
+  'venue.choose_sport_first': 'Choose a sport first to see venues.',
 
   mob_skill_sports_title: 'What do you play?',
   mob_skill_sports_subtitle: 'Select all that apply. Level comes next.',
