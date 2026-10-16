@@ -177,6 +177,14 @@ describe('errors', () => {
     expect(has(root, expected)).toBe(true);
   });
 
+  it('backend body {"detail":"INVITES_CLOSED"} (409) shows the label and never the raw code', async () => {
+    const root = await mountTournament({ my_invite_access: 'individuals' });
+    mockPost.mockRejectedValueOnce({ response: { status: 409, data: { detail: 'INVITES_CLOSED' } } });
+    await sendUser(root);
+    expect(has(root, 'Invitations are closed for this tournament.')).toBe(true);
+    expect(texts(root).some(x => x.includes('INVITES_CLOSED'))).toBe(false);
+  });
+
   it('a network error uses the generic invite message', async () => {
     const root = await mountTournament({ my_invite_access: 'individuals' });
     mockPost.mockRejectedValueOnce(new Error('network'));

@@ -86,6 +86,9 @@ describe('respond', () => {
     server.tournament = rawTournament({ my_invitation_status: null }); // server no longer reports it
     await press(root, 'Accept');
     expect(has(root, expected)).toBe(true);
+    if (detail === 'INVITES_CLOSED') {
+      expect(texts(root).some(x => x.includes('INVITES_CLOSED'))).toBe(false); // never the raw code
+    }
     expect(tournamentGets()).toBe(before + 1);
   });
 
