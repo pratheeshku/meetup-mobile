@@ -81,7 +81,12 @@ import {
   TargetIcon,
 } from '../components/icons/SharedIcons';
 import { useT } from '../labels/LabelsContext';
-import type { LabelKey } from '../labels/fallbackLabels';
+import SkillRequirementPicker from '../components/SkillRequirementPicker';
+import {
+  DEFAULT_SKILL_REQUIREMENT,
+  skillRequirementLabelKey,
+  toSkillRequirement,
+} from '../utils/skillRequirement';
 import { showCompletion } from '../navigation/showCompletion';
 import type { CompletionRow } from '../navigation/showCompletion';
 import type { HomeStackParamList } from '../navigation/types';
@@ -166,7 +171,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [editCourtDetails, setEditCourtDetails] = useState('');
   const [editCapacity, setEditCapacity] = useState(4);
   const [isCapacityValid, setIsCapacityValid] = useState(true);
-  const [editSkillLevel, setEditSkillLevel] = useState<EventSkillLevel>('intermediate');
+  const [editSkillLevel, setEditSkillLevel] = useState<EventSkillLevel>(DEFAULT_SKILL_REQUIREMENT);
   const [isEditSubmitting, setIsEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [mapsApiKey, setMapsApiKey] = useState<string | null>(null);
@@ -393,7 +398,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     setEditCourtDetails('');
     setEditCapacity(event.capacity || 4);
     setIsCapacityValid(true);
-    setEditSkillLevel((event.skill_level_requirement as EventSkillLevel) || 'intermediate');
+    setEditSkillLevel(toSkillRequirement(event.skill_level_requirement));
     setEditStep(1);
     setEditError(null);
     setIsEditing(true);
@@ -592,25 +597,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       await withCorrelationId(async correlationId => {
         await updateEvent(eventId, payload, { correlationId });
       });
-      const originalSkill = (event.skill_level_requirement as EventSkillLevel) || 'intermediate';
+      const originalSkill = toSkillRequirement(event.skill_level_requirement);
       const originalCapacity = event.capacity || 4;
       const originalWhen = event.starts_at ? new Date(event.starts_at).getTime() : Number.NaN;
-      const skillKey = (level: EventSkillLevel): LabelKey => {
-        switch (level) {
-          case 'beginner':
-            return 'skill_level.beginner';
-          case 'expert':
-            return 'skill_level.expert';
-          case 'all_levels':
-            return 'skill_level.all_levels';
-          case 'intermediate':
-            return 'skill_level.intermediate';
-          default: {
-            const exhaustive: never = level;
-            return exhaustive;
-          }
-        }
-      };
       const rows: CompletionRow[] = [];
       if (editTitle.trim() !== event.title) {
         rows.push({ label: t('mob.done.f_title'), value: editTitle.trim() });
@@ -626,7 +615,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         rows.push({ label: t('mob.done.f_venue'), value: fullVenueName });
       }
       if (editSkillLevel !== originalSkill) {
-        rows.push({ label: t('mob.done.f_skill'), value: t(skillKey(editSkillLevel)) });
+        rows.push({ label: t('mob.done.f_skill'), value: t(skillRequirementLabelKey(editSkillLevel)) });
       }
       if (editCapacity !== originalCapacity) {
         rows.push({ label: t('mob.done.f_players'), value: String(editCapacity) });
@@ -1003,30 +992,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
               <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
                 <Text style={styles.inputCardLabel}>{t('mob.create_game.skill_level_label')}</Text>
-                <View style={styles.skillPillRow}>
-                  {(['beginner', 'intermediate', 'expert'] as EventSkillLevel[]).map(lvl => {
-                    const isSelected = editSkillLevel === lvl;
-                    const label =
-                      lvl === 'beginner'
-                        ? 'Beginner'
-                        : lvl === 'intermediate'
-                        ? 'Intermediate'
-                        : 'Advanced';
-                    return (
-                      <TouchableOpacity
-                        key={lvl}
-                        style={[styles.skillPill, isSelected && styles.skillPillSelected]}
-                        onPress={() => setEditSkillLevel(lvl)}
-                      >
-                        <Text
-                          style={[styles.skillPillText, isSelected && styles.skillPillTextSelected]}
-                        >
-                          {label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <SkillRequirementPicker value={editSkillLevel} onChange={setEditSkillLevel} />
               </View>
             </View>
           )}
@@ -1172,10 +1138,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           <View style={styles.detailSubtitleRow}>
             <Text style={styles.detailSubtitle}>
               {sportLabel} ·{' '}
-              {event.skill_level_requirement
-                ? event.skill_level_requirement.charAt(0).toUpperCase() +
-                  event.skill_level_requirement.slice(1)
-                : t('skill_level.intermediate')}{' '}
+              {t(skillRequirementLabelKey(toSkillRequirement(event.skill_level_requirement)))}{' '}
               •
             </Text>
             {isOrganiser ? (
@@ -1923,29 +1886,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     backgroundColor: colors.surface,
-  },
-  skillPillRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  skillPill: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skillPillSelected: {
-    backgroundColor: colors.primary,
-  },
-  skillPillText: {
-    ...typography.caption,
-    fontWeight: '600',
-    color: colors.primaryDark,
-  },
-  skillPillTextSelected: {
-    color: colors.white,
   },
   reviewMainRow: {
     flexDirection: 'row',

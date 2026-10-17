@@ -266,7 +266,7 @@ describe('Legacy Venue Flow Verification (Isolated Suite)', () => {
           title: 'Friday Badminton',
           sport: 'badminton',
           visibility: 'group',
-          skill_level_requirement: 'intermediate',
+          skill_level_requirement: 'all_levels',
           capacity: 4,
           starts_at: expect.any(String),
           // Duration (default 2 hrs) replaced the old `ends_at: null`.

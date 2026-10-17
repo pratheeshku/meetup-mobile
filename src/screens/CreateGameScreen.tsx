@@ -61,7 +61,11 @@ import SelectableCard from '../components/SelectableCard';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
 import { useT } from '../labels/LabelsContext';
-import type { LabelKey } from '../labels/fallbackLabels';
+import SkillRequirementPicker from '../components/SkillRequirementPicker';
+import {
+  DEFAULT_SKILL_REQUIREMENT,
+  skillRequirementLabelKey,
+} from '../utils/skillRequirement';
 import { showCompletion } from '../navigation/showCompletion';
 import type { CompletionRow } from '../navigation/showCompletion';
 import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
@@ -187,7 +191,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   // Step 5: Capacity & Skill
   const [capacity, setCapacity] = useState<number>(4);
   const [isCapacityValid, setIsCapacityValid] = useState<boolean>(true);
-  const [skillLevel, setSkillLevel] = useState<EventSkillLevel>('intermediate');
+  const [skillLevel, setSkillLevel] = useState<EventSkillLevel>(DEFAULT_SKILL_REQUIREMENT);
 
   // Step 6: Invites & Review
   const [invitedPlayers, setInvitedPlayers] = useState<UserSearchResult[]>([]);
@@ -419,14 +423,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       const submittedWhen = `${formatEventDate(startsAtIso)}, ${formatEventTimeRange(startsAtIso, mode === 'game' ? endsAtIso : null)}`;
       const submittedDate = formatEventDate(startsAtIso);
       const selectedGroupName = groups.find(item => item.id === selectedGroupId)?.name;
-      const skillKey: LabelKey =
-        skillLevel === 'beginner'
-          ? 'skill_level.beginner'
-          : skillLevel === 'expert'
-            ? 'skill_level.expert'
-            : skillLevel === 'all_levels'
-              ? 'skill_level.all_levels'
-              : 'skill_level.intermediate';
+      const skillKey = skillRequirementLabelKey(skillLevel);
       const audienceFor = (kind: 'game' | 'tournament'): string => {
         if (gVisibility === 'group' && selectedGroupName) {
           return selectedGroupName;
@@ -1033,30 +1030,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
         <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
           <Text style={styles.inputCardLabel}>{t('mob.create_game.skill_level_label')}</Text>
-          <View style={styles.skillPillRow}>
-            {(['beginner', 'intermediate', 'expert'] as EventSkillLevel[]).map(lvl => {
-              const isSelected = skillLevel === lvl;
-              const label =
-                lvl === 'beginner'
-                  ? 'Beginner'
-                  : lvl === 'intermediate'
-                  ? 'Intermediate'
-                  : 'Advanced';
-              return (
-                <TouchableOpacity
-                  key={lvl}
-                  style={[styles.skillPill, isSelected && styles.skillPillSelected]}
-                  onPress={() => setSkillLevel(lvl)}
-                >
-                  <Text
-                    style={[styles.skillPillText, isSelected && styles.skillPillTextSelected]}
-                  >
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+          <SkillRequirementPicker value={skillLevel} onChange={setSkillLevel} />
         </View>
       </View>
     );
@@ -1168,7 +1142,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               <Text style={styles.reviewGameTitle}>{gTitle}</Text>
               <Text style={styles.reviewGameSubtitle}>
                 {gSport.charAt(0).toUpperCase() + gSport.slice(1)} ·{' '}
-                {skillLevel.charAt(0).toUpperCase() + skillLevel.slice(1)}
+                {t(skillRequirementLabelKey(skillLevel))}
               </Text>
             </View>
           </View>
@@ -1591,29 +1565,6 @@ const styles = StyleSheet.create({
   radioCircleSelected: {
     borderColor: colors.primary,
     backgroundColor: colors.primary,
-  },
-  skillPillRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  skillPill: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skillPillSelected: {
-    backgroundColor: colors.primary,
-  },
-  skillPillText: {
-    ...typography.caption,
-    fontWeight: '600',
-    color: colors.primaryDark,
-  },
-  skillPillTextSelected: {
-    color: colors.white,
   },
   reviewHeaderTitle: {
     ...typography.h3,
