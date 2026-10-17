@@ -32,7 +32,6 @@ import {
 } from '../api/places';
 import { getSports } from '../api/sports';
 import { createTournament } from '../api/tournaments';
-import { searchUsers } from '../api/users';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import Button from '../components/Button';
 import DropdownField from '../components/DropdownField';
@@ -83,6 +82,7 @@ import type {
 } from '../types/tournament';
 import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
+import UserSearchPicker from '../components/UserSearchPicker';
 import { addInviteEmail } from '../utils/inviteEmails';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import {
@@ -177,12 +177,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   const [skillLevel, setSkillLevel] = useState<EventSkillLevel>('intermediate');
 
   // Step 6: Invites & Review
-  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
-  const [playerSuggestions, setPlayerSuggestions] = useState<UserSearchResult[]>([]);
   const [invitedPlayers, setInvitedPlayers] = useState<UserSearchResult[]>([]);
   const [invitedEmails, setInvitedEmails] = useState<string[]>([]);
-  const [emailInput, setEmailInput] = useState('');
-  const [emailError, setEmailError] = useState<string | null>(null);
 
   // Submission & errors
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -215,7 +211,6 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         setSelectedGroupId(res.items[0].id);
       }
     }).catch(() => {});
-    searchUsers({ q: '' }).then(setPlayerSuggestions).catch(() => {});
   }, []);
 
   const handleVenueSearch = async (text: string) => {
@@ -315,34 +310,21 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     );
   };
 
-  const handlePlayerSearch = async (text: string) => {
-    setPlayerSearchQuery(text);
-    try {
-      const results = await searchUsers({ q: text });
-      setPlayerSuggestions(results);
-    } catch {}
+  // Added through the shared UserSearchPicker (one search field for people and emails).
+  const addInvitedPlayer = (user: UserSearchResult) => {
+    setInvitedPlayers(prev => (prev.some(u => u.id === user.id) ? prev : [...prev, user]));
   };
 
-  const toggleInvitePlayer = (user: UserSearchResult) => {
-    setInvitedPlayers(prev => {
-      if (prev.some(u => u.id === user.id)) {
-        return prev.filter(u => u.id !== user.id);
-      }
-      return [...prev, user];
-    });
+  const removeInvitedPlayer = (userId: string) => {
+    setInvitedPlayers(prev => prev.filter(u => u.id !== userId));
   };
 
-  const handleAddEmail = () => {
-    const result = addInviteEmail(invitedEmails, emailInput);
-    if (!result.ok) {
-      setEmailError(
-        t(result.reason === 'invalid' ? 'mob.create_game.invite_email_invalid' : 'mob.create_game.invite_email_duplicate'),
-      );
-      return;
+  /** Case-insensitive de-duplication; the address is never logged. */
+  const addInvitedEmail = (email: string) => {
+    const result = addInviteEmail(invitedEmails, email);
+    if (result.ok) {
+      setInvitedEmails(result.emails);
     }
-    setInvitedEmails(result.emails);
-    setEmailInput('');
-    setEmailError(null);
   };
 
   const removeInvitedEmail = (email: string) => {
@@ -1018,6 +1000,62 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     });
     const selectedGroup = groups.find(g => g.id === selectedGroupId);
 
+    // Everyone added so far (players and emails): directly under the picker's text box.
+    const inviteeChips = (
+      <>
+          {invitedPlayers.length + invitedEmails.length > 0 ? (
+            <View style={styles.inviteeList} testID="invitee-list">
+              {invitedPlayers.map(person => {
+                const tint = getAvatarTint(person.display_name);
+                return (
+                  <View key={`p-${person.id}`} style={styles.inviteeChip}>
+                    <View style={[styles.inviteeAvatar, { backgroundColor: tint.bg }]}>
+                      <Text style={[styles.inviteeAvatarText, { color: tint.text }]}>
+                        {getInitials(person.display_name)}
+                      </Text>
+                    </View>
+                    <Text style={styles.inviteeName} numberOfLines={1}>
+                      {person.display_name}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('mob.create_game.invitee_remove_a11y', { name: person.display_name })}
+                      onPress={() => removeInvitedPlayer(person.id)}
+                      style={styles.inviteeRemove}
+                    >
+                      <CrossIcon size={14} color={colors.textSecondary} />
+                    </Pressable>
+                  </View>
+                );
+              })}
+              {invitedEmails.map(email => {
+                const tint = getAvatarTint(email);
+                return (
+                  <View key={`e-${email.toLowerCase()}`} style={styles.inviteeChip}>
+                    <View style={[styles.inviteeAvatar, { backgroundColor: tint.bg }]}>
+                      <Text style={[styles.inviteeAvatarText, { color: tint.text }]}>
+                        {email.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.inviteeName} numberOfLines={1}>
+                      {email}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t('mob.create_game.invitee_remove_a11y', { name: email })}
+                      onPress={() => removeInvitedEmail(email)}
+                      style={styles.inviteeRemove}
+                    >
+                      <CrossIcon size={14} color={colors.textSecondary} />
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
+      </>
+    );
+
     return (
       <View style={styles.stepContent}>
         {/* Invitee UI only for invite-only games: nobody else is invited. */}
@@ -1030,133 +1068,15 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           </Text>
         </View>
 
-        <View style={styles.searchBox}>
-          <SearchIcon size={18} color={colors.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            value={playerSearchQuery}
-            onChangeText={handlePlayerSearch}
-            placeholder={t('mob.create_game.search_players_placeholder')}
-            placeholderTextColor={colors.textMuted}
-          />
-        </View>
-
-        {/* Everyone added so far (players and emails), directly under the search box */}
-        {invitedPlayers.length + invitedEmails.length > 0 ? (
-          <View style={styles.inviteeList} testID="invitee-list">
-            {invitedPlayers.map(person => {
-              const tint = getAvatarTint(person.display_name);
-              return (
-                <View key={`p-${person.id}`} style={styles.inviteeChip}>
-                  <View style={[styles.inviteeAvatar, { backgroundColor: tint.bg }]}>
-                    <Text style={[styles.inviteeAvatarText, { color: tint.text }]}>
-                      {getInitials(person.display_name)}
-                    </Text>
-                  </View>
-                  <Text style={styles.inviteeName} numberOfLines={1}>
-                    {person.display_name}
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t('mob.create_game.invitee_remove_a11y', { name: person.display_name })}
-                    onPress={() => toggleInvitePlayer(person)}
-                    style={styles.inviteeRemove}
-                  >
-                    <CrossIcon size={14} color={colors.textSecondary} />
-                  </Pressable>
-                </View>
-              );
-            })}
-            {invitedEmails.map(email => {
-              const tint = getAvatarTint(email);
-              return (
-                <View key={`e-${email.toLowerCase()}`} style={styles.inviteeChip}>
-                  <View style={[styles.inviteeAvatar, { backgroundColor: tint.bg }]}>
-                    <Text style={[styles.inviteeAvatarText, { color: tint.text }]}>
-                      {email.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={styles.inviteeName} numberOfLines={1}>
-                    {email}
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t('mob.create_game.invitee_remove_a11y', { name: email })}
-                    onPress={() => removeInvitedEmail(email)}
-                    style={styles.inviteeRemove}
-                  >
-                    <CrossIcon size={14} color={colors.textSecondary} />
-                  </Pressable>
-                </View>
-              );
-            })}
-          </View>
-        ) : null}
-
-        {playerSuggestions.length > 0 ? (
-          <View style={[styles.cardContainer, styles.playerSuggestionsCard]}>
-            {playerSuggestions.slice(0, 4).map((user, idx) => {
-              const isInvited = invitedPlayers.some(u => u.id === user.id);
-              const tint = getAvatarTint(user.display_name);
-              const isLast = idx === Math.min(playerSuggestions.length, 4) - 1;
-              return (
-                <View
-                  key={user.id}
-                  style={[styles.playerRow, !isLast && styles.playerRowBorder]}
-                >
-                  <View style={[styles.avatarCircle, { backgroundColor: tint.bg }]}>
-                    <Text style={[styles.avatarText, { color: tint.text }]}>
-                      {getInitials(user.display_name)}
-                    </Text>
-                  </View>
-
-                  <Text style={styles.playerName}>{user.display_name}</Text>
-
-                  <TouchableOpacity
-                    style={[styles.inviteToggleBtn, isInvited && styles.inviteToggleBtnActive]}
-                    onPress={() => toggleInvitePlayer(user)}
-                    testID={`invite-toggle-${user.id}`}
-                  >
-                    {isInvited ? (
-                      <CheckIcon size={16} color={colors.white} />
-                    ) : (
-                      <Text style={styles.inviteTogglePlus}>+</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-          </View>
-        ) : null}
-
-          <View style={styles.emailInviteBlock}>
-            <Text style={styles.fieldLabel}>{t('mob.create_game.invite_email_label')}</Text>
-            <View style={styles.emailInviteRow}>
-              <TextInput
-                style={styles.emailInviteInput}
-                value={emailInput}
-                onChangeText={text => {
-                  setEmailInput(text);
-                  setEmailError(null);
-                }}
-                onSubmitEditing={handleAddEmail}
-                placeholder={t('mob.create_game.invite_email_placeholder')}
-                placeholderTextColor={colors.textMuted}
-                accessibilityLabel={t('mob.create_game.invite_email_label')}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <Button
-                label={t('mob.create_game.invite_email_add')}
-                variant="secondary"
-                onPress={handleAddEmail}
-                disabled={emailInput.trim().length === 0}
-                style={styles.emailInviteAdd}
-              />
-            </View>
-            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-          </View>
+        <UserSearchPicker
+          onSelect={addInvitedPlayer}
+          onSelectEmail={addInvitedEmail}
+          entityLabel={t('mob.user_search.entity_player')}
+          excludeUserIds={invitedPlayers.map(person => person.id)}
+          placeholder={t('mob.create_game.search_players_placeholder')}
+          disabled={isSubmitting}
+          belowInput={inviteeChips}
+        />
         </>
         ) : null}
 
@@ -1445,27 +1365,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emailInviteBlock: {
-    marginTop: spacing.md,
-  },
-  emailInviteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  emailInviteInput: {
-    flex: 1,
-    height: 48,
-    borderWidth: borderWidth.thin,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
-    color: colors.textPrimary,
-  },
-  emailInviteAdd: {
-    marginBottom: 0,
-  },
   searchInput: {
     flex: 1,
     marginLeft: spacing.sm,
@@ -1621,48 +1520,6 @@ const styles = StyleSheet.create({
   skillPillTextSelected: {
     color: colors.white,
   },
-  playerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-  },
-  playerRowBorder: {
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: colors.border,
-  },
-  avatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    ...typography.bodyBold,
-  },
-  playerName: {
-    flex: 1,
-    marginLeft: spacing.md,
-    ...typography.bodyBold,
-    color: colors.textPrimary,
-  },
-  inviteToggleBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inviteToggleBtnActive: {
-    backgroundColor: colors.primary,
-  },
-  inviteTogglePlus: {
-    color: colors.primary,
-    fontSize: 18,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
   reviewHeaderTitle: {
     ...typography.h3,
     color: colors.textPrimary,
@@ -1718,10 +1575,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopWidth: borderWidth.thin,
     borderTopColor: colors.border,
-  },
-  playerSuggestionsCard: {
-    marginTop: spacing.md,
-    padding: 0,
   },
   errorText: {
     ...typography.caption,

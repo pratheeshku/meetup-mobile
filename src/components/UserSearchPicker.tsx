@@ -57,6 +57,8 @@ interface UserSearchPickerProps {
   suggestionContext?: SuggestionContext;
   /** Change the value to refetch the current list silently. */
   refreshToken?: number;
+  /** Optional content rendered directly under the text field, above the results (e.g. who was added). */
+  belowInput?: React.ReactNode;
 }
 
 export default function UserSearchPicker({
@@ -71,6 +73,7 @@ export default function UserSearchPicker({
   disabled = false,
   suggestionContext = 'players',
   refreshToken = 0,
+  belowInput,
 }: UserSearchPickerProps): React.JSX.Element {
   const t = useT();
   const tRef = useRef(t);
@@ -310,6 +313,7 @@ export default function UserSearchPicker({
         autoCorrect={false}
         accessibilityLabel={t('mob.user_search.a11y')}
       />
+      {belowInput}
       {isSearching ? (
         <View style={styles.statusRow}>
           <ActivityIndicator size="small" color={colors.primary} />
