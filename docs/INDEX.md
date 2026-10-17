@@ -5,6 +5,19 @@ Each document's header holds its current version and status; this index delibera
 - REQ-MEETUP-MOBILE.md: mobile requirements (R-xxx). Use to check what must be true.
 - DES-MEETUP-MOBILE.md: mobile baseline design (navigation, API client, token storage, push, create flows).
 
+## As-built design and requirements (reverse-engineered from code; read with the baseline, never instead of it)
+Per-module files, one folder per kind so no folder is flooded. They describe what the code does, not what was approved. Read only the area you touch. Each file ends with its own drift and findings. Version and status are not recorded here or in the files; the owner assigns them.
+- Change logs (record every edit to these files here, not in CHANGELOG-DOCS.md): as-built/changelog/DESIGN-CHANGELOG.md, as-built/changelog/REQUIREMENTS-CHANGELOG.md.
+- architecture_overview: as-built/design/architecture_overview.md. Stack, layout, runtime composition, cross-cutting findings (design only).
+- api: as-built/design/api.md, as-built/requirements/api.md. Axios client, refresh, domain modules, endpoint inventory (checked against the backend).
+- auth_storage: as-built/design/auth_storage.md, as-built/requirements/auth_storage.md. Sign-in, session restore, token storage.
+- navigation: as-built/design/navigation.md, as-built/requirements/navigation.md. Stacks, tabs, create flow, completion.
+- notifications: as-built/design/notifications.md, as-built/requirements/notifications.md. FCM, local rendering, routing, history.
+- screens: as-built/design/screens.md, as-built/requirements/screens.md. All 27 screens.
+- components: as-built/design/components.md, as-built/requirements/components.md. Shared and feature components, icons.
+- hooks_utils: as-built/design/hooks_utils.md, as-built/requirements/hooks_utils.md. Hooks, game lists, helpers.
+- labels_theme_diagnostics: as-built/design/labels_theme_diagnostics.md, as-built/requirements/labels_theme_diagnostics.md. Labels, theme, sports, perf log, config.
+
 ## Design addenda (read together with the baseline)
 - DES-MEETUP-ADDENDUM-IOS-App.md, -IOS-PN-Support.md: iOS app and iOS push.
 - DES-MEETUP-ADDENDUM-email-auth.md, -social-login.md: email auth and login providers.
