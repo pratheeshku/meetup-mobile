@@ -47,6 +47,8 @@ export interface Group {
   member_count?: number | null;
   upcoming_game_count?: number | null;
   created_at: string;
+  /** Most recent activity in the group (ISO); the game group picker lists the newest first. */
+  last_activity_at?: string | null;
   /**
    * On `getMyGroups()` list items: a Proposed Assumption ('owner' for
    * items sourced from `/settings/groups-owned`, 'member' for items from

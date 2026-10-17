@@ -69,6 +69,10 @@ export interface Event {
   is_organiser: boolean;
   /** Name of the group a `group` game belongs to (`GET /events/{id}` `group_name`); null otherwise. */
   group_name?: string | null;
+  /** All groups a `group` game is shared with (`group_ids`); older servers: a one-item list from `group_id`. */
+  group_ids?: string[];
+  /** Names matching `group_ids` (`group_names`); older servers: a one-item list from `group_name`. */
+  group_names?: string[];
   venue_name?: string | null;
   venue_address?: string | null;
   venue_place_id?: string | null;

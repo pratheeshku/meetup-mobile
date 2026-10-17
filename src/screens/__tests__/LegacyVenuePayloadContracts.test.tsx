@@ -265,7 +265,8 @@ describe('Legacy Venue Flow Verification (Isolated Suite)', () => {
         expect(payload).toEqual({
           title: 'Friday Badminton',
           sport: 'badminton',
-          visibility: 'group',
+          // No groups to share with: the form starts on Public.
+          visibility: 'public',
           skill_level_requirement: 'all_levels',
           capacity: 4,
           starts_at: expect.any(String),
@@ -343,7 +344,8 @@ describe('Legacy Venue Flow Verification (Isolated Suite)', () => {
         expect(payload).toEqual({
           title: 'Autumn Open Tournament',
           sport: 'badminton',
-          visibility: 'group',
+          // No groups to share with: the form starts on Public.
+          visibility: 'public',
           participation_mode: 'individual',
           format: 'knockout',
           capacity: 4,

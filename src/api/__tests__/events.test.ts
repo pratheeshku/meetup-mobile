@@ -510,3 +510,35 @@ describe('display_status', () => {
     expect(mockedGet).toHaveBeenCalledWith('/events', expect.objectContaining({ params: { history: true } }));
   });
 });
+
+describe('group_ids / group_names', () => {
+  const raw = (extra: Record<string, unknown>) => ({
+    id: 'e-1', organizer_id: 'o', sport: 'tennis', title: 'T', visibility: 'group', capacity: 4,
+    starts_at: '2026-09-20T10:00:00Z', ends_at: null, recurrence_rule_id: null, status: 'upcoming',
+    venue_name: null, venue_address: null, organizer_nickname: null, organizer_display_name: null,
+    going_count: 0, user_rsvp_status: null, ...extra,
+  });
+  afterEach(() => mockedGet.mockReset());
+
+  it('maps group_ids and group_names from the response', async () => {
+    mockedGet.mockResolvedValueOnce({ data: [raw({ group_ids: ['a', 'b'], group_names: ['A', 'B'] })] });
+    const [event] = (await getEvents()).items;
+    expect(event.group_ids).toEqual(['a', 'b']);
+    expect(event.group_names).toEqual(['A', 'B']);
+    expect(event.group_name).toBe('A');
+  });
+
+  it('old server: falls back to a one-item list from group_id / group_name', async () => {
+    mockedGet.mockResolvedValueOnce({ data: [raw({ group_id: 'a', group_name: 'A' })] });
+    const [event] = (await getEvents()).items;
+    expect(event.group_ids).toEqual(['a']);
+    expect(event.group_names).toEqual(['A']);
+  });
+
+  it('no groups at all: empty lists', async () => {
+    mockedGet.mockResolvedValueOnce({ data: [raw({ visibility: 'public' })] });
+    const [event] = (await getEvents()).items;
+    expect(event.group_ids).toEqual([]);
+    expect(event.group_names).toEqual([]);
+  });
+});
