@@ -104,6 +104,9 @@ jobs:
           set -euo pipefail
           # Xcode 27+ (iOS 27 SDK) crashes at launch until UIScene lifecycle
           # is adopted; unpin after that.
+          # The UIScene lifecycle is now adopted in code (SceneDelegate.swift), but keep
+          # this pin: unpin ONLY after the owner confirms ios/UISCENE_MANUAL_TEST_CHECKLIST.md
+          # passes on an Xcode 27 build (iOS 27 simulator and a device).
           xcode_app="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)"
           if [ -z "$xcode_app" ]; then
             echo "::error::No Xcode 26.x (/Applications/Xcode_26*.app) is installed on this runner image. Xcode 27+ is deliberately not used until UIScene lifecycle is adopted."

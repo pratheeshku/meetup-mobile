@@ -4,8 +4,13 @@ import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
 
+/// Process-level setup only. The window and React Native start in `SceneDelegate`
+/// (UIScene lifecycle, required for the iOS 27 SDK). APNs token and notification
+/// callbacks (Firebase messaging, notify-kit) are app-level and stay on this delegate.
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
+  /// Set by `SceneDelegate` once its window exists, for libraries that still read
+  /// `UIApplication.shared.delegate?.window` (e.g. react-native-image-crop-picker).
   var window: UIWindow?
 
   var reactNativeDelegate: ReactNativeDelegate?
@@ -23,14 +28,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     reactNativeDelegate = delegate
     reactNativeFactory = factory
-
-    window = UIWindow(frame: UIScreen.main.bounds)
-
-    factory.startReactNative(
-      withModuleName: "MeetupMobile",
-      in: window,
-      launchOptions: launchOptions
-    )
 
     return true
   }
