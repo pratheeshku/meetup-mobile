@@ -12,7 +12,10 @@
  * Definitions (AD-14), all over events that start in the future and are
  * not cancelled:
  * - My games   = the user organises it, or is going / waitlisted.
- * - Open games = public, not organised by the user, `rsvp === 'none'`.
+ * - Open games = public OR group games, not organised by the user,
+ *   `rsvp === 'none'`. The backend only returns group games the caller is a
+ *   member of, so a returned group game is one the user can join. Invite-only
+ *   games stay excluded: they need the accept-invitation step, not a Join.
  *   (Declined/withdrawn games carry a non-`none` status and are excluded;
  *   see the Implementation Report for the unverified `null` case.)
  * - Order: `starts_at` ascending, ties by `created_at` ascending.
@@ -81,7 +84,7 @@ export function isMyGame(event: Event, userId: string | undefined): boolean {
 
 export function isOpenGame(event: Event, userId: string | undefined): boolean {
   return (
-    event.visibility === 'public' &&
+    (event.visibility === 'public' || event.visibility === 'group') &&
     !isOrganiserOf(event, userId) &&
     event.current_user_rsvp_status === 'none'
   );

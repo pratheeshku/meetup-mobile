@@ -39,8 +39,9 @@ const FEED: Event[] = [
   makeEvent({ id: 'past-open', starts_at: iso(-30) }),
   makeEvent({ id: 'cancelled-hosted', organiser_id: ME, status: 'cancelled', starts_at: iso(8) }),
   makeEvent({ id: 'cancelled-open', status: 'cancelled', starts_at: iso(9) }),
-  // Not open: wrong visibility, declined/withdrawn (non-"none" status).
-  makeEvent({ id: 'group-only', visibility: 'group', starts_at: iso(6) }),
+  // Group games the user can see are joinable, so they count as open.
+  makeEvent({ id: 'group-open', visibility: 'group', starts_at: iso(6) }),
+  // Not open: invite-only (needs accept step), declined/withdrawn (non-"none" status).
   makeEvent({ id: 'invite-only', visibility: 'invite_only', starts_at: iso(7) }),
   makeEvent({ id: 'declined', current_user_rsvp_status: 'withdrawn', starts_at: iso(11) }),
 ];
@@ -65,11 +66,11 @@ describe('My games (AD-14)', () => {
 });
 
 describe('Open / Recommended games (AD-14)', () => {
-  it('lists only future public games the user does not organise and has not accepted', () => {
-    expect(ids(selectOpenGames(FEED, opts))).toEqual(['open-a', 'open-b']);
+  it('lists future public and group games the user does not organise and has not accepted, earliest first', () => {
+    expect(ids(selectOpenGames(FEED, opts))).toEqual(['open-a', 'group-open', 'open-b']);
   });
 
-  it('excludes hosted, going, waitlisted, declined, cancelled, past and non-public games', () => {
+  it('excludes hosted, going, waitlisted, declined, cancelled, past and invite-only games', () => {
     const open = ids(selectOpenGames(FEED, opts));
     for (const excluded of [
       'hosted',
@@ -78,7 +79,6 @@ describe('Open / Recommended games (AD-14)', () => {
       'declined',
       'cancelled-open',
       'past-open',
-      'group-only',
       'invite-only',
     ]) {
       expect(open).not.toContain(excluded);
@@ -91,6 +91,7 @@ describe('ordering', () => {
     const shuffled = [...FEED].reverse();
     expect(ids(selectGames(shuffled, 'all', opts))).toEqual([
       'open-a',
+      'group-open',
       'going',
       'wait',
       'hosted',
@@ -116,12 +117,19 @@ describe('ordering', () => {
 
 describe('Games screen union and scope (AD-15)', () => {
   it('"all" is the union of My games and Open games, earliest first', () => {
-    expect(ids(selectGames(FEED, 'all', opts))).toEqual(['open-a', 'going', 'wait', 'hosted', 'open-b']);
+    expect(ids(selectGames(FEED, 'all', opts))).toEqual([
+      'open-a',
+      'group-open',
+      'going',
+      'wait',
+      'hosted',
+      'open-b',
+    ]);
   });
 
   it('"mine" is My games only and "open" is Open games only', () => {
     expect(ids(selectGames(FEED, 'mine', opts))).toEqual(['going', 'wait', 'hosted']);
-    expect(ids(selectGames(FEED, 'open', opts))).toEqual(['open-a', 'open-b']);
+    expect(ids(selectGames(FEED, 'open', opts))).toEqual(['open-a', 'group-open', 'open-b']);
   });
 
   it('scope combines with the sport filter', () => {
@@ -150,6 +158,7 @@ describe('badges (AD-15)', () => {
     expect(getGameBadge(byId('going'), ME)).toBe('Going');
     expect(getGameBadge(byId('wait'), ME)).toBe('Waitlisted');
     expect(getGameBadge(byId('open-a'), ME)).toBe('Open');
+    expect(getGameBadge(byId('group-open'), ME)).toBe('Open');
   });
 
   it('Hosting wins when the user hosts a game they are also going to', () => {
@@ -158,7 +167,7 @@ describe('badges (AD-15)', () => {
   });
 
   it('has no badge for a game that is neither mine nor open', () => {
-    expect(getGameBadge(byId('group-only'), ME)).toBeNull();
+    expect(getGameBadge(byId('invite-only'), ME)).toBeNull();
     expect(getGameBadge(byId('declined'), ME)).toBeNull();
   });
 });
