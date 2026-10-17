@@ -772,6 +772,8 @@ export const DEFAULT_LABELS = {
   'mob.create_game.review_header': 'Review',
   'mob.create_game.review_players_group': '{count} players · {group}',
   'mob.create_game.review_players_invite': '{count} players · Invite only · {invited} invited',
+  'mob.create_game.review_players_group_invited': '{count} players · {group} · {invited} invited',
+  'mob.create_game.review_players_public_invited': '{count} players · Public · {invited} invited',
   'mob.create_game.review_players_public': '{count} players · Public',
   'mob.create_game.who_invited': 'Who is invited?',
   'mob.create_game.at_least_one': '(at least 1)',

@@ -12,6 +12,7 @@ import {
   TextInput,
   Pressable,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
@@ -120,8 +121,20 @@ function getInitials(name: string): string {
   return (name.trim().slice(0, 2) || '?').toUpperCase();
 }
 
+/**
+ * Games put Date, Start time and Duration in one row. Below this width, or with a large
+ * system font, the row uses the short date ("17 Oct") with no decorative icons so labels
+ * and values never wrap or truncate (checked for 360dp / 375pt at font scale 1.3).
+ */
+export const DATE_ROW_COMPACT_MAX_WIDTH = 420;
+export const DATE_ROW_COMPACT_FONT_SCALE = 1.15;
+export function isCompactDateRow(width: number, fontScale: number): boolean {
+  return width < DATE_ROW_COMPACT_MAX_WIDTH || fontScale > DATE_ROW_COMPACT_FONT_SCALE;
+}
+
 export default function CreateGameScreen({ navigation }: Props): React.JSX.Element {
   const t = useT();
+  const { width: windowWidth, fontScale } = useWindowDimensions();
 
   // Wizard state
   const [step, setStep] = useState<number>(1);
@@ -442,7 +455,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           sport: gSport,
           visibility: gVisibility,
           ...(gVisibility === 'group' && selectedGroupId ? { group_ids: [selectedGroupId] } : {}),
-          ...(gVisibility === 'invite_only' && invitedPlayers.length > 0
+          ...(invitedPlayers.length > 0
             ? { invite_user_ids: invitedPlayers.map(p => p.id) }
             : {}),
           skill_level_requirement: skillLevel,
@@ -470,7 +483,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               }),
         };
 
-        const emailsToInvite = gVisibility === 'invite_only' ? invitedEmails : [];
+        const emailsToInvite = invitedEmails;
         const failedEmailInvites: string[] = [];
         let emailsInvited = 0;
         const created = await withCorrelationId(async correlationId => {
@@ -496,7 +509,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           { label: t('mob.done.f_players'), value: String(capacity) },
           { label: t('mob.done.f_skill'), value: t(skillKey) },
         ];
-        if (gVisibility === 'invite_only') {
+        if (gVisibility === 'invite_only' || invitedPlayers.length + invitedEmails.length > 0) {
           rows.push({ label: t('mob.done.f_invited'), value: String(invitedPlayers.length) });
           rows.push({ label: t('mob.done.f_invited_email'), value: String(emailsInvited) });
         }
@@ -666,35 +679,112 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       minute: '2-digit',
       hour12: true,
     });
+    const shortDate = dateValue.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const compactRow = isCompactDateRow(windowWidth, fontScale);
 
     return (
       <View style={styles.stepContent}>
         <Text style={styles.stepHeading}>{t('mob.create_game.step_when_where')}</Text>
 
         <View style={styles.cardContainer}>
-          <View style={styles.row}>
-            <TouchableOpacity
-              style={styles.halfField}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.fieldLabel}>{t('mob.create_game.date_label')}</Text>
-              <View style={styles.pickerBox}>
-                <CalendarIcon size={18} />
-                <Text style={styles.pickerBoxText}>{formattedDate}</Text>
-              </View>
-            </TouchableOpacity>
+          {mode === 'game' ? (
+            // Games: Date, Start time and Duration in ONE row (flex 1.35 / 1 / 1).
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={styles.dateField}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text
+                  style={styles.fieldLabel}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {t('mob.create_game.date_label')}
+                </Text>
+                <View style={[styles.pickerBox, compactRow && styles.pickerBoxCompact]}>
+                  {compactRow ? null : <CalendarIcon size={18} />}
+                  <Text
+                    style={styles.pickerBoxText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    {compactRow ? shortDate : formattedDate}
+                  </Text>
+                </View>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.halfField}
-              onPress={() => setShowTimePicker(true)}
-            >
-              <Text style={styles.fieldLabel}>{t('mob.create_game.start_time_label')}</Text>
-              <View style={styles.pickerBox}>
-                <ClockIcon size={18} />
-                <Text style={styles.pickerBoxText}>{formattedTime}</Text>
+              <TouchableOpacity
+                style={styles.halfField}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Text
+                  style={styles.fieldLabel}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {t('mob.create_game.start_time_label')}
+                </Text>
+                <View style={[styles.pickerBox, compactRow && styles.pickerBoxCompact]}>
+                  {compactRow ? null : <ClockIcon size={18} />}
+                  <Text
+                    style={styles.pickerBoxText}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    {formattedTime}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <View style={styles.halfField}>
+                <Text
+                  style={styles.fieldLabel}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {t('mob.create_game.duration_label')}
+                </Text>
+                <DropdownField
+                  options={durationOptions}
+                  value={String(durationHours)}
+                  onChange={value => setDurationHours(Number(value))}
+                  placeholder={t('mob.create_game.duration_label')}
+                  accessibilityLabel={t('mob.create_game.duration_label')}
+                  style={[styles.durationTrigger, compactRow && styles.durationTriggerCompact]}
+                />
               </View>
-            </TouchableOpacity>
-          </View>
+            </View>
+          ) : (
+            // Tournaments keep the two-column row, no duration.
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={styles.halfField}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={styles.fieldLabel}>{t('mob.create_game.date_label')}</Text>
+                <View style={styles.pickerBox}>
+                  <CalendarIcon size={18} />
+                  <Text style={styles.pickerBoxText}>{formattedDate}</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.halfField}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Text style={styles.fieldLabel}>{t('mob.create_game.start_time_label')}</Text>
+                <View style={styles.pickerBox}>
+                  <ClockIcon size={18} />
+                  <Text style={styles.pickerBoxText}>{formattedTime}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {showDatePicker && (
             <DateTimePicker
@@ -713,19 +803,6 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               onChange={handleTimeChange}
             />
           )}
-
-          {mode === 'game' ? (
-            <View style={styles.durationField}>
-              <Text style={styles.fieldLabel}>{t('mob.create_game.duration_label')}</Text>
-              <DropdownField
-                options={durationOptions}
-                value={String(durationHours)}
-                onChange={value => setDurationHours(Number(value))}
-                placeholder={t('mob.create_game.duration_label')}
-                accessibilityLabel={t('mob.create_game.duration_label')}
-              />
-            </View>
-          ) : null}
 
           {venueCatalogueEnabled ? (
             <VenuePicker
@@ -988,6 +1065,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   // Step 6: Review & Invite
   const renderStep6 = () => {
     const isInviteOnly = gVisibility === 'invite_only';
+    const invitedCount = invitedPlayers.length + invitedEmails.length;
     const formattedDate = dateValue.toLocaleDateString('en-US', {
       weekday: 'short',
       day: 'numeric',
@@ -1058,8 +1136,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
     return (
       <View style={styles.stepContent}>
-        {/* Invitee UI only for invite-only games: nobody else is invited. */}
-        {isInviteOnly ? (
+        {/* Invite UI for every game type (public, group, invite-only). */}
         <>
         <View style={styles.stepHeaderRow}>
           <Text style={styles.stepHeading}>
@@ -1078,7 +1155,6 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           belowInput={inviteeChips}
         />
         </>
-        ) : null}
 
         {/* Review Card */}
         <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
@@ -1127,9 +1203,17 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             </View>
             <Text style={styles.reviewDetailText}>
               {gVisibility === 'group' && selectedGroup
-                ? t('mob.create_game.review_players_group', { count: capacity, group: selectedGroup.name })
+                ? invitedCount > 0
+                  ? t('mob.create_game.review_players_group_invited', {
+                      count: capacity,
+                      group: selectedGroup.name,
+                      invited: invitedCount,
+                    })
+                  : t('mob.create_game.review_players_group', { count: capacity, group: selectedGroup.name })
                 : isInviteOnly
-                ? t('mob.create_game.review_players_invite', { count: capacity, invited: invitedPlayers.length + invitedEmails.length })
+                ? t('mob.create_game.review_players_invite', { count: capacity, invited: invitedCount })
+                : invitedCount > 0
+                ? t('mob.create_game.review_players_public_invited', { count: capacity, invited: invitedCount })
                 : t('mob.create_game.review_players_public', { count: capacity })}
             </Text>
           </View>
@@ -1290,8 +1374,19 @@ const styles = StyleSheet.create({
   halfField: {
     flex: 1,
   },
-  durationField: {
-    marginTop: spacing.md,
+  dateField: {
+    flex: 1.35,
+  },
+  pickerBoxCompact: {
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  durationTrigger: {
+    minHeight: 44,
+    marginBottom: 0,
+  },
+  durationTriggerCompact: {
+    paddingHorizontal: spacing.sm,
   },
   fieldLabel: {
     ...typography.caption,
