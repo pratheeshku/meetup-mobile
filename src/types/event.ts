@@ -127,6 +127,8 @@ export interface EventParticipant {
   joined_at?: string;
   user_display_name?: string | null;
   user_nickname?: string;
+  /** `user_photo_url` from `GET /events/{id}/participants`; initials are shown when null. */
+  user_photo_url?: string | null;
   is_checked_in?: boolean;
 }
 

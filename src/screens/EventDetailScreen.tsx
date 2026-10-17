@@ -45,6 +45,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import GroupNamesRow from '../components/GroupNamesRow';
+import UserAvatar from '../components/UserAvatar';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
 import ShareActionSheet from '../components/ShareActionSheet';
@@ -102,19 +103,7 @@ import { stripIconGlyphs, useSportDisplayName } from '../utils/labels';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 
-const AVATAR_TINTS = [
-  { bg: colors.avatarTint1, text: colors.avatarTintText1 },
-  { bg: colors.avatarTint2, text: colors.avatarTintText2 },
-  { bg: colors.avatarTint3, text: colors.avatarTintText3 },
-  { bg: colors.avatarTint4, text: colors.avatarTintText4 },
-  { bg: colors.avatarTint5, text: colors.avatarTintText5 },
-];
-
-function getAvatarTint(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
-  return AVATAR_TINTS[Math.abs(hash) % AVATAR_TINTS.length];
-}
+const PLAYER_AVATAR_SIZE = 44;
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -184,25 +173,43 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [venueCatalogueEnabled, setVenueCatalogueEnabled] = useState(false);
   const [editCatalogueVenue, setEditCatalogueVenue] = useState<SelectedVenueState | null>(null);
 
-  const loadEvent = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const [data, parts] = await Promise.all([
-        getEvent(eventId),
-        getEventParticipants(eventId).catch(() => []),
-      ]);
-      setEvent(data);
-      setParticipants(Array.isArray(parts) ? parts : []);
-    } catch {
-      setLoadError(t('mob.game_detail.load_error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [eventId, t]);
+  /**
+   * Loads the game AND its participants together. `silent` (after Join/Leave)
+   * keeps the screen on screen instead of flashing the loading view, and keeps the
+   * previous participants if only that call fails.
+   */
+  const loadEvent = useCallback(
+    async (silent: boolean = false) => {
+      if (!silent) {
+        setIsLoading(true);
+        setLoadError(null);
+      }
+      try {
+        const [data, parts] = await Promise.all([
+          getEvent(eventId),
+          getEventParticipants(eventId).catch(() => null),
+        ]);
+        setEvent(data);
+        if (Array.isArray(parts)) {
+          setParticipants(parts);
+        } else if (!silent) {
+          setParticipants([]);
+        }
+      } catch {
+        if (!silent) {
+          setLoadError(t('mob.game_detail.load_error'));
+        }
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [eventId, t],
+  );
 
   useEffect(() => {
-    loadEvent();
+    loadEvent(false);
     getClientConfig().then(cfg => {
       setMapsApiKey(cfg.google_maps_api_key);
       setVenueCatalogueEnabled(Boolean(cfg.venue_catalogue_enabled));
@@ -526,7 +533,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       return;
     }
     if (editStep === 3) {
-      if (!isCapacityValid || editCapacity < Math.max(2, participants.length)) {
+      if (!isCapacityValid || editCapacity < Math.max(2, event?.participant_count ?? 0)) {
         return;
       }
       setEditStep(4);
@@ -674,7 +681,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     try {
       await withCorrelationId(async correlationId => {
         await rsvpEvent(eventId, { correlationId });
-        await loadEvent();
+        await loadEvent(true);
       });
     } catch (e) {
       // Backend 4xx detail (e.g. skill level or membership) when present, else the generic message.
@@ -690,7 +697,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     try {
       await withCorrelationId(async correlationId => {
         await withdrawEvent(eventId, { correlationId });
-        await loadEvent();
+        await loadEvent(true);
       });
     } catch {
       setActionError(t('mob.game_detail.leave_error'));
@@ -701,7 +708,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   if (isLoading) return <LoadingView />;
   if (loadError || !event) {
-    return <ErrorView message={loadError ?? t('mob.game_detail.not_found')} onRetry={loadEvent} />;
+    return <ErrorView message={loadError ?? t('mob.game_detail.not_found')} onRetry={() => loadEvent(false)} />;
   }
 
   // -------------------------------------------------------------
@@ -718,7 +725,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       minute: '2-digit',
       hour12: true,
     });
-    const minCap = Math.max(2, participants.length);
+    const minCap = Math.max(2, event.participant_count);
 
     const originalTime = event.starts_at
       ? new Date(event.starts_at).toLocaleTimeString('en-US', {
@@ -1070,7 +1077,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
               <View style={styles.notifyCard}>
                 <Text style={styles.notifyText}>
-                  {t('mob.edit_game.notify_joined', { count: participants.length })}
+                  {t('mob.edit_game.notify_joined', { count: event.participant_count })}
                 </Text>
               </View>
             </View>
@@ -1112,7 +1119,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const isOrganiserActionsVisible =
     isOrganiser && event.status !== 'cancelled' && event.status !== 'completed';
   const totalCapacity = event.capacity || 4;
-  const joinedCount = participants.length > 0 ? participants.length : event.participant_count;
+  // The backend's going count for the game: withdrawn and waitlisted people are not joined.
+  const joinedCount = event.participant_count;
+  const goingParticipants = participants.filter(p => p.status === 'going');
   const emptySpotsCount = Math.max(0, totalCapacity - joinedCount);
 
   return (
@@ -1235,17 +1244,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             </View>
 
             <View style={styles.playerAvatarsRow}>
-              {participants.map(p => {
+              {goingParticipants.map(p => {
                 const name = p.user_display_name || p.user_nickname || 'Player';
-                const tint = getAvatarTint(name);
                 return (
-                  <View
-                    key={p.id || p.user_id}
-                    style={[styles.playerAvatarCircle, { backgroundColor: tint.bg }]}
-                  >
-                    <Text style={[styles.playerAvatarText, { color: tint.text }]}>
-                      {getInitials(name)}
-                    </Text>
+                  <View key={p.id || p.user_id} style={styles.playerAvatarCircle} testID="player-avatar">
+                    <UserAvatar imageUrl={p.user_photo_url} name={name} size={PLAYER_AVATAR_SIZE} />
                   </View>
                 );
               })}
@@ -1648,14 +1651,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   playerAvatarCircle: {
-    width: 44,
-    height: 44,
+    width: PLAYER_AVATAR_SIZE,
+    height: PLAYER_AVATAR_SIZE,
     borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playerAvatarText: {
-    ...typography.bodyBold,
+    overflow: 'hidden',
   },
   emptyAvatarCircle: {
     width: 44,
