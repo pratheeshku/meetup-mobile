@@ -102,9 +102,13 @@ react {
 }
 
 /**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
+ * R8 code shrinking + obfuscation + resource shrinking for release builds
+ * (Play Console "DEX code optimisation below threshold"). Keep rules live in
+ * proguard-rules.pro. The mapping file is produced at
+ * app/build/outputs/mapping/release/mapping.txt and is also embedded in the
+ * AAB, which Play reads automatically to deobfuscate crash reports.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -168,7 +172,12 @@ android {
             // build without a real keystore present.
             signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            shrinkResources enableProguardInReleaseBuilds
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            // Native debug symbols for Play's native crash/ANR reports (Hermes, VisionCamera, etc.).
+            ndk {
+                debugSymbolLevel 'SYMBOL_TABLE'
+            }
         }
     }
 }
