@@ -675,8 +675,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         await rsvpEvent(eventId, { correlationId });
         await loadEvent();
       });
-    } catch {
-      setActionError(t('mob.game_detail.join_error'));
+    } catch (e) {
+      // Backend 4xx detail (e.g. skill level or membership) when present, else the generic message.
+      setActionError(getApiErrorMessage(e, t('mob.game_detail.join_error')));
     } finally {
       setIsActionLoading(false);
     }
@@ -1425,7 +1426,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           ) : null}
 
           {/* Non-organiser RSVP Actions */}
-          {!isOrganiser ? (
+          {!isOrganiser && (event.current_user_rsvp_status === 'going' || event.status !== 'cancelled') ? (
             <View style={styles.rsvpActionContainer}>
               {event.current_user_rsvp_status === 'going' ? (
                 <Button
