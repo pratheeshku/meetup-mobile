@@ -57,6 +57,8 @@ interface UnifiedCardProps {
   onPress: () => void;
   accessibilityLabel: string;
   badge?: React.ReactNode;
+  /** Rendered directly below the count line (e.g. a Join button). */
+  belowCount?: React.ReactNode;
   perfScreen?: string;
 }
 
@@ -71,6 +73,7 @@ export function UnifiedCard({
   onPress,
   accessibilityLabel,
   badge,
+  belowCount,
   perfScreen,
 }: UnifiedCardProps): React.JSX.Element {
   const t = useT();
@@ -128,14 +131,17 @@ export function UnifiedCard({
 
         {/* (4) Right-hand column: count and action button */}
         <View style={styles.rightCol}>
-          {countLabel ? (
-            <View style={styles.countContainer}>
-              <PeopleGreenIcon size={14} />
-              <Text style={styles.countText}>{countLabel}</Text>
-            </View>
-          ) : (
-            <View />
-          )}
+          <View style={styles.countBlock}>
+            {countLabel ? (
+              <View style={styles.countContainer}>
+                <PeopleGreenIcon size={14} />
+                <Text style={styles.countText}>{countLabel}</Text>
+              </View>
+            ) : (
+              <View />
+            )}
+            {belowCount}
+          </View>
 
           <View style={styles.actionBtn}>
             <Text style={styles.actionBtnText}>{actionButtonLabel}</Text>
@@ -242,11 +248,16 @@ export function UnifiedGameCard({
   onPress,
   badge,
   perfScreen,
+  onJoin,
+  joining = false,
 }: {
   event: Event;
   onPress: () => void;
   badge?: GameBadge | null | React.ReactNode;
   perfScreen?: string;
+  /** When given, a Join button shows directly below the "x/y going" line. */
+  onJoin?: () => void;
+  joining?: boolean;
 }): React.JSX.Element {
   const t = useT();
 
@@ -302,6 +313,21 @@ export function UnifiedGameCard({
       accessibilityLabel={`${event.title}, ${timeLine}, ${venue}, ${countLabel}`}
       badge={badgeNode}
       perfScreen={perfScreen}
+      belowCount={
+        onJoin ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t('mob.game_detail.join')}, ${event.title}`}
+            accessibilityState={{ disabled: joining, busy: joining }}
+            disabled={joining}
+            onPress={onJoin}
+            style={({ pressed }) => [styles.joinBtn, joining ? styles.joinBtnBusy : null, pressed ? styles.pressed : null]}
+            testID="card-join-button"
+          >
+            <Text style={styles.joinBtnText}>{t('mob.game_detail.join')}</Text>
+          </Pressable>
+        ) : null
+      }
     />
   );
 }
@@ -558,6 +584,9 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     minHeight: 48,
   },
+  countBlock: {
+    alignItems: 'flex-end',
+  },
   countContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -634,6 +663,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 4,
     paddingVertical: 5,
     marginTop: spacing.xs,
+  },
+  joinBtn: {
+    minWidth: 56,
+    height: 28,
+    marginTop: 4,
+    paddingHorizontal: spacing.sm + 4,
+    borderRadius: radius.md,
+    backgroundColor: dash.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  joinBtnBusy: { opacity: 0.6 },
+  joinBtnText: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: dash.white,
+    fontSize: 12,
   },
   actionBtnText: {
     ...typography.caption,

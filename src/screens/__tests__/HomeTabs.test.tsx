@@ -68,7 +68,7 @@ const press = async (node: Instance): Promise<void> => {
 beforeEach(() => {
   navigate.mockReset();
   (getEvents as jest.Mock).mockReset().mockResolvedValue({
-    items: [makeEvent({ id: 'e1', title: 'Sunday Doubles' })], total: 1, page: 1, page_size: 2,
+    items: [makeEvent({ id: 'e1', title: 'Sunday Doubles', current_user_rsvp_status: 'going', starts_at: new Date(Date.now() + 86_400_000).toISOString() })], total: 1, page: 1, page_size: 2,
   });
   (getGroups as jest.Mock).mockReset().mockResolvedValue({ items: [GROUP], total: 1, page: 1, page_size: 3 });
   (getSports as jest.Mock).mockReset().mockResolvedValue([]);

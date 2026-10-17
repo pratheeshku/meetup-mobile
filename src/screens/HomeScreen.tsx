@@ -29,15 +29,15 @@
  * 2. MENU (hamburger drawer):
  *    - Drawer with Home, Groups, Tournament teams, Games, Tournaments, About links.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useScrollToTop } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
-import { getEvents } from '../api/events';
+import { getEvents, rsvpEvent } from '../api/events';
 import { getCachedHomeGroups, getGroups } from '../api/groups';
 import {
   BUNDLED_FALLBACK_BANNER,
@@ -72,17 +72,27 @@ import { useSportFilter } from '../hooks/useSportFilter';
 import { refreshUnreadCount, useUnreadBadgeCount } from '../hooks/useUnreadCount';
 import { useT } from '../labels/LabelsContext';
 import type { AppTabParamList, HomeStackParamList } from '../navigation/types';
-import { colors, spacing } from '../theme/tokens';
+import { colors, spacing, typography } from '../theme/tokens';
 import type { Event } from '../types/event';
 import type { Group } from '../types/group';
 import { getDisplayName } from '../utils/displayName';
-import { filteredEmptyMessage } from '../utils/gameLists';
+import { getApiErrorMessage } from '../utils/apiError';
+import {
+  filteredEmptyMessage,
+  getGameBadge,
+  HOME_SECTION_ROWS,
+  isOrganiserOf,
+  selectGames,
+} from '../utils/gameLists';
 import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'EventsList'>,
   BottomTabScreenProps<AppTabParamList, 'Home'>
 >;
+
+/** The events API maximum (`limit` 1..100). */
+const UPCOMING_FEED_LIMIT = 100;
 
 export default function HomeScreen({ navigation, route }: Props): React.JSX.Element {
   const { user } = useAuth();
@@ -195,16 +205,17 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     }
   }, []);
 
-  // Live upcoming games: GET /events?mine=true&upcoming=true&limit=2&sports=...
+  // Live upcoming games: GET /events?upcoming=true&limit=100&sports=... The rows are picked
+  // client-side (My games + Open games, earliest first), because open-game filtering happens
+  // client-side; a server-side limit would leave fewer than the rows shown.
   const loadLiveUpcoming = useCallback(
     async (selectedSports: string[], correlationId?: string) => {
       setLiveUpcoming(prev => ({ ...prev, status: 'loading' }));
       try {
         const res = await getEvents(
           {
-            mine: true,
             upcoming: true,
-            limit: 2,
+            limit: UPCOMING_FEED_LIMIT,
             sports: selectedSports.length > 0 ? selectedSports.join(',') : undefined,
           },
           { correlationId },
@@ -409,15 +420,24 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   }, [executeHomeLoad]);
 
   // Resolved counts: live summary data preferred, live items length fallback on failure
+  // The rows: the same union as Games > All (My games + Open games), earliest first.
+  const displayedUpcoming = useMemo(
+    () =>
+      liveUpcoming.items
+        ? selectGames(liveUpcoming.items, 'all', { userId: user?.id, sportKeys: filter.selected }).slice(
+            0,
+            HOME_SECTION_ROWS,
+          )
+        : null,
+    [liveUpcoming.items, user?.id, filter.selected],
+  );
+
   const upcomingCount =
     summaryData?.upcoming_games_this_week ??
-    (liveUpcoming.items ? liveUpcoming.items.length : null);
+    (displayedUpcoming ? displayedUpcoming.length : null);
   const groupsCount =
     summaryData?.active_groups ??
     (liveGroups.items ? liveGroups.items.length : null);
-
-  // Resolved list items: live endpoints preferred
-  const displayedUpcoming = liveUpcoming.items;
 
   const isUpcomingLoading =
     liveUpcoming.status === 'loading' && displayedUpcoming === null;
@@ -433,6 +453,34 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
   const groupsError =
     liveGroups.status === 'error' && displayedGroups === null;
+
+  // Join straight from a Home card: the existing RSVP call, then refresh the list so the card
+  // becomes a "Going" card (the order is by start time, so it does not move).
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<{ id: string; message: string } | null>(null);
+  const handleJoin = useCallback(
+    async (eventId: string): Promise<void> => {
+      if (joiningId) {
+        return;
+      }
+      setJoinError(null);
+      setJoiningId(eventId);
+      try {
+        await withCorrelationId(async correlationId => {
+          await rsvpEvent(eventId, { correlationId });
+          await Promise.all([
+            loadLiveUpcoming(selectedSportsRef.current, correlationId),
+            loadSummary(selectedSportsRef.current, correlationId),
+          ]);
+        });
+      } catch (e) {
+        setJoinError({ id: eventId, message: getApiErrorMessage(e, t('mob.game_detail.join_error')) });
+      } finally {
+        setJoiningId(null);
+      }
+    },
+    [joiningId, loadLiveUpcoming, loadSummary, t],
+  );
 
   const retryUpcoming = useCallback(() => {
     withCorrelationId(correlationId =>
@@ -541,14 +589,27 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
             ) : displayedUpcoming.length === 0 ? (
               <EmptyText>{filteredEmpty ?? t('mob.home.upcoming_empty')}</EmptyText>
             ) : (
-              displayedUpcoming.map(event => (
-                <UnifiedGameCard
-                  key={event.id}
-                  event={event}
-                  perfScreen="HomeScreen"
-                  onPress={() => openEvent(event)}
-                />
-              ))
+              displayedUpcoming.map(event => {
+                const canJoin =
+                  event.current_user_rsvp_status === 'none' && !isOrganiserOf(event, user?.id);
+                return (
+                  <View key={event.id}>
+                    <UnifiedGameCard
+                      event={event}
+                      badge={getGameBadge(event, user?.id)}
+                      perfScreen="HomeScreen"
+                      onPress={() => openEvent(event)}
+                      onJoin={canJoin ? () => handleJoin(event.id) : undefined}
+                      joining={joiningId === event.id}
+                    />
+                    {joinError?.id === event.id ? (
+                      <Text style={styles.joinErrorText} testID="home-join-error">
+                        {joinError.message}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })
             )}
           </View>
         ) : (
@@ -639,6 +700,12 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: spacing.lg,
+  },
+  joinErrorText: {
+    ...typography.caption,
+    color: colors.error,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   statsSection: {
     paddingHorizontal: spacing.md,
