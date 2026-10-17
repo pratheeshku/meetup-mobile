@@ -37,13 +37,14 @@ import {
   reverseGeocodeCoordinates,
   type PlacePrediction,
 } from '../api/places';
-import { getClientConfig } from '../api/config';
+import { getClientConfig, getGameLimits } from '../api/config';
 import { getMyGroups } from '../api/groups';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
+import GroupMultiSelect from '../components/GroupMultiSelect';
 import GroupNamesRow from '../components/GroupNamesRow';
 import UserAvatar from '../components/UserAvatar';
 import LoadingView from '../components/LoadingView';
@@ -104,6 +105,7 @@ import type { Group } from '../types/group';
 import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
+import { groupFromGame, maxGroupsFor } from '../utils/gameGroups';
 import { displayStatusOf, isOrganiserOf } from '../utils/gameLists';
 import { stripIconGlyphs, useSportDisplayName } from '../utils/labels';
 
@@ -178,6 +180,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [mapsApiKey, setMapsApiKey] = useState<string | null>(null);
   const [venueCatalogueEnabled, setVenueCatalogueEnabled] = useState(false);
   const [editCatalogueVenue, setEditCatalogueVenue] = useState<SelectedVenueState | null>(null);
+  // Group games: the groups the game is shared with (edited as a full list).
+  const [editGroupIds, setEditGroupIds] = useState<string[]>([]);
+  const [editGroupOptions, setEditGroupOptions] = useState<Group[]>([]);
+  const [maxGroups, setMaxGroups] = useState(maxGroupsFor(null));
 
   /**
    * Loads the game AND its participants together. `silent` (after Join/Leave)
@@ -400,6 +406,22 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     setEditCapacity(event.capacity || 4);
     setIsCapacityValid(true);
     setEditSkillLevel(toSkillRequirement(event.skill_level_requirement));
+    const currentGroupIds = event.group_ids ?? [];
+    setEditGroupIds(currentGroupIds);
+    // Current groups show even if the user is no longer in them (name from the game).
+    const currentGroupNames = event.group_names ?? [];
+    const fromGame = currentGroupIds.map((id, index) => groupFromGame(id, currentGroupNames[index]));
+    setEditGroupOptions(fromGame);
+    if (event.visibility === 'group') {
+      getGameLimits().then(limits => setMaxGroups(maxGroupsFor(limits))).catch(() => {});
+      getMyGroups()
+        .then(res => {
+          const mine = res.items;
+          const known = new Set(mine.map(group => group.id));
+          setEditGroupOptions([...mine, ...fromGame.filter(group => !known.has(group.id))]);
+        })
+        .catch(() => {});
+    }
     setEditStep(1);
     setEditError(null);
     setIsEditing(true);
@@ -527,6 +549,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         setEditError(t('mob.game_detail.edit_err_title'));
         return;
       }
+      if (event?.visibility === 'group' && editGroupIds.length === 0) {
+        setEditError(t('mob.create_game.groups_required'));
+        return;
+      }
       setEditStep(2);
       return;
     }
@@ -574,6 +600,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         skill_level_requirement: editSkillLevel,
         capacity: editCapacity,
         starts_at: editDateValue.toISOString(),
+        // The full list replaces the game's groups.
+        ...(event.visibility === 'group' ? { group_ids: editGroupIds } : {}),
         ...(venueCatalogueEnabled && editCatalogueVenue
           ? editCatalogueVenue.isOthers && editCatalogueVenue.othersInput
             ? {
@@ -783,6 +811,18 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                   <LockIcon size={18} color={colors.warning} />
                 </View>
               </View>
+
+              {event.visibility === 'group' ? (
+                <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
+                  <Text style={styles.inputCardLabel}>{t('mob.create_game.share_group_section')}</Text>
+                  <GroupMultiSelect
+                    groups={editGroupOptions}
+                    selectedIds={editGroupIds}
+                    onChange={setEditGroupIds}
+                    max={maxGroups}
+                  />
+                </View>
+              ) : null}
             </View>
           )}
 
@@ -1067,7 +1107,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           <WizardFooter
             nextLabel={t('mob.wizard.next')}
             onNext={handleNextEditStep}
-            nextDisabled={editStep === 3 && (!isCapacityValid || editCapacity < minCap)}
+            nextDisabled={
+              (editStep === 1 && event.visibility === 'group' && editGroupIds.length === 0) ||
+              (editStep === 3 && (!isCapacityValid || editCapacity < minCap))
+            }
           />
         )}
       </View>
@@ -1200,7 +1243,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             </View>
 
             {event.visibility === 'group' ? (
-              <GroupNamesRow names={event.group_name ? [event.group_name] : []} />
+              <GroupNamesRow names={event.group_names?.length ? event.group_names : event.group_name ? [event.group_name] : []} />
             ) : null}
           </Card>
 

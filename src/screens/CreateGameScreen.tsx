@@ -35,10 +35,11 @@ import { getSports } from '../api/sports';
 import { createTournament } from '../api/tournaments';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import Button from '../components/Button';
+import GroupMultiSelect from '../components/GroupMultiSelect';
+import GroupNamesRow from '../components/GroupNamesRow';
 import DropdownField from '../components/DropdownField';
 import IconBadge from '../components/IconBadge';
 import {
-  CheckIcon,
   CrossIcon,
   SearchIcon,
 } from '../components/icons/ActionIcons';
@@ -61,6 +62,8 @@ import SelectableCard from '../components/SelectableCard';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
 import { useT } from '../labels/LabelsContext';
+import { getAvatarTint, getInitials } from '../utils/avatarTint';
+import { maxGroupsFor, sortByLastActivity } from '../utils/gameGroups';
 import SkillRequirementPicker from '../components/SkillRequirementPicker';
 import {
   DEFAULT_SKILL_REQUIREMENT,
@@ -102,28 +105,6 @@ type Props = CompositeScreenProps<
 >;
 
 type GameKind = 'game' | 'tournament';
-
-const AVATAR_TINTS = [
-  { bg: colors.avatarTint1, text: colors.avatarTintText1 },
-  { bg: colors.avatarTint2, text: colors.avatarTintText2 },
-  { bg: colors.avatarTint3, text: colors.avatarTintText3 },
-  { bg: colors.avatarTint4, text: colors.avatarTintText4 },
-  { bg: colors.avatarTint5, text: colors.avatarTintText5 },
-];
-
-function getAvatarTint(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
-  return AVATAR_TINTS[Math.abs(hash) % AVATAR_TINTS.length];
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
-  }
-  return (name.trim().slice(0, 2) || '?').toUpperCase();
-}
 
 /**
  * Games put Date, Start time and Duration in one row. Below this width, or with a large
@@ -186,7 +167,19 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
   // Step 4: Who can play
   const [gVisibility, setGVisibility] = useState<EventVisibility>('group');
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+  const maxGroups = maxGroupsFor(gameLimits);
+  // A tournament has one group: keep the first when switching over from a multi-group game.
+  useEffect(() => {
+    if (mode === 'tournament') {
+      setSelectedGroupIds(ids => (ids.length > 1 ? ids.slice(0, 1) : ids));
+    }
+  }, [mode]);
+  /** "Group A" for one group, "Group A +2 more" for several. */
+  const summariseGroupNames = (names: string[]): string =>
+    names.length <= 1
+      ? names[0] ?? ''
+      : t('mob.create_game.groups_more', { first: names[0], count: names.length - 1 });
 
   // Step 5: Capacity & Skill
   const [capacity, setCapacity] = useState<number>(4);
@@ -225,7 +218,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     getMyGroups().then(res => {
       setGroups(res.items);
       if (res.items.length > 0) {
-        setSelectedGroupId(res.items[0].id);
+        setSelectedGroupIds([sortByLastActivity(res.items)[0].id]);
+      } else {
+        // No group to share with: start on Public rather than a group game that cannot be created.
+        setGVisibility(current => (current === 'group' ? 'public' : current));
       }
     }).catch(() => {});
   }, []);
@@ -389,6 +385,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       return;
     }
     if (step === 4) {
+      if (gVisibility === 'group' && selectedGroupIds.length === 0) {
+        setError(t('mob.create_game.groups_required'));
+        return;
+      }
       setStep(5);
       return;
     }
@@ -422,7 +422,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       const sportName = sports.find(item => item.name === gSport)?.display_name || gSport;
       const submittedWhen = `${formatEventDate(startsAtIso)}, ${formatEventTimeRange(startsAtIso, mode === 'game' ? endsAtIso : null)}`;
       const submittedDate = formatEventDate(startsAtIso);
-      const selectedGroupName = groups.find(item => item.id === selectedGroupId)?.name;
+      const selectedGroupNames = selectedGroupIds
+        .map(id => groups.find(item => item.id === id)?.name)
+        .filter((name): name is string => Boolean(name));
+      const selectedGroupName = selectedGroupNames.length > 0 ? summariseGroupNames(selectedGroupNames) : undefined;
       const skillKey = skillRequirementLabelKey(skillLevel);
       const audienceFor = (kind: 'game' | 'tournament'): string => {
         if (gVisibility === 'group' && selectedGroupName) {
@@ -451,7 +454,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           title: gTitle.trim(),
           sport: gSport,
           visibility: gVisibility,
-          ...(gVisibility === 'group' && selectedGroupId ? { group_ids: [selectedGroupId] } : {}),
+          ...(gVisibility === 'group' && selectedGroupIds.length > 0 ? { group_ids: selectedGroupIds } : {}),
           ...(invitedPlayers.length > 0
             ? { invite_user_ids: invitedPlayers.map(p => p.id) }
             : {}),
@@ -524,7 +527,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           title: gTitle.trim(),
           sport: gSport,
           visibility: (gVisibility === 'invite_only' ? 'invite' : gVisibility) as TournamentVisibility,
-          ...(gVisibility === 'group' && selectedGroupId ? { group_id: selectedGroupId } : {}),
+          ...(gVisibility === 'group' && selectedGroupIds.length > 0 ? { group_id: selectedGroupIds[0] } : {}),
           participation_mode: tParticipation,
           format: tFormat,
           capacity: capacity,
@@ -950,7 +953,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
       <SelectableCard
         selected={gVisibility === 'public'}
-        onPress={() => setGVisibility('public')}
+        onPress={() => {
+          setGVisibility('public');
+          setSelectedGroupIds([]);
+        }}
         title={t('mob.create_game.public_title')}
         subtitle={t('mob.create_game.public_desc')}
         leading={
@@ -962,7 +968,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
       <SelectableCard
         selected={gVisibility === 'invite_only'}
-        onPress={() => setGVisibility('invite_only')}
+        onPress={() => {
+          setGVisibility('invite_only');
+          setSelectedGroupIds([]);
+        }}
         title={t('mob.create_game.invite_only_title')}
         subtitle={t('mob.create_game.invite_only_desc')}
         leading={
@@ -974,37 +983,18 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
       <Text style={styles.sectionHeading}>{t('mob.create_game.share_group_section')}</Text>
 
-      {groups.map(grp => {
-        const isSelected = gVisibility === 'group' && selectedGroupId === grp.id;
-        const tint = getAvatarTint(grp.name);
-        return (
-          <TouchableOpacity
-            key={grp.id}
-            style={[styles.groupCard, isSelected && styles.groupCardSelected]}
-            onPress={() => {
-              setGVisibility('group');
-              setSelectedGroupId(grp.id);
-            }}
-          >
-            <View style={[styles.groupAvatar, { backgroundColor: tint.bg }]}>
-              <Text style={[styles.groupAvatarText, { color: tint.text }]}>
-                {getInitials(grp.name)}
-              </Text>
-            </View>
-
-            <View style={styles.groupInfo}>
-              <Text style={styles.groupName}>{grp.name}</Text>
-              <Text style={styles.groupMembers}>
-                {t('mob.create_game.group_members_count', { count: grp.member_count ?? 0 })}
-              </Text>
-            </View>
-
-            <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-              {isSelected ? <CheckIcon size={14} color={colors.white} /> : null}
-            </View>
-          </TouchableOpacity>
-        );
-      })}
+      <GroupMultiSelect
+        groups={groups}
+        selectedIds={selectedGroupIds}
+        onChange={ids => {
+          setSelectedGroupIds(ids);
+          if (ids.length > 0) {
+            setGVisibility('group');
+          }
+        }}
+        max={mode === 'game' ? maxGroups : 1}
+        showRequired={gVisibility === 'group'}
+      />
     </View>
   );
 
@@ -1050,7 +1040,11 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       minute: '2-digit',
       hour12: true,
     });
-    const selectedGroup = groups.find(g => g.id === selectedGroupId);
+    const selectedGroupNames = selectedGroupIds
+      .map(id => groups.find(g => g.id === id)?.name)
+      .filter((name): name is string => Boolean(name));
+    const selectedGroupLabel =
+      selectedGroupNames.length > 0 ? summariseGroupNames(selectedGroupNames) : undefined;
 
     // Everyone added so far (players and emails): directly under the picker's text box.
     const inviteeChips = (
@@ -1171,19 +1165,21 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             </Text>
           </View>
 
+          {gVisibility === 'group' ? <GroupNamesRow names={selectedGroupNames} /> : null}
+
           <View style={styles.reviewDetailRow}>
             <View style={[styles.reviewIconCircle, { backgroundColor: colors.success }]}>
               <PeopleIcon size={16} />
             </View>
             <Text style={styles.reviewDetailText}>
-              {gVisibility === 'group' && selectedGroup
+              {gVisibility === 'group' && selectedGroupLabel
                 ? invitedCount > 0
                   ? t('mob.create_game.review_players_group_invited', {
                       count: capacity,
-                      group: selectedGroup.name,
+                      group: selectedGroupLabel,
                       invited: invitedCount,
                     })
-                  : t('mob.create_game.review_players_group', { count: capacity, group: selectedGroup.name })
+                  : t('mob.create_game.review_players_group', { count: capacity, group: selectedGroupLabel })
                 : isInviteOnly
                 ? t('mob.create_game.review_players_invite', { count: capacity, invited: invitedCount })
                 : invitedCount > 0
@@ -1196,6 +1192,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     );
   };
 
+  const isStep4Disabled = step === 4 && gVisibility === 'group' && selectedGroupIds.length === 0;
   const isStep5Disabled = step === 5 && (!isCapacityValid || capacity < gameLimits.players_min);
 
   return (
@@ -1238,7 +1235,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         <WizardFooter
           nextLabel={t('mob.wizard.next')}
           onNext={handleNext}
-          nextDisabled={isStep5Disabled}
+          nextDisabled={isStep4Disabled || isStep5Disabled}
         />
       )}
     </View>
@@ -1515,56 +1512,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     backgroundColor: colors.surface,
-  },
-  groupCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  groupCardSelected: {
-    borderColor: colors.primary,
-    borderWidth: borderWidth.thick,
-  },
-  groupAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  groupAvatarText: {
-    ...typography.bodyBold,
-  },
-  groupInfo: {
-    flex: 1,
-    marginLeft: spacing.md,
-  },
-  groupName: {
-    ...typography.bodyBold,
-    color: colors.textPrimary,
-  },
-  groupMembers: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  radioCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: radius.full,
-    borderWidth: borderWidth.thick,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioCircleSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
   },
   reviewHeaderTitle: {
     ...typography.h3,

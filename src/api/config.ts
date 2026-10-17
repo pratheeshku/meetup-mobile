@@ -3,6 +3,8 @@ import { apiClient } from './client';
 export interface GameLimits {
   players_min: number;
   players_max: number;
+  /** Most groups one game can be shared with; absent on older servers (default 20). */
+  max_groups_per_game?: number;
 }
 
 export interface ClientConfig {

@@ -64,6 +64,8 @@ interface GroupApiItem {
   ownerId?: string;
   created_at?: string;
   createdAt?: string;
+  last_activity_at?: string | null;
+  lastActivityAt?: string | null;
   logo_url?: string | null;
   logoUrl?: string | null;
   owner?: {
@@ -168,6 +170,7 @@ function mapGroupApiItem(raw: GroupApiItem, currentUserRole: GroupRole): Group {
     upcoming_game_count: upcomingGameCount,
     members_preview: membersPreview,
     created_at: raw.created_at ?? raw.createdAt ?? '',
+    last_activity_at: raw.last_activity_at ?? raw.lastActivityAt ?? null,
     current_user_role: role,
   };
 }

@@ -98,6 +98,9 @@ interface EventApiItem {
   created_at?: string;
   players_preview?: Array<{ display_name: string; photo_url: string | null }>;
   group_name?: string | null;
+  group_id?: string | null;
+  group_ids?: string[] | null;
+  group_names?: string[] | null;
 }
 
 /**
@@ -165,7 +168,10 @@ function mapEventApiItem(raw: EventApiItem): Event {
     estimated_cost_currency: raw.estimated_cost_currency ?? null,
     created_at: raw.created_at,
     players_preview: raw.players_preview,
-    group_name: raw.group_name ?? null,
+    group_name: raw.group_name ?? raw.group_names?.[0] ?? null,
+    // Older servers send only group_id / group_name: a one-item list.
+    group_ids: raw.group_ids ?? (raw.group_id ? [raw.group_id] : []),
+    group_names: raw.group_names ?? (raw.group_name ? [raw.group_name] : []),
   };
 }
 
