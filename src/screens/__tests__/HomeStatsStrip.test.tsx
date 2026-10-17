@@ -63,6 +63,8 @@ const mount = (): Promise<Instance> => {
 
 const strip = (root: Instance): Instance[] =>
   root.findAll(n => n.props.testID === 'profile-stats-strip' && typeof n.type === 'string');
+const wonTile = (root: Instance): Instance[] =>
+  root.findAll(n => n.props.testID === 'profile-stat-won' && typeof n.type === 'string');
 const columns = (root: Instance): number =>
   strip(root)[0].findAll(n => typeof n.type === 'string' && n.props.style && JSON.stringify(n.props.style).includes('"flex":1')).length;
 
@@ -89,27 +91,31 @@ describe('Home stats strip', () => {
     expect(banner).toBeGreaterThanOrEqual(0);
     expect(stats).toBeGreaterThan(banner);
     expect(tiles).toBeGreaterThan(stats);
-    expect(texts(root)).toEqual(expect.arrayContaining(['12', 'Played', '3', 'Hosted', '2', 'Groups']));
+    expect(texts(root)).toEqual(
+      expect.arrayContaining(['12', 'Played', '3', 'Hosted', '2', 'Groups', 'Won', '0']),
+    );
   });
 
-  it('shows exactly three tiles when games_won is absent', async () => {
+  it('renders 0 for the Won tile when games_won is absent', async () => {
     const root = await mount();
-    expect(texts(root)).not.toContain('Won');
-    expect(root.findAll(n => n.props.testID === 'profile-stat-won')).toHaveLength(0);
-    expect(columns(root)).toBe(3);
+    expect(texts(root)).toEqual(expect.arrayContaining(['Won', '0']));
+    expect(wonTile(root)).toHaveLength(1);
+    expect(columns(root)).toBe(4);
   });
 
-  it('shows exactly three tiles when games_won is 0', async () => {
+  it('renders 0 for the Won tile when games_won is 0', async () => {
     mockSummary.mockResolvedValue({ games_played: 1, games_hosted: 0, groups_count: 0, games_won: 0, recent_games: [] });
     const root = await mount();
-    expect(texts(root)).not.toContain('Won');
-    expect(columns(root)).toBe(3);
+    expect(texts(root)).toEqual(expect.arrayContaining(['Won', '0']));
+    expect(wonTile(root)).toHaveLength(1);
+    expect(columns(root)).toBe(4);
   });
 
-  it('shows a fourth Won tile when games_won > 0', async () => {
-    mockSummary.mockResolvedValue({ games_played: 12, games_hosted: 3, groups_count: 2, games_won: 5, recent_games: [] });
+  it('renders the value for the Won tile when games_won is present', async () => {
+    mockSummary.mockResolvedValue({ games_played: 12, games_hosted: 3, groups_count: 2, games_won: 3, recent_games: [] });
     const root = await mount();
-    expect(texts(root)).toEqual(expect.arrayContaining(['Won', '5']));
+    expect(texts(root)).toEqual(expect.arrayContaining(['Won', '3']));
+    expect(wonTile(root)).toHaveLength(1);
     expect(columns(root)).toBe(4);
   });
 
