@@ -52,7 +52,12 @@ export async function shareToWhatsApp(message: string): Promise<void> {
   await Linking.openURL(webLink);
 }
 
-/** Copies the share URL to the system clipboard via React Native core `Clipboard.setString`. */
+/** Copies text to the system clipboard via React Native core `Clipboard.setString`. */
+export function copyTextToClipboard(text: string): void {
+  Clipboard.setString(text);
+}
+
+/** Copies the share URL to the system clipboard. */
 export function copyLinkToClipboard(url: string): void {
-  Clipboard.setString(url);
+  copyTextToClipboard(url);
 }

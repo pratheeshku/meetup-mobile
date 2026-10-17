@@ -523,6 +523,8 @@ export const DEFAULT_LABELS = {
   'mob.settings.privacy_policy': 'Privacy policy',
   'mob.settings.terms_conditions': 'Terms and conditions',
   'mob.settings.section_danger': 'DANGER ZONE',
+  'mob.settings.app_version': 'Version {version} ({build})',
+  'mob.settings.support_info_copied': 'Copied',
   'mob.settings.delete_account': 'Delete account',
   'mob.settings.delete_account_sub': 'Permanently removes your personal data',
   'mob.settings.load_error': 'Could not load settings. Please try again.',

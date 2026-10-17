@@ -163,6 +163,12 @@ jest.mock('react-native-device-info', () => ({
   __esModule: true,
   default: {
     getAndroidId: jest.fn(async () => 'mock-android-id'),
+    getVersion: jest.fn(() => '1.2.3'),
+    getBuildNumber: jest.fn(() => '45'),
+    getBrand: jest.fn(() => 'Google'),
+    getModel: jest.fn(() => 'Pixel 8'),
+    getSystemVersion: jest.fn(() => '15'),
+    getApiLevel: jest.fn(async () => 35),
   },
 }));
 

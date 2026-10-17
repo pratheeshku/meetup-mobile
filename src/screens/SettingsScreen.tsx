@@ -7,7 +7,7 @@
  * - ABOUT: Privacy policy, Terms and conditions
  * - DANGER ZONE: Delete account card linking to Phase 1 deletion flow
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -30,6 +30,8 @@ import { withCorrelationId } from '../api/correlationId';
 import appConfig from '../../config/appConfig.json';
 import { toHttpsUrl } from '../utils/httpsUrl';
 import { openLink } from '../utils/openLink';
+import { copyTextToClipboard } from '../utils/shareLink';
+import { buildSupportText, getAppVersion } from '../utils/supportInfo';
 import { toSupportLink } from '../utils/supportLink';
 import { getApiErrorMessage } from '../utils/apiError';
 import { BackArrowIcon, TrashIcon } from '../components/icons/ActionIcons';
@@ -45,6 +47,7 @@ import {
 import IconBadge from '../components/IconBadge';
 import LoadingView from '../components/LoadingView';
 import ScreenContainer from '../components/ScreenContainer';
+import Toast from '../components/Toast';
 import { useT } from '../labels/LabelsContext';
 import {
   borderWidth,
@@ -64,6 +67,7 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isRequestingDeletion, setIsRequestingDeletion] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const reportFormUrl = toHttpsUrl(appConfig.reportFormUrl);
   const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
@@ -95,6 +99,24 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
       await updateNotificationSettings({ push_enabled: value });
     } catch {
       setPushEnabled(!value);
+    }
+  };
+
+  const { version, build } = getAppVersion();
+  const versionLine = t('mob.settings.app_version', { version, build });
+
+  // Long-press: build the support text (server version fetched now, not on open) and copy it.
+  const copyingRef = useRef(false);
+  const handleCopySupportInfo = async (): Promise<void> => {
+    if (copyingRef.current) {
+      return;
+    }
+    copyingRef.current = true;
+    try {
+      copyTextToClipboard(await buildSupportText());
+      setToastMessage(t('mob.settings.support_info_copied'));
+    } finally {
+      copyingRef.current = false;
     }
   };
 
@@ -149,7 +171,7 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
   }
 
   return (
-    <ScreenContainer edges="top" style={styles.screen}>
+    <ScreenContainer edges="both" style={styles.screen}>
     <View style={styles.screen}>
       {/* Header bar */}
       <View style={styles.headerBar}>
@@ -307,7 +329,19 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
             )}
           </Pressable>
         </View>
+
+        {/* App version: long-press copies the support text */}
+        <Pressable
+          onLongPress={handleCopySupportInfo}
+          accessibilityRole="text"
+          accessibilityLabel={versionLine}
+          testID="settings-app-version"
+          style={styles.versionWrap}
+        >
+          <Text style={styles.versionText}>{versionLine}</Text>
+        </Pressable>
       </ScrollView>
+      <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
     </View>
     </ScreenContainer>
   );
@@ -348,6 +382,15 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: spacing.xs,
+  },
+  versionWrap: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+  },
+  versionText: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
   sectionHeader: {
     ...typography.caption,
