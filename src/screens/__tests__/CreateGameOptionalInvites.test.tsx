@@ -90,11 +90,7 @@ describe('invite-only game with optional players', () => {
   it('still sends invite_user_ids when players are invited', async () => {
     const root = await mount();
     await toStep6(root);
-    await press(
-      root.findAll(
-        n => typeof n.props.onPress === 'function' && texts(n).includes('+'),
-      )[0],
-    );
+    await press(root.findAll(n => n.props.testID === 'user-search-row' && typeof n.props.onPress === 'function')[0]);
     await press(byLabel(root, 'Create Game'));
 
     expect(mockCreateEvent.mock.calls[0][0].invite_user_ids).toEqual(['u-1']);

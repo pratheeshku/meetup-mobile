@@ -18,7 +18,13 @@ export async function mountCreateGame(users: unknown[] = [], groups: unknown[] =
     { name: 'badminton', display_name: 'Badminton', icon_key: 'badminton', color: '#000' },
   ]);
   (getMyGroups as jest.Mock).mockResolvedValue({ items: groups, total: groups.length, page: 1, page_size: 1 });
-  (searchUsers as jest.Mock).mockResolvedValue(users);
+  // Name/nickname match like the server; an empty query returns the default list.
+  (searchUsers as jest.Mock).mockImplementation(async ({ q }: { q: string }) => {
+    const needle = q.trim().toLowerCase();
+    return (users as { display_name: string; nickname: string }[]).filter(
+      u => !needle || u.display_name.toLowerCase().includes(needle) || u.nickname.toLowerCase().includes(needle),
+    );
+  });
   const props = { navigation: { popTo: jest.fn(), navigate: jest.fn(), goBack: jest.fn() }, route: { params: undefined } };
   return renderAsync(<CreateGameScreen {...(props as unknown as Props)} />);
 }
@@ -46,20 +52,36 @@ export async function toStep6InviteOnly(root: Instance): Promise<void> {
   await press(byLabel(root, 'Next')); // 5 -> 6
 }
 
-export const emailField = (root: Instance): Instance =>
-  root.find(n => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Invite by email');
+/** The shared picker's single search field (people and emails). */
+export const searchField = (root: Instance): Instance =>
+  root.find(n => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Search users');
 
-export async function typeEmail(root: Instance, value: string): Promise<void> {
+/** Types into the search field and waits out the picker's debounce (tests use fake timers). */
+export async function typeSearch(root: Instance, value: string): Promise<void> {
   await act(async () => {
-    emailField(root).props.onChangeText(value);
+    searchField(root).props.onChangeText(value);
+  });
+  await act(async () => {
+    jest.advanceTimersByTime(300);
   });
 }
 
-export async function addEmail(root: Instance, value: string): Promise<void> {
-  await typeEmail(root, value);
-  await press(byLabel(root, 'Add'));
+/** Result rows of the picker. */
+export const resultRows = (root: Instance): Instance[] =>
+  root.findAll(n => n.props.testID === 'user-search-row' && typeof n.props.onPress === 'function');
+
+/** Taps the result row whose accessibility label contains `name`. */
+export async function pickRow(root: Instance, name: string): Promise<void> {
+  const row = resultRows(root).find(n => String(n.props.accessibilityLabel).includes(name));
+  if (!row) throw new Error(`No result row for ${name}`);
+  await press(row);
 }
 
-/** The add/remove toggle of a suggestion row, found by user id. */
-export const suggestionToggle = (root: Instance, userId: string): Instance =>
-  root.findAll(n => n.props.testID === `invite-toggle-${userId}` && typeof n.props.onPress === 'function')[0];
+/** The "Invite <email>" button the picker shows for a valid email that matches nobody. */
+export const emailButton = (root: Instance, email: string): Instance | undefined =>
+  root.findAll(
+    n => n.props.accessibilityLabel === `Invite ${email} as new player` && typeof n.props.onPress === 'function',
+  )[0];
+
+export const anyEmailButton = (root: Instance): boolean =>
+  root.findAll(n => /^Invite .+@.+ as new /.test(String(n.props.accessibilityLabel ?? ''))).length > 0;

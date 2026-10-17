@@ -1,14 +1,17 @@
-/** create-game-email-invites: step 6 "Invite by email" for invite-only games. */
+/** create-game step 6: ONE shared search field for people and emails (invite-only games). */
 import { createEvent, inviteEmailToEvent } from '../../api/events';
 import { showCompletion } from '../../navigation/showCompletion';
-import { texts } from '../../test-utils/render';
+import { act, texts } from '../../test-utils/render';
+import type { Instance } from '../../test-utils/render';
 import {
-  addEmail,
+  ALEX,
+  anyEmailButton,
   byLabel,
+  emailButton,
   mountCreateGame,
   press,
   toStep6InviteOnly,
-  typeEmail,
+  typeSearch,
 } from '../../test-utils/createGameHarness';
 
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
@@ -22,11 +25,20 @@ const mockCreate = createEvent as jest.Mock;
 const mockInviteEmail = inviteEmailToEvent as jest.Mock;
 const mockCompletion = showCompletion as jest.Mock;
 
-const rowsOf = (): { label: string; value: string }[] => mockCompletion.mock.calls[0][0].rows;
-const rowValue = (label: string): string | undefined => rowsOf().find(r => r.label === label)?.value;
+const rowValue = (label: string): string | undefined =>
+  (mockCompletion.mock.calls[0][0].rows as { label: string; value: string }[]).find(r => r.label === label)?.value;
+const chips = (root: Instance): string[] => {
+  const list = root.findAll(n => n.props.testID === 'invitee-list' && typeof n.type === 'string')[0];
+  return list ? texts(list) : [];
+};
+const addEmailViaSearch = async (root: Instance, email: string): Promise<void> => {
+  await typeSearch(root, email);
+  await press(emailButton(root, email) as Instance);
+};
 
 let spies: jest.SpyInstance[];
 beforeEach(() => {
+  jest.useFakeTimers();
   mockCreate.mockReset().mockResolvedValue({ id: 'evt-77' });
   mockInviteEmail.mockReset().mockResolvedValue({});
   mockCompletion.mockReset();
@@ -34,71 +46,98 @@ beforeEach(() => {
     jest.spyOn(console, m).mockImplementation(() => {}),
   );
 });
-afterEach(() => spies.forEach(s => s.mockRestore()));
+afterEach(() => {
+  act(() => {
+    jest.runOnlyPendingTimers();
+  });
+  jest.useRealTimers();
+  spies.forEach(s => s.mockRestore());
+});
 
-describe('email validation', () => {
-  it('rejects an invalid email with a message and does not add it', async () => {
-    const root = await mountCreateGame();
+describe('one search field', () => {
+  it('has exactly one text input on step 6 and no separate "Invite by email" input', async () => {
+    const root = await mountCreateGame([ALEX]);
     await toStep6InviteOnly(root);
-    await addEmail(root, 'not-an-email');
-    expect(texts(root)).toContain('Enter a valid email address.');
-    expect(root.findAll(n => n.props.testID === 'invitee-list')).toHaveLength(0);
+    expect(root.findAll(n => (n.type as unknown) === 'TextInput')).toHaveLength(1);
+    expect(root.findAll(n => n.props.accessibilityLabel === 'Invite by email')).toHaveLength(0);
+    expect(texts(root)).not.toContain('Invite by email');
+    expect(byLabel(root, 'Add')).toBeUndefined();
   });
 
-  it('adds a valid email and rejects a case-insensitive duplicate', async () => {
-    const root = await mountCreateGame();
+  it('a valid email that matches nobody shows the Invite button; tapping it adds a chip', async () => {
+    const root = await mountCreateGame([ALEX]);
     await toStep6InviteOnly(root);
-    await addEmail(root, 'Sam@Example.com');
-    expect(texts(root)).toContain('Sam@Example.com');
-    await addEmail(root, 'sam@example.COM');
-    expect(texts(root)).toContain('That email is already added.');
-    expect(texts(root).filter(x => x.toLowerCase() === 'sam@example.com')).toHaveLength(1);
+    await typeSearch(root, 'newcomer@example.com');
+    expect(texts(root)).toContain('Invite newcomer@example.com as new player');
+    await press(emailButton(root, 'newcomer@example.com') as Instance);
+    expect(chips(root)).toContain('newcomer@example.com');
   });
 
-  it('clears the error when typing again and trims whitespace', async () => {
-    const root = await mountCreateGame();
+  it.each([['not-an-email'], ['zzz'], ['a@b'], ['@example.com']])('"%s" shows no email button', async text => {
+    const root = await mountCreateGame([ALEX]);
     await toStep6InviteOnly(root);
-    await addEmail(root, 'bad');
-    await typeEmail(root, 'x');
-    expect(texts(root)).not.toContain('Enter a valid email address.');
-    await addEmail(root, '  pat@example.com  ');
-    expect(texts(root)).toContain('pat@example.com');
+    await typeSearch(root, text);
+    expect(anyEmailButton(root)).toBe(false);
+  });
+
+  it('a valid email that matches a person shows that person, not the email button', async () => {
+    const root = await mountCreateGame([{ ...ALEX, display_name: 'alex@example.com', nickname: 'alexe' }]);
+    await toStep6InviteOnly(root);
+    await typeSearch(root, 'alex@example.com');
+    expect(anyEmailButton(root)).toBe(false);
+  });
+
+  it('adds a duplicate email (different case) only once', async () => {
+    const root = await mountCreateGame([ALEX]);
+    await toStep6InviteOnly(root);
+    await addEmailViaSearch(root, 'Sam@Example.com');
+    await addEmailViaSearch(root, 'sam@example.COM');
+    expect(chips(root).filter(x => x.toLowerCase() === 'sam@example.com')).toHaveLength(1);
+    expect(texts(root).find(x => /invited$/.test(x))).toMatch(/1 invited$/);
+  });
+
+  it('removes an email chip with its remove control', async () => {
+    const root = await mountCreateGame([ALEX]);
+    await toStep6InviteOnly(root);
+    await addEmailViaSearch(root, 'gone@example.com');
+    await press(byLabel(root, 'Remove gone@example.com'));
+    expect(chips(root)).not.toContain('gone@example.com');
   });
 });
 
 describe('sending after create', () => {
-  it('calls inviteEmailToEvent once per email with the created event id and one shared correlation id', async () => {
-    const root = await mountCreateGame();
+  it('the email chip leads to exactly one inviteEmailToEvent call after create, with the created id and one correlation id', async () => {
+    const root = await mountCreateGame([ALEX]);
     await toStep6InviteOnly(root);
-    await addEmail(root, 'a@example.com');
-    await addEmail(root, 'b@example.com');
+    await addEmailViaSearch(root, 'a@example.com');
     await press(byLabel(root, 'Create Game'));
 
-    expect(mockInviteEmail).toHaveBeenCalledTimes(2);
-    expect(mockInviteEmail.mock.calls.map(c => [c[0], c[1]])).toEqual([
-      ['evt-77', 'a@example.com'],
-      ['evt-77', 'b@example.com'],
-    ]);
-    const ids = new Set([
-      mockCreate.mock.calls[0][1].correlationId,
-      mockInviteEmail.mock.calls[0][2].correlationId,
-      mockInviteEmail.mock.calls[1][2].correlationId,
-    ]);
-    expect(ids.size).toBe(1);
+    expect(mockInviteEmail).toHaveBeenCalledTimes(1);
+    expect(mockInviteEmail.mock.calls[0].slice(0, 2)).toEqual(['evt-77', 'a@example.com']);
+    expect(mockInviteEmail.mock.calls[0][2].correlationId).toBe(mockCreate.mock.calls[0][1].correlationId);
     expect(mockCreate.mock.invocationCallOrder[0]).toBeLessThan(mockInviteEmail.mock.invocationCallOrder[0]);
-    expect(rowValue('Invited by email')).toBe('2');
+    expect(rowValue('Invited by email')).toBe('1');
     expect(rowValue('Invited players')).toBe('0');
     expect(rowValue('Could not invite')).toBeUndefined();
   });
 
-  it('shows partial failures on the completion screen without rolling back the game', async () => {
+  it('one call per email, in order, none for a removed one', async () => {
+    const root = await mountCreateGame([ALEX]);
+    await toStep6InviteOnly(root);
+    for (const e of ['a@example.com', 'b@example.com', 'c@example.com']) await addEmailViaSearch(root, e);
+    await press(byLabel(root, 'Remove b@example.com'));
+    await press(byLabel(root, 'Create Game'));
+    expect(mockInviteEmail.mock.calls.map(c => c[1])).toEqual(['a@example.com', 'c@example.com']);
+  });
+
+  it('partial failure is listed on the completion screen without blocking the game', async () => {
     mockInviteEmail
       .mockResolvedValueOnce({})
       .mockRejectedValueOnce({ response: { status: 409, data: { detail: 'Already invited' } } })
       .mockRejectedValueOnce(new Error('network'));
-    const root = await mountCreateGame();
+    const root = await mountCreateGame([ALEX]);
     await toStep6InviteOnly(root);
-    for (const e of ['ok@example.com', 'dup@example.com', 'down@example.com']) await addEmail(root, e);
+    for (const e of ['ok@example.com', 'dup@example.com', 'down@example.com']) await addEmailViaSearch(root, e);
     await press(byLabel(root, 'Create Game'));
 
     expect(mockCompletion).toHaveBeenCalledTimes(1);
@@ -112,15 +151,15 @@ describe('sending after create', () => {
 
   it('never writes email addresses to the console', async () => {
     mockInviteEmail.mockRejectedValueOnce(new Error('boom'));
-    const root = await mountCreateGame();
+    const root = await mountCreateGame([ALEX]);
     await toStep6InviteOnly(root);
-    await addEmail(root, 'secret.person@example.com');
+    await addEmailViaSearch(root, 'secret.person@example.com');
     await press(byLabel(root, 'Create Game'));
     expect(JSON.stringify(spies.map(s => s.mock.calls))).not.toContain('secret.person');
   });
 
   it('makes no email calls when none were added', async () => {
-    const root = await mountCreateGame();
+    const root = await mountCreateGame([ALEX]);
     await toStep6InviteOnly(root);
     await press(byLabel(root, 'Create Game'));
     expect(mockInviteEmail).not.toHaveBeenCalled();

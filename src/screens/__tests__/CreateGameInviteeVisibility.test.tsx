@@ -11,18 +11,16 @@ jest.mock('../../api/tournaments', () => ({ createTournament: jest.fn() }));
 jest.mock('../../navigation/showCompletion', () => ({ showCompletion: jest.fn() }));
 
 const hasSearch = (root: Instance): boolean =>
-  root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.placeholder === 'Search players').length > 0;
-const hasEmail = (root: Instance): boolean =>
-  root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Invite by email').length > 0;
-const hasSuggestion = (root: Instance): boolean =>
-  root.findAll(n => n.props.testID === `invite-toggle-${ALEX.id}`).length > 0;
+  root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Search users').length > 0;
+const hasRows = (root: Instance): boolean => root.findAll(n => n.props.testID === 'user-search-row').length > 0;
+const textInputs = (root: Instance): number => root.findAll(n => (n.type as unknown) === 'TextInput').length;
 
-it('invite-only shows the search, suggestions and email input', async () => {
+it('invite-only shows the one shared search field and its suggestions', async () => {
   const root = await mountCreateGame([ALEX]);
   await toStep6InviteOnly(root);
   expect(hasSearch(root)).toBe(true);
-  expect(hasSuggestion(root)).toBe(true);
-  expect(hasEmail(root)).toBe(true);
+  expect(hasRows(root)).toBe(true);
+  expect(textInputs(root)).toBe(1);
   expect(texts(root).some(x => x.startsWith('Invite players'))).toBe(true);
 });
 
@@ -31,7 +29,7 @@ const GROUP = { id: 'g-1', name: 'Sunday Footballers', description: '', owner_id
 it.each([
   ['Public', '4 players · Public'],
   ['Sunday Footballers', '4 players · Sunday Footballers'],
-])('%s hides the search, suggestions, email input and chips', async (option, reviewLine) => {
+])('%s hides the search field, suggestions and chips', async (option, reviewLine) => {
   const root = await mountCreateGame([ALEX], [GROUP]);
   await press(byLabel(root, 'Next')); // 1 -> 2
   await press(byLabel(root, 'Next')); // 2 -> 3 (default title)
@@ -49,8 +47,8 @@ it.each([
   // The visibility choice really took effect (review reflects the chosen audience).
   expect(texts(root)).toContain(reviewLine);
   expect(hasSearch(root)).toBe(false);
-  expect(hasSuggestion(root)).toBe(false);
-  expect(hasEmail(root)).toBe(false);
+  expect(hasRows(root)).toBe(false);
+  expect(textInputs(root)).toBe(0);
   expect(root.findAll(n => n.props.testID === 'invitee-list')).toHaveLength(0);
   expect(texts(root)).toContain('Review');
 });
