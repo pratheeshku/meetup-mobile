@@ -476,3 +476,37 @@ describe('group_name on events', () => {
     expect((await getEvent('e-1')).group_name).toBeNull();
   });
 });
+
+describe('display_status', () => {
+  const raw = (extra: Record<string, unknown>) => ({
+    id: 'e-1', organizer_id: 'o', sport: 'tennis', title: 'T', visibility: 'public', capacity: 4,
+    starts_at: '2026-09-20T10:00:00Z', ends_at: null, recurrence_rule_id: null,
+    venue_name: null, venue_address: null, organizer_nickname: null, organizer_display_name: null,
+    going_count: 0, user_rsvp_status: null, ...extra,
+  });
+
+  afterEach(() => mockedGet.mockReset());
+
+  it.each(['active', 'cancelled', 'completed'])('maps the server value %s', async value => {
+    mockedGet.mockResolvedValueOnce({ data: [raw({ status: 'upcoming', display_status: value })] });
+    expect((await getEvents()).items[0].display_status).toBe(value);
+  });
+
+  it('old server: derives cancelled from status and active otherwise, never completed', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: [
+        raw({ id: 'a', status: 'cancelled' }),
+        raw({ id: 'b', status: 'upcoming' }),
+        raw({ id: 'c', status: 'completed' }),
+        raw({ id: 'd', status: 'upcoming', display_status: 'bogus' }),
+      ],
+    });
+    expect((await getEvents()).items.map(e => e.display_status)).toEqual(['cancelled', 'active', 'active', 'active']);
+  });
+
+  it('sends history=true when asked', async () => {
+    mockedGet.mockResolvedValueOnce({ data: [] });
+    await getEvents({ history: true });
+    expect(mockedGet).toHaveBeenCalledWith('/events', expect.objectContaining({ params: { history: true } }));
+  });
+});

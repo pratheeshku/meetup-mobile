@@ -24,6 +24,12 @@ import type { OthersVenueInput, VenueSnapshot } from './venue';
 
 export type EventVisibility = 'public' | 'invite_only' | 'group';
 export type EventStatus = 'upcoming' | 'active' | 'cancelled' | 'completed';
+/**
+ * Backend `display_status`: what the UI shows as the game's state. Older
+ * servers omit it; the mapper then derives `active`/`cancelled` from `status`
+ * and never `completed` (see `mapEventApiItem`).
+ */
+export type GameDisplayStatus = 'active' | 'cancelled' | 'completed';
 export type RsvpStatus = 'none' | 'going' | 'waitlisted' | 'withdrawn';
 
 /**
@@ -49,6 +55,7 @@ export interface Event {
   waitlist_count: number;
   visibility: EventVisibility;
   status: EventStatus;
+  display_status?: GameDisplayStatus;
   organiser_id: string;
   organiser_nickname: string;
   is_recurring: boolean;

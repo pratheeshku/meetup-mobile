@@ -25,7 +25,7 @@
  * signed-in user's id. UX convenience only — the backend is the authority
  * (R-017, R-082).
  */
-import type { Event } from '../types/event';
+import type { Event, GameDisplayStatus } from '../types/event';
 import type { Sport } from '../types/sport';
 import type { SkillLevel } from '../types/user';
 import { bundledT } from '../labels/LabelsContext';
@@ -49,10 +49,20 @@ function parseMs(value: string | undefined): number {
   return Date.parse(value);
 }
 
-/** Future (strictly after `now`) and not cancelled (AD-14). */
+/** The state the UI shows; hand-built events without `display_status` count as `cancelled` or `active`. */
+export function displayStatusOf(event: Event): GameDisplayStatus {
+  return event.display_status ?? (event.status === 'cancelled' ? 'cancelled' : 'active');
+}
+
+/** Future (strictly after `now`), active and not cancelled/completed (AD-14). */
 export function isUpcomingActive(event: Event, now: number): boolean {
   const startsAt = parseMs(event.starts_at);
-  return !Number.isNaN(startsAt) && startsAt > now && event.status !== 'cancelled';
+  return (
+    !Number.isNaN(startsAt) &&
+    startsAt > now &&
+    event.status !== 'cancelled' &&
+    displayStatusOf(event) === 'active'
+  );
 }
 
 /** Earliest start first; ties by creation time; unparseable dates last. */
@@ -157,6 +167,23 @@ export function selectGames(
           : isMyGame(event, userId) || isOpenGame(event, userId),
     options,
   );
+}
+
+/**
+ * My games with history (Games tab, My games scope): upcoming active games
+ * first (earliest first, as everywhere), then the rest — completed and
+ * cancelled (and any game already started) — most recent first.
+ */
+export function selectMyGamesWithHistory(
+  events: readonly Event[],
+  { userId, sportKeys = [], now = Date.now() }: GameListOptions,
+): Event[] {
+  const mine = events.filter(
+    event => isMyGame(event, userId) && matchesSports(event, sportKeys),
+  );
+  const upcoming = mine.filter(event => isUpcomingActive(event, now)).sort(compareGames);
+  const past = mine.filter(event => !isUpcomingActive(event, now)).sort((a, b) => compareGames(b, a));
+  return [...upcoming, ...past];
 }
 
 /**

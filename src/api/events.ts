@@ -24,6 +24,7 @@ import type {
   EventSkillLevel,
   EventVisibility,
   EventStatus,
+  GameDisplayStatus,
   RsvpStatus,
   UpdateEventInput,
 } from '../types/event';
@@ -33,6 +34,8 @@ export interface GetEventsParams {
   sports?: string;
   mine?: boolean;
   upcoming?: boolean;
+  /** Also return past (completed and cancelled) games; used by the My games scope. */
+  history?: boolean;
   limit?: number;
   page?: number;
   page_size?: number;
@@ -84,6 +87,7 @@ interface EventApiItem {
   allow_waitlist?: boolean;
   recurrence_rule_id: string | null;
   status: string;
+  display_status?: string | null;
   venue_name: string | null;
   venue_address: string | null;
   organizer_nickname: string | null;
@@ -122,6 +126,14 @@ interface EventApiItem {
  *    this is inert for this fix; flagged for correction alongside the
  *    `getEvent()`/EventDetailScreen follow-up.
  */
+/** Server value when valid; else active/cancelled from `status` — `completed` is never derived. */
+function resolveDisplayStatus(raw: string | null | undefined, status: string): GameDisplayStatus {
+  if (raw === 'active' || raw === 'cancelled' || raw === 'completed') {
+    return raw;
+  }
+  return status === 'cancelled' ? 'cancelled' : 'active';
+}
+
 function mapEventApiItem(raw: EventApiItem): Event {
   return {
     id: raw.id,
@@ -138,6 +150,7 @@ function mapEventApiItem(raw: EventApiItem): Event {
     waitlist_count: 0,
     visibility: raw.visibility as EventVisibility,
     status: raw.status as EventStatus,
+    display_status: resolveDisplayStatus(raw.display_status, raw.status),
     organiser_id: raw.organizer_id,
     organiser_nickname: raw.organizer_nickname ?? raw.organizer_display_name ?? '',
     is_recurring: raw.recurrence_rule_id !== null,

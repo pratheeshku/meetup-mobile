@@ -28,6 +28,7 @@ import {
   PeopleGreenIcon,
 } from '../icons/HomeV2Icons';
 import { getRolePillColor, ROLE_BADGE_LABEL_KEY } from '../GroupCard';
+import GameStatusPill from '../GameStatusPill';
 import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius } from '../../theme/dashboardTheme';
@@ -37,6 +38,7 @@ import type { Group, GroupRole } from '../../types/group';
 import type { Tournament, TournamentRegistrationStatus } from '../../types/tournament';
 import { perfImageError, perfImageLoad, perfImageLoadStart } from '../../diagnostics/perfLog';
 import { formatRowDate } from '../../utils/formatGameTime';
+import { displayStatusOf } from '../../utils/gameLists';
 import type { GameBadge } from '../../utils/gameLists';
 import { useSportDisplayName } from '../../utils/labels';
 import type { LabelKey } from '../../labels/fallbackLabels';
@@ -250,6 +252,7 @@ export function UnifiedGameCard({
   perfScreen,
   onJoin,
   joining = false,
+  showStatus = false,
 }: {
   event: Event;
   onPress: () => void;
@@ -258,6 +261,8 @@ export function UnifiedGameCard({
   /** When given, a Join button shows directly below the "x/y going" line. */
   onJoin?: () => void;
   joining?: boolean;
+  /** Also show the game's display-status pill next to the role badge (My games history). */
+  showStatus?: boolean;
 }): React.JSX.Element {
   const t = useT();
 
@@ -284,6 +289,16 @@ export function UnifiedGameCard({
     ) : (
       badge
     );
+  const badgeWithStatus = showStatus ? (
+    <>
+      {badgeNode}
+      <View style={badgeNode ? styles.statusPillGap : undefined}>
+        <GameStatusPill status={displayStatusOf(event)} />
+      </View>
+    </>
+  ) : (
+    badgeNode
+  );
 
   return (
     <UnifiedCard
@@ -311,7 +326,7 @@ export function UnifiedGameCard({
       actionButtonLabel={t('mob.home.view_game')}
       onPress={onPress}
       accessibilityLabel={`${event.title}, ${timeLine}, ${venue}, ${countLabel}`}
-      badge={badgeNode}
+      badge={badgeWithStatus}
       perfScreen={perfScreen}
       belowCount={
         onJoin ? (
@@ -558,6 +573,9 @@ const styles = StyleSheet.create({
   badgeRow: {
     flexDirection: 'row',
     marginBottom: 4,
+  },
+  statusPillGap: {
+    marginLeft: spacing.xs,
   },
   rolePill: {
     flexDirection: 'row',

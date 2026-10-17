@@ -17,6 +17,7 @@ import {
   isOrganiserOf,
   selectGames,
   selectMyGames,
+  selectMyGamesWithHistory,
   selectNextGame,
   selectOpenGames,
   toggleSportSelection,
@@ -261,5 +262,49 @@ describe('sport chip selection (AD-9)', () => {
     expect(filteredEmptyMessage(['badminton', 'football', 'tennis'], options)).toBe(
       'No Badminton, Football and Tennis games here — clear the filter to see all',
     );
+  });
+});
+
+describe('display status in the lists', () => {
+  const MIXED: Event[] = [
+    makeEvent({ id: 'later', organiser_id: ME, starts_at: iso(30), display_status: 'active' }),
+    makeEvent({ id: 'soon', current_user_rsvp_status: 'going', starts_at: iso(10), display_status: 'active' }),
+    makeEvent({ id: 'done-old', current_user_rsvp_status: 'going', starts_at: iso(-50), display_status: 'completed' }),
+    makeEvent({ id: 'done-new', current_user_rsvp_status: 'going', starts_at: iso(-5), display_status: 'completed' }),
+    makeEvent({ id: 'cancelled-past', organiser_id: ME, status: 'cancelled', starts_at: iso(-20), display_status: 'cancelled' }),
+    makeEvent({ id: 'cancelled-future', organiser_id: ME, status: 'cancelled', starts_at: iso(15), display_status: 'cancelled' }),
+    makeEvent({ id: 'not-mine', starts_at: iso(-1), display_status: 'completed' }),
+  ];
+
+  it('My games with history: upcoming active earliest first, then past (completed and cancelled) most recent first', () => {
+    expect(ids(selectMyGamesWithHistory(MIXED, opts))).toEqual([
+      'soon',
+      'later',
+      'cancelled-future',
+      'done-new',
+      'cancelled-past',
+      'done-old',
+    ]);
+  });
+
+  it('applies the sport filter to the history list too', () => {
+    const feed = [
+      makeEvent({ id: 'a', sport: 'tennis', organiser_id: ME, starts_at: iso(-3), display_status: 'completed' }),
+      makeEvent({ id: 'b', sport: 'football', organiser_id: ME, starts_at: iso(-4), display_status: 'completed' }),
+    ];
+    expect(ids(selectMyGamesWithHistory(feed, { ...opts, sportKeys: ['tennis'] }))).toEqual(['a']);
+  });
+
+  it('keeps cancelled and completed games out of My games, Open games and the next-game card', () => {
+    const feed = [
+      makeEvent({ id: 'open-done', starts_at: iso(5), display_status: 'completed' }),
+      makeEvent({ id: 'open-cancelled', starts_at: iso(6), display_status: 'cancelled' }),
+      makeEvent({ id: 'open-ok', starts_at: iso(7), display_status: 'active' }),
+      makeEvent({ id: 'mine-done', current_user_rsvp_status: 'going', starts_at: iso(3), display_status: 'completed' }),
+    ];
+    expect(ids(selectOpenGames(feed, opts))).toEqual(['open-ok']);
+    expect(ids(selectGames(feed, 'open', opts))).toEqual(['open-ok']);
+    expect(selectMyGames(feed, opts)).toEqual([]);
+    expect(selectNextGame(feed, opts)).toBeNull();
   });
 });

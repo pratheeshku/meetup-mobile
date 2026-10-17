@@ -166,7 +166,7 @@ describe('switch', () => {
     expect(navigate).toHaveBeenCalledWith('TournamentDetail', { tournamentId: 't-1' });
   });
 
-  it('keeps each segment\'s own state when switching (scope, sport chips, no refetch)', async () => {
+  it('keeps each segment\'s own state when switching (scope, sport chips; only entering My games refetches, for history)', async () => {
     const root = await mount();
     await tap(root, 'Mine games');
     await tap(root, 'Tennis');
@@ -176,7 +176,9 @@ describe('switch', () => {
     expect(selected(root, 'Mine games')).toBe(true);
     expect(selected(root, 'Tennis')).toBe(true);
     expect(listTitles(root)).toEqual(['Waitlisted tennis']);
-    expect(mockGetEvents).toHaveBeenCalledTimes(1);
+    // One load on mount, one when My games asked for history; segment switches add none.
+    expect(mockGetEvents).toHaveBeenCalledTimes(2);
+    expect(mockGetEvents).toHaveBeenLastCalledWith({ history: true }, expect.anything());
     expect(mockGetTournaments).toHaveBeenCalledTimes(1);
   });
 
@@ -234,7 +236,8 @@ describe('Games list (AD-15)', () => {
     const root = await mount();
     expect(selected(root, 'All games')).toBe(true);
     await tap(root, 'Mine games');
-    expect(listTitles(root)).toEqual(['Going badminton', 'Waitlisted tennis', 'Hosted football']);
+    // My games also lists past games (after the upcoming ones).
+    expect(listTitles(root)).toEqual(['Going badminton', 'Waitlisted tennis', 'Hosted football', 'Past going']);
     await tap(root, 'Open games');
     expect(listTitles(root)).toEqual(['Open tennis', 'Open badminton']);
     await tap(root, 'All games');
@@ -249,9 +252,9 @@ describe('Games list (AD-15)', () => {
     await tap(root, 'Badminton');
     expect(listTitles(root)).toEqual(['Open tennis', 'Open badminton']);
     await tap(root, 'Mine games');
-    expect(listTitles(root)).toEqual(['Going badminton', 'Waitlisted tennis']);
+    expect(listTitles(root)).toEqual(['Going badminton', 'Waitlisted tennis', 'Past going']);
     await tap(root, 'All');
-    expect(listTitles(root)).toEqual(['Going badminton', 'Waitlisted tennis', 'Hosted football']);
+    expect(listTitles(root)).toEqual(['Going badminton', 'Waitlisted tennis', 'Hosted football', 'Past going']);
   });
 
   it('uses the same sport defaults as Home: the user\'s skill sports, otherwise All', async () => {
@@ -308,7 +311,7 @@ describe('Home entry points (scope params)', () => {
   it('opens on the requested scope from the route params', async () => {
     const mine = await mount({ scope: 'mine', entryKey: 1 });
     expect(selected(mine, 'Mine games')).toBe(true);
-    expect(listTitles(mine)).toEqual(['Going badminton', 'Waitlisted tennis', 'Hosted football']);
+    expect(listTitles(mine)).toEqual(['Going badminton', 'Waitlisted tennis', 'Hosted football', 'Past going']);
     const open = await mount({ scope: 'open', entryKey: 2 });
     expect(selected(open, 'Open games')).toBe(true);
     expect(listTitles(open)).toEqual(['Open tennis', 'Open badminton']);
@@ -332,5 +335,49 @@ describe('Home entry points (scope params)', () => {
       renderer.update(element({ scope: 'open', entryKey: 3 }));
     });
     expect(selected(root, 'Open games')).toBe(true);
+  });
+});
+
+describe('Display status on My games', () => {
+  const MIXED: Event[] = [
+    makeEvent({ id: 'later', title: 'Hosted football', sport: 'football', organiser_id: ME, starts_at: hours(30), display_status: 'active' }),
+    makeEvent({ id: 'soon', title: 'Going badminton', sport: 'badminton', current_user_rsvp_status: 'going', starts_at: hours(10), display_status: 'active' }),
+    makeEvent({ id: 'old', title: 'Past going', current_user_rsvp_status: 'going', starts_at: hours(-50), display_status: 'completed' }),
+    makeEvent({ id: 'cx', title: 'Cancelled open', organiser_id: ME, status: 'cancelled', starts_at: hours(-5), display_status: 'cancelled' }),
+    makeEvent({ id: 'open-cx', title: 'Open tennis', sport: 'tennis', status: 'cancelled', starts_at: hours(5), display_status: 'cancelled' }),
+  ];
+  const pills = (root: Instance): string[] =>
+    root.findAll(n => /^game-status-pill-/.test(String(n.props.testID)) && typeof n.type === 'string').map(n => n.props.testID);
+
+  beforeEach(() => {
+    mockGetEvents.mockResolvedValue(eventsOf(MIXED));
+  });
+
+  it('orders upcoming active first, then past games most recent first', async () => {
+    const root = await mount({ scope: 'mine', entryKey: 1 });
+    expect(listTitles(root)).toEqual(['Going badminton', 'Hosted football', 'Cancelled open', 'Past going']);
+  });
+
+  it('shows one status pill per row (active, cancelled, completed) next to the role badge', async () => {
+    const root = await mount({ scope: 'mine', entryKey: 1 });
+    expect(pills(root)).toEqual([
+      'game-status-pill-active',
+      'game-status-pill-active',
+      'game-status-pill-cancelled',
+      'game-status-pill-completed',
+    ]);
+    const list = root.find(n => n.props.testID === 'games-list' && typeof n.type !== 'string');
+    expect(texts(list)).toEqual(expect.arrayContaining(['Active', 'Cancelled', 'Completed', 'Hosting', 'Going']));
+  });
+
+  it('requests history for My games only; other scopes do not show pills or past games', async () => {
+    const root = await mount({ scope: 'mine', entryKey: 1 });
+    expect(mockGetEvents).toHaveBeenLastCalledWith({ history: true }, expect.anything());
+    await tap(root, 'Open games');
+    expect(mockGetEvents).toHaveBeenLastCalledWith(undefined, expect.anything());
+    expect(listTitles(root)).not.toContain('Cancelled open');
+    expect(listTitles(root)).not.toContain('Past going');
+    expect(listTitles(root)).not.toContain('Open tennis');
+    expect(pills(root)).toEqual([]);
   });
 });

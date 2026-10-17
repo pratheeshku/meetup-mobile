@@ -45,7 +45,12 @@ import type { GamesScope, TournamentsStackParamList } from '../navigation/types'
 import { dash, dashRadius, dashSize } from '../theme/dashboardTheme';
 import { spacing, typography } from '../theme/tokens';
 import type { Event } from '../types/event';
-import { filteredEmptyMessage, getGameBadge, selectGames } from '../utils/gameLists';
+import {
+  filteredEmptyMessage,
+  getGameBadge,
+  selectGames,
+  selectMyGamesWithHistory,
+} from '../utils/gameLists';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
 import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
@@ -121,7 +126,12 @@ function GamesSegment({
   const t = useT();
   const userId = user?.id;
 
-  const events = useResource(options => getEvents(undefined, options), 'getEvents');
+  // My games also lists past (completed / cancelled) games, so it asks for history.
+  const withHistory = scope === 'mine';
+  const events = useResource(
+    options => getEvents(withHistory ? { history: true } : undefined, options),
+    'getEvents',
+  );
   const sports = useResource(options => getSports(options), 'getSports');
   const profile = useResource(options => getProfile(options), 'getProfile');
   const { load: loadEvents } = events;
@@ -145,6 +155,16 @@ function GamesSegment({
     loadAll();
   }, [loadAll]);
 
+  // Switching to or from My games changes the request; reload (not on first mount).
+  const lastWithHistory = useRef(withHistory);
+  useEffect(() => {
+    if (lastWithHistory.current === withHistory) {
+      return;
+    }
+    lastWithHistory.current = withHistory;
+    withCorrelationId(correlationId => loadEvents(correlationId));
+  }, [withHistory, loadEvents]);
+
   useEffect(() => {
     onListLoadingChange(events.status === 'loading');
   }, [events.status, onListLoadingChange]);
@@ -165,7 +185,8 @@ function GamesSegment({
     if (!feed) {
       return undefined;
     }
-    return selectGames(feed, scope, { userId, sportKeys: filter.selected, now: Date.now() });
+    const options = { userId, sportKeys: filter.selected, now: Date.now() };
+    return scope === 'mine' ? selectMyGamesWithHistory(feed, options) : selectGames(feed, scope, options);
   }, [events.data, scope, userId, filter.selected]);
 
   const emptyCopy =
@@ -211,6 +232,7 @@ function GamesSegment({
             event={item}
             badge={getGameBadge(item, userId)}
             perfScreen="GamesScreen"
+            showStatus={scope === 'mine'}
             onPress={() => onOpenEvent(item)}
           />
         )}

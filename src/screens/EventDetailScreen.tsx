@@ -81,6 +81,7 @@ import {
   TargetIcon,
 } from '../components/icons/SharedIcons';
 import { useT } from '../labels/LabelsContext';
+import GameStatusPill from '../components/GameStatusPill';
 import SkillRequirementPicker from '../components/SkillRequirementPicker';
 import {
   DEFAULT_SKILL_REQUIREMENT,
@@ -103,7 +104,7 @@ import type { Group } from '../types/group';
 import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
-import { isOrganiserOf } from '../utils/gameLists';
+import { displayStatusOf, isOrganiserOf } from '../utils/gameLists';
 import { stripIconGlyphs, useSportDisplayName } from '../utils/labels';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
@@ -1082,8 +1083,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     .filter(Boolean)
     .join(', ');
 
-  const isOrganiserActionsVisible =
-    isOrganiser && event.status !== 'cancelled' && event.status !== 'completed';
+  const displayStatus = displayStatusOf(event);
+  // Cancelled / completed games are read-only: no edit, cancel, Join or Leave.
+  const isClosed =
+    displayStatus !== 'active' || event.status === 'cancelled' || event.status === 'completed';
+  const isOrganiserActionsVisible = isOrganiser && !isClosed;
   const totalCapacity = event.capacity || 4;
   // The backend's going count for the game: withdrawn and waitlisted people are not joined.
   const joinedCount = event.participant_count;
@@ -1105,7 +1109,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               <BackArrowIcon size={20} color={colors.white} />
             </Pressable>
 
-            {isOrganiser ? (
+            {isOrganiserActionsVisible ? (
               <View style={styles.bannerActions}>
                 <TouchableOpacity
                   accessibilityRole="button"
@@ -1146,11 +1150,17 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 <Text style={styles.hostPillText}>{t('mob.game_detail.host_badge')}</Text>
               </View>
             ) : null}
+            <GameStatusPill status={displayStatus} />
           </View>
         </View>
 
         {/* Content Cards */}
         <View style={styles.detailContent}>
+          {displayStatus === 'cancelled' ? (
+            <View style={styles.cancelledBanner} accessibilityRole="alert" testID="cancelled-banner">
+              <Text style={styles.cancelledBannerText}>{t('mob.game_detail.cancelled_banner')}</Text>
+            </View>
+          ) : null}
           {/* Card 1: Details */}
           <Card style={styles.infoCard}>
             <View style={styles.infoRow}>
@@ -1397,7 +1407,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           ) : null}
 
           {/* Non-organiser RSVP Actions */}
-          {!isOrganiser && (event.current_user_rsvp_status === 'going' || event.status !== 'cancelled') ? (
+          {!isOrganiser && !isClosed ? (
             <View style={styles.rsvpActionContainer}>
               {event.current_user_rsvp_status === 'going' ? (
                 <Button
@@ -1553,6 +1563,16 @@ const styles = StyleSheet.create({
   detailSubtitle: {
     ...typography.bodyBold,
     color: colors.white,
+  },
+  cancelledBanner: {
+    backgroundColor: colors.errorLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  cancelledBannerText: {
+    ...typography.bodyBold,
+    color: colors.error,
+    textAlign: 'center',
   },
   hostPill: {
     backgroundColor: colors.ownerChipBg,
