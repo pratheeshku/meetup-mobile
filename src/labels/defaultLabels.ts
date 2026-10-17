@@ -581,7 +581,7 @@ export const DEFAULT_LABELS = {
   'mob.home.greeting_prefix': 'Good to see you',
   'mob.home.greeting_line': 'Ready to play, {name}!',
   'mob.home.tab_upcoming': 'Upcoming games',
-  'mob.home.tab_groups': 'Your groups',
+  'mob.home.tab_groups': 'My groups',
   'mob.home.tile_upcoming_sub': 'This week',
   'mob.home.tile_groups_sub': 'Active groups',
   'mob.home.upcoming_empty': 'No upcoming games yet. Join one or create your own.',

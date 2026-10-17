@@ -11,6 +11,7 @@ import { getEvents } from '../../api/events';
 import { getProfile, getProfileSummary } from '../../api/profile';
 import { getSports } from '../../api/sports';
 import { act, renderAsync, texts } from '../../test-utils/render';
+import { StyleSheet } from 'react-native';
 import type { Instance } from '../../test-utils/render';
 import HomeScreen from '../HomeScreen';
 
@@ -76,6 +77,54 @@ beforeEach(() => {
   });
   mockSummary.mockReset().mockResolvedValue({
     games_played: 12, games_hosted: 3, groups_count: 2, recent_games: [],
+  });
+});
+
+describe('Home stats strip layout', () => {
+  it('cells are ordered Played, Won, Hosted, Groups', async () => {
+    const root = await mount();
+    const ids = root
+      .findAll(n => typeof n.type === 'string' && /^profile-stat-/.test(String(n.props.testID)))
+      .map(n => n.props.testID);
+    expect(ids).toEqual(['profile-stat-played', 'profile-stat-won', 'profile-stat-hosted', 'profile-stat-groups']);
+    const labels = texts(strip(root)[0]).filter(x => ['Played', 'Won', 'Hosted', 'Groups'].includes(x));
+    expect(labels).toEqual(['Played', 'Won', 'Hosted', 'Groups']);
+  });
+
+  it('is one fixed 56dp card with a 1.5dp border and three 1 x 26 dividers', async () => {
+    const root = await mount();
+    const card = StyleSheet.flatten(strip(root)[0].props.style);
+    expect(card).toMatchObject({ height: 56, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center' });
+    const dividers = strip(root)[0]
+      .findAll(n => typeof n.type === 'string')
+      .filter(n => {
+        const st = StyleSheet.flatten(n.props.style);
+        return st?.width === 1 && st?.height === 26;
+      });
+    expect(dividers).toHaveLength(3);
+  });
+
+  it('values and labels are single-line and fit their cell (1.3 font scale safe)', async () => {
+    const root = await mount();
+    const cellTexts = strip(root)[0].findAll(n => (n.type as unknown) === 'Text');
+    expect(cellTexts).toHaveLength(8);
+    for (const node of cellTexts) {
+      expect(node.props.numberOfLines).toBe(1);
+      expect(node.props.adjustsFontSizeToFit).toBe(true);
+    }
+  });
+
+  it('value colours: Played primary, Won purple, Hosted dark warning, Groups dark success', async () => {
+    const root = await mount();
+    const valueColor = (id: string): string => {
+      const cell = root.find(n => n.props.testID === id && typeof n.type === 'string');
+      const value = cell.findAll(n => (n.type as unknown) === 'Text')[0];
+      return String(StyleSheet.flatten(value.props.style).color);
+    };
+    expect(valueColor('profile-stat-played')).toBe('#1565C0');
+    expect(valueColor('profile-stat-won')).toBe('#8B5CF6');
+    expect(valueColor('profile-stat-hosted')).toBe('#B45309');
+    expect(valueColor('profile-stat-groups')).toBe('#166534');
   });
 });
 
