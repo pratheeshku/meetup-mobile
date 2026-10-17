@@ -1,5 +1,6 @@
 /** Settings: version line and long-press support text (five lines, no personal data, /health best effort). */
 import React from 'react';
+import { Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -28,6 +29,10 @@ const METRICS = { frame: { x: 0, y: 0, width: 360, height: 640 }, insets: { top:
 const NOW = new Date('2026-10-17T08:30:00.000Z');
 
 const originalFetch = globalThis.fetch;
+const originalOS = Platform.OS;
+const setOS = (os: 'android' | 'ios'): void => {
+  Object.defineProperty(Platform, 'OS', { configurable: true, get: () => os });
+};
 const mockFetch = jest.fn();
 
 async function mount(): Promise<Instance> {
@@ -47,6 +52,7 @@ const longPress = async (root: Instance): Promise<void> => {
 };
 
 beforeEach(() => {
+  setOS('android');
   jest.useFakeTimers({ now: NOW });
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockReset().mockResolvedValue({ ok: true, json: async () => ({ status: 'ok', version: '2.5.0' }) });
@@ -60,6 +66,7 @@ beforeEach(() => {
   device.getApiLevel.mockReset().mockResolvedValue(35);
 });
 afterEach(() => {
+  setOS(originalOS as 'android' | 'ios');
   globalThis.fetch = originalFetch;
   act(() => {
     jest.runOnlyPendingTimers();
@@ -121,6 +128,36 @@ describe('long press copies the support text', () => {
       ].join('\n'),
     );
     expect(texts(root)).toContain('Copied');
+  });
+
+  it('iOS: "iOS: {version}" with no API level, device line unchanged', async () => {
+    setOS('ios');
+    device.getBrand.mockReturnValue('Apple');
+    device.getModel.mockReturnValue('iPhone 16');
+    device.getSystemVersion.mockReturnValue('18.1');
+    const root = await mount();
+    await longPress(root);
+    expect(mockCopy.mock.calls[0][0]).toBe(
+      [
+        'App: 1.2.3 (45)',
+        'Server: 2.5.0',
+        'Device: Apple iPhone 16',
+        'iOS: 18.1',
+        'Time: 2026-10-17T08:30:00.000Z',
+      ].join('\n'),
+    );
+    expect(device.getApiLevel).not.toHaveBeenCalled();
+  });
+
+  it('iOS: still five lines and no personal data', async () => {
+    setOS('ios');
+    const root = await mount();
+    await longPress(root);
+    const text: string = mockCopy.mock.calls[0][0];
+    const lines = text.split('\n');
+    expect(lines).toHaveLength(5);
+    expect(lines.map(line => line.split(':')[0])).toEqual(['App', 'Server', 'Device', 'iOS', 'Time']);
+    expect(text).not.toMatch(/user|name|email|phone|token|device ?id|android|push|ip\b|@/i);
   });
 
   it('requests /health at the API root with no credentials', async () => {

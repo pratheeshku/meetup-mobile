@@ -1,8 +1,9 @@
 /**
  * Support text for Settings (long-press on the version line): exactly five lines
- * of app, server, device and OS facts. No user id, name, email, phone, token,
+ * of app, server, device and OS facts (the OS line is Android or iOS by `Platform.OS`). No user id, name, email, phone, token,
  * device id, push token or IP address — keep it that way.
  */
+import { Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 
 import { ENV } from '../../config/env';
@@ -60,20 +61,26 @@ export async function fetchServerVersion(): Promise<string> {
 export async function buildSupportText(now: Date = new Date()): Promise<string> {
   const { version, build } = getAppVersion();
   const server = await fetchServerVersion();
-  let apiLevel = UNKNOWN;
-  try {
-    apiLevel = clean(await DeviceInfo.getApiLevel());
-  } catch {
-    apiLevel = UNKNOWN;
-  }
   const brand = safe(() => DeviceInfo.getBrand());
   const model = safe(() => DeviceInfo.getModel());
-  const android = safe(() => DeviceInfo.getSystemVersion());
+  const systemVersion = safe(() => DeviceInfo.getSystemVersion());
+  let osLine: string;
+  if (Platform.OS === 'ios') {
+    osLine = `iOS: ${systemVersion}`;
+  } else {
+    let apiLevel = UNKNOWN;
+    try {
+      apiLevel = clean(await DeviceInfo.getApiLevel());
+    } catch {
+      apiLevel = UNKNOWN;
+    }
+    osLine = `Android: ${systemVersion} (API ${apiLevel})`;
+  }
   return [
     `App: ${version} (${build})`,
     `Server: ${server}`,
     `Device: ${brand} ${model}`,
-    `Android: ${android} (API ${apiLevel})`,
+    osLine,
     `Time: ${now.toISOString()}`,
   ].join('\n');
 }
