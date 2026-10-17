@@ -15,6 +15,10 @@ export type GroupRole = GroupMemberRole | 'none';
 export interface GroupMember {
   user_id: string;
   nickname: string;
+  /** `user_display_name`, falling back to the nickname. The primary name everywhere. */
+  display_name: string;
+  /** `user_photo_url`; initials are shown when null. */
+  photo_url: string | null;
   role: GroupMemberRole;
   joined_at: string;
 }
@@ -35,6 +39,8 @@ export interface Group {
    * are optional here.
    */
   owner_nickname?: string;
+  /** Owner's display name (from the member list); `Owned by` shows this, falling back to the nickname. */
+  owner_display_name?: string;
   owner?: { display_name: string; nickname?: string } | null;
   logo_url?: string | null;
   members_preview?: Array<{ display_name: string; photo_url: string | null }>;

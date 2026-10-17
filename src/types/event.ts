@@ -60,6 +60,8 @@ export interface Event {
   cost: number | null;
   current_user_rsvp_status: RsvpStatus;
   is_organiser: boolean;
+  /** Name of the group a `group` game belongs to (`GET /events/{id}` `group_name`); null otherwise. */
+  group_name?: string | null;
   venue_name?: string | null;
   venue_address?: string | null;
   venue_place_id?: string | null;

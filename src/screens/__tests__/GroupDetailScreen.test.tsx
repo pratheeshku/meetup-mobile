@@ -54,7 +54,7 @@ const GROUP: GroupDetail = {
   member_count: 1,
   created_at: '2026-01-01T00:00:00Z',
   current_user_role: 'owner',
-  members: [{ user_id: 'user-me', nickname: 'sam99', role: 'owner', joined_at: '2026-01-01T00:00:00Z' }],
+  members: [{ user_id: 'user-me', nickname: 'sam99', display_name: 'sam99', photo_url: null, role: 'owner', joined_at: '2026-01-01T00:00:00Z' }],
 };
 
 const FOUND_USER: UserSearchResult = {
@@ -125,7 +125,7 @@ describe('invite flow', () => {
     expect(texts(root)).toEqual(expect.arrayContaining(['alexc', 'Alex Chan']));
 
     act(() => pressableWithText(root, 'alexc').props.onPress());
-    expect(texts(root)).toContain('alexc (Alex Chan)');
+    expect(texts(root)).toContain('Alex Chan');
 
     await act(async () => pressableWithText(root, 'Send Invite').props.onPress());
     expect(mockInviteMember).toHaveBeenCalledWith('group-1', 'u-2', expect.anything());
@@ -145,7 +145,7 @@ describe('invite flow', () => {
     act(() => pressableWithText(root, 'alexc').props.onPress());
 
     act(() => pressableWithText(root, 'Change').props.onPress());
-    expect(texts(root)).not.toContain('alexc (Alex Chan)');
+    expect(texts(root)).not.toContain('Alex Chan');
     expect(searchInput(root)).toBeDefined();
   });
 
@@ -178,14 +178,13 @@ describe('invite flow', () => {
     await search(root, 'bob');
     act(() => pressableWithText(root, 'bob').props.onPress());
 
-    expect(texts(root)).toContain('alexc (Alex Chan)');
-    expect(texts(root)).toContain('bob (Bob Builder)');
+    expect(texts(root)).toEqual(expect.arrayContaining(['Alex Chan', 'alexc', 'Bob Builder', 'bob']));
 
     // Remove first user
-    const removeAlex = root.findByProps({ accessibilityLabel: 'Remove alexc' });
+    const removeAlex = root.findByProps({ accessibilityLabel: 'Remove Alex Chan' });
     act(() => removeAlex.props.onPress());
-    expect(texts(root)).not.toContain('alexc (Alex Chan)');
-    expect(texts(root)).toContain('bob (Bob Builder)');
+    expect(texts(root)).not.toContain('Alex Chan');
+    expect(texts(root)).toContain('Bob Builder');
 
     await act(async () => pressableWithText(root, 'Send Invite').props.onPress());
     expect(mockInviteMember).toHaveBeenCalledTimes(1);
@@ -231,7 +230,7 @@ describe('group invite link sharing', () => {
     mockGetGroup.mockResolvedValueOnce({
       ...GROUP,
       owner_id: 'other-owner',
-      members: [{ user_id: 'user-me', nickname: 'sam99', role: 'member', joined_at: '2026-01-01T00:00:00Z' }],
+      members: [{ user_id: 'user-me', nickname: 'sam99', display_name: 'sam99', photo_url: null, role: 'member', joined_at: '2026-01-01T00:00:00Z' }],
     });
     const root = await mount();
     expect(texts(root)).not.toContain('Share Group Invite');

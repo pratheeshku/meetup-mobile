@@ -460,3 +460,19 @@ describe('inviteEmailToEvent (POST /events/{id}/invite-email)', () => {
 });
 
 
+
+describe('group_name on events', () => {
+  it('is mapped from GET /events/{id} and null when absent', async () => {
+    const { apiClient: client } = require('../client');
+    const base = {
+      id: 'e-1', organizer_id: 'o', sport: 'badminton', title: 'T', description: null, visibility: 'group', capacity: 4,
+      starts_at: '2999-01-01T10:00:00Z', ends_at: null, estimated_cost_cents: null, recurrence_rule_id: null, status: 'upcoming',
+      venue_name: null, venue_address: null, organizer_nickname: 'o', organizer_display_name: null, going_count: 0, user_rsvp_status: null,
+    };
+    (client.get as jest.Mock).mockResolvedValueOnce({ data: { ...base, group_name: 'Sunday Footballers' } });
+    const { getEvent } = require('../events');
+    expect((await getEvent('e-1')).group_name).toBe('Sunday Footballers');
+    (client.get as jest.Mock).mockResolvedValueOnce({ data: base });
+    expect((await getEvent('e-1')).group_name).toBeNull();
+  });
+});

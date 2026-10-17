@@ -302,3 +302,69 @@ describe('createGroupInvitation', () => {
   });
 });
 
+
+describe('settings group lists: member_count from the backend', () => {
+  afterEach(() => {
+    mockedGet.mockReset();
+  });
+
+  it('keeps member_count from /settings/groups-owned and /settings/groups-member', async () => {
+    mockedGet.mockImplementation((url: string) =>
+      Promise.resolve({
+        data:
+          url === '/settings/groups-owned'
+            ? [{ id: 'g-1', name: 'Owned', owner_id: 'me', member_count: 7, created_at: '2026-01-01T00:00:00Z' }]
+            : [{ id: 'g-2', name: 'Joined', owner_id: 'x', member_count: 12, created_at: '2026-01-01T00:00:00Z' }],
+      }),
+    );
+    const { items } = await getMyGroups();
+    expect(items.map(g => [g.id, g.member_count])).toEqual([['g-1', 7], ['g-2', 12]]);
+  });
+});
+
+describe('group members: display name and photo', () => {
+  afterEach(() => {
+    mockedGet.mockReset();
+  });
+
+  const member = (overrides: Record<string, unknown>) => ({
+    user_id: 'u-1', role: 'member', joined_at: '2026-01-01T00:00:00Z',
+    user_display_name: 'Alex Chan', user_nickname: 'alexc', user_photo_url: 'https://cdn.example.com/a.jpg',
+    ...overrides,
+  });
+
+  async function members(raw: unknown[]) {
+    mockedGet.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url === '/groups/g-1'
+          ? { id: 'g-1', name: 'G', owner_id: 'u-1', created_at: '2026-01-01T00:00:00Z' }
+          : raw,
+      }),
+    );
+    return (await getGroup('g-1')).members;
+  }
+
+  it('maps user_display_name and user_photo_url', async () => {
+    const [m] = await members([member({})]);
+    expect(m).toMatchObject({ nickname: 'alexc', display_name: 'Alex Chan', photo_url: 'https://cdn.example.com/a.jpg' });
+  });
+
+  it('falls back to the nickname when there is no display name; photo is null when absent', async () => {
+    const [m] = await members([member({ user_display_name: null, user_photo_url: undefined })]);
+    expect(m.display_name).toBe('alexc');
+    expect(m.photo_url).toBeNull();
+  });
+
+  it('exposes the owner display name on the group', async () => {
+    mockedGet.mockImplementation((url: string) =>
+      Promise.resolve({
+        data: url === '/groups/g-1'
+          ? { id: 'g-1', name: 'G', owner_id: 'u-1', created_at: '2026-01-01T00:00:00Z' }
+          : [member({})],
+      }),
+    );
+    const group = await getGroup('g-1');
+    expect(group.owner_display_name).toBe('Alex Chan');
+    expect(group.owner_nickname).toBe('alexc');
+  });
+});

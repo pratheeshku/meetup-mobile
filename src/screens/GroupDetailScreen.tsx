@@ -47,6 +47,7 @@ import {
 } from '../components/icons/ActionIcons';
 import DeleteGroupSheet from '../components/groups/DeleteGroupSheet';
 import Badge from '../components/Badge';
+import UserAvatar from '../components/UserAvatar';
 import type { BadgeVariant } from '../components/Badge';
 import Button from '../components/Button';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
@@ -67,6 +68,8 @@ import type { UserSearchResult } from '../types/user';
 import type { GroupsStackParamList } from '../navigation/types';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
+
+const MEMBER_AVATAR_SIZE = 40;
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'GroupDetail'>;
 
@@ -267,7 +270,7 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
   const handleRemoveMemberPress = (member: GroupMember): void => {
     Alert.alert(
       t('mob.group_detail.remove_title'),
-      t('mob.group_detail.remove_message', { name: member.nickname }),
+      t('mob.group_detail.remove_message', { name: member.display_name }),
       [
       { text: t('mob.common.cancel'), style: 'cancel' },
       {
@@ -432,7 +435,7 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
       <Card style={styles.infoCard}>
         {group.description ? <Text style={styles.description}>{group.description}</Text> : null}
         <Text style={styles.meta}>
-          {t('mob.group_detail.owned_by', { name: group.owner_nickname ?? '' })}
+          {t('mob.group_detail.owned_by', { name: group.owner_display_name || group.owner_nickname || '' })}
         </Text>
         {canInvite ? (
           <Button
@@ -478,15 +481,19 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
             ) : null}
             {selectedInviteUsers.map(invitee => (
               <View key={invitee.id} style={styles.selectedInviteRow}>
-                <Text style={styles.selectedInviteText}>
-                  {t('mob.group_detail.invitee_line', {
-                    nickname: invitee.nickname,
-                    name: invitee.display_name,
-                  })}
-                </Text>
+                <View style={styles.inviteeNames}>
+                  <Text style={styles.selectedInviteText} numberOfLines={1}>
+                    {invitee.display_name}
+                  </Text>
+                  {invitee.nickname && invitee.nickname !== invitee.display_name ? (
+                    <Text style={styles.nicknameText} numberOfLines={1}>
+                      {invitee.nickname}
+                    </Text>
+                  ) : null}
+                </View>
                 <TextLink
                   label={selectedInviteUsers.length === 1 ? t('mob.common.change') : t('mob.common.remove')}
-                  accessibilityLabel={t('mob.group_detail.remove_invitee_a11y', { name: invitee.nickname })}
+                  accessibilityLabel={t('mob.group_detail.remove_invitee_a11y', { name: invitee.display_name })}
                   onPress={() => handleRemoveUser(invitee.id)}
                   disabled={isInviting}
                 />
@@ -535,7 +542,19 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
           return (
             <View key={member.user_id} style={styles.memberRow}>
               <View style={styles.memberInfo}>
-                <Text style={styles.memberNickname}>{member.nickname}</Text>
+                <View style={styles.memberAvatar}>
+                  <UserAvatar imageUrl={member.photo_url} name={member.display_name} size={MEMBER_AVATAR_SIZE} />
+                </View>
+                <View style={styles.memberNames}>
+                  <Text style={styles.memberDisplayName} numberOfLines={1}>
+                    {member.display_name}
+                  </Text>
+                  {member.nickname && member.nickname !== member.display_name ? (
+                    <Text style={styles.nicknameText} numberOfLines={1}>
+                      {member.nickname}
+                    </Text>
+                  ) : null}
+                </View>
                 <Badge
                   label={t(ROLE_LABEL_KEY[member.role])}
                   variant={ROLE_BADGE_VARIANT[member.role]}
@@ -819,10 +838,14 @@ const styles = StyleSheet.create({
   },
   memberInfo: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
   },
-  memberNickname: { ...typography.body, color: colors.textPrimary },
+  memberAvatar: { width: MEMBER_AVATAR_SIZE, height: MEMBER_AVATAR_SIZE },
+  memberNames: { flex: 1, minWidth: 0 },
+  memberDisplayName: { ...typography.bodyBold, color: colors.textPrimary },
+  nicknameText: { ...typography.caption, color: colors.textSecondary },
+  inviteeNames: { flexShrink: 1 },
   memberActionsRow: { flexDirection: 'row', marginTop: spacing.sm },
   linkSpacing: { marginRight: spacing.md },
   editRow: { marginTop: spacing.sm, width: '100%' },

@@ -54,6 +54,7 @@ import VenueDetailCard from '../components/venue/VenueDetailCard';
 import TournamentInvitationBanner from '../components/tournament/TournamentInvitationBanner';
 import TournamentInvitePanel from '../components/tournament/TournamentInvitePanel';
 import ErrorView from '../components/ErrorView';
+import GroupNamesRow from '../components/GroupNamesRow';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
@@ -265,6 +266,9 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
           })}
         </Text>
         <Text style={styles.description}>{tournament.description}</Text>
+        {tournament.visibility === 'group' ? (
+          <GroupNamesRow names={tournament.group_name ? [tournament.group_name] : []} />
+        ) : null}
       </Card>
 
       <TournamentInvitationBanner

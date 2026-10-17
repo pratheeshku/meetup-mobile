@@ -105,12 +105,15 @@ interface GroupMembershipApiItem {
   joined_at: string;
   user_display_name: string | null;
   user_nickname: string | null;
+  user_photo_url?: string | null;
 }
 
 function mapGroupMember(raw: GroupMembershipApiItem): GroupMember {
   return {
     user_id: raw.user_id,
     nickname: raw.user_nickname ?? raw.user_display_name ?? '',
+    display_name: raw.user_display_name ?? raw.user_nickname ?? '',
+    photo_url: raw.user_photo_url ?? null,
     role: raw.role as GroupMemberRole,
     joined_at: raw.joined_at,
   };
@@ -293,6 +296,7 @@ export async function getMyGroups(options?: GetMyGroupsOptions): Promise<GroupsL
           return {
             ...mapGroupApiItem(raw, role),
             owner_nickname: owner?.nickname ?? '',
+            owner_display_name: owner?.display_name ?? '',
             member_count: members.length,
           };
         } catch {
@@ -326,6 +330,7 @@ export async function getGroup(id: string, options?: RequestOptions): Promise<Gr
   return {
     ...mapGroupApiItem(raw, 'none'),
     owner_nickname: owner?.nickname ?? '',
+    owner_display_name: owner?.display_name ?? '',
     member_count: members.length,
     members,
   };

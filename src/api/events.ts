@@ -93,6 +93,7 @@ interface EventApiItem {
   skill_level_requirement?: string | null;
   created_at?: string;
   players_preview?: Array<{ display_name: string; photo_url: string | null }>;
+  group_name?: string | null;
 }
 
 /**
@@ -151,6 +152,7 @@ function mapEventApiItem(raw: EventApiItem): Event {
     estimated_cost_currency: raw.estimated_cost_currency ?? null,
     created_at: raw.created_at,
     players_preview: raw.players_preview,
+    group_name: raw.group_name ?? null,
   };
 }
 

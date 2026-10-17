@@ -44,6 +44,7 @@ import { useAuth } from '../auth/AuthContext';
 import Button from '../components/Button';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
+import GroupNamesRow from '../components/GroupNamesRow';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
 import ShareActionSheet from '../components/ShareActionSheet';
@@ -1215,6 +1216,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 {event.visibility === 'group' ? t('mob.create_game.group') : t('mob.create_game.public_title')}
               </Text>
             </View>
+
+            {event.visibility === 'group' ? (
+              <GroupNamesRow names={event.group_name ? [event.group_name] : []} />
+            ) : null}
           </Card>
 
           {/* Card 2: Players */}

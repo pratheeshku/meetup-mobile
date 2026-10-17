@@ -96,6 +96,9 @@ export interface Tournament {
   current_user_registration_status: TournamentRegistrationStatus | null;
   is_organiser: boolean;
   /** Absent/undefined is treated as `'none'` everywhere; the mapper never defaults to a value that shows buttons. */
+  /** Name of the group a `group` tournament belongs to (`group_name`); null otherwise. */
+  group_name?: string | null;
+  visibility?: TournamentVisibility;
   my_invite_access?: TournamentInviteAccess;
   my_invitation_status?: TournamentInvitationStatus | null;
   venue_name?: string | null;

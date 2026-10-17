@@ -61,6 +61,8 @@ interface TournamentApiItem {
   registered_count?: number | null;
   my_registration_status?: TournamentRegistrationStatus | null;
   my_invite_access?: string | null;
+  group_name?: string | null;
+  visibility?: string | null;
   my_invitation_status?: string | null;
   venue_name?: string | null;
   venue_label?: string | null;
@@ -100,6 +102,11 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     created_at: raw.created_at,
     current_user_registration_status: raw.my_registration_status ?? null,
     is_organiser: Boolean(currentUserId) && raw.organizer_id === currentUserId,
+    group_name: raw.group_name ?? null,
+    visibility:
+      raw.visibility === 'public' || raw.visibility === 'group' || raw.visibility === 'invite'
+        ? raw.visibility
+        : undefined,
     my_invite_access: normaliseInviteAccess(raw.my_invite_access),
     my_invitation_status: normaliseInvitationStatus(raw.my_invitation_status),
     venue_name: raw.venue_name ?? null,

@@ -370,3 +370,21 @@ describe('invitation calls', () => {
     ]);
   });
 });
+
+describe('group_name and visibility on tournaments', () => {
+  const base = {
+    id: 't-9', organizer_id: 'org-1', sport: 'football', title: 'Cup', name: null, description: null,
+    format: 'knockout', capacity: 8, registration_closes_at: null,
+    starts_at: '2999-02-01T00:00:00Z', status: 'upcoming', created_at: '2026-01-01T00:00:00Z',
+  };
+
+  it('maps group_name and visibility; null/undefined when absent', async () => {
+    mockedGet.mockResolvedValueOnce({ data: { ...base, visibility: 'group', group_name: 'Sunday Footballers' } });
+    const t1 = await getTournament('t-9');
+    expect(t1).toMatchObject({ group_name: 'Sunday Footballers', visibility: 'group' });
+    mockedGet.mockResolvedValueOnce({ data: base });
+    const t2 = await getTournament('t-9');
+    expect(t2.group_name).toBeNull();
+    expect(t2.visibility).toBeUndefined();
+  });
+});
