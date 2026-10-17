@@ -2,23 +2,14 @@
  * Group creation, step 2: "Invite members" (DES-MEETUP-FEEDBACK-001 C4,
  * R-05 to R-08; design-ref-p23/CreateGroup2.png).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, { useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
-import { inviteMember } from '../api/groups';
-import { searchUsers } from '../api/users';
-import { SearchIcon } from '../components/icons/ActionIcons';
+import { createGroupInvitation, inviteMember } from '../api/groups';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
+import UserSearchPicker from '../components/UserSearchPicker';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
 import { useT } from '../labels/LabelsContext';
@@ -27,6 +18,7 @@ import { showCompletion } from '../navigation/showCompletion';
 import type { GroupsStackParamList } from '../navigation/types';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { UserSearchResult } from '../types/user';
+import { addInviteEmail } from '../utils/inviteEmails';
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'InviteMembers'>;
 
@@ -56,42 +48,14 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
   const { groupId } = route.params;
   const t = useT();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<UserSearchResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [added, setAdded] = useState<UserSearchResult[]>([]);
+  const [addedEmails, setAddedEmails] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const inFlight = useRef(false);
 
-  const loadUsers = useCallback(
-    async (query: string) => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const results = await searchUsers({
-          q: query,
-          excludeGroupId: groupId,
-        });
-        setSuggestions(results);
-      } catch {
-        setError(t('mob.invite.load_error'));
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [groupId, t],
-  );
-
-  useEffect(() => {
-    loadUsers('');
-  }, [loadUsers]);
-
-  const handleSearchChange = (text: string) => {
-    setSearchQuery(text);
-    loadUsers(text);
-  };
-
+  // One search field: a name adds that person; a valid email that matches nobody
+  // is invited by email (same `POST /groups/invitations` call as Group Detail).
   const handleAdd = async (user: UserSearchResult): Promise<void> => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -103,7 +67,23 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
       setAdded(current =>
         current.some(item => item.id === user.id) ? current : [...current, user],
       );
-      setSuggestions(current => current.filter(item => item.id !== user.id));
+    } catch {
+      setError(t('mob.invite.add_error'));
+    } finally {
+      inFlight.current = false;
+    }
+  };
+
+  const handleAddEmail = async (email: string): Promise<void> => {
+    const next = addInviteEmail(addedEmails, email);
+    if (!next.ok || inFlight.current) return; // already invited (case-insensitive) or busy
+    inFlight.current = true;
+    setError(null);
+    try {
+      await withCorrelationId(correlationId =>
+        createGroupInvitation(groupId, { invitedEmail: email, correlationId }),
+      );
+      setAddedEmails(next.emails);
     } catch {
       setError(t('mob.invite.add_error'));
     } finally {
@@ -113,11 +93,12 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
 
   const finish = (): void => {
     const draft = readGroupCreateDraft(groupId);
-    const names = added
-      .map(user => user.display_name.trim())
-      .filter(name => name.length > 0);
-    const membersValue =
-      names.length > 0 ? `${added.length} — ${names.join(', ')}` : String(added.length);
+    const names = [
+      ...added.map(user => user.display_name.trim()).filter(name => name.length > 0),
+      ...addedEmails,
+    ];
+    const total = added.length + addedEmails.length;
+    const membersValue = names.length > 0 ? `${total} — ${names.join(', ')}` : String(total);
     showCompletion({
       flow: 'group_created',
       rows: [
@@ -137,9 +118,53 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
     });
   };
 
-  const displayedSuggestions = suggestions.filter(
-    s => !added.some(a => a.id === s.id),
-  );
+  const addedCard =
+    added.length + addedEmails.length > 0 ? (
+      <View style={styles.addedCard}>
+        <View style={styles.addedHeader}>
+          <Text style={styles.addedTitle}>{t('mob.create_game.review_header')}</Text>
+          <View style={styles.addedPill}>
+            <Text style={styles.addedPillText}>
+              {t('mob.invite.added_pill', { count: added.length + addedEmails.length })}
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.addedRow}>
+          {added.map(user => {
+            const tint = getAvatarTint(user.display_name);
+            const firstName = user.display_name.trim().split(/\s+/)[0];
+            return (
+              <View key={user.id} style={styles.addedItem}>
+                <View style={[styles.avatarCircleLarge, { backgroundColor: tint.bg }]}>
+                  <Text style={[styles.avatarTextLarge, { color: tint.text }]}>
+                    {getInitials(user.display_name)}
+                  </Text>
+                </View>
+                <Text style={styles.addedName} numberOfLines={1}>
+                  {firstName}
+                </Text>
+              </View>
+            );
+          })}
+          {addedEmails.map(email => {
+            const tint = getAvatarTint(email);
+            return (
+              <View key={email.toLowerCase()} style={styles.addedItem}>
+                <View style={[styles.avatarCircleLarge, { backgroundColor: tint.bg }]}>
+                  <Text style={[styles.avatarTextLarge, { color: tint.text }]}>
+                    {email.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={styles.addedName} numberOfLines={1}>
+                  {email}
+                </Text>
+              </View>
+            );
+          })}
+        </ScrollView>
+      </View>
+    ) : null;
 
   return (
     <View style={styles.screen}>
@@ -153,96 +178,15 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
       <KeyboardAwareScreen
         contentContainerStyle={styles.content}
       >
-        <View style={styles.searchContainer}>
-          <SearchIcon size={20} color={colors.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t('mob.create_game.search_players_placeholder')}
-            placeholderTextColor={colors.textMuted}
-            value={searchQuery}
-            onChangeText={handleSearchChange}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
-
-        {added.length > 0 ? (
-          <View style={styles.addedCard}>
-            <View style={styles.addedHeader}>
-              <Text style={styles.addedTitle}>{t('mob.create_game.review_header')}</Text>
-              <View style={styles.addedPill}>
-                <Text style={styles.addedPillText}>
-                  {t('mob.invite.added_pill', { count: added.length })}
-                </Text>
-              </View>
-            </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.addedRow}>
-              {added.map(user => {
-                const tint = getAvatarTint(user.display_name);
-                const firstName = user.display_name.trim().split(/\s+/)[0];
-                return (
-                  <View key={user.id} style={styles.addedItem}>
-                    <View style={[styles.avatarCircleLarge, { backgroundColor: tint.bg }]}>
-                      <Text style={[styles.avatarTextLarge, { color: tint.text }]}>
-                        {getInitials(user.display_name)}
-                      </Text>
-                    </View>
-                    <Text style={styles.addedName} numberOfLines={1}>
-                      {firstName}
-                    </Text>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          </View>
-        ) : null}
-
-        <Text style={styles.sectionHeading}>{t('mob.invite.suggested_players_header')}</Text>
-
-        <View style={styles.suggestedCard}>
-          {isLoading && displayedSuggestions.length === 0 ? (
-            <ActivityIndicator style={styles.loader} color={colors.primary} />
-          ) : displayedSuggestions.length === 0 ? (
-            <Text style={styles.emptyText}>{t('mob.invite.empty')}</Text>
-          ) : (
-            displayedSuggestions.map((user, idx) => {
-              const tint = getAvatarTint(user.display_name);
-              const isLast = idx === displayedSuggestions.length - 1;
-              return (
-                <View
-                  key={user.id}
-                  style={[styles.memberRow, !isLast && styles.memberRowBorder]}
-                >
-                  <View style={[styles.avatarCircle, { backgroundColor: tint.bg }]}>
-                    <Text style={[styles.avatarText, { color: tint.text }]}>
-                      {getInitials(user.display_name)}
-                    </Text>
-                  </View>
-
-                  <View style={styles.memberInfo}>
-                    <Text style={styles.memberName} numberOfLines={1}>
-                      {user.display_name}
-                    </Text>
-                    <Text style={styles.memberSubtitle} numberOfLines={1}>
-                      @{user.nickname || user.display_name.toLowerCase().replace(/\s+/g, '')}
-                      {user.shared_group ? ` · ${user.shared_group}` : ''}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel={t('mob.invite.card_a11y', { name: user.display_name })}
-                    style={styles.addButton}
-                    onPress={() => handleAdd(user)}
-                  >
-                    <Text style={styles.addButtonText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })
-          )}
-        </View>
+        <UserSearchPicker
+          onSelect={handleAdd}
+          onSelectEmail={handleAddEmail}
+          excludeGroupId={groupId}
+          excludeUserIds={added.map(user => user.id)}
+          suggestionContext="group_members"
+          placeholder={t('mob.create_game.search_players_placeholder')}
+          belowInput={addedCard}
+        />
 
         <Text style={styles.helperText}>{t('mob.invite.suggested_players_hint')}</Text>
 
@@ -267,23 +211,6 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     paddingBottom: spacing.xxl,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: borderWidth.thin,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    height: 48,
-    marginBottom: spacing.md,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: spacing.sm,
-    ...typography.body,
-    color: colors.textPrimary,
   },
   addedCard: {
     backgroundColor: colors.surface,
@@ -338,79 +265,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  sectionHeading: {
-    ...typography.bodyBold,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  suggestedCard: {
-    backgroundColor: colors.surface,
-    borderWidth: borderWidth.thin,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-  },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-  },
-  memberRowBorder: {
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: colors.border,
-  },
-  avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    ...typography.bodyBold,
-  },
-  memberInfo: {
-    flex: 1,
-    marginLeft: spacing.md,
-    marginRight: spacing.sm,
-  },
-  memberName: {
-    ...typography.bodyBold,
-    color: colors.textPrimary,
-  },
-  memberSubtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    color: colors.white,
-    fontSize: 20,
-    fontWeight: '600',
-    lineHeight: 22,
-  },
   helperText: {
     ...typography.caption,
     color: colors.textMuted,
     marginTop: spacing.sm,
     paddingHorizontal: spacing.xs,
-  },
-  loader: {
-    padding: spacing.xl,
-  },
-  emptyText: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: 'center',
-    padding: spacing.xl,
   },
   errorText: {
     ...typography.caption,
