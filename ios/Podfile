@@ -40,6 +40,26 @@ target 'MeetupMobile' do
       # :ccache_enabled => true
     )
 
+    # Xcode 27 (iOS 27 SDK) rejects deployment targets below 15.0 ("range of supported
+    # deployment target versions is 15.0 to ..."), and many third-party pods still declare
+    # 9.0-12.0. Raise any pod target (and the Pods project itself) below 15.0 to 15.0; never
+    # lower one that is already higher. The app targets 15.1, so this changes nothing at runtime.
+    min_pod_deployment_target = Gem::Version.new('15.0')
+    raise_deployment_target = lambda do |build_configurations|
+      build_configurations.each do |build_configuration|
+        current = build_configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        next if current.nil? || current.to_s.strip.empty? || current.to_s.include?('$')
+
+        if Gem::Version.new(current.to_s) < min_pod_deployment_target
+          build_configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+        end
+      end
+    end
+    raise_deployment_target.call(installer.pods_project.build_configurations)
+    installer.pods_project.targets.each do |target|
+      raise_deployment_target.call(target.build_configurations)
+    end
+
     # React-Core-prebuilt is built in release mode (with REACT_NATIVE_PRODUCTION / NDEBUG).
     # When compiling third-party pods in Debug configuration, ensure REACT_NATIVE_PRODUCTION
     # is defined so Fabric headers don't emit debug-only symbols (Sealable, ShadowNode::getDebug*, etc.)
