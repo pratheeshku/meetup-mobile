@@ -24,6 +24,11 @@ export const dash = {
   white: '#FFFFFF',
   /** Neutral skeleton block. */
   skeleton: '#E3EAF8',
+  /** Home folder tabs: panel/active tab border (light blue, not the brand blue). */
+  panelBorder: '#BCCDF0',
+  /** Home folder tabs: inactive tab fill and border. */
+  tabIdleBg: '#E9EEF8',
+  tabIdleBorder: '#E1E8F6',
 } as const;
 
 /** "All sports" chip fill. Per-sport fills come from the sports API colour. */

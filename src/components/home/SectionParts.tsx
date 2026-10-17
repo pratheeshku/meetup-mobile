@@ -16,14 +16,17 @@ import type { LabelKey } from '../../labels/fallbackLabels';
 export function SectionHeader({
   title,
   onViewAll,
+  variant = 'default',
 }: {
   title: string;
   onViewAll?: () => void;
+  /** `panel`: Home folder-panel header (title 16/800, View all 13/700). */
+  variant?: 'default' | 'panel';
 }): React.JSX.Element {
   const t = useT();
   return (
     <View style={styles.header}>
-      <Text style={styles.title} accessibilityRole="header">
+      <Text style={[styles.title, variant === 'panel' ? styles.titlePanel : null]} accessibilityRole="header">
         {title}
       </Text>
       {onViewAll ? (
@@ -34,7 +37,9 @@ export function SectionHeader({
           hitSlop={spacing.sm}
           style={({ pressed }) => [styles.viewAll, pressed ? styles.pressed : null]}
         >
-          <Text style={styles.viewAllText}>{t('mob.dashboard.view_all')}</Text>
+          <Text style={[styles.viewAllText, variant === 'panel' ? styles.viewAllTextPanel : null]}>
+            {t('mob.dashboard.view_all')}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -118,6 +123,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   viewAllText: { ...typography.bodyBold, color: dash.brand },
+  titlePanel: { fontSize: 16, fontWeight: '800' },
+  viewAllTextPanel: { fontSize: 13, fontWeight: '700' },
   pressed: { opacity: 0.7 },
   skeletonRow: {
     flexDirection: 'row',

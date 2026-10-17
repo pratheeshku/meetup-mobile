@@ -13,7 +13,7 @@
  *      Set accessibilityLabel from alt_text.
  *      Banner with click_url is pressable and opens system browser (re-check https scheme);
  *      without it not pressable. "Ad" tag only when is_sponsored.
- *    - Tab tiles: "Upcoming games" (default) and "Your groups"; selected has border plus tint,
+ *    - Tab tiles: "Upcoming games" (default) and "My groups" (folder tabs); the selected tab opens into the panel,
  *      accessibilityRole tab with selected state, no chevrons. Content loads on selection and is cached per tab.
  *      Create Game card stays visible on both tabs.
  *      - Upcoming tile count = games in next 7 days; list = next 2 upcoming games, earliest first,
@@ -57,7 +57,7 @@ import BannerCarousel from '../components/home/BannerCarousel';
 import CreateGameCard from '../components/home/CreateGameCard';
 import DrawerMenu from '../components/home/DrawerMenu';
 import ProfileStatsStrip from '../components/ProfileStatsStrip';
-import HomeTabTiles, { type HomeTab } from '../components/home/HomeTabTiles';
+import HomeTabTiles, { panelStyle, type HomeTab } from '../components/home/HomeTabTiles';
 import HomeTopBar from '../components/home/HomeTopBar';
 import {
   EmptyText,
@@ -517,7 +517,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
           </View>
         ) : null}
 
-        {/* Two Tab Tiles: Upcoming games & Your groups */}
+        {/* Folder tabs: Upcoming games & My groups (the tiles are the tabs) */}
         <HomeTabTiles
           selectedTab={selectedTab}
           onSelectTab={setSelectedTab}
@@ -527,10 +527,11 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
         {/* Tab Content (cached per tab) */}
         {selectedTab === 'upcoming' ? (
-          <View style={styles.tabContentSection} testID="upcoming-games-tab-content">
+          <View style={panelStyle('upcoming')} testID="upcoming-games-tab-content">
             <SectionHeader
               title={t('mob.home.tab_upcoming')}
               onViewAll={openAllGames}
+              variant="panel"
             />
 
             {upcomingError ? (
@@ -551,10 +552,11 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
             )}
           </View>
         ) : (
-          <View style={styles.tabContentSection} testID="your-groups-tab-content">
+          <View style={panelStyle('groups')} testID="your-groups-tab-content">
             <SectionHeader
               title={t('mob.home.tab_groups')}
               onViewAll={openAllGroups}
+              variant="panel"
             />
 
             {groupsError ? (
@@ -639,10 +641,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
   },
   statsSection: {
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
-  },
-  tabContentSection: {
     paddingHorizontal: spacing.md,
     marginTop: spacing.xs,
   },
