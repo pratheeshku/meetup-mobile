@@ -1,66 +1,37 @@
-# Meetup Mobile
+# Meetup Mobile (GameonSG)
 
-Mobile app for creating and joining sports events, groups, and tournaments.
-Built with React Native (bare workflow, Android). Consumes the Meetup
-platform API.
+React Native app (bare workflow, TypeScript) for creating and joining sports games, groups and tournaments. It consumes the Meetup backend API, which lives in a separate repo: `~/meetup` (backend + web). Android is the main target; iOS is covered by docs/DES-MEETUP-ADDENDUM-IOS-App.md.
 
-## Stack
+## Commands (state the machine, then `cd ~/Developer/meetup-mobile && pwd`, in every command you give; see docs/ENVIRONMENTS.md)
+- Test: `npx jest`, run ONCE (never repeatedly).
+- Lint: `npm run lint`. Type-check: `npx tsc --noEmit`. Labels: `npm run check:labels`.
+- Run: `npm run android` (emulator or device) or `npm run ios`.
+- Release AAB: `npm run build:aab`. It bumps `versionCode` on every run; to keep a manually set value use `SKIP_VERSION_BUMP=1 npm run build:aab`.
+- Migrate: not applicable (no local database).
 
-- Language/Runtime: TypeScript on React Native 0.86.3 (bare workflow, no Expo)
-- Framework: React Navigation (native-stack + bottom-tabs); React Query planned for server state (§3.2, not yet wired)
-- Database: None on-device beyond React Query's planned cache persister (§3.8) — all durable state lives in the backend
-- Frontend: React Native (Android target only; iOS scaffold present but out of scope per design)
-- Infrastructure: GitHub Actions CI/CD → signed AAB/APK → Google Play (§3.11, not yet built)
+## Modules under `src/`
+api (Axios client, correlation IDs, auth event bus) · auth · storage (Keychain tokens) · navigation (Auth/App stacks, tabs) · screens · components · hooks · notifications (FCM) · onboarding · sports · labels · theme · diagnostics · types · utils · test-utils. `config/` holds environment config (no secrets). Zero sibling imports between `src/api`, `src/storage` and `src/notifications` beyond documented dependencies.
 
-## Commands
+## Hard rules
+- The backend contract comes from `~/meetup`. Do not invent endpoints or fields. If one is missing, stop and ask.
+- Never commit secrets: `android/key.properties`, `google-services.json`, any populated `.env`.
+- `docs/` holds the governing baselines. Do not edit it during implementation; report drift in your implementation report. Never choose version numbers.
+- The approved design doc is the source of truth. A CRITICAL/HIGH gap means a Blocked Report, not an invented solution.
+- Tokens live in Keychain only, never AsyncStorage or logs.
+- One correlation ID (UUIDv4) per logical user action via `withCorrelationId()`, not per HTTP call.
+- Role and permission checks in the UI are UX only; the backend is the authority. Never recompute anything the backend returns (for example standings).
+- Theme tokens only: no literal colours. Fixed-size boxes for any icon-plus-text row.
+- UI work must match its board. If the board and the design doc disagree, or no board exists, stop and ask. Do not invent.
+- Never self-certify. Reports carry raw test output, coverage delta and screenshots next to the board.
+- Stay inside your task ID. No conformance review or testing-agent dispatch unless the owner asks.
 
-- Run: `npm run android` (requires an Android emulator/device and a configured Android SDK)
-- Test: `npx jest`
-- Migrate: N/A — this app has no local database/migrations
-- Lint: `npx eslint . --ext .ts,.tsx`
-- Type-check: `npx tsc --noEmit`
-
-## Architecture
-
-- `src/api/` — shared Axios client, correlation ID propagation, auth event bus
-- `src/storage/` — Keychain-backed secure token storage (never AsyncStorage)
-- `src/navigation/` — root Auth/App stack switch
-- `src/screens/` — screen components
-- `src/notifications/` — FCM registration/lifecycle
-- `config/` — environment configuration (no secrets committed)
-- Zero sibling imports between `src/api`, `src/storage`, `src/notifications` beyond the documented dependencies above — enforced by review.
-
-## Active Design Document
-
-- Doc ID: DES-MEETUP-MOBILE
-- Version: APPROVED, architect-approved 2026-09-13
-- Status: APPROVED
-- Location: `docs/DES-MEETUP-MOBILE.md`
-- Requirements baseline: `docs/REQ-MEETUP-MOBILE.md`
-- Active phase: Scaffold (navigation skeleton, API client, secure token storage, FCM registration primitives, Android signing config)
-
-## Off-limits
-
-- `docs/` — governing design/requirements baselines; do not edit as part of implementation work
-- `android/key.properties` — real release-signing credentials; gitignored, never committed
-- Never execute migration scripts — write only; human runs them (N/A for this app currently, but the rule carries forward if one is added)
-- Never commit secrets or API keys — `google-services.json`, OAuth client config, and any populated `.env` file are forbidden from version control (P10; §3.11)
-
-## Key Conventions
-
-- Approved design document (DES-MEETUP-MOBILE.md) is the non-negotiable source of truth; REQ-MEETUP-MOBILE.md is the requirements baseline it must trace to.
-- Blocked Report required for any CRITICAL/HIGH gap before proceeding.
-- Tokens: Keychain only, never AsyncStorage or logs (R-014, R-111).
-- Correlation ID: one UUIDv4 per logical user action via `withCorrelationId()`, not per HTTP call (§3.12, R-113).
-- All role/permission gating in the UI is a UX convenience only — the backend is the sole authority (R-017, R-082).
-- No client-side recalculation of anything the backend returns (e.g. tournament standings, R-042).
-
-## Stack Gotchas
-
-- **Node engine**: react-native@0.86.3 requires Node `^20.19.4 || ^22.13.0 || ^24.3.0 || >=25`. `npx react-native@latest`/`init` currently resolves to a version requiring Node ≥22.13 — this repo is deliberately pinned to 0.86.3 to stay compatible with Node 20.19.4+ development machines. Confirm the installed Node version satisfies this before bumping `react-native`.
-- **`react-native-template-typescript` is obsolete**: React Native ≥0.71 ships TypeScript by default via `@react-native-community/template`; the standalone template package (last published 2023) is ignored by the current CLI. Do not chase template-flag errors — omit `--template` entirely for TS projects.
-- **Jest + ESM-published RN libraries**: `@react-navigation/*`, `react-native-screens`, `react-native-svg`, etc. ship ES modules under `node_modules` and need explicit `transformIgnorePatterns` overrides in `jest.config.js` (already configured) or test suites fail with `Unexpected token 'export'`.
-- **`react-native-keychain` in tests**: the native Keystore/Keychain bridge doesn't exist under Jest — mocked in `jest.setup.js`. Add to that mock (not a new ad hoc mock per test file) if new keychain APIs are used.
-- **QR/barcode scanning uses `react-native-vision-camera`'s own built-in `useCodeScanner`/`codeScanner` prop — no separate scanner plugin is installed.** `react-native-camera` (unmaintained) was replaced with `react-native-vision-camera@4.7.3` (pinned to the v4 line deliberately — the unpinned `latest` dist-tag now resolves to v5.x, which depends on the newer Nitro Modules architecture via mandatory `react-native-nitro-modules`/`react-native-nitro-image` peer deps, a bigger jump than "swap the camera library" implies). VisionCamera v4 scans QR/barcodes using platform-native APIs directly (`src/hooks/useCodeScanner.ts`, no reanimated/worklets dependency) — do not add `vision-camera-code-scanner` (last published 2022, targets VisionCamera v2's now-removed frame-processor-plugin API, incompatible) or `@mgcrea/vision-camera-barcode-scanner` (compatible with v4 but pulls in a mandatory `react-native-worklets-core` peer dependency for functionality VisionCamera already provides natively) unless a future need genuinely exceeds what `useCodeScanner` offers.
-- **`android.permission.CAMERA` is not yet declared** in `AndroidManifest.xml` — neither `react-native-camera` nor `react-native-vision-camera` bundles it in their own manifests, and no QR-scan screen exists yet to need it (scaffold only, per rule). Add it (with the pre-scan rationale flow, §3.7/R-062) when the actual scan screen is implemented — same pattern as `POST_NOTIFICATIONS` for FCM.
-- **`process.env` in RN**: bare RN does not substitute custom env vars into the bundle by default (no `react-native-config`/babel env plugin wired). `config/env.ts`'s `process.env.API_BASE_URL` will read `undefined` at runtime today and fall through to the hardcoded default — this is a known scaffold-stage gap, not a working env-injection pipeline. `global.d.ts` supplies only the ambient TypeScript type for `process.env`, not a runtime polyfill.
+## Read before acting (open the file when the trigger matches)
+| When you are about to... | Read first |
+|---|---|
+| Give or run any command, path, build or release step | docs/ENVIRONMENTS.md |
+| Debug a crash, failing test, build or API problem | docs/DEBUG-FAQ.md |
+| Add a dependency, touch native config, tests or env handling | docs/STACK-GOTCHAS.md |
+| Build or change a feature (task ID) | docs/INDEX.md, then the DES addendum and the brief in `~/meetup/docs/briefs/` for that task |
+| Build or change any screen, form or navigation | docs/INDEX.md, section "Design reference (UI)": open the matching board (png for look, html for sizes) before writing UI |
+| Check what a requirement or design says | docs/INDEX.md |
+| Need a doc's amendment history | docs/CHANGELOG-DOCS.md |
