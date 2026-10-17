@@ -21,7 +21,8 @@
 #
 # Xcode: Apple requires uploads to be built with Xcode 26 or later (iOS 26 SDK) since
 # 2026-04-28 (https://developer.apple.com/news/upcoming-requirements/). The newest
-# non-beta Xcode installed on the runner is selected and checked against that minimum.
+# Xcode 26.x installed on the runner is selected (pinned, not the highest installed)
+# and checked against that minimum.
 name: iOS TestFlight
 
 on:
@@ -101,9 +102,12 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          xcode_app="$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)"
+          # Xcode 27+ (iOS 27 SDK) crashes at launch until UIScene lifecycle
+          # is adopted; unpin after that.
+          xcode_app="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)"
           if [ -z "$xcode_app" ]; then
-            echo "::error::No non-beta Xcode found in /Applications on this runner image."
+            echo "::error::No Xcode 26.x (/Applications/Xcode_26*.app) is installed on this runner image. Xcode 27+ is deliberately not used until UIScene lifecycle is adopted."
+            echo "Installed Xcode apps:"; ls -d /Applications/Xcode*.app 2>/dev/null || true
             exit 1
           fi
           sudo xcode-select -s "$xcode_app/Contents/Developer"
