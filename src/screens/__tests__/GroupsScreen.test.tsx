@@ -14,7 +14,6 @@ const mockUseFocusEffect = jest.fn();
 // Any `useNavigation()` from this screen's header now fails the test loudly.
 const mockGetGroups = jest.fn();
 const mockGetMyGroups = jest.fn();
-const mockGetCachedHomeGroups = jest.fn();
 jest.mock('../../auth/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'u-1', nickname: 'sam' } }),
 }));
@@ -32,7 +31,6 @@ jest.mock('@react-navigation/native', () => {
 jest.mock('../../api/groups', () => ({
   getGroups: (...args: unknown[]) => mockGetGroups(...args),
   getMyGroups: (...args: unknown[]) => mockGetMyGroups(...args),
-  getCachedHomeGroups: (...args: unknown[]) => mockGetCachedHomeGroups(...args),
 }));
 const navigate = jest.fn();
 const setOptions = jest.fn();
@@ -46,7 +44,6 @@ function element(params?: { refreshKey?: number }): React.ReactElement {
 beforeEach(() => {
   mockGetGroups.mockReset().mockResolvedValue(EMPTY);
   mockGetMyGroups.mockReset();
-  mockGetCachedHomeGroups.mockReset().mockResolvedValue([]);
   mockUseScrollToTop.mockReset();
   mockUseFocusEffect.mockReset();
   navigate.mockReset();

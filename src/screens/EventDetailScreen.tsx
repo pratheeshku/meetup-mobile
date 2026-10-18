@@ -2,7 +2,7 @@
  * Event Detail screen (DES-MEETUP-MOBILE.md §4.3; design-ref-p23/GameDetail.png,
  * EditGame.png..EditGame4.png, DeleteGame.png).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Image,
   Modal,
@@ -103,7 +103,9 @@ import {
 import type { Event, EventParticipant, EventSkillLevel, UpdateEventInput } from '../types/event';
 import type { Group } from '../types/group';
 import type { UserSearchResult } from '../types/user';
-import { getApiErrorMessage } from '../utils/apiError';
+import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
+import { closeUnavailableScreen } from '../navigation/accessNotice';
+import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import { groupFromGame, maxGroupsFor } from '../utils/gameGroups';
 import { displayStatusOf, isOrganiserOf } from '../utils/gameLists';
@@ -131,6 +133,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const unavailableHandledRef = useRef(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -207,8 +210,15 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         } else if (!silent) {
           setParticipants([]);
         }
-      } catch {
-        if (!silent) {
+      } catch (error) {
+        // The server answers 404 for a game that is gone or no longer visible to this user
+        // (AC-11): close the screen with the neutral message, once.
+        if (isNotFoundError(error)) {
+          if (!unavailableHandledRef.current) {
+            unavailableHandledRef.current = true;
+            closeUnavailableScreen(navigation);
+          }
+        } else if (!silent) {
           setLoadError(t('mob.game_detail.load_error'));
         }
       } finally {
@@ -217,16 +227,31 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         }
       }
     },
-    [eventId, t],
+    [eventId, t, navigation],
+  );
+
+  // Fetch on every focus and app foreground, including a push or deep link that opens a game
+  // already on the stack (AC-10). The first load shows the loading view; later ones refresh in place.
+  const loadedIdRef = useRef<string | null>(null);
+  useRefetchOnFocus(
+    navigation,
+    useCallback(() => {
+      const silent = loadedIdRef.current === eventId;
+      if (!silent) {
+        unavailableHandledRef.current = false;
+      }
+      loadedIdRef.current = eventId;
+      loadEvent(silent);
+    }, [loadEvent, eventId]),
+    eventId,
   );
 
   useEffect(() => {
-    loadEvent(false);
     getClientConfig().then(cfg => {
       setMapsApiKey(cfg.google_maps_api_key);
       setVenueCatalogueEnabled(Boolean(cfg.venue_catalogue_enabled));
     }).catch(() => {});
-  }, [loadEvent]);
+  }, []);
 
   const sportLabel = useSportDisplayName(event?.sport ?? '');
   const sportRecord = useSportRecord(event?.sport ?? '');

@@ -39,6 +39,7 @@ import SportChipsRow from '../components/home/SportChipsRow';
 import SegmentedSwitch from '../components/SegmentedSwitch';
 import TournamentsListContent from '../components/TournamentsListContent';
 import WipStrip from '../components/WipStrip';
+import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useResource } from '../hooks/useResource';
 import { useSportFilter } from '../hooks/useSportFilter';
 import type { GamesScope, TournamentsStackParamList } from '../navigation/types';
@@ -116,11 +117,14 @@ function GamesSegment({
   onScopeChange,
   onOpenEvent,
   onListLoadingChange,
+  openTick,
 }: {
   scope: GamesScope;
   onScopeChange: (scope: GamesScope) => void;
   onOpenEvent: (event: Event) => void;
   onListLoadingChange: (loading: boolean) => void;
+  /** Bumped by the screen on every focus and app foreground (AC-10); 0 = not opened yet. */
+  openTick: number;
 }): React.JSX.Element {
   const { user } = useAuth();
   const t = useT();
@@ -139,11 +143,13 @@ function GamesSegment({
   const { load: loadProfile } = profile;
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // `fresh` (focus / foreground) drops the rows held and shows the loading state until the
+  // server answers; pull-to-refresh keeps the rows loaded in this open (AC-10).
   const loadAll = useCallback(
-    () =>
+    (fresh: boolean = false) =>
       withCorrelationId(correlationId =>
         Promise.all([
-          loadEvents(correlationId),
+          loadEvents(correlationId, { fresh }),
           loadSports(correlationId),
           loadProfile(correlationId),
         ]).then(() => undefined),
@@ -152,8 +158,10 @@ function GamesSegment({
   );
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    if (openTick > 0) {
+      loadAll(true);
+    }
+  }, [loadAll, openTick]);
 
   // Switching to or from My games changes the request; reload (not on first mount).
   const lastWithHistory = useRef(withHistory);
@@ -162,7 +170,7 @@ function GamesSegment({
       return;
     }
     lastWithHistory.current = withHistory;
-    withCorrelationId(correlationId => loadEvents(correlationId));
+    withCorrelationId(correlationId => loadEvents(correlationId, { fresh: true }));
   }, [withHistory, loadEvents]);
 
   useEffect(() => {
@@ -172,7 +180,7 @@ function GamesSegment({
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await loadAll();
+      await loadAll(false);
     } finally {
       setIsRefreshing(false);
     }
@@ -195,7 +203,7 @@ function GamesSegment({
       : t(SCOPE_EMPTY[scope]);
 
   const retry = useCallback(() => {
-    withCorrelationId(correlationId => loadEvents(correlationId));
+    withCorrelationId(correlationId => loadEvents(correlationId, { fresh: true }));
   }, [loadEvents]);
 
   let body: React.JSX.Element;
@@ -282,6 +290,9 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
     segment === 'tournaments' ? tournamentsListLoading : gamesListLoading,
   );
 
+  // Counts the times the Tournaments segment is opened; each one refetches it (AC-10).
+  const [segmentOpens, setSegmentOpens] = useState(0);
+
   // Home entry points: land on Games with the requested scope.
   const entryKey = route.params?.entryKey;
   const routeScope = route.params?.scope;
@@ -294,6 +305,7 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
       if (routeSegment) {
         if (routeSegment === 'tournaments') {
           setTournamentsVisited(true);
+          setSegmentOpens(count => count + 1);
         }
         setSegment(routeSegment);
       } else {
@@ -302,6 +314,7 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
     } else if (routeSegment) {
       if (routeSegment === 'tournaments') {
         setTournamentsVisited(true);
+        setSegmentOpens(count => count + 1);
       }
       setSegment(routeSegment);
     }
@@ -312,13 +325,23 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
   useEffect(() => {
     if (refreshKey !== undefined) {
       setTournamentsVisited(true);
+      setSegmentOpens(count => count + 1);
       setSegment('tournaments');
     }
   }, [refreshKey]);
 
+  // Access-consistency AC-10: fetch on every focus and app foreground, and each time the
+  // Tournaments segment is opened. `openTick` is 0 until the first focus.
+  const [openTick, setOpenTick] = useState(0);
+  useRefetchOnFocus(
+    navigation,
+    useCallback(() => setOpenTick(tick => tick + 1), []),
+  );
+
   const changeSegment = useCallback((next: Segment) => {
     if (next === 'tournaments') {
       setTournamentsVisited(true);
+      setSegmentOpens(count => count + 1);
     }
     setSegment(next);
   }, []);
@@ -348,6 +371,7 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
           onScopeChange={setScope}
           onOpenEvent={openEvent}
           onListLoadingChange={onGamesListLoading}
+          openTick={openTick}
         />
       </View>
       {tournamentsVisited ? (
@@ -355,6 +379,7 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
           <WipStrip labelKey="mob.wip.banner_text" />
           <TournamentsListContent
             refreshKey={refreshKey}
+            reloadKey={openTick + segmentOpens}
             onLoadingChange={onTournamentsListLoading}
             onOpenTournament={tournamentId =>
               navigation.navigate('TournamentDetail', { tournamentId })

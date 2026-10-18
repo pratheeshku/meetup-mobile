@@ -23,12 +23,19 @@ interface Props {
   refreshKey?: number;
   /** Reports whether the list is still on its first-load spinner. */
   onLoadingChange?: (loading: boolean) => void;
+  /**
+   * Access-consistency AC-10: every new value (screen focus, app foreground,
+   * the segment being opened) fetches again with the loading state in place of
+   * the old rows. Loads once on mount whatever its value.
+   */
+  reloadKey?: number;
 }
 
 export default function TournamentsListContent({
   onOpenTournament,
   refreshKey,
   onLoadingChange,
+  reloadKey,
 }: Props): React.JSX.Element {
   const t = useT();
   const { user } = useAuth();
@@ -45,6 +52,8 @@ export default function TournamentsListContent({
     if (isRefresh) {
       setIsRefreshing(true);
     } else {
+      // A fresh load never shows the previous rows (AC-10).
+      setTournaments([]);
       setIsLoading(true);
     }
     setError(null);
@@ -61,7 +70,7 @@ export default function TournamentsListContent({
 
   useEffect(() => {
     loadTournaments(false);
-  }, [loadTournaments]);
+  }, [loadTournaments, reloadKey]);
 
   useEffect(() => {
     onLoadingChange?.(isLoading);

@@ -24,7 +24,10 @@ import { dismissBanner, getBannerState } from '../notificationBannerStore';
 import { getUnreadBadgeCount, setUnreadBadgeCount } from '../unreadCountStore';
 
 jest.mock('../../api/client', () => ({ apiClient: { post: jest.fn(), delete: jest.fn() } }));
+jest.mock('../../hooks/useUnreadCount', () => ({ refreshUnreadCount: jest.fn() }));
 
+import { refreshUnreadCount } from '../../hooks/useUnreadCount';
+const mockRefreshUnreadCount = refreshUnreadCount as jest.Mock;
 const mockOnMessage = firebaseMessaging.onMessage as jest.Mock;
 const mockDisplayNotification = notifee.displayNotification as jest.Mock;
 
@@ -147,32 +150,28 @@ it('still drops a type the app does not know (unchanged behaviour)', () => {
 });
 
 describe('unread badge count', () => {
-  it('increments by 1 for a banner-type message', () => {
+  // The count comes from the server (`refreshUnreadCount`), never from local arithmetic.
+  beforeEach(() => {
+    mockRefreshUnreadCount.mockClear();
+    setUnreadBadgeCount(0);
+  });
+
+  it.each([
+    ['a banner-type message', 'event_invite'],
+    ['a participant (data-only) message', 'event_participant_added'],
+    ['a group_event_created/event_changed (data-only) message', 'event_changed'],
+  ])('reads the count back from the server for %s and does not increment locally', (_name, type) => {
     deliver({
       messageId: 'm1',
-      data: { notification_type: 'event_invite', entity_id: 'e1', title: 't', body: 'b' },
+      data: { notification_type: type, entity_id: 'e1', title: 't', body: 'b' },
     });
-    expect(getUnreadBadgeCount()).toBe(1);
+    expect(mockRefreshUnreadCount).toHaveBeenCalledTimes(1);
+    expect(getUnreadBadgeCount()).toBe(0);
   });
 
-  it('increments by 1 for a participant (data-only) message too', () => {
-    deliver({
-      messageId: 'm2',
-      data: { notification_type: 'event_participant_added', entity_id: 'e1', title: 't', body: 'b' },
-    });
-    expect(getUnreadBadgeCount()).toBe(1);
-  });
-
-  it('increments by 1 for a group_event_created/event_changed (data-only) message too', () => {
-    deliver({
-      messageId: 'm4',
-      data: { notification_type: 'event_changed', entity_id: 'e1', title: 't', body: 'b' },
-    });
-    expect(getUnreadBadgeCount()).toBe(1);
-  });
-
-  it('does not increment for a message with no notification_type', () => {
+  it('does nothing for a message with no notification_type', () => {
     deliver({ messageId: 'm3', data: { something: 'else' } });
+    expect(mockRefreshUnreadCount).not.toHaveBeenCalled();
     expect(getUnreadBadgeCount()).toBe(0);
   });
 });

@@ -59,6 +59,9 @@ import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
 import { showCompletion } from '../navigation/showCompletion';
+import { closeUnavailableScreen } from '../navigation/accessNotice';
+import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
+import { isNotFoundError } from '../utils/apiError';
 import { useSportDisplayName } from '../utils/labels';
 import { formatEventDate } from '../utils/formatEventDateTime';
 import type { TournamentsStackParamList } from '../navigation/types';
@@ -76,7 +79,7 @@ function formatDateTime(isoString: string): string {
   });
 }
 
-export default function TournamentDetailScreen({ route }: Props): React.JSX.Element {
+export default function TournamentDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
   const { tournamentId } = route.params;
   const { user } = useAuth();
@@ -113,28 +116,59 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
       .catch(() => setVenueCatalogueEnabled(false));
   }, []);
 
-  const loadAll = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const [tournamentData, fixturesData, registrationsData] = await Promise.all([
-        getTournament(tournamentId),
-        getFixtures(tournamentId),
-        getRegistrations(tournamentId),
-      ]);
-      setTournament(tournamentData);
-      setFixtures(fixturesData);
-      setRegistrations(registrationsData);
-    } catch {
-      setLoadError(tRef.current('mob.tournament.load_error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [tournamentId]);
+  // `silent` refreshes in place (focus / foreground after the first load) instead of flashing
+  // the loading view.
+  const unavailableHandledRef = useRef(false);
+  const loadAll = useCallback(
+    async (silent: boolean = false) => {
+      if (!silent) {
+        setIsLoading(true);
+        setLoadError(null);
+      }
+      try {
+        const [tournamentData, fixturesData, registrationsData] = await Promise.all([
+          getTournament(tournamentId),
+          getFixtures(tournamentId),
+          getRegistrations(tournamentId),
+        ]);
+        setTournament(tournamentData);
+        setFixtures(fixturesData);
+        setRegistrations(registrationsData);
+      } catch (error) {
+        // 404 = gone or no longer visible to this user (AC-11, AC-07: a registered player who
+        // lost access sees nothing): close with the neutral message, once.
+        if (isNotFoundError(error)) {
+          if (!unavailableHandledRef.current) {
+            unavailableHandledRef.current = true;
+            closeUnavailableScreen(navigation);
+          }
+        } else if (!silent) {
+          setLoadError(tRef.current('mob.tournament.load_error'));
+        }
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [tournamentId, navigation],
+  );
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  // Fetch on every focus and app foreground (AC-10), including a push that opens a tournament
+  // already on the stack.
+  const loadedTournamentIdRef = useRef<string | null>(null);
+  useRefetchOnFocus(
+    navigation,
+    useCallback(() => {
+      const silent = loadedTournamentIdRef.current === tournamentId;
+      if (!silent) {
+        unavailableHandledRef.current = false;
+      }
+      loadedTournamentIdRef.current = tournamentId;
+      loadAll(silent);
+    }, [loadAll, tournamentId]),
+    tournamentId,
+  );
 
   /** Re-reads the tournament so access/invitation status reflect the server. */
   const refreshTournament = useCallback(async (): Promise<void> => {
@@ -216,7 +250,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
   }
 
   if (loadError || !tournament) {
-    return <ErrorView message={loadError ?? t('mob.tournament.not_found')} onRetry={loadAll} />;
+    return <ErrorView message={loadError ?? t('mob.tournament.not_found')} onRetry={() => loadAll(false)} />;
   }
 
   // Full-contract-audit fix (2026-09-18, see

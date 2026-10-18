@@ -39,7 +39,6 @@ jest.mock('@react-navigation/native', () => {
 jest.mock('../../api/events', () => ({ getEvents: jest.fn() }));
 jest.mock('../../api/groups', () => ({
   getMyGroups: jest.fn(),
-  getCachedHomeGroups: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../../api/profile', () => ({ getProfile: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
