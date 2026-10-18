@@ -85,6 +85,7 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   EditSkillLevels: undefined;
   Settings: undefined;
+  PaSpike: undefined; // pa-spike, __DEV__ only
   NotificationPreferences: undefined;
   AccountDeletionBlocked: {
     groups?: OwnedGroupInfo[];

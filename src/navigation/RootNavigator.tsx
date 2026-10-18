@@ -123,6 +123,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import EditSkillLevelsScreen from '../screens/EditSkillLevelsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import PaSpikeScreen from '../screens/PaSpikeScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
 import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
 import EditGroupScreen from '../screens/EditGroupScreen';
@@ -314,6 +315,13 @@ function ProfileStack(): React.JSX.Element {
         component={SettingsScreen}
         options={{ headerShown: false }}
       />
+      {__DEV__ ? (
+        <ProfileStackNav.Screen
+          name="PaSpike"
+          component={PaSpikeScreen}
+          options={{ title: 'PA spike' }}
+        />
+      ) : null}
       <ProfileStackNav.Screen
         name="NotificationPreferences"
         component={NotificationPreferencesScreen}

@@ -120,6 +120,18 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
     }
   };
 
+  // pa-spike (__DEV__ only): 5 quick taps on the version line open the dev screen.
+  const spikeTaps = useRef({ n: 0, t: 0 });
+  const handleSpikeTap = (): void => {
+    const now = Date.now();
+    spikeTaps.current.n = now - spikeTaps.current.t < 800 ? spikeTaps.current.n + 1 : 1;
+    spikeTaps.current.t = now;
+    if (spikeTaps.current.n >= 5) {
+      spikeTaps.current.n = 0;
+      navigation.navigate('PaSpike');
+    }
+  };
+
   const handleToggleEmail = async (value: boolean): Promise<void> => {
     setEmailEnabled(value);
     try {
@@ -333,6 +345,7 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
         {/* App version: long-press copies the support text */}
         <Pressable
           onLongPress={handleCopySupportInfo}
+          onPress={__DEV__ ? handleSpikeTap : undefined}
           accessibilityRole="text"
           accessibilityLabel={versionLine}
           testID="settings-app-version"
