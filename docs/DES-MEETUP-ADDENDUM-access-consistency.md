@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
 
 **Doc ID:** DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
-**Version:** v1.0
-**Status:** APPROVED by the owner, 2026-10-18. Phase 6 (tournaments) is gated on OI-5; all other phases are unblocked.
+**Version:** v1.1
+**Status:** APPROVED by the owner, 2026-10-18 (v1.1 amendment, same day: owner constraint on DB-side validation). Phase 6 (tournaments) is gated on OI-5; all other phases are unblocked.
 **Owner:** Pratheesh
 **Date:** 2026-10-18
 **Scale Tier:** T1
@@ -180,9 +180,9 @@ and revoke group-sourced invitations whose source group membership is gone. The 
 
 | Change | Detail |
 |---|---|
-| `group_membership_audit` (new) | `id UUID PK`, `group_id UUID NOT NULL` (no FK: the group may be deleted), `user_id UUID NOT NULL` (no FK: survives account deletion), `action` CHECK(`added`,`removed`,`left`,`role_changed`,`ownership_transferred`), `actor_user_id UUID NULL` (no FK), `actor_type` CHECK(`user`,`system`,`admin_override`), `old_role`, `new_role` (CHECK in `owner`,`admin`,`member` or NULL), `source` (text, values fixed in Phase 1 from the write sites: e.g. `creator`, `invite_accept`, `direct_add`, `leave`, `owner_remove`, `admin_override`), `occurred_at TIMESTAMPTZ NOT NULL`, `correlation_id`. Indexes `(group_id, occurred_at)` and `(user_id, occurred_at)`. No UPDATE or DELETE path in code (P6). |
-| `event_participant_actions.action` | CHECK widened with `access_revoked` (additive). Verify the live CHECK first (BP-01). |
-| `notifications` | `retracted_at TIMESTAMPTZ NULL`; `notification_type` CHECK widened with `tournament_registrant_access_lost` (additive; verify live CHECK). |
+| `group_membership_audit` (new) | `id UUID PK`, `group_id UUID NOT NULL` (no FK: the group may be deleted), `user_id UUID NOT NULL` (no FK: survives account deletion), `action` (text; app-validated: `added`,`removed`,`left`,`role_changed`,`ownership_transferred`), `actor_user_id UUID NULL` (no FK), `actor_type` (text; app-validated: `user`,`system`,`admin_override`), `old_role`, `new_role` (text or NULL; app-validated), `source` (text, app-validated; values fixed in Phase 1 from the write sites: e.g. `creator`, `invite_accept`, `direct_add`, `leave`, `owner_remove`, `admin_override`), `occurred_at TIMESTAMPTZ NOT NULL`, `correlation_id`. Indexes `(group_id, occurred_at)` and `(user_id, occurred_at)`. **No CHECK constraints on this table** (no DB-side validation; values are validated in `record_membership_change`). Only PK, NOT NULL and indexes. No UPDATE or DELETE path in code (P6). |
+| `event_participant_actions.action` | The existing CHECK is widened with `access_revoked` (additive; unavoidable, otherwise the insert is rejected). No other new CHECK is added anywhere. Verify the live CHECK first (BP-01). |
+| `notifications` | `retracted_at TIMESTAMPTZ NULL`; the existing `notification_type` CHECK, if any, is widened with `tournament_registrant_access_lost` (additive; unavoidable; verify live CHECK). |
 | Existing tables | No column removed or retyped. `event_invitations.status` already admits `revoked`. |
 
 Identity columns now: `correlation_id` on audit rows; the cascade is idempotent on `(event_id, user_id)` (a second run finds nothing to release).
@@ -415,3 +415,4 @@ Status: **APPROVED v1.0**. No blocking items for Phases 1–5, 7, 8.
 |---|---|---|
 | v0.1 | 2026-10-18 | First draft. Requirements stated by the owner 2026-10-18 and tournament decision (a) accepted. Incident analysis and code reading recorded in process note 4. |
 | v1.0 | 2026-10-18 | Approved by the owner as drafted. Proposed defaults for OI-1–4, 7, 8 accepted; Phase 6 remains gated on OI-5. §14 and Status updated; no design content changed. |
+| v1.1 | 2026-10-18 | Owner constraint (no DB-side validation): removed the CHECK constraints from the new `group_membership_audit` table; values are validated in application code. Existing CHECKs are only widened where the insert would otherwise fail. Status stays APPROVED, Phase 6 still gated on OI-5. |
