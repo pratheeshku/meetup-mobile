@@ -22,3 +22,11 @@ Jest tests: (a) each listed screen refetches on focus; (b) no list renders previ
 
 ## Reporting
 Raw test output, coverage delta, the audit list from step 1, screenshots of the "no longer available" message, deviations. Write `docs/reports/ac-m-refetch-report.md` and stop. Starts after backend `ac-p2-view-rule` and `ac-p3-cascade` are deployed, so the 404 behaviour can be exercised end to end.
+
+## Task `ac-m-followup` (stacked on `ac-m-refetch`)
+Branch `ac/ac-m-followup` off `ac/ac-m-refetch`; open the PR against `ac/ac-m-refetch`. Closes the gaps listed in `docs/reports/ac-m-refetch-report.md`.
+1. **404 on an action:** a 404 returned by an action on an open game, group or tournament detail screen (join, leave, RSVP, withdraw, member changes) goes through the same close-and-message path as a 404 detail fetch. Other errors keep today's handling.
+2. **Own actions must not show the notice:** when the user's own successful action (cancel or delete a game, delete or leave a group, withdraw) makes the next fetch 404, show the existing completion flow only, never "no longer available". Trace every create/cancel/delete/leave completion flow in `src/navigation` and `src/screens` and report file:line for each.
+3. **Label inventory:** `docs/label-inventory-mobile.json` drifts by one label; do not edit `docs/`. Put the exact entry needed in the report for the owner.
+4. Tests for 1 and 2. Run `npx jest` once, `npx tsc --noEmit`, `npm run lint`, `npm run check:labels`; compare failing suites to `main` as before. Report `docs/reports/ac-m-followup-report.md`.
+

@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
 
 **Doc ID:** DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
-**Version:** v1.1
-**Status:** APPROVED by the owner, 2026-10-18 (v1.1 amendment, same day: owner constraint on DB-side validation). Phase 6 (tournaments) is gated on OI-5; all other phases are unblocked.
+**Version:** v1.2
+**Status:** APPROVED by the owner, 2026-10-18 (v1.1 amendment, same day: owner constraint on DB-side validation). v1.2 (same day) records the owner's decisions after `ac-p1-verify` (D-5 to D-8, approved 2026-10-18). The Phase 6 policy removal is gated on OI-10 (live counts and the reconcile); all other phases are unblocked.
 **Owner:** Pratheesh
 **Date:** 2026-10-18
 **Scale Tier:** T1
@@ -77,19 +77,19 @@ Group membership changes (added, removed, left, role changed, ownership moved, a
 |---|---|
 | Game `public` | any signed-in user |
 | Game `group` | organizer; platform admin; current member of **any** attached group (`event_groups`, legacy `group_id` as fallback); holder of a **direct** invitation in `pending` or `accepted`; holder of a **group-sourced** invitation in `pending` or `accepted` **and** a current member of its `source_group_id` |
-| Game `invite_only` | organizer; platform admin; holder of an invitation in `pending` or `accepted` (direct only; no groups on this class) |
+| Game `invite_only` | organizer; platform admin; holder of a **direct** invitation in `pending` or `accepted`; holder of a **group-sourced** invitation in `pending` or `accepted` **and** a current member of its `source_group_id` (`invite-group` creates these on any game; D-6) |
 | Tournament `public` | any signed-in user |
 | Tournament `group` (v1) | organizer; active committee; platform admin; current member of its group |
 | Tournament `invite` | organizer; active committee; platform admin; invitation in `pending` or `accepted` where, if group-sourced, the user is a current member of the source group |
 
-Participant rows, registration rows and team roster rows **never** grant view. A denied read is 404.
+Participant rows, registration rows and team roster rows **never** grant view. A denied read is 404. Every group-membership basis also requires `groups.is_deleted = false` (D-5).
 **Code today (BP-01):** `events/policies.py:64` ORs `_participant` (line 57) and `_invited` (line 51, status only); `tournaments/policies.py:134` ORs `_registered` (line 119) and `_invited` (line 95). These are the defects. The inline invite check in `events/router.py:170` and the inline pre-filter in `events/repository.py:64-70` duplicate the rule and are removed so one rule remains (lineage §5.2).
 
 **AD-2: Derived versus explicit access (AC-06).**
 - *Derived access* follows a relationship that can end: group membership, and invitations created by a group fan-out (`source_group_id` set, `events/service.py:106-134`).
 - *Explicit access* is a deliberate act by a person and is not tied to a group: a direct invitation (`source_group_id` NULL) and an organizer add.
 - The view predicate for a group-sourced invitation therefore adds `EXISTS group_memberships (source_group_id, user)`. No stored status is trusted past its relationship.
-- **Organizer add on group games (gap found):** `organizer_add_participant` writes no invitation for `group` or `public` games (`events/service.py:854-878`; the invitation sync is `invite_only` only). Such a person sees the game today only via the participant row. Because participant rows stop granting view (AD-1), organizer add on a `group` game now also upserts an `accepted` **direct** invitation (the existing `upsert_event_invitation_accepted`, same transaction). Organizer remove revokes it.
+- **Organizer add on group games (gap found):** `organizer_add_participant` writes no invitation for `group` or `public` games (`events/service.py:854-878`; the invitation sync is `invite_only` only). Such a person sees the game today only via the participant row. Because participant rows stop granting view (AD-1), organizer add on a `group` game now also upserts an `accepted` **direct** invitation (the existing `upsert_event_invitation_accepted`, same transaction). Organizer remove revokes it. `upsert_event_invitation_accepted` keeps `source_group_id` on an existing row today (`events/repository.py:376-417`); for organizer add it must set `source_group_id` to NULL, otherwise the player stays group-sourced.
 - **RSVP aligned to the view rule (drift fix):** the RSVP check for group games requires current membership only (`events/service.py:634-647`). The owner decided on 2026-10-17 that the invite field applies to all visibilities "same behaviour as invite-only", so a direct invitee of a group game must be able to RSVP after accepting. RSVP rule for `group` games becomes: current member of an attached group, or `accepted` direct invitation. Confirmed by approval (OI-7).
 
 **AD-3: Participation rows grant nothing (AC-03).** `event_participants`, `tournament_registrations` and roster rows record *attendance*, not *authority to see*. Removing them from the view rule is safe only because AD-2 gives every legitimate participant an explicit or derived basis. The reconcile in AD-10 repairs legacy rows that have none.
@@ -98,7 +98,7 @@ Participant rows, registration rows and team roster rows **never** grant view. A
 1. self leave (`groups/service.py:191`),
 2. administrative removal and platform-admin override removal (`:211`),
 3. group removed from a game (organizer edit, `set_event_groups`, `events/service.py:137`),
-4. group deleted (OI-4).
+4. group soft-deleted (D-5, below).
 
 Steps, in this order (lock ordering is mandatory):
 1. Select affected upcoming, non-cancelled `group` games: attached to the group and with the user holding a participant, waitlist or invitation row. Lock those event rows `FOR UPDATE` in ascending id. This serialises against RSVP, which already locks the event first (`events/service.py:627`), so a concurrent RSVP either completes before the cascade sees it or sees the membership gone.
@@ -109,19 +109,21 @@ Steps, in this order (lock ordering is mandatory):
 
 Past or cancelled games: no status change (nothing to release). The view rule alone hides them, which is why AD-1 is the primary control and the cascade is hygiene plus capacity.
 
+**Group soft delete (D-5, owner 2026-10-18).** `soft_delete_group_service` (`groups/service.py:235`) and `detach_upcoming_games` (`groups/repository.py:129`) change: the deleted group is removed from `event_groups` (not only `events.group_id`); if other groups remain the game stays `group` and `events.group_id` is repointed to a remaining group (consistent with `set_event_groups`); only when none remain does it become `invite_only` (today's detach). `release_group_derived_access` then runs in the same transaction for every user who lost their last basis. Tournaments detach as today; the policy change covers their view. Hard delete by a platform admin fails today on foreign keys for any group that ever had a game; that is a separate bug (OI-11).
+
 **AD-5: Tournaments, owner decision (a) (AC-07).**
 - The `_registered` branch is removed as an independent view basis (AD-1). A registered player sees a `group` or `invite` tournament only through a current basis.
 - Registration rows are **not** withdrawn after the hard block (roster freeze, AD-6 of the lifecycle addendum is untouched). On access loss the system writes a `tournament_registrant_access_lost` record and notifies the organizer and every active committee member (one notice per tournament per day, de-duplicated). The committee acts through the existing `team_disqualification` or walkover paths (maker-checker, unchanged).
 - Before the hard block a person who lost access may self-withdraw if they can reach the withdraw endpoint; otherwise the committee removes them. The cascade does not auto-withdraw, so there is one behaviour at all phases.
 - Fan-out audiences (reminders, results, fixture notices) are filtered by AD-6, so an ineligible registrant receives nothing. The committee notice is the compensating control.
-- **Phase 1 gate:** confirm which roster members of `group` tournaments can legitimately hold a registration without being group members or invitees (`team` rosters, `tournaments/policies.py:106-110`, OI-5 of lifecycle). If such a path exists, the person needs an explicit basis at registration (an `accepted` direct invitation written by the committee add) or they would lose view the moment this ships. Blocking for the tournament slice only (OI-5 here).
+- **Gate decision (owner, 2026-10-18, after `ac-p1-verify` found the gate not cleared):** (1) registration in a `group` tournament requires a current basis for every person registered: the individual, or each active roster member, must be a group member, an invitee or active committee; individuals register themselves only (`req.user_id` equals the caller; also a stand-alone bug, OI-12); (2) existing registrants with no basis (live queries G1–G3, OI-10) receive an `accepted` direct tournament invitation from a human-run, dry-run-first reconcile; (3) only after that reconcile has run is `_registered` removed from the view rule. The order 1, 2, 3 is mandatory. The invitation basis works only if `meetup.tournament.invitations.enabled` is true in production (default false in code); `ac-p6` verifies it and reports if it is false. Tournament slice only; games are unaffected.
 
 **AD-6: Notifications (AC-08).**
 - The central audience resolver `notifications/fanout._resolve_recipients` applies the object's current view predicate to every candidate recipient before inserting deliveries. One filter, one place.
-- On cascade (AD-4) and on a tournament access loss, notifications belonging to the user whose payload names the affected game or tournament are marked `retracted` (additive column `retracted_at`, hidden from list and unread count). History for other objects is untouched.
+- On cascade (AD-4) and on a tournament access loss, notifications belonging to the user whose payload names the affected game or tournament are marked `retracted` (additive column `retracted_at` on `notifications.notification_deliveries`, filtered at the seven list/count query sites in `notifications/service.py`). History for other objects is untouched.
 - Pushes already delivered to a device cannot be recalled (R-3).
 
-**AD-7: Live streams (AC-09).** The event stream authorises only at connect (`events/router.py:490-531`, `_load_stream_event`). The stream loop re-checks the view predicate every `meetup.access.stream_recheck_seconds` (default 60) and ends the stream with a terminal `access_revoked` event. Group streams re-check membership the same way. Phase 1 confirms the exact loop structure before implementation (OI-5).
+**AD-7: Live streams (AC-09).** The event stream authorises only at connect (`events/router.py:490-531`, `_load_stream_event`). The stream loop re-checks the view predicate every `meetup.access.stream_recheck_seconds` (default 60) and ends the stream with a terminal `access_revoked` event. Group streams re-check membership the same way. Implementation shape (`ac-p1-verify` 4.4): pass the actor id into the generator, open a fresh `session_scope()` per re-check (never hold a session across the stream), and add the re-check as a periodic branch in the existing 30-second `wait_for` timeout loop (a 60-second default fits without a new task). `_broadcast_rsvp_update` (`events/router.py` ~:372-436) must stop sending `realtime_refresh` (event id, user id, action) to `withdrawn` participants and `declined` invitees; recipients are filtered by the view predicate. The notification stream (`notifications/router.py:31-70`) is per-user and needs no re-check.
 
 **AD-8: Client rule (AC-10).** Web and mobile: dashboard, All Games, All Tournaments, group and detail screens fetch on every open and on app foreground. List rows are not persisted past the screen. A 404 or an `access_revoked` stream event pops the detail screen and shows a neutral "no longer available" message. Mobile and web changes follow separate build briefs.
 
@@ -133,6 +135,8 @@ Past or cancelled games: no status change (nothing to release). The view rule al
 and revoke group-sourced invitations whose source group membership is gone. The dry run prints counts and ids per game for owner review before the real run. Idempotent. Run after the policy deploy (AD-1) because the policy already hides the games; the reconcile cleans capacity.
 
 **AD-11: Config (P1).** `meetup.access.stream_recheck_seconds` (default 60, bounds 15–300); `meetup.access.membership_audit.retention_months` (default 12, bounds 6–120, OI-1). Validated at startup, hard failure if missing or out of bounds. No feature flag on the view rule itself: a flag that re-opens access would defeat AC-01.
+
+**AD-12: Worker read grants (AC-08, D-8).** The outbox worker role has no SELECT on `event_groups`, `event_invitations`, `group_memberships`, `groups`, `tournament_invitations` and `tournament_committee_memberships` (`ac-p1-verify` 4.1), so the AD-6 filter cannot run there. One migration grants read-only SELECT on exactly those six tables to the worker role. No write grant, no RLS, no function. Human-run before `ac-p5` ships its filter.
 
 **Alternatives rejected**
 - *Keep the view rule and only fix the cascade.* The cascade can miss rows (race, legacy data, a new membership path). The predicate must be correct on its own (AC-01).
@@ -151,14 +155,14 @@ and revoke group-sourced invitations whose source group membership is gone. The 
 | Component | Change |
 |---|---|
 | `events/policies.py` | New `can_view_event` per AD-1; `_participant` removed; `_invited` split into direct and group-sourced. One `visible_events_filter`. |
-| `events/router.py`, `events/repository.py` | Delete the inline invite check (router :170) and inline pre-filter (repo :64-70); call the policy only. |
+| `events/router.py`, `events/repository.py` | Delete the inline invite check (router :170) and inline pre-filter (repo :64-70); call the policy only. The inline check returns 403 (:192); every denied read becomes 404. |
 | `events/service.py` | `release_group_derived_access`, RSVP rule, organizer add writes direct invitation, waitlist promotion eligibility, `set_event_groups` calls the cascade. |
 | `groups/service.py`, `groups/router.py` | Remove, leave, role, transfer, add, delete call `record_membership_change` and the cascade hooks inside their transaction. |
 | `groups/audit.py` (new) | `record_membership_change`, admin read endpoint. |
 | `tournaments/policies.py`, `tournaments/` | AD-1 rule, drop `_registered`, `tournament_registrant_access_lost` notice. |
 | `notifications/fanout.py` | Audience filter (AD-6), retraction. |
 | `core/realtime`, `events/router.py` stream, `groups/router.py` streams | Periodic re-check (AD-7). |
-| `home/service.py`, `settings_dashboard/` | Verify each list and count uses the policy (OI-5); fix any that do not. |
+| `settings_dashboard/service.py`, `users/repository.py` | Route `/settings/participating` (:29-43), `/settings/invitations` (:73-88) and `recent_games` in profile-summary (:262-272) through the visibility policy. `home/service.py` already uses it. |
 | `frontend/`, `meetup-mobile` | AD-8, from separate briefs. |
 
 **Endpoint (new):** `GET /groups/{id}/membership-audit?cursor=` and `GET /admin/groups/{id}/membership-audit`. Rule: group owner or group admin of that group, or platform admin. Members and non-members: 404. Paged, rate limited (P17). Rule declared per endpoint in `policies.py`.
@@ -180,9 +184,10 @@ and revoke group-sourced invitations whose source group membership is gone. The 
 
 | Change | Detail |
 |---|---|
-| `group_membership_audit` (new) | `id UUID PK`, `group_id UUID NOT NULL` (no FK: the group may be deleted), `user_id UUID NOT NULL` (no FK: survives account deletion), `action` (text; app-validated: `added`,`removed`,`left`,`role_changed`,`ownership_transferred`), `actor_user_id UUID NULL` (no FK), `actor_type` (text; app-validated: `user`,`system`,`admin_override`), `old_role`, `new_role` (text or NULL; app-validated), `source` (text, app-validated; values fixed in Phase 1 from the write sites: e.g. `creator`, `invite_accept`, `direct_add`, `leave`, `owner_remove`, `admin_override`), `occurred_at TIMESTAMPTZ NOT NULL`, `correlation_id`. Indexes `(group_id, occurred_at)` and `(user_id, occurred_at)`. **No CHECK constraints on this table** (no DB-side validation; values are validated in `record_membership_change`). Only PK, NOT NULL and indexes. No UPDATE or DELETE path in code (P6). |
+| `group_membership_audit` (new) | `id UUID PK`, `group_id UUID NOT NULL` (no FK: the group may be deleted), `user_id UUID NOT NULL` (no FK: survives account deletion), `action` (text; app-validated: `added`,`removed`,`left`,`role_changed`,`ownership_transferred`), `actor_user_id UUID NULL` (no FK), `actor_type` (text; app-validated: `user`,`system`,`admin_override`), `old_role`, `new_role` (text or NULL; app-validated), `source` (text, app-validated; exact list fixed by `ac-p1-verify` 4.7: `creator`, `member_invite`, `invite_link`, `leave`, `owner_remove`, `admin_remove`, `admin_override`, `role_change`, `ownership_transfer`; an admin-override removal of an owner writes two rows), `occurred_at TIMESTAMPTZ NOT NULL`, `correlation_id`. Indexes `(group_id, occurred_at)` and `(user_id, occurred_at)`. **No CHECK constraints on this table** (no DB-side validation; values are validated in `record_membership_change`). Only PK, NOT NULL and indexes. No UPDATE or DELETE path in code (P6). |
 | `event_participant_actions.action` | The existing CHECK is widened with `access_revoked` (additive; unavoidable, otherwise the insert is rejected). No other new CHECK is added anywhere. Verify the live CHECK first (BP-01). |
-| `notifications` | `retracted_at TIMESTAMPTZ NULL`; the existing `notification_type` CHECK, if any, is widened with `tournament_registrant_access_lost` (additive; unavoidable; verify live CHECK). |
+| `notifications.notification_deliveries` | `retracted_at TIMESTAMPTZ NULL`. No CHECK widening: `tournament_registrant_access_lost` has no preference toggle and `notification_deliveries.notification_type` has no CHECK (`ac-p1-verify` 4.1). |
+| Grants | Read-only SELECT for the worker role on six tables (AD-12). |
 | Existing tables | No column removed or retyped. `event_invitations.status` already admits `revoked`. |
 
 Identity columns now: `correlation_id` on audit rows; the cascade is idempotent on `(event_id, user_id)` (a second run finds nothing to release).
@@ -227,6 +232,7 @@ Identity columns now: `correlation_id` on audit rows; the cascade is idempotent 
 - *Audit tampering* → append-only in code, written in the same transaction, admin read only; tampering at the DB layer is the same T1 trust boundary as the rest of the system (flagged, not new).
 - *Admin override removal leaves no trace* → audited with `actor_type='admin_override'`.
 - *Over-revocation* (a legitimate explicit grant lost) → AD-2 keeps direct invitations and organizer adds; test 5; reconcile dry-run (AD-10) before any change.
+- *Public share link* → `/public/events/{id}` stays visibility-agnostic by the shareable-links addendum (Decision 4): the organizer's explicit act, 7 non-identifying fields, no participants, no auth. Documented exception to AC-02 and AC-11 (D-7).
 
 **Compliance (PDPA):** the audit stores ids only. After account deletion the ids cannot be linked to a person, so no erasure action is needed on audit rows (P12). Retention period OI-1. The privacy policy should state that group membership changes are recorded (owner to confirm wording, same item as `meetup-privacy-tnc`).
 
@@ -244,7 +250,7 @@ Identity columns now: `correlation_id` on audit rows; the cascade is idempotent 
 | Reconcile run twice | Idempotent; second run reports zero changes. |
 | Worker down | Fan-out delayed, and the eligibility filter is applied when it runs, so nothing is sent to a user who lost access in the meantime. |
 | Tied or unknowable origin of a legacy participant | Conservative rule (AD-10): only `organizer_add` in the action log keeps access; everyone else is released. The dry-run is reviewed by the owner before the real run. |
-| Group deleted | Treated as membership ended for every member (OI-4, default). |
+| Group soft-deleted | D-5: deleted group removed from `event_groups`, game stays `group` if other groups remain, AD-4 release for users who lost their last basis. |
 
 **Lock ordering (mandatory):** group membership row → event rows by ascending id → invitation and participant rows. No code path may invert this. A concurrency test (test 9) asserts no deadlock.
 
@@ -284,6 +290,12 @@ Risk classification (blast × exploitability): view policies **High**; cascade *
 14. Audit: every add, remove, leave, role change, ownership transfer and admin override writes exactly one row; a meta-test fails if a new membership write site skips `record_membership_change`; audit read by a member or non-member → 404; account deletion leaves audit rows.
 15. Stream: after removal the open stream receives `access_revoked` and closes within the re-check interval.
 16. Reconcile dry-run changes nothing; real run is idempotent; an `organizer_add` participant keeps access.
+17. `/settings/participating`, `/settings/invitations` and `recent_games` show nothing the user can no longer view (stale `going` row, stale group-sourced invitation).
+18. `invite-group` on an `invite_only` game: the invitee sees it while in the source group and loses it on leaving; a direct invitee keeps it.
+19. Group soft delete: members lose view of its upcoming games unless another attached group or a direct invitation applies; a multi-group game stays `group`; derived spots are released.
+20. Organizer add over an existing group-sourced invitation clears `source_group_id`; the player keeps access after leaving the group.
+21. `realtime_refresh` is not sent to withdrawn participants or declined invitees.
+22. Registration in a `group` tournament is refused for a person without a basis (individual or any roster member) and for a `req.user_id` other than the caller.
 
 **Other:** v1 tournament and existing game regression suites run unchanged and green except tests that asserted the old rule (listed and justified in the implementation report); migration up and down on a copy.
 
@@ -296,11 +308,11 @@ Migrations are written per phase; the human runs them. Each phase ends with an i
 | Phase | Content | Acceptance |
 |---|---|---|
 | 1. Verify | BP-01: live CHECKs (`event_participant_actions.action`, `notification_type`), the write sites in AD-9, `groups/service.py:336`, stream loop, which lists and counts bypass the policy (home, settings_dashboard, groups pages), group delete behaviour, team roster registration path (AD-5 gate) | Schema and code facts recorded; OI-4, OI-5, OI-8 answered |
-| 2. View rule | AD-1, AD-2 (organizer add invitation, RSVP), remove duplicate inline rules, tournament rule | Tests 1–8 (view part), 5–7 |
-| 3. Cascade | AD-4 with callers, waitlist promotion eligibility | Tests 2–4, 9–11 |
+| 2. View rule (games only) | AD-1, AD-2 (organizer add invitation, RSVP), remove duplicate inline rules, 404 everywhere, settings and profile paths. `tournaments/policies.py` untouched | Tests 1–8 (view part), 5–7, 17, 18, 20 |
+| 3. Cascade | AD-4 with callers, waitlist promotion eligibility, group soft delete (D-5) | Tests 2–4, 9–11, 19 |
 | 4. Audit | Table, `record_membership_change`, all write sites, read endpoint | Test 14 |
-| 5. Notifications and streams | AD-6, AD-7 | Tests 12, 15 |
-| 6. Tournaments | AD-5 notice, fan-out filter for registrants | Test 13 |
+| 5. Notifications and streams | AD-6, AD-7, AD-12 (grants migration run by the owner first) | Tests 12, 15, 21 |
+| 6. Tournaments | AD-5 in order: (1) registration basis rule and caller check, (2) tournament reconcile script, human-run, (3) view predicate without `_registered` and the registrant notice. Step 3 ships only after the owner confirms step 2 ran | Tests 13, 22 |
 | 7. Clients | Web and mobile refetch rule (AD-8), from separate briefs | e2e: removed user's list shows nothing after reopening |
 | 8. Reconcile and enable | Script, dry-run, owner review, real run | Dry-run reviewed; counts zero on second run |
 
@@ -346,8 +358,7 @@ Migrations are written per phase; the human runs them. Each phase ends with an i
 | D-1 | Supersedes the 2026-10-13 keep-access rule | Owner rule of 2026-10-13 | Owner principle of 2026-10-18: no access means no view, whoever ended it |
 | D-2 | Removes the `_registered` view branch added in lifecycle v1.2.2 | Lifecycle addendum v1.2.2 (owner-approved implementation ruling) | AC-03 and AC-07: participation rows must not grant view. Needs the Phase 1 gate (AD-5) |
 | D-3 | Requirements restated in-document, not an approved REQ addendum | `solution-design` precondition | Process note 1 |
-| D-4 | Organizer keeps access to a game they created after leaving an attached group (OI-2) | AC-01 literal reading | Authorship is an explicit relationship; the organizer cannot be locked out of their own game |
-
+\1| D-5 | Group soft delete: deleted group removed from `event_groups`; game stays `group` if other groups remain; view rule checks `groups.is_deleted` | Current behaviour (`groups/service.py:235`, `groups/repository.py:129-143`) | AC-04: deleting a group must end access like any other removal; today members keep view and multi-group games lose their other groups |\n| D-6 | AD-1 `invite_only` accepts group-sourced invitations while the user is in the source group | AD-1 v1.0 text (\"direct only\") | `invite-group` already creates them; AC-04 requires leaving the group to end that access |\n| D-7 | `/public/events/{id}` stays visibility-agnostic | AC-02 and AC-11 as written | Approved exception in the shareable-links addendum (Decision 4); organizer's explicit act; 7 non-identifying fields; no participants |\n| D-8 | Worker role gets read-only SELECT on six tables | Repo rule: grant changes need prior sign-off | Needed to run the AD-6 filter in the worker; signed off 2026-10-18 |\n
 ---
 
 ## 13. Requirements Coverage and Deferred Decisions
@@ -386,13 +397,12 @@ On approval (2026-10-18) the owner accepted the proposed defaults for OI-1, OI-2
 | OI-1 | Audit retention 12 months (config); readable by group owner, group admins of that group and platform admin. Privacy-policy wording to follow (`meetup-privacy-tnc`). | 🟡 MEDIUM | Resolved |
 | OI-2 | If an organizer is no longer in an attached group, they keep access and control of their own game (D-4). | 🟡 MEDIUM | Resolved |
 | OI-3 | A player's own counters and tournament record (Played, Won, owner-only record) are their own data and stay after access ends. Game and tournament detail do not. | 🟢 LOW | Resolved |
-| OI-4 | Group deleted: treat every membership as ended and run AD-4. Phase 1 verifies the `is_deleted` handling. | 🟡 MEDIUM | Resolved, verify in Phase 1 |
-| OI-5 | Phase 1 gates: stream loop structure, every list and count (home, settings_dashboard, groups pages) uses the policy, and which `group` tournament roster members can register without a basis (AD-5). The last is blocking for Phase 6 only. | 🟠 HIGH | **Open; blocks Phase 6 only** |
+| OI-4 | Group deleted. Decision D-5 (AD-4). | 🟡 MEDIUM | Resolved |
+| OI-5 | Phase 1 gates (streams, lists, roster path). Answered by `ac-p1-verify`; the gate decision is in AD-5. | 🟠 HIGH | Resolved; live counts are OI-10 |
 | OI-6 | The Project copy of the tournament lifecycle addendum was v1.1; the repo holds v1.2.2. Sync the Project copy. | 🟡 MEDIUM | Open, non-blocking (architect) |
 | OI-7 | RSVP for direct invitees of group games follows the 2026-10-17 invite decision (AD-2). | 🟡 MEDIUM | Resolved |
-| OI-8 | Source values and the exact action list for the audit table are fixed by the Phase 1 verification of the write sites. | 🟢 LOW | Resolved, fixed in Phase 1 |
-
-Status: **APPROVED v1.0**. No blocking items for Phases 1–5, 7, 8.
+\1| OI-9 | `invite-group` creates group-sourced invitations on any game visibility. Decision: AD-1 applies the group-sourced rule on every class; no change to `invite-group` (D-6). | 🟡 MEDIUM | Resolved |\n| OI-10 | Live counts of registrants with no basis: queries G1–G3 in the `ac-p1-verify` report section 4.9, run by the owner. Gates Phase 6 step 3. | 🟠 HIGH | **Open; gates Phase 6 step 3** |\n| OI-11 | Admin hard delete of any group that ever had a game fails on foreign keys. Separate bug, not in this design. | 🟢 LOW | Out of scope |\n| OI-12 | `register_participant` has no `req.user_id == caller` check for `group`/`public` tournaments. Separate bug brief AC-BUG-1; AD-5 step 1 depends on it. | 🟠 HIGH | Separate task |\n
+Status: **APPROVED v1.2** (D-5 to D-8 approved by the owner 2026-10-18). No blocking items for Phases 2–5, 7, 8. Phase 6 step 3 is gated on OI-10.
 
 ---
 
@@ -416,3 +426,4 @@ Status: **APPROVED v1.0**. No blocking items for Phases 1–5, 7, 8.
 | v0.1 | 2026-10-18 | First draft. Requirements stated by the owner 2026-10-18 and tournament decision (a) accepted. Incident analysis and code reading recorded in process note 4. |
 | v1.0 | 2026-10-18 | Approved by the owner as drafted. Proposed defaults for OI-1–4, 7, 8 accepted; Phase 6 remains gated on OI-5. §14 and Status updated; no design content changed. |
 | v1.1 | 2026-10-18 | Owner constraint (no DB-side validation): removed the CHECK constraints from the new `group_membership_audit` table; values are validated in application code. Existing CHECKs are only widened where the insert would otherwise fail. Status stays APPROVED, Phase 6 still gated on OI-5. |
+| v1.2 | 2026-10-18 | Owner decisions after `ac-p1-verify` (PR #47): AD-5 gate decision and order, D-5 group soft delete, D-6 group-sourced invitations on every class, D-7 public share exception, D-8 worker grants (AD-12), no preference CHECK widening. Added AD-12, tests 17–22, OI-9 to OI-12. Corrected `notifications` to `notifications.notification_deliveries` and the audit `source` list. Phase 2 is games only; tournament view change moves to Phase 6 step 3. |
