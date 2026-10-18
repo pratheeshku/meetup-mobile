@@ -137,6 +137,7 @@ import { useT } from '../labels/LabelsContext';
 import ScreenContainer from '../components/ScreenContainer';
 import { perfLog, isPerfCapturing } from '../diagnostics/perfLog';
 import { recordNavChange } from '../hooks/usePerfScreen';
+import { PA_SPIKE_ENABLED } from '../devspike/spikeFlag';
 
 type AppRootParamList = {
   Tabs: undefined;
@@ -315,7 +316,7 @@ function ProfileStack(): React.JSX.Element {
         component={SettingsScreen}
         options={{ headerShown: false }}
       />
-      {__DEV__ ? (
+      {PA_SPIKE_ENABLED ? (
         <ProfileStackNav.Screen
           name="PaSpike"
           component={PaSpikeScreen}

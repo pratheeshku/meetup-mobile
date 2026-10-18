@@ -48,6 +48,7 @@ import IconBadge from '../components/IconBadge';
 import LoadingView from '../components/LoadingView';
 import ScreenContainer from '../components/ScreenContainer';
 import Toast from '../components/Toast';
+import { PA_SPIKE_ENABLED } from '../devspike/spikeFlag';
 import { useT } from '../labels/LabelsContext';
 import {
   borderWidth,
@@ -345,7 +346,7 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
         {/* App version: long-press copies the support text */}
         <Pressable
           onLongPress={handleCopySupportInfo}
-          onPress={__DEV__ ? handleSpikeTap : undefined}
+          onPress={PA_SPIKE_ENABLED ? handleSpikeTap : undefined}
           accessibilityRole="text"
           accessibilityLabel={versionLine}
           testID="settings-app-version"

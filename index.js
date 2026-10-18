@@ -53,7 +53,7 @@ registerEventBackgroundHandler();
 
 // pa-spike (throwaway, dev builds only): wraps the single background handler so
 // spike action presses run first, everything else falls through unchanged.
-if (__DEV__) {
+if (true /* pa-spike: release builds too, branch only */) {
   require('./src/devspike/paSpike').registerSpikeBackgroundHandler();
 }
 
