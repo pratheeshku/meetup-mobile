@@ -102,6 +102,11 @@ import {
   getInitialEventNotification,
   registerEventForegroundHandler,
 } from '../notifications/eventNotificationHandler';
+import {
+  getInitialPushActionNotification,
+  registerPushActionCategories,
+  registerPushActionForegroundHandler,
+} from '../notifications/pushActions';
 
 import { claimAuthHandoff } from './showCompletion';
 import CompletionScreen from '../screens/CompletionScreen';
@@ -426,7 +431,8 @@ export default function RootNavigator(): React.JSX.Element {
     const payload =
       (await getInitialNotification()) ??
       (await getInitialParticipantNotification()) ??
-      (await getInitialEventNotification());
+      (await getInitialEventNotification()) ??
+      (await getInitialPushActionNotification());
     // Known limitation (consistent with §3.9's own "unauthenticated deep
     // links" note, which this codebase hasn't built the
     // `pendingDestination` mechanism for either): a quit-state tap that
@@ -462,11 +468,18 @@ export default function RootNavigator(): React.JSX.Element {
     // the app is active — same pattern as the participant listener above.
     const unsubscribeEventEvents = registerEventForegroundHandler();
 
+    // Invite / group-added action presses while the app is active, and a
+    // second iOS category registration once labels are loaded (index.js
+    // registers at launch, possibly before the label cache is read).
+    const unsubscribePushActionEvents = registerPushActionForegroundHandler();
+    registerPushActionCategories().catch(() => {});
+
     return () => {
       unsubscribeMessage();
       unsubscribeOpenedApp();
       unsubscribeParticipantEvents();
       unsubscribeEventEvents();
+      unsubscribePushActionEvents();
     };
   }, []);
 

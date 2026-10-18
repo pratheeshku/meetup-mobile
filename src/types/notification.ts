@@ -115,6 +115,12 @@ export interface NotificationHistoryItem {
   created_at: string;
   /** ISO 8601 date-time; `null` while unread. */
   read_at: string | null;
+  /**
+   * Derived outcome of the invitation / membership (push actions AD-6), e.g.
+   * `going`, `waitlisted`, `accepted`, `declined`, `left`, `unavailable`.
+   * Absent or `null` for other types and from servers that predate it.
+   */
+  action_state?: string | null;
   /** Optional metadata from API, including display.title and display.body. */
   data?: Record<string, any> | null;
   payload?: {

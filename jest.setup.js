@@ -147,6 +147,7 @@ jest.mock('react-native-notify-kit', () => ({
     getInitialNotification: jest.fn(async () => null),
     onBackgroundEvent: jest.fn(),
     onForegroundEvent: jest.fn(() => () => {}),
+    setNotificationCategories: jest.fn(async () => undefined),
   },
   EventType: { DISMISSED: 0, PRESS: 1, ACTION_PRESS: 2, DELIVERED: 3 },
   AndroidImportance: { DEFAULT: 3, HIGH: 4 },

@@ -20,12 +20,31 @@ import {
 } from 'react-native';
 
 import { useT } from '../labels/LabelsContext';
+import type { LabelKey, TranslateFn } from '../labels/LabelsContext';
 import type { NotificationHistoryItem } from '../types/notification';
 import { formatNotificationCardTime } from '../utils/notificationDateUtils';
 import { CheckIcon, MarkUnreadIcon } from './icons/ActionIcons';
 import NotificationIcon from './icons/NotificationIcon';
 
 const ACTION_WIDTH = 96;
+
+/** Outcome text for `action_state`; states without a label show nothing. */
+const ACTION_STATE_LABELS: Record<string, LabelKey> = {
+  going: 'mob.notif_action_state.going',
+  waitlisted: 'mob.notif_action_state.waitlisted',
+  accepted: 'mob.notif_action_state.accepted',
+  declined: 'mob.notif_action_state.declined',
+  left: 'mob.notif_action_state.left',
+  unavailable: 'mob.notif_action_state.unavailable',
+};
+
+function getActionStateLabel(
+  state: string | null | undefined,
+  t: TranslateFn,
+): string | null {
+  const key = state ? ACTION_STATE_LABELS[state] : undefined;
+  return key ? t(key) : null;
+}
 
 export interface NotificationCardProps {
   item: NotificationHistoryItem;
@@ -107,6 +126,7 @@ export default function NotificationCard({
   const rawBody = item.payload?.display?.body ?? item.body;
   const body = rawBody && rawBody.trim() ? rawBody.trim() : '';
   const timeText = formatNotificationCardTime(item.created_at, now);
+  const actionStateLabel = getActionStateLabel(item.action_state, t);
 
   const toggleActionLabel = isUnread
     ? t('mob.notif_history.action_mark_read')
@@ -205,6 +225,14 @@ export default function NotificationCard({
                 numberOfLines={2}
               >
                 {body}
+              </Text>
+            ) : null}
+            {actionStateLabel ? (
+              <Text
+                style={[styles.body, isUnread ? styles.bodyUnread : styles.bodyRead]}
+                numberOfLines={1}
+              >
+                {actionStateLabel}
               </Text>
             ) : null}
           </View>

@@ -111,6 +111,9 @@ describe.each([
 it('still shows the banner (and never notify-kit) for every other known type — unchanged behaviour', () => {
   deliver({
     messageId: 'm6',
+    // A push with a `notification` block (flag off / old path) keeps the banner;
+    // the data-only shape is the push-actions path (pushActionsDisplay.test.ts).
+    notification: { title: 't', body: 'b' },
     data: { notification_type: 'event_invite', entity_id: 'evt-9', title: 't', body: 'b' },
   });
 

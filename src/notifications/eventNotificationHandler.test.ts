@@ -11,13 +11,13 @@ import notifee, { AndroidStyle, EventType } from 'react-native-notify-kit';
 import type { Event } from 'react-native-notify-kit';
 
 import { PLAN_CHANNEL_ID } from './channels';
+import { registerNotificationBackgroundDispatcher } from './notificationEventDispatcher';
 import { navigationRef } from './notificationRouting';
 import {
   displayEventNotification,
   getInitialEventNotification,
   handleEventNotificationEvent,
   isEventNotificationType,
-  registerEventBackgroundHandler,
   registerEventForegroundHandler,
 } from './eventNotificationHandler';
 
@@ -163,9 +163,9 @@ describe('displayEventNotification', () => {
   );
 });
 
-describe('registerEventBackgroundHandler', () => {
+describe('background dispatcher: event notifications', () => {
   function registerAndGetHandler(): (event: Event) => Promise<void> {
-    registerEventBackgroundHandler();
+    registerNotificationBackgroundDispatcher();
     expect(mockOnBackgroundEvent).toHaveBeenCalledTimes(1);
     return mockOnBackgroundEvent.mock.calls[0][0];
   }
