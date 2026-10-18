@@ -195,7 +195,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('1. a 404 returned by an action closes the screen with the message', () => {
+describe('1. a 404 returned by an action closes the screen with the message (except member role / remove)', () => {
   describe('game detail', () => {
     it('Join (RSVP) 404: goes back, shows the message once', async () => {
       const root = await mountEvent();
@@ -273,7 +273,9 @@ describe('1. a 404 returned by an action closes the screen with the message', ()
       expect(root).toBeDefined();
     });
 
-    it('remove member 404: goes back, shows the message', async () => {
+    // A 404 here can mean "member not found", not "the group is gone": today's normal error
+    // handling, the screen stays open (ac-m-followup-fix).
+    it('remove member 404: keeps today\'s error, no goBack, no notice', async () => {
       mockGetGroup.mockResolvedValue(GROUP_OWNER);
       const root = await mountGroup();
       (removeMember as jest.Mock).mockRejectedValueOnce(NOT_FOUND);
@@ -282,18 +284,22 @@ describe('1. a 404 returned by an action closes the screen with the message', ()
       });
       await press(byLabel(root, 'Remove'));
       await act(async () => {});
-      expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
-      expect(goneNow()).toBe(true);
+      expect(nav.navigation.goBack).not.toHaveBeenCalled();
+      expect(goneNow()).toBe(false);
+      expect(texts(root)).toContain('Could not remove this group member. Please try again.');
+      expect(mockShowCompletion).not.toHaveBeenCalled();
     });
 
-    it('change role 404: goes back, shows the message', async () => {
+    it('change role 404: keeps today\'s error, no goBack, no notice', async () => {
       mockGetGroup.mockResolvedValue(GROUP_OWNER);
       const root = await mountGroup();
       await press(byLabel(root, 'Change Role'));
       (updateMemberRole as jest.Mock).mockRejectedValueOnce(NOT_FOUND);
       await press(byLabel(root, 'Save'));
-      expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
-      expect(goneNow()).toBe(true);
+      expect(nav.navigation.goBack).not.toHaveBeenCalled();
+      expect(goneNow()).toBe(false);
+      expect(texts(root)).toContain('Could not update this group member’s role. Please try again.');
+      expect(mockShowCompletion).not.toHaveBeenCalled();
     });
 
     it('change role with another error keeps the role error', async () => {
@@ -304,6 +310,7 @@ describe('1. a 404 returned by an action closes the screen with the message', ()
       await press(byLabel(root, 'Save'));
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(false);
+      expect(texts(root)).toContain('Could not update this group member’s role. Please try again.');
     });
 
     it('Delete group 404: goes back, shows the message', async () => {
