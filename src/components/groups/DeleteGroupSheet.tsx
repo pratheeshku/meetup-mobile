@@ -12,7 +12,7 @@ import {
 } from '../icons/ActionIcons';
 import { useT } from '../../labels/LabelsContext';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
-import { getApiErrorMessage } from '../../utils/apiError';
+import { getApiErrorMessage, isNotFoundError } from '../../utils/apiError';
 
 interface DeleteGroupSheetProps {
   groupId: string;
@@ -21,6 +21,8 @@ interface DeleteGroupSheetProps {
   visible: boolean;
   onClose: () => void;
   onDeleted: () => void;
+  /** The group answered 404 (gone or no longer visible): the screen closes with the neutral message. */
+  onNotFound?: () => void;
 }
 
 export default function DeleteGroupSheet({
@@ -30,6 +32,7 @@ export default function DeleteGroupSheet({
   visible,
   onClose,
   onDeleted,
+  onNotFound,
 }: DeleteGroupSheetProps): React.JSX.Element | null {
   const t = useT();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -49,7 +52,12 @@ export default function DeleteGroupSheet({
       onClose();
       onDeleted();
     } catch (e) {
-      setDeleteError(getApiErrorMessage(e, t('mob.group_delete.err_delete')));
+      if (isNotFoundError(e) && onNotFound) {
+        onClose();
+        onNotFound();
+      } else {
+        setDeleteError(getApiErrorMessage(e, t('mob.group_delete.err_delete')));
+      }
       setIsDeleting(false);
     }
   };
