@@ -3,3 +3,6 @@ One section per document. Version and amendment narrative belongs here; document
 
 ## DES-MEETUP-MOBILE.md and addenda
 Not yet migrated. Amendment narrative still sits in each document's header and review log and moves here in a separate architect edit.
+
+## DES-MEETUP-ADDENDUM-access-consistency.md
+- v1.0 (2026-10-18): approved by the owner. Copy of the backend repo's document; the backend copy is the one the owner updates.

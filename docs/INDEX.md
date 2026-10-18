@@ -23,6 +23,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - DES-MEETUP-ADDENDUM-email-auth.md, -social-login.md: email auth and login providers.
 - DES-MEETUP-ADDENDUM-dashboard.md: dashboard and the bottom bar navigation rules.
 - DES-MEETUP-ADDENDUM-tournament-lifecycle.md: tournament v2 (see also the mobile brief for it).
+- DES-MEETUP-ADDENDUM-access-consistency.md: no access means no view; mobile scope is AD-8 only (refetch on open, 404 closes the screen). Brief: `~/meetup/docs/briefs/BRIEF-access-consistency-mobile.md`.
 - DES-MEETUP-ADDENDUM-approval-context-signing.md, -profile-onboarding.md: approvals, first-run profile steps.
 - DES-MEETUP-MOBILE-ADDENDUM-shareable-links.md: share links and deep links.
 - MOBILE-ADDENDUM-skill-level-delete.md, MOBILE-ADDENDUM-sports-filter-preselect.md: mobile-only features.
@@ -33,7 +34,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - Enterprise_Design_Principles.md (P1-P17) and design-best-practices.md (BP-01-BP-13). Not in this repo; they live in the owner's Architect Project and the Sadhana repo.
 
 ## Active work
-- Build briefs live in the backend repo: `~/meetup/docs/briefs/` (tournament Release 1 mobile, venue catalogue mobile). Read only the brief for your task ID.
+- Build briefs live in the backend repo: `~/meetup/docs/briefs/` (tournament Release 1 mobile, venue catalogue mobile, access consistency mobile). Read only the brief for your task ID.
 - status/: per-task status files (for example `vc-m-*-status.md`). Update the one for your task ID.
 - ../implementation-status-*.md (repo root): per-design implementation status.
 
