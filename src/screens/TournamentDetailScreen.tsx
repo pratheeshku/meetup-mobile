@@ -59,8 +59,8 @@ import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
 import { showCompletion } from '../navigation/showCompletion';
-import { closeUnavailableScreen } from '../navigation/accessNotice';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
+import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { isNotFoundError } from '../utils/apiError';
 import { useSportDisplayName } from '../utils/labels';
 import { formatEventDate } from '../utils/formatEventDateTime';
@@ -118,7 +118,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
 
   // `silent` refreshes in place (focus / foreground after the first load) instead of flashing
   // the loading view.
-  const unavailableHandledRef = useRef(false);
+  const unavailable = useUnavailableScreen(navigation);
   const loadAll = useCallback(
     async (silent: boolean = false) => {
       if (!silent) {
@@ -138,10 +138,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         // 404 = gone or no longer visible to this user (AC-11, AC-07: a registered player who
         // lost access sees nothing): close with the neutral message, once.
         if (isNotFoundError(error)) {
-          if (!unavailableHandledRef.current) {
-            unavailableHandledRef.current = true;
-            closeUnavailableScreen(navigation);
-          }
+          unavailable.onNotFound();
         } else if (!silent) {
           setLoadError(tRef.current('mob.tournament.load_error'));
         }
@@ -151,7 +148,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         }
       }
     },
-    [tournamentId, navigation],
+    [tournamentId, unavailable],
   );
 
   // Fetch on every focus and app foreground (AC-10), including a push that opens a tournament
@@ -162,19 +159,28 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     useCallback(() => {
       const silent = loadedTournamentIdRef.current === tournamentId;
       if (!silent) {
-        unavailableHandledRef.current = false;
+        unavailable.reset();
       }
       loadedTournamentIdRef.current = tournamentId;
       loadAll(silent);
-    }, [loadAll, tournamentId]),
+    }, [loadAll, tournamentId, unavailable]),
     tournamentId,
   );
 
   /** Re-reads the tournament so access/invitation status reflect the server. */
   const refreshTournament = useCallback(async (): Promise<void> => {
-    const fresh = await getTournament(tournamentId);
-    setTournament(fresh);
-  }, [tournamentId]);
+    try {
+      const fresh = await getTournament(tournamentId);
+      setTournament(fresh);
+    } catch (error) {
+      // 404 (for example after declining the invitation): close; other errors surface as before.
+      if (isNotFoundError(error)) {
+        unavailable.onNotFound();
+        return;
+      }
+      throw error;
+    }
+  }, [tournamentId, unavailable]);
 
   const handleRegister = async (): Promise<void> => {
     setRegisterError(null);
@@ -189,8 +195,12 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         setTournament(tournamentData);
         setRegistrations(registrationsData);
       });
-    } catch {
-      setRegisterError(t('mob.tournament.register_error'));
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        setRegisterError(t('mob.tournament.register_error'));
+      }
     } finally {
       setIsRegistering(false);
     }
@@ -207,6 +217,8 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     try {
       await withCorrelationId(async correlationId => {
         await withdrawFromTournament(tournamentId, myRegistration.id, { correlationId });
+        // The user's own action: a 404 on the refetch below closes the screen quietly.
+        unavailable.markOwnAction();
         const [tournamentData, registrationsData] = await Promise.all([
           getTournament(tournamentId, { correlationId }),
           getRegistrations(tournamentId, { correlationId }),
@@ -214,8 +226,12 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         setTournament(tournamentData);
         setRegistrations(registrationsData);
       });
-    } catch {
-      setWithdrawError(t('mob.tournament.withdraw_error'));
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        setWithdrawError(t('mob.tournament.withdraw_error'));
+      }
     } finally {
       setIsWithdrawing(false);
     }
@@ -226,6 +242,8 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     setIsCancelling(true);
     try {
       await cancelTournament(tournamentId);
+      // The organiser's own action: any 404 after this closes the screen quietly.
+      unavailable.markOwnAction();
       if (tournament) {
         showCompletion({
           flow: 'tournament_cancelled',
@@ -238,8 +256,12 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           primary: 'dashboard',
         });
       }
-    } catch {
-      setCancelError(t('mob.tournament.cancel_error'));
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        setCancelError(t('mob.tournament.cancel_error'));
+      }
     } finally {
       setIsCancelling(false);
     }
@@ -308,7 +330,14 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       <TournamentInvitationBanner
         tournamentId={tournament.id}
         status={tournament.my_invitation_status}
-        onResponded={refreshTournament}
+        onResponded={async result => {
+          // Declining is the user's own action and can take the tournament out of sight.
+          if (result?.accepted === false) {
+            unavailable.markOwnAction();
+          }
+          await refreshTournament();
+        }}
+        onNotFound={unavailable.onNotFound}
       />
 
       <TournamentInvitePanel tournamentId={tournament.id} access={tournament.my_invite_access} />

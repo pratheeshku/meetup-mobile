@@ -59,3 +59,14 @@ export function closeUnavailableScreen(navigation: ClosableNavigation | undefine
     navigation.goBack();
   }
 }
+
+/**
+ * Closes a detail screen after the user's OWN successful action made the next fetch 404
+ * (cancel / delete / leave / withdraw): the existing completion flow is what the user sees,
+ * so there is no "no longer available" message. Goes back only if there is somewhere to go.
+ */
+export function closeScreenQuietly(navigation: ClosableNavigation | undefined): void {
+  if (navigation && (typeof navigation.canGoBack !== 'function' || navigation.canGoBack())) {
+    navigation.goBack();
+  }
+}

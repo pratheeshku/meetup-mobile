@@ -13,6 +13,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { withCorrelationId } from '../../api/correlationId';
 import { respondToTournamentInvitation } from '../../api/tournaments';
+import { isNotFoundError } from '../../utils/apiError';
 import { useT } from '../../labels/LabelsContext';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import type { TournamentInvitationStatus } from '../../types/tournament';
@@ -24,13 +25,16 @@ interface Props {
   tournamentId: string;
   status: TournamentInvitationStatus | null | undefined;
   /** Re-fetches the tournament so `my_invitation_status` reflects the server. */
-  onResponded: () => Promise<void>;
+  onResponded: (result?: { accepted: boolean }) => Promise<void>;
+  /** The respond call answered 404 (gone or no longer visible): the screen closes with the neutral message. */
+  onNotFound?: () => void;
 }
 
 export default function TournamentInvitationBanner({
   tournamentId,
   status,
   onResponded,
+  onNotFound,
 }: Props): React.JSX.Element | null {
   const t = useT();
   const [busy, setBusy] = useState<'accept' | 'decline' | null>(null);
@@ -60,6 +64,11 @@ export default function TournamentInvitationBanner({
         await respondToTournamentInvitation(tournamentId, accept, { correlationId });
       });
     } catch (e) {
+      if (isNotFoundError(e) && onNotFound) {
+        setBusy(null);
+        onNotFound();
+        return;
+      }
       const info = readTournamentInviteError(e);
       setError(
         info.message ??
@@ -75,7 +84,7 @@ export default function TournamentInvitationBanner({
       return;
     }
     try {
-      await onResponded();
+      await onResponded({ accepted: accept });
     } finally {
       setBusy(null);
     }
