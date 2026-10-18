@@ -272,13 +272,8 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
       });
       setEditingRoleUserId(null);
       goToDashboard(t('mob.success.group_updated'));
-    } catch (e) {
-      // 404: the group is gone or no longer visible (AC-11): close with the neutral message.
-      if (isNotFoundError(e)) {
-        unavailable.onNotFound();
-      } else {
-        setRoleError(t('mob.group_detail.role_error'));
-      }
+    } catch {
+      setRoleError(t('mob.group_detail.role_error'));
     } finally {
       setIsSavingRole(false);
     }
@@ -293,12 +288,8 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         setGroup(await getGroup(groupId, { correlationId }));
       });
       goToDashboard(t('mob.success.group_updated'));
-    } catch (e) {
-      if (isNotFoundError(e)) {
-        unavailable.onNotFound();
-      } else {
-        setRemoveError(t('mob.group_detail.remove_error'));
-      }
+    } catch {
+      setRemoveError(t('mob.group_detail.remove_error'));
     } finally {
       setRemovingUserId(null);
     }
