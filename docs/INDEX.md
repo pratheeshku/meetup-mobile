@@ -30,6 +30,9 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - DES-MEETUP-FEEDBACK-001 — Terminology, Navigation, Group Invite & Share Link.md: feedback-driven UI and terminology rules.
 - Several addenda are copies of the backend repo's; the backend copy is the one the owner updates and may be newer. If they differ, ask.
 
+## AI models and tools
+- Backend repo: `~/meetup/docs/AI-MODELS.md`. Which AI model or tool to use for which scenario, routing rules and known trust issues. Single copy; do not duplicate here.
+
 ## Governing files (apply to every design and review)
 - Enterprise_Design_Principles.md (P1-P17) and design-best-practices.md (BP-01-BP-13). Not in this repo; they live in the owner's Architect Project and the Sadhana repo.
 
