@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
 
 **Doc ID:** DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
-**Version:** v1.3
-**Status:** APPROVED by the owner, 2026-10-18 (v1.1 amendment, same day: owner constraint on DB-side validation). v1.2 (same day) records the owner's decisions after `ac-p1-verify` (D-5 to D-8, approved 2026-10-18). The Phase 6 policy removal is gated on OI-10 (live counts and the reconcile); all other phases are unblocked. v1.3 (same day) records the owner's decisions on group deletion and group invitations (AC-15, AC-16, AD-13, AD-14, D-9, tests 23-29) and repairs the v1.2 edit, which had dropped rows D-4 and OI-8 and left two tables malformed.
+**Version:** v1.4
+**Status:** APPROVED by the owner, 2026-10-18 (v1.1 amendment, same day: owner constraint on DB-side validation). v1.2 (same day) records the owner's decisions after `ac-p1-verify` (D-5 to D-8, approved 2026-10-18). The Phase 6 policy removal is gated on OI-10 (live counts and the reconcile); all other phases are unblocked. v1.3 (same day) records the owner's decisions on group deletion and group invitations (AC-15, AC-16, AD-13, AD-14, D-9, tests 23-29) and repairs the v1.2 edit, which had dropped rows D-4 and OI-8 and left two tables malformed. v1.4 (same day, owner approved) adds the recurring-games job to the attach paths of AD-13, fixes the tournament status list (no draft status; `dissolved` is closed) and adds test 30 (task `ac-bug-2b`).
 **Owner:** Pratheesh
 **Date:** 2026-10-18
 **Scale Tier:** T1
@@ -141,10 +141,10 @@ and revoke group-sourced invitations whose source group membership is gone. The 
 **AD-12: Worker read grants (AC-08, D-8).** The outbox worker role has no SELECT on `event_groups`, `event_invitations`, `group_memberships`, `groups`, `tournament_invitations` and `tournament_committee_memberships` (`ac-p1-verify` 4.1), so the AD-6 filter cannot run there. One migration grants read-only SELECT on exactly those six tables to the worker role. No write grant, no RLS, no function. Human-run before `ac-p5` ships its filter.
 
 **AD-13: Group deletion guard (AC-15; amends D-5).** A group cannot be deleted while it is referenced by an active game or an open tournament.
-- *Active game:* attached through `event_groups` (or the legacy `events.group_id`), status not `cancelled`, and not yet ended (`ends_at`, or `starts_at` when there is no end, is in the future). *Open tournament:* references the group and is neither completed nor cancelled; a draft counts as open. The task lists every reference site and the exact status values it used (BP-01).
+- *Active game:* attached through `event_groups` (or the legacy `events.group_id`), status not `cancelled`, and not yet ended (`ends_at`, or `starts_at` when there is no end, is in the future). *Open tournament:* references the group (`tournaments.group_id`) and its status is none of `completed`, `cancelled`, `dissolved` (the committee-dissolved terminal state, owner decision 2026-10-18). There is no draft status. The task lists every reference site and the exact status values it used (BP-01).
 - Applies to the app's soft delete and to the admin delete path.
 - Refusal: HTTP 409, `detail` "This group is used by upcoming games or open tournaments. Cancel or finish them first.", plus additive fields `blocker_count` and `blockers` (up to 20 items of `type`, `id`, `title`, `starts_at`). The caller is a member or a platform admin and can already view these items; nothing else is returned.
-- Race: delete locks the group row `FOR UPDATE`, then checks references. Every path that attaches a group (create or edit a game or tournament, `invite-group`) takes `FOR SHARE` on the group row (ascending id) before writing, and refuses a deleted group. Lock order extends AD-4: group row, then membership rows, then event rows.
+- Race: delete locks the group row `FOR UPDATE`, then checks references. Every path that attaches a group (create or edit a game or tournament, `invite-group`, and the recurring-games job in `jobs/recurring_events.py`, which copies a base game's groups into each generated game; the job skips a deleted group, and skips generating a group game left with no group, with a log line) takes `FOR SHARE` on the group row (ascending id) before writing, and refuses a deleted group. Lock order extends AD-4: group row, then membership rows, then event rows.
 - Admin hard delete runs the same guard first. If any reference remains at all (including past games), it answers 409 "This group has history and cannot be purged" instead of the foreign-key error (OI-11). A real purge is out of scope.
 - D-5's detach and release stay for the references the guard allows (past or cancelled games, where no spot is at stake). No code is removed.
 
@@ -310,11 +310,12 @@ Risk classification (blast × exploitability): view policies **High**; cascade *
 22. Registration in a `group` tournament is refused for a person without a basis (individual or any roster member) and for a `req.user_id` other than the caller.
 23. Deleting a group (app and admin path) that has an upcoming `group` game returns 409 with `blockers`; the group, memberships and game are unchanged.
 24. Deleting a group whose only games are cancelled or past succeeds; detach and release behave as in test 19.
-25. An open (draft or in-progress) group tournament blocks deletion; completed or cancelled does not.
+25. A group tournament in `registration_open` or `registration_closed` blocks deletion; `completed`, `cancelled` or `dissolved` does not.
 26. Concurrent delete and attach (create or edit a game): exactly one wins, a deleted group is never attached to an active game, no deadlock.
 27. `invite-group` by an organizer who is not a group member returns the same 404 as a nonexistent group; no invitation and no notification is created.
 28. `invite-group` by an organizer who is a member, and by a group owner or admin who is not the organizer, still succeed.
 29. Admin hard delete of a group with any game reference returns 409, not a database error; nothing is deleted.
+30. Recurring-games job: with the group deleted before generation, the generated game is not attached to it (a game left with no group is skipped and logged); with the group alive, generation is unchanged.
 
 **Other:** v1 tournament and existing game regression suites run unchanged and green except tests that asserted the old rule (listed and justified in the implementation report); migration up and down on a copy.
 
@@ -334,7 +335,7 @@ Migrations are written per phase; the human runs them. Each phase ends with an i
 | 6. Tournaments | AD-5 in order: (1) registration basis rule and caller check, (2) tournament reconcile script, human-run, (3) view predicate without `_registered` and the registrant notice. Step 3 ships only after the owner confirms step 2 ran | Tests 13, 22 |
 | 7. Clients | Web and mobile refetch rule (AD-8), from separate briefs | e2e: removed user's list shows nothing after reopening |
 | 8. Reconcile and enable | Script, dry-run, owner review, real run | Dry-run reviewed; counts zero on second run |
-| 9. Group guards (task `ac-bug-2`) | AD-13, AD-14. Independent of phases 4 to 8; may ship any time after phases 2 and 3 | Tests 23-29 |
+| 9. Group guards (tasks `ac-bug-2`, `ac-bug-2b`) | AD-13, AD-14; `ac-bug-2b` covers the recurring-games job. Independent of phases 4 to 8; may ship any time after phases 2 and 3 | Tests 23-29 (`ac-bug-2`, merged as PR #50), test 30 (`ac-bug-2b`) |
 
 ---
 
@@ -435,7 +436,7 @@ On approval (2026-10-18) the owner accepted the proposed defaults for OI-1, OI-2
 | OI-11 | Admin hard delete of any group that ever had a game fails on foreign keys. v1.3 (AD-13): it now refuses with a clear 409. A real purge stays out of scope. | 🟢 LOW | Partly resolved |
 | OI-12 | `register_participant` has no `req.user_id == caller` check for `group`/`public` tournaments. Separate bug brief AC-BUG-1; AD-5 step 1 depends on it. | 🟠 HIGH | Separate task |
 
-Status: **APPROVED v1.3** (D-5 to D-9 approved by the owner 2026-10-18). No blocking items for Phases 2–5, 7, 8. Phase 6 step 3 is gated on OI-10.
+Status: **APPROVED v1.4** (D-5 to D-9 approved by the owner 2026-10-18). No blocking items for Phases 2–5, 7, 8. Phase 6 step 3 is gated on OI-10.
 
 ---
 
@@ -461,3 +462,4 @@ Status: **APPROVED v1.3** (D-5 to D-9 approved by the owner 2026-10-18). No bloc
 | v1.1 | 2026-10-18 | Owner constraint (no DB-side validation): removed the CHECK constraints from the new `group_membership_audit` table; values are validated in application code. Existing CHECKs are only widened where the insert would otherwise fail. Status stays APPROVED, Phase 6 still gated on OI-5. |
 | v1.2 | 2026-10-18 | Owner decisions after `ac-p1-verify` (PR #47): AD-5 gate decision and order, D-5 group soft delete, D-6 group-sourced invitations on every class, D-7 public share exception, D-8 worker grants (AD-12), no preference CHECK widening. Added AD-12, tests 17–22, OI-9 to OI-12. Corrected `notifications` to `notifications.notification_deliveries` and the audit `source` list. Phase 2 is games only; tournament view change moves to Phase 6 step 3. |
 | v1.3 | 2026-10-18 | Owner decisions: a group cannot be deleted while active games or open tournaments reference it (AC-15, AD-13, amends D-5); inviting a group's members requires membership of that group (AC-16, AD-14, D-9). Tests 23-29, Phase 9 (`ac-bug-2`). Repaired the v1.2 edit, which had dropped rows D-4 and OI-8 and left two tables malformed (BP-03). Approved by the owner as proposed. |
+| v1.4 | 2026-10-18 | After PR #50 (`ac-bug-2`): the recurring-games job added to the AD-13 attach paths (a gap in the v1.3 list, found by the implementing agent); tournament status list corrected from the code (`registration_open`, `registration_closed`, `completed`, `cancelled`, `dissolved`; no draft; `dissolved` closed by owner decision); test 30 and task `ac-bug-2b`. Approved by the owner. |
