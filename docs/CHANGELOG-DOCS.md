@@ -13,3 +13,4 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - v1.1 (2026-10-18): no CHECK constraints on the new audit table (owner rule: no DB-side validation). Copy of the backend repo's document.
 - v1.3 (2026-10-18): group deletion guard and group invitations need membership (backend/web scope; mobile only shows the server's 409 message on delete group). Copy synced from ~/meetup.
 - v1.2 (2026-10-18): owner decisions after ac-p1-verify. Copy of the backend repo's document.
+- v1.5 (2026-10-18): D-10 test-data exception to the AD-9 membership audit (backend scope; no mobile change). Copy of the backend repo's document.

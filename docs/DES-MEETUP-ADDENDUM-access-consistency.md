@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
 
 **Doc ID:** DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
-**Version:** v1.4
-**Status:** APPROVED by the owner, 2026-10-18 (v1.1 amendment, same day: owner constraint on DB-side validation). v1.2 (same day) records the owner's decisions after `ac-p1-verify` (D-5 to D-8, approved 2026-10-18). The Phase 6 policy removal is gated on OI-10 (live counts and the reconcile); all other phases are unblocked. v1.3 (same day) records the owner's decisions on group deletion and group invitations (AC-15, AC-16, AD-13, AD-14, D-9, tests 23-29) and repairs the v1.2 edit, which had dropped rows D-4 and OI-8 and left two tables malformed. v1.4 (same day, owner approved) adds the recurring-games job to the attach paths of AD-13, fixes the tournament status list (no draft status; `dissolved` is closed) and adds test 30 (task `ac-bug-2b`).
+**Version:** v1.5
+**Status:** APPROVED by the owner, 2026-10-18 (v1.1 amendment, same day: owner constraint on DB-side validation). v1.2 (same day) records the owner's decisions after `ac-p1-verify` (D-5 to D-8, approved 2026-10-18). The Phase 6 policy removal is gated on OI-10 (live counts and the reconcile); all other phases are unblocked. v1.3 (same day) records the owner's decisions on group deletion and group invitations (AC-15, AC-16, AD-13, AD-14, D-9, tests 23-29) and repairs the v1.2 edit, which had dropped rows D-4 and OI-8 and left two tables malformed. v1.4 (same day, owner approved) adds the recurring-games job to the attach paths of AD-13, fixes the tournament status list (no draft status; `dissolved` is closed) and adds test 30 (task `ac-bug-2b`). v1.5 (same day) adds D-10: the regression-suite sweeper may delete audit rows of its own synthetic accounts (owner instruction 2026-10-18 14:34 SGT; AC-12, AD-9, section 5.1, section 6, test 31, OI-13).
 **Owner:** Pratheesh
 **Date:** 2026-10-18
 **Scale Tier:** T1
@@ -47,7 +47,7 @@ Group membership changes (added, removed, left, role changed, ownership moved, a
 | AC-09 | Open live streams for content the user can no longer see end within a bounded time. |
 | AC-10 | Clients re-fetch on every dashboard, All Games and All Tournaments open and never render cached rows. A 404 on a detail screen closes it. |
 | AC-11 | A denied read returns 404, never 403 (no existence leak). |
-| AC-12 | Group membership changes are audited: added, removed, left, role changed, ownership transferred, admin override. Append-only. Survives account deletion without copying personal data. |
+| AC-12 | Group membership changes are audited: added, removed, left, role changed, ownership transferred, admin override. Append-only for the application: no application path updates or deletes rows. One narrow exception: the regression-suite sweeper may delete rows belonging to its own synthetic test groups (D-10). Survives account deletion without copying personal data. |
 | AC-13 | Existing data that violates AC-01 is reconciled once, dry-run first, by the human. |
 | AC-14 | Every access rule has an API-level negative test with the database backstop absent (P13). |
 | AC-15 | A group cannot be deleted while an active game or an open tournament references it. (Owner, 2026-10-18.) |
@@ -131,6 +131,8 @@ Past or cancelled games: no status change (nothing to release). The view rule al
 
 **AD-9: Membership audit (AC-12).** New append-only table `group_membership_audit`, written in the same transaction as the change (§5.1). Write sites found at `cab80e3` (BP-01): `groups/repository.py:54` (group creation, owner), `groups/service.py:109` (invitation accepted or add), `groups/service.py:336` (verify purpose in Phase 1), `groups/service.py:191` and `:211` (leave, removal), role change and ownership transfer in `groups/service.py` (~`:173`, `transfer_ownership`), and admin override paths. No UPDATE or DELETE path exists in code. Written by a single function `record_membership_change(...)` called by every site; a test enumerates `add_group_membership`/`remove_group_membership`/role-update call sites so a new site cannot skip it.
 
+**AD-9 test-data exception (D-10, owner 2026-10-18).** The production API regression suite creates synthetic groups and users in production and must leave no test data behind, audit rows included. Its cleanup job (the sweeper, own database role, never held by the application or the CI runner) deletes `group_membership_audit` rows for the run's groups only. Controls: (1) the application role keeps INSERT and SELECT only, so the table stays append-only for every application path; (2) the sweeper role gets SELECT and DELETE on this table, no UPDATE, and no access to any other audit table (`admin_action_log`, `admin_approval_requests`, `external_call_logs` stay undeletable); (3) the delete predicate is `group_id` in the run manifest's group ids. A row for a manifest user on a group that is not in the manifest means a test touched real data: the sweeper aborts that run and raises an alert instead of deleting; (4) dry-run first, one transaction, abort above the configured row-count threshold, and deleted counts written to the run record; (5) the grant migration is written by the agent and run by the owner; it ships with the regression-suite task, not with Phase 4.
+
 **AD-10: One-time reconcile of existing data (AC-13).** A script `scripts/reconcile_group_access.py`, human-run, **dry-run by default**. For every `group` game with a `going`/`waitlisted` participant who is neither organizer, nor a current member of an attached group, nor a holder of a direct invitation:
 - action log shows `organizer_add` → create an `accepted` direct invitation (keeps their spot, grants view);
 - otherwise → apply the AD-4 release (spot withdrawn, waitlist promoted);
@@ -199,7 +201,7 @@ and revoke group-sourced invitations whose source group membership is gone. The 
 | `group_membership_audit` (new) | `id UUID PK`, `group_id UUID NOT NULL` (no FK: the group may be deleted), `user_id UUID NOT NULL` (no FK: survives account deletion), `action` (text; app-validated: `added`,`removed`,`left`,`role_changed`,`ownership_transferred`), `actor_user_id UUID NULL` (no FK), `actor_type` (text; app-validated: `user`,`system`,`admin_override`), `old_role`, `new_role` (text or NULL; app-validated), `source` (text, app-validated; exact list fixed by `ac-p1-verify` 4.7: `creator`, `member_invite`, `invite_link`, `leave`, `owner_remove`, `admin_remove`, `admin_override`, `role_change`, `ownership_transfer`; an admin-override removal of an owner writes two rows), `occurred_at TIMESTAMPTZ NOT NULL`, `correlation_id`. Indexes `(group_id, occurred_at)` and `(user_id, occurred_at)`. **No CHECK constraints on this table** (no DB-side validation; values are validated in `record_membership_change`). Only PK, NOT NULL and indexes. No UPDATE or DELETE path in code (P6). |
 | `event_participant_actions.action` | The existing CHECK is widened with `access_revoked` (additive; unavoidable, otherwise the insert is rejected). No other new CHECK is added anywhere. Verify the live CHECK first (BP-01). |
 | `notifications.notification_deliveries` | `retracted_at TIMESTAMPTZ NULL`. No CHECK widening: `tournament_registrant_access_lost` has no preference toggle and `notification_deliveries.notification_type` has no CHECK (`ac-p1-verify` 4.1). |
-| Grants | Read-only SELECT for the worker role on six tables (AD-12). |
+| Grants | Read-only SELECT for the worker role on six tables (AD-12). SELECT and DELETE (no UPDATE) for the regression-suite sweeper role on `group_membership_audit` only, scoped as AD-9 describes (D-10). The application role is unchanged. |
 | Existing tables | No column removed or retyped. `event_invitations.status` already admits `revoked`. |
 
 Identity columns now: `correlation_id` on audit rows; the cascade is idempotent on `(event_id, user_id)` (a second run finds nothing to release).
@@ -241,7 +243,7 @@ Identity columns now: `correlation_id` on audit rows; the cascade is idempotent 
 - *Race: RSVP concurrent with removal* → event row lock first, ascending id (AD-4 step 1); test 9.
 - *Open stream or cached rows after removal* → AD-7, AD-8.
 - *Enumeration through status codes* → 404 only (AC-11).
-- *Audit tampering* → append-only in code, written in the same transaction, admin read only; tampering at the DB layer is the same T1 trust boundary as the rest of the system (flagged, not new).
+- *Audit tampering* → append-only in code and in the application role's grants; the only delete path is the sweeper role, limited to manifest groups with abort-on-surprise (D-10); written in the same transaction, admin read only; tampering at the DB layer is the same T1 trust boundary as the rest of the system (flagged, not new).
 - *Admin override removal leaves no trace* → audited with `actor_type='admin_override'`.
 - *Over-revocation* (a legitimate explicit grant lost) → AD-2 keeps direct invitations and organizer adds; test 5; reconcile dry-run (AD-10) before any change.
 - *Public share link* → `/public/events/{id}` stays visibility-agnostic by the shareable-links addendum (Decision 4): the organizer's explicit act, 7 non-identifying fields, no participants, no auth. Documented exception to AC-02 and AC-11 (D-7).
@@ -316,6 +318,7 @@ Risk classification (blast × exploitability): view policies **High**; cascade *
 28. `invite-group` by an organizer who is a member, and by a group owner or admin who is not the organizer, still succeed.
 29. Admin hard delete of a group with any game reference returns 409, not a database error; nothing is deleted.
 30. Recurring-games job: with the group deleted before generation, the generated game is not attached to it (a game left with no group is skipped and logged); with the group alive, generation is unchanged.
+31. Sweeper exception (D-10): the application role cannot delete from `group_membership_audit`; the sweeper role deletes only rows whose `group_id` is in the run manifest, aborts and alerts when it meets a manifest user's row on a non-manifest group, and removes nothing from the other audit tables. Verified in the regression-suite task (the suite's cleanup verification CL-01 asserts zero audit rows remain for the run).
 
 **Other:** v1 tournament and existing game regression suites run unchanged and green except tests that asserted the old rule (listed and justified in the implementation report); migration up and down on a copy.
 
@@ -355,11 +358,11 @@ Migrations are written per phase; the human runs them. Each phase ends with an i
 | P1 Config-driven | AD-11, startup validation | Met |
 | P2–P4 | Baseline; §8 | Unchanged / Met |
 | P5 Idempotency | Cascade and reconcile idempotent | Met |
-| P6 Immutable context | Audit append-only; action log rows | Met |
+| P6 Immutable context | Audit append-only; action log rows | Met, with deliberate deviation D-10 (test-data deletion) |
 | P7 Fault isolation | Fail-closed filters, rollback on cascade failure | Met |
 | P9 Validate at boundary | Server-side predicate; clients are UX only | Met |
 | P10 Least privilege | Audit read limited; cascade has no route | Met |
-| P12 Retention | OI-1 resolved: 12 months default, config-driven | Met |
+| P12 Retention | OI-1 resolved: 12 months default, config-driven | Met, with deliberate deviation D-10 (volume threshold kept, dual control not applied) |
 | P13 Negative tests | §9, tests 1–16 | Met |
 | P14 Additive evolution | §5.1, §11 | Met |
 | P15 Shift-left authz | AD-1 (one predicate at the entry point, applied to list, search, stream); no RLS | Met; **closes the P15 gap found on the list and stream paths** |
@@ -386,6 +389,7 @@ Migrations are written per phase; the human runs them. Each phase ends with an i
 | D-8 | Worker role gets read-only SELECT on six tables | Repo rule: grant changes need prior sign-off | Needed to run the AD-6 filter in the worker; signed off 2026-10-18 |
 | D-9 | `invite-group` now requires the caller to belong to the group; group deletion is refused while active games or open tournaments reference it (amends D-5) | OI-9 "no change to `invite-group`"; D-5 (deletion ends access through the cascade) | Owner, 2026-10-18: inviting a random individual is fine, contacting a random group is not; and a group in active use must not disappear under its players |
 
+| D-10 | The regression-suite sweeper role may delete `group_membership_audit` rows of its own synthetic test groups; the application role stays append-only | `Enterprise_Design_Principles.md` P6 (store append-only, never update or delete) and P12 (audit records immutable for their retention window; dual-control approval before bulk purges); repo rule that grant changes need prior sign-off | The rows describe synthetic accounts created by the production test suite, so they carry no compliance value and the owner requires that no test data remains in the audit. Mitigations: AD-9 controls (1) to (5) (manifest-scoped predicate, abort on a row outside the manifest, row-count threshold, dry-run, separate role). Dual control is not applied because the scope is bounded by the run manifest and the owner approves the grant once. Grant signed off 2026-10-18 |
 ---
 
 ## 13. Requirements Coverage and Deferred Decisions
@@ -400,7 +404,7 @@ Migrations are written per phase; the human runs them. Each phase ends with an i
 | AC-08 | AD-6 |
 | AC-09 | AD-7 |
 | AC-10 | AD-8 |
-| AC-12 | AD-9, §5.1 |
+| AC-12 | AD-9, §5.1, D-10 |
 | AC-13 | AD-10 |
 | AC-14 | §9 |
 | AC-15 | AD-13 |
@@ -435,8 +439,9 @@ On approval (2026-10-18) the owner accepted the proposed defaults for OI-1, OI-2
 | OI-10 | Live counts of registrants with no basis: queries G1–G3 in the `ac-p1-verify` report section 4.9, run by the owner. Gates Phase 6 step 3. | 🟠 HIGH | **Open; gates Phase 6 step 3** |
 | OI-11 | Admin hard delete of any group that ever had a game fails on foreign keys. v1.3 (AD-13): it now refuses with a clear 409. A real purge stays out of scope. | 🟢 LOW | Partly resolved |
 | OI-12 | `register_participant` has no `req.user_id == caller` check for `group`/`public` tournaments. Separate bug brief AC-BUG-1; AD-5 step 1 depends on it. | 🟠 HIGH | Separate task |
+| OI-13 | Sweeper delete grant on `group_membership_audit` (D-10). Migration written by the agent with the regression-suite task and run by the owner before the first production test run. | 🟠 HIGH | Approved 2026-10-18; open until the migration is run |
 
-Status: **APPROVED v1.4** (D-5 to D-9 approved by the owner 2026-10-18). No blocking items for Phases 2–5, 7, 8. Phase 6 step 3 is gated on OI-10.
+Status: **APPROVED v1.5** (D-5 to D-10 approved by the owner 2026-10-18). No blocking items for Phases 2–5, 7, 8. Phase 6 step 3 is gated on OI-10.
 
 ---
 
@@ -463,3 +468,4 @@ Status: **APPROVED v1.4** (D-5 to D-9 approved by the owner 2026-10-18). No bloc
 | v1.2 | 2026-10-18 | Owner decisions after `ac-p1-verify` (PR #47): AD-5 gate decision and order, D-5 group soft delete, D-6 group-sourced invitations on every class, D-7 public share exception, D-8 worker grants (AD-12), no preference CHECK widening. Added AD-12, tests 17–22, OI-9 to OI-12. Corrected `notifications` to `notifications.notification_deliveries` and the audit `source` list. Phase 2 is games only; tournament view change moves to Phase 6 step 3. |
 | v1.3 | 2026-10-18 | Owner decisions: a group cannot be deleted while active games or open tournaments reference it (AC-15, AD-13, amends D-5); inviting a group's members requires membership of that group (AC-16, AD-14, D-9). Tests 23-29, Phase 9 (`ac-bug-2`). Repaired the v1.2 edit, which had dropped rows D-4 and OI-8 and left two tables malformed (BP-03). Approved by the owner as proposed. |
 | v1.4 | 2026-10-18 | After PR #50 (`ac-bug-2`): the recurring-games job added to the AD-13 attach paths (a gap in the v1.3 list, found by the implementing agent); tournament status list corrected from the code (`registration_open`, `registration_closed`, `completed`, `cancelled`, `dissolved`; no draft; `dissolved` closed by owner decision); test 30 and task `ac-bug-2b`. Approved by the owner. |
+| v1.5 | 2026-10-18 | Owner instruction (14:34 SGT): test data must not remain in the audit. AC-12 and AD-9 carve out the regression-suite sweeper (D-10), grant row in section 5.1, threat row in section 6, test 31, OI-13. Deviates from P6 and P12 by design, flagged in D-10. Rebased onto v1.4 (the earlier draft of this amendment was numbered v1.3 and D-9 and collided with the group-deletion decisions). |
