@@ -25,7 +25,6 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -37,6 +36,9 @@ import {
   removeMember,
   updateMemberRole,
 } from '../api/groups';
+import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
+import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
+import { isNotFoundError } from '../utils/apiError';
 import { getCachedBanners, type BannerFallback } from '../api/home';
 import { BannerBackground } from '../components/icons/DashboardIcons';
 import {
@@ -127,23 +129,49 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
 
   const share = useAppShare();
 
-  const loadGroup = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const data = await getGroup(groupId);
-      setGroup(data);
-    } catch {
-      setLoadError(tRef.current('mob.group_detail.load_error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [groupId]);
+  // `silent` refreshes in place (focus / foreground after the first load) instead of flashing
+  // the loading view.
+  const unavailable = useUnavailableScreen(navigation);
+  const loadGroup = useCallback(
+    async (silent: boolean = false) => {
+      if (!silent) {
+        setIsLoading(true);
+        setLoadError(null);
+      }
+      try {
+        const data = await getGroup(groupId);
+        setGroup(data);
+      } catch (error) {
+        // 404 = gone or no longer visible to this user (AC-11): close with the neutral
+        // message, once.
+        if (isNotFoundError(error)) {
+          unavailable.onNotFound();
+        } else if (!silent) {
+          setLoadError(tRef.current('mob.group_detail.load_error'));
+        }
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [groupId, unavailable],
+  );
 
-  useFocusEffect(
+  // Fetch on every focus and app foreground (AC-10), including a push that opens a group already
+  // on the stack.
+  const loadedGroupIdRef = useRef<string | null>(null);
+  useRefetchOnFocus(
+    navigation,
     useCallback(() => {
-      loadGroup();
-    }, [loadGroup]),
+      const silent = loadedGroupIdRef.current === groupId;
+      if (!silent) {
+        unavailable.reset();
+      }
+      loadedGroupIdRef.current = groupId;
+      loadGroup(silent);
+    }, [loadGroup, groupId, unavailable]),
+    groupId,
   );
 
   useEffect(() => {
@@ -290,6 +318,8 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
     setIsLeaving(true);
     try {
       await removeMember(groupId, currentUserId);
+      // The user's own action: any 404 after this closes the screen quietly (completion flow only).
+      unavailable.markOwnAction();
       showCompletion({
         flow: 'group_left',
         rows: [
@@ -298,8 +328,12 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         ],
         primary: 'groups',
       });
-    } catch {
-      setLeaveError(t('mob.group_detail.leave_error'));
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        setLeaveError(t('mob.group_detail.leave_error'));
+      }
       setIsLeaving(false);
     }
   };
@@ -316,7 +350,7 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
   }
 
   if (loadError || !group) {
-    return <ErrorView message={loadError ?? t('mob.group_detail.not_found')} onRetry={loadGroup} />;
+    return <ErrorView message={loadError ?? t('mob.group_detail.not_found')} onRetry={() => loadGroup(false)} />;
   }
 
   // Full-contract-audit fix (2026-09-18, see
@@ -651,7 +685,10 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         memberCount={group.member_count ?? group.members.length}
         visible={isDeleteSheetVisible}
         onClose={() => setIsDeleteSheetVisible(false)}
+        onNotFound={unavailable.onNotFound}
         onDeleted={() => {
+          // The owner's own action: any 404 after this closes the screen quietly.
+          unavailable.markOwnAction();
           showCompletion({
             flow: 'group_deleted',
             rows: [

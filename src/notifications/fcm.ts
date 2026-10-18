@@ -36,7 +36,7 @@ import {
 import { apiClient } from '../api/client';
 import { getDeviceId } from './deviceId';
 import { showBanner } from './notificationBannerStore';
-import { incrementUnreadBadgeCount } from './unreadCountStore';
+import { refreshUnreadCount } from '../hooks/useUnreadCount';
 import {
   displayParticipantNotification,
   isParticipantNotificationType,
@@ -266,11 +266,11 @@ export function onMessage(): () => void {
       notificationType: remoteMessage.data?.notification_type,
     });
 
-    // Bell badge (Home header): every foreground push carrying a
-    // notification type is a new stored notification the server counts as
-    // unread. The header re-syncs with the server on focus.
+    // Bell badge (Home header): a foreground push carrying a notification type is a new stored
+    // notification, so the count is read back from the server. It is never incremented locally
+    // (access consistency: the server alone knows what the user can still see).
     if (typeof remoteMessage.data?.notification_type === 'string') {
-      incrementUnreadBadgeCount();
+      refreshUnreadCount();
     }
 
     if (isParticipantNotificationType(remoteMessage.data?.notification_type)) {

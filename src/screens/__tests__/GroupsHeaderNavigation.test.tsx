@@ -9,7 +9,6 @@ jest.mock('../../auth/AuthContext', () => ({
 jest.mock('../../api/groups', () => ({
   getMyGroups: jest.fn(),
   getGroups: jest.fn().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 0 }),
-  getCachedHomeGroups: jest.fn().mockResolvedValue([]),
 }));
 (getMyGroups as jest.Mock).mockResolvedValue({ items: [], total: 0, page: 1, page_size: 0 });
 

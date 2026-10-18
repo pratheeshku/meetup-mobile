@@ -24,7 +24,6 @@ jest.mock('../../api/events', () => ({ getEvents: jest.fn() }));
 jest.mock('../../api/groups', () => ({
   getMyGroups: jest.fn().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 1 }),
   getGroups: jest.fn().mockResolvedValue({ items: [], total: 0, page: 1, page_size: 1 }),
-  getCachedHomeGroups: jest.fn().mockResolvedValue([]),
 }));
 jest.mock('../../api/profile', () => ({ getProfile: jest.fn(), getProfileSummary: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));

@@ -17,7 +17,7 @@ jest.mock('@react-navigation/native', () => ({
   useFocusEffect: jest.fn(),
 }));
 jest.mock('../../api/events', () => ({ getEvents: jest.fn(), rsvpEvent: jest.fn() }));
-jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn(), getGroups: jest.fn().mockResolvedValue({ items: [] }), getCachedHomeGroups: jest.fn().mockResolvedValue([]) }));
+jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn(), getGroups: jest.fn().mockResolvedValue({ items: [] }) }));
 jest.mock('../../api/profile', () => ({ getProfile: jest.fn(), getProfileSummary: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 jest.mock('../../api/home', () => ({

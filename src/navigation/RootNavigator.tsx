@@ -129,6 +129,7 @@ import EditGroupScreen from '../screens/EditGroupScreen';
 import AccountDeletionBlockedScreen from '../screens/AccountDeletionBlockedScreen';
 import TransferGroupOwnershipScreen from '../screens/TransferGroupOwnershipScreen';
 import AccountDeletionCodeScreen from '../screens/AccountDeletionCodeScreen';
+import AccessNoticeToast from '../components/AccessNoticeToast';
 import NotificationBanner from '../components/NotificationBanner';
 import OnboardingOverlay from './OnboardingOverlay';
 import { useT } from '../labels/LabelsContext';
@@ -528,6 +529,7 @@ export default function RootNavigator(): React.JSX.Element {
       </NavigationContainer>
       {user ? <OnboardingOverlay userId={user.id} /> : null}
       <NotificationBanner />
+      <AccessNoticeToast />
     </View>
   );
 }

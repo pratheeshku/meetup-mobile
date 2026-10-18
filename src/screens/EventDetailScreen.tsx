@@ -2,7 +2,7 @@
  * Event Detail screen (DES-MEETUP-MOBILE.md §4.3; design-ref-p23/GameDetail.png,
  * EditGame.png..EditGame4.png, DeleteGame.png).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Image,
   Modal,
@@ -103,7 +103,9 @@ import {
 import type { Event, EventParticipant, EventSkillLevel, UpdateEventInput } from '../types/event';
 import type { Group } from '../types/group';
 import type { UserSearchResult } from '../types/user';
-import { getApiErrorMessage } from '../utils/apiError';
+import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
+import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
+import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import { groupFromGame, maxGroupsFor } from '../utils/gameGroups';
 import { displayStatusOf, isOrganiserOf } from '../utils/gameLists';
@@ -131,6 +133,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [participants, setParticipants] = useState<EventParticipant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const unavailable = useUnavailableScreen(navigation);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -207,8 +210,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         } else if (!silent) {
           setParticipants([]);
         }
-      } catch {
-        if (!silent) {
+      } catch (error) {
+        // The server answers 404 for a game that is gone or no longer visible to this user
+        // (AC-11): close the screen with the neutral message, once.
+        if (isNotFoundError(error)) {
+          unavailable.onNotFound();
+        } else if (!silent) {
           setLoadError(t('mob.game_detail.load_error'));
         }
       } finally {
@@ -217,16 +224,31 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         }
       }
     },
-    [eventId, t],
+    [eventId, t, unavailable],
+  );
+
+  // Fetch on every focus and app foreground, including a push or deep link that opens a game
+  // already on the stack (AC-10). The first load shows the loading view; later ones refresh in place.
+  const loadedIdRef = useRef<string | null>(null);
+  useRefetchOnFocus(
+    navigation,
+    useCallback(() => {
+      const silent = loadedIdRef.current === eventId;
+      if (!silent) {
+        unavailable.reset();
+      }
+      loadedIdRef.current = eventId;
+      loadEvent(silent);
+    }, [loadEvent, eventId, unavailable]),
+    eventId,
   );
 
   useEffect(() => {
-    loadEvent(false);
     getClientConfig().then(cfg => {
       setMapsApiKey(cfg.google_maps_api_key);
       setVenueCatalogueEnabled(Boolean(cfg.venue_catalogue_enabled));
     }).catch(() => {});
-  }, [loadEvent]);
+  }, []);
 
   const sportLabel = useSportDisplayName(event?.sport ?? '');
   const sportRecord = useSportRecord(event?.sport ?? '');
@@ -657,7 +679,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         secondary: { button: 'view_game', id: eventId },
       });
     } catch (e) {
-      setEditError(getApiErrorMessage(e, t('mob.game_detail.edit_error')));
+      // 404: the game is gone or no longer visible (AC-11): close with the neutral message.
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        setEditError(getApiErrorMessage(e, t('mob.game_detail.edit_error')));
+      }
     } finally {
       setIsEditSubmitting(false);
     }
@@ -672,6 +699,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       await withCorrelationId(async correlationId => {
         await cancelEvent(eventId, 'Deleted by host', { correlationId });
       });
+      // The host's own action: any 404 after this closes the screen quietly (completion flow only).
+      unavailable.markOwnAction();
       setIsDeleteModalOpen(false);
       showCompletion({
         flow: 'game_cancelled',
@@ -687,7 +716,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         primary: 'dashboard',
       });
     } catch (e) {
-      setActionError(getApiErrorMessage(e, t('mob.game_detail.cancel_error')));
+      if (isNotFoundError(e)) {
+        setIsDeleteModalOpen(false);
+        unavailable.onNotFound();
+      } else {
+        setActionError(getApiErrorMessage(e, t('mob.game_detail.cancel_error')));
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -702,8 +736,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         await loadEvent(true);
       });
     } catch (e) {
-      // Backend 4xx detail (e.g. skill level or membership) when present, else the generic message.
-      setActionError(getApiErrorMessage(e, t('mob.game_detail.join_error')));
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        // Backend 4xx detail (e.g. skill level or membership) when present, else the generic message.
+        setActionError(getApiErrorMessage(e, t('mob.game_detail.join_error')));
+      }
     } finally {
       setIsActionLoading(false);
     }
@@ -715,10 +753,17 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     try {
       await withCorrelationId(async correlationId => {
         await withdrawEvent(eventId, { correlationId });
+        // Leaving can take the game out of sight: a 404 on the refetch below closes the screen
+        // quietly, it is not a "no longer available" surprise.
+        unavailable.markOwnAction();
         await loadEvent(true);
       });
-    } catch {
-      setActionError(t('mob.game_detail.leave_error'));
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        setActionError(t('mob.game_detail.leave_error'));
+      }
     } finally {
       setIsActionLoading(false);
     }

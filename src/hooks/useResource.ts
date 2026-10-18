@@ -26,10 +26,19 @@ export interface ResourceOptions {
 
 export type ResourceStatus = 'loading' | 'ready' | 'error';
 
+export interface LoadOptions {
+  /**
+   * Access-consistency AC-10: drop the rows already held and show the loading
+   * state until this fetch returns; a failure shows the error state, never the
+   * old rows. Used by lists on screen focus / app foreground. Default false.
+   */
+  fresh?: boolean;
+}
+
 export interface Resource<T> {
   status: ResourceStatus;
   data: T | undefined;
-  load: (correlationId?: string) => Promise<void>;
+  load: (correlationId?: string, options?: LoadOptions) => Promise<void>;
 }
 
 interface State<T> {
@@ -83,12 +92,16 @@ export function useResource<T>(
   fetcherRef.current = fetcher;
   const sequence = useRef(0);
 
-  const load = useCallback((correlationId?: string): Promise<void> => {
+  const load = useCallback((correlationId?: string, loadOptions?: LoadOptions): Promise<void> => {
     const mine = ++sequence.current;
+    const fresh = Boolean(loadOptions?.fresh);
     // First load or retry after an error: show the skeleton. A reload over
-    // existing data leaves the data in place.
+    // existing data leaves the data in place, unless the caller asked for a
+    // fresh load (lists on focus), which clears it.
     setState(previous =>
-      previous.data !== undefined ? previous : { status: 'loading', data: undefined },
+      fresh || previous.data === undefined
+        ? { status: 'loading', data: undefined }
+        : previous,
     );
 
     // ── Perf: span the fetch ────────────────────────────────────────────────
@@ -113,7 +126,7 @@ export function useResource<T>(
         if (sequence.current === mine) {
           endSpan({ result: 'error' });
           setState(previous =>
-            previous.data !== undefined ? previous : { status: 'error', data: undefined },
+            !fresh && previous.data !== undefined ? previous : { status: 'error', data: undefined },
           );
         } else {
           endSpan({ result: 'stale-error' });

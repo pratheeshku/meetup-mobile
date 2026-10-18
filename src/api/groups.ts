@@ -180,44 +180,18 @@ export interface GetGroupsParams {
   limit?: number;
 }
 
-export const HOME_GROUPS_CACHE_KEY = '@meetup/home_groups_cache';
-export const HOME_GROUPS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+/**
+ * Group rows used to be cached here in AsyncStorage (24 h) and served when the live call failed.
+ * Access consistency (AC-10) forbids rendering cached rows, so the cache is gone; this only
+ * removes the entry an older app version left on the device.
+ */
+export const LEGACY_HOME_GROUPS_CACHE_KEY = '@meetup/home_groups_cache';
 
-export async function getCachedHomeGroups(): Promise<Group[] | null> {
+export async function clearLegacyHomeGroupsCache(): Promise<void> {
   try {
-    const raw = await AsyncStorage.getItem(HOME_GROUPS_CACHE_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed.savedAt !== 'number' || !Array.isArray(parsed.data)) {
-      return null;
-    }
-    const age = Date.now() - parsed.savedAt;
-    if (age > HOME_GROUPS_CACHE_TTL_MS || age < 0) {
-      return null;
-    }
-    return parsed.data as Group[];
+    await AsyncStorage.removeItem(LEGACY_HOME_GROUPS_CACHE_KEY);
   } catch {
-    return null;
-  }
-}
-
-export async function setCachedHomeGroups(data: Group[], isLimited = false): Promise<void> {
-  try {
-    if (isLimited) {
-      const existing = await getCachedHomeGroups();
-      if (existing && existing.length > data.length) {
-        return;
-      }
-    }
-    const envelope = {
-      savedAt: Date.now(),
-      data,
-    };
-    await AsyncStorage.setItem(HOME_GROUPS_CACHE_KEY, JSON.stringify(envelope));
-  } catch {
-    // Non-blocking cache write failure
+    // Nothing to clean up if storage is unavailable.
   }
 }
 
@@ -225,42 +199,30 @@ export async function setCachedHomeGroups(data: Group[], isLimited = false): Pro
  * `GET /groups` (Home v2 contract): accepts `mine` (bool) and `limit` (1-100).
  * Note: `sports` and `upcoming` are NOT parameters on `/groups`.
  */
+let legacyCachePurged = false;
+
 export async function getGroups(
   params?: GetGroupsParams,
   options?: RequestOptions,
 ): Promise<GroupsListResponse> {
-  try {
-    const { data } = await apiClient.get<GroupApiItem[] | { items: GroupApiItem[] }>('/groups', {
-      params,
-      correlationId: options?.correlationId,
-    });
-    const rawList = Array.isArray(data)
-      ? data
-      : (data as { items?: GroupApiItem[] })?.items ?? [];
-    const items = rawList.map(raw => mapGroupApiItem(raw, params?.mine ? 'member' : 'none'));
-    if (items.length > 0 && params?.mine) {
-      await setCachedHomeGroups(items, params?.limit !== undefined);
-    }
-    return {
-      items,
-      total: items.length,
-      page: 1,
-      page_size: items.length,
-    };
-  } catch (error) {
-    if (params?.mine) {
-      const cached = await getCachedHomeGroups();
-      if (cached) {
-        return {
-          items: cached,
-          total: cached.length,
-          page: 1,
-          page_size: cached.length,
-        };
-      }
-    }
-    throw error;
+  if (!legacyCachePurged) {
+    legacyCachePurged = true;
+    clearLegacyHomeGroupsCache();
   }
+  const { data } = await apiClient.get<GroupApiItem[] | { items: GroupApiItem[] }>('/groups', {
+    params,
+    correlationId: options?.correlationId,
+  });
+  const rawList = Array.isArray(data)
+    ? data
+    : (data as { items?: GroupApiItem[] })?.items ?? [];
+  const items = rawList.map(raw => mapGroupApiItem(raw, params?.mine ? 'member' : 'none'));
+  return {
+    items,
+    total: items.length,
+    page: 1,
+    page_size: items.length,
+  };
 }
 
 export interface GetMyGroupsOptions extends RequestOptions {

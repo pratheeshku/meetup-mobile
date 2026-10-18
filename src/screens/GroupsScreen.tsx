@@ -13,7 +13,7 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { getCachedHomeGroups, getGroups } from '../api/groups';
+import { getGroups } from '../api/groups';
 import { useAuth } from '../auth/AuthContext';
 import EmptyState from '../components/EmptyState';
 import ErrorView from '../components/ErrorView';
@@ -23,6 +23,7 @@ import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { Group } from '../types/group';
 import type { GroupsStackParamList } from '../navigation/types';
+import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
 
@@ -56,47 +57,37 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
     }, []),
   );
 
-  // Load cached groups on mount so groups display immediately if cached
-  useEffect(() => {
-    getCachedHomeGroups().then(cached => {
-      if (cached && cached.length > 0) {
-        setGroups(prev => (prev.length > 0 ? prev : cached));
-        setIsLoading(false);
-      }
-    });
-  }, []);
-
+  // A fresh load (focus / foreground) never shows the previous rows (AC-10): the loading state
+  // takes their place, and a failure shows the error state. Pull-to-refresh and the
+  // post-create refresh (`isRefresh`) keep the rows loaded in this open.
   const loadGroups = useCallback(async (isRefresh: boolean) => {
     if (isRefresh) {
       setIsRefreshing(true);
     } else {
-      setGroups(current => {
-        if (current.length === 0) {
-          setIsLoading(true);
-        }
-        return current;
-      });
+      setGroups([]);
+      setIsLoading(true);
     }
     setError(null);
     try {
       const response = await getGroups({ mine: true });
       setGroups(response.items);
     } catch {
-      setGroups(current => {
-        if (current.length === 0) {
-          setError(tRef.current('mob.groups.load_error'));
-        }
-        return current;
-      });
+      if (!isRefresh) {
+        setError(tRef.current('mob.groups.load_error'));
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadGroups(false);
-  }, [loadGroups]);
+  // Fetch on every focus and when the app returns to the foreground.
+  useRefetchOnFocus(
+    navigation,
+    useCallback(() => {
+      loadGroups(false);
+    }, [loadGroups]),
+  );
 
   // Create Group/Tournament pops back here with a fresh `refreshKey` on
   // success; re-fetch once per new key (the initial mount load is above).

@@ -59,6 +59,9 @@ import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
 import { showCompletion } from '../navigation/showCompletion';
+import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
+import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
+import { isNotFoundError } from '../utils/apiError';
 import { useSportDisplayName } from '../utils/labels';
 import { formatEventDate } from '../utils/formatEventDateTime';
 import type { TournamentsStackParamList } from '../navigation/types';
@@ -76,7 +79,7 @@ function formatDateTime(isoString: string): string {
   });
 }
 
-export default function TournamentDetailScreen({ route }: Props): React.JSX.Element {
+export default function TournamentDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
   const { tournamentId } = route.params;
   const { user } = useAuth();
@@ -113,34 +116,71 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
       .catch(() => setVenueCatalogueEnabled(false));
   }, []);
 
-  const loadAll = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const [tournamentData, fixturesData, registrationsData] = await Promise.all([
-        getTournament(tournamentId),
-        getFixtures(tournamentId),
-        getRegistrations(tournamentId),
-      ]);
-      setTournament(tournamentData);
-      setFixtures(fixturesData);
-      setRegistrations(registrationsData);
-    } catch {
-      setLoadError(tRef.current('mob.tournament.load_error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [tournamentId]);
+  // `silent` refreshes in place (focus / foreground after the first load) instead of flashing
+  // the loading view.
+  const unavailable = useUnavailableScreen(navigation);
+  const loadAll = useCallback(
+    async (silent: boolean = false) => {
+      if (!silent) {
+        setIsLoading(true);
+        setLoadError(null);
+      }
+      try {
+        const [tournamentData, fixturesData, registrationsData] = await Promise.all([
+          getTournament(tournamentId),
+          getFixtures(tournamentId),
+          getRegistrations(tournamentId),
+        ]);
+        setTournament(tournamentData);
+        setFixtures(fixturesData);
+        setRegistrations(registrationsData);
+      } catch (error) {
+        // 404 = gone or no longer visible to this user (AC-11, AC-07: a registered player who
+        // lost access sees nothing): close with the neutral message, once.
+        if (isNotFoundError(error)) {
+          unavailable.onNotFound();
+        } else if (!silent) {
+          setLoadError(tRef.current('mob.tournament.load_error'));
+        }
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [tournamentId, unavailable],
+  );
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  // Fetch on every focus and app foreground (AC-10), including a push that opens a tournament
+  // already on the stack.
+  const loadedTournamentIdRef = useRef<string | null>(null);
+  useRefetchOnFocus(
+    navigation,
+    useCallback(() => {
+      const silent = loadedTournamentIdRef.current === tournamentId;
+      if (!silent) {
+        unavailable.reset();
+      }
+      loadedTournamentIdRef.current = tournamentId;
+      loadAll(silent);
+    }, [loadAll, tournamentId, unavailable]),
+    tournamentId,
+  );
 
   /** Re-reads the tournament so access/invitation status reflect the server. */
   const refreshTournament = useCallback(async (): Promise<void> => {
-    const fresh = await getTournament(tournamentId);
-    setTournament(fresh);
-  }, [tournamentId]);
+    try {
+      const fresh = await getTournament(tournamentId);
+      setTournament(fresh);
+    } catch (error) {
+      // 404 (for example after declining the invitation): close; other errors surface as before.
+      if (isNotFoundError(error)) {
+        unavailable.onNotFound();
+        return;
+      }
+      throw error;
+    }
+  }, [tournamentId, unavailable]);
 
   const handleRegister = async (): Promise<void> => {
     setRegisterError(null);
@@ -155,8 +195,12 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         setTournament(tournamentData);
         setRegistrations(registrationsData);
       });
-    } catch {
-      setRegisterError(t('mob.tournament.register_error'));
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        setRegisterError(t('mob.tournament.register_error'));
+      }
     } finally {
       setIsRegistering(false);
     }
@@ -173,6 +217,8 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
     try {
       await withCorrelationId(async correlationId => {
         await withdrawFromTournament(tournamentId, myRegistration.id, { correlationId });
+        // The user's own action: a 404 on the refetch below closes the screen quietly.
+        unavailable.markOwnAction();
         const [tournamentData, registrationsData] = await Promise.all([
           getTournament(tournamentId, { correlationId }),
           getRegistrations(tournamentId, { correlationId }),
@@ -180,8 +226,12 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
         setTournament(tournamentData);
         setRegistrations(registrationsData);
       });
-    } catch {
-      setWithdrawError(t('mob.tournament.withdraw_error'));
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        setWithdrawError(t('mob.tournament.withdraw_error'));
+      }
     } finally {
       setIsWithdrawing(false);
     }
@@ -192,6 +242,8 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
     setIsCancelling(true);
     try {
       await cancelTournament(tournamentId);
+      // The organiser's own action: any 404 after this closes the screen quietly.
+      unavailable.markOwnAction();
       if (tournament) {
         showCompletion({
           flow: 'tournament_cancelled',
@@ -204,8 +256,12 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
           primary: 'dashboard',
         });
       }
-    } catch {
-      setCancelError(t('mob.tournament.cancel_error'));
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else {
+        setCancelError(t('mob.tournament.cancel_error'));
+      }
     } finally {
       setIsCancelling(false);
     }
@@ -216,7 +272,7 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
   }
 
   if (loadError || !tournament) {
-    return <ErrorView message={loadError ?? t('mob.tournament.not_found')} onRetry={loadAll} />;
+    return <ErrorView message={loadError ?? t('mob.tournament.not_found')} onRetry={() => loadAll(false)} />;
   }
 
   // Full-contract-audit fix (2026-09-18, see
@@ -274,7 +330,14 @@ export default function TournamentDetailScreen({ route }: Props): React.JSX.Elem
       <TournamentInvitationBanner
         tournamentId={tournament.id}
         status={tournament.my_invitation_status}
-        onResponded={refreshTournament}
+        onResponded={async result => {
+          // Declining is the user's own action and can take the tournament out of sight.
+          if (result?.accepted === false) {
+            unavailable.markOwnAction();
+          }
+          await refreshTournament();
+        }}
+        onNotFound={unavailable.onNotFound}
       />
 
       <TournamentInvitePanel tournamentId={tournament.id} access={tournament.my_invite_access} />

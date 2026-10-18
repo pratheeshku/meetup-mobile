@@ -10,6 +10,7 @@
  */
 export const DEFAULT_LABELS = {
   'mob.common.and': 'and',
+  'mob.access.no_longer_available': 'This is no longer available.',
   'mob.common.back': 'Back',
   'mob.common.cancel': 'Cancel',
   'mob.common.change': 'Change',

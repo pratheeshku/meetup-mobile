@@ -30,7 +30,7 @@
  *    - Drawer with Home, Groups, Tournament teams, Games, Tournaments, About links.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useScrollToTop } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
@@ -38,7 +38,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
 import { getEvents, rsvpEvent } from '../api/events';
-import { getCachedHomeGroups, getGroups } from '../api/groups';
+import { getGroups } from '../api/groups';
 import {
   BUNDLED_FALLBACK_BANNER,
   getCachedBanners,
@@ -67,6 +67,7 @@ import {
 } from '../components/home/SectionParts';
 import { UnifiedGameCard, UnifiedGroupCard } from '../components/home/UnifiedCard';
 import Toast from '../components/Toast';
+import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useResource } from '../hooks/useResource';
 import { useSportFilter } from '../hooks/useSportFilter';
 import { refreshUnreadCount, useUnreadBadgeCount } from '../hooks/useUnreadCount';
@@ -159,15 +160,6 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     });
   }, []);
 
-  // Load cached groups on mount so groups display immediately if cached
-  useEffect(() => {
-    getCachedHomeGroups().then(cached => {
-      if (cached && cached.length > 0) {
-        setLiveGroups(prev => (prev.items !== null ? prev : { items: cached, status: 'success' }));
-      }
-    });
-  }, []);
-
   // Update persisted banners when banners resource arrives, keeping last real data
   useEffect(() => {
     if (banners.data) {
@@ -208,9 +200,16 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   // Live upcoming games: GET /events?upcoming=true&limit=100&sports=... The rows are picked
   // client-side (My games + Open games, earliest first), because open-game filtering happens
   // client-side; a server-side limit would leave fewer than the rows shown.
+  // `fresh` (screen focus / app foreground) drops the rows held and shows the loading state
+  // until the server answers; a failure shows the error state, never the old rows (AC-10).
+  // The request counters keep a slow, older response from overwriting a newer one.
+  const upcomingSeqRef = useRef(0);
+  const groupsSeqRef = useRef(0);
+
   const loadLiveUpcoming = useCallback(
-    async (selectedSports: string[], correlationId?: string) => {
-      setLiveUpcoming(prev => ({ ...prev, status: 'loading' }));
+    async (selectedSports: string[], correlationId?: string, fresh: boolean = false) => {
+      const seq = ++upcomingSeqRef.current;
+      setLiveUpcoming(prev => (fresh ? { items: null, status: 'loading' } : { ...prev, status: 'loading' }));
       try {
         const res = await getEvents(
           {
@@ -220,28 +219,32 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
           },
           { correlationId },
         );
-        setLiveUpcoming({ items: res.items, status: 'success' });
+        if (seq === upcomingSeqRef.current) {
+          setLiveUpcoming({ items: res.items, status: 'success' });
+        }
       } catch {
-        setLiveUpcoming(prev => ({
-          items: prev.items,
-          status: prev.items !== null ? 'success' : 'error',
-        }));
+        if (seq === upcomingSeqRef.current) {
+          setLiveUpcoming(prev => ({
+            items: prev.items,
+            status: prev.items !== null ? 'success' : 'error',
+          }));
+        }
       }
     },
     [],
   );
 
   // Live groups: GET /groups?mine=true&limit=3
-  const loadLiveGroups = useCallback(async (correlationId?: string) => {
-    setLiveGroups(prev => ({ ...prev, status: 'loading' }));
+  const loadLiveGroups = useCallback(async (correlationId?: string, fresh: boolean = false) => {
+    const seq = ++groupsSeqRef.current;
+    setLiveGroups(prev => (fresh ? { items: null, status: 'loading' } : { ...prev, status: 'loading' }));
     try {
       const res = await getGroups({ mine: true, limit: 3 }, { correlationId });
-      setLiveGroups({ items: res.items, status: 'success' });
+      if (seq === groupsSeqRef.current) {
+        setLiveGroups({ items: res.items, status: 'success' });
+      }
     } catch {
-      const cached = await getCachedHomeGroups();
-      if (cached && cached.length > 0) {
-        setLiveGroups({ items: cached, status: 'success' });
-      } else {
+      if (seq === groupsSeqRef.current) {
         setLiveGroups(prev => ({
           items: prev.items,
           status: prev.items !== null ? 'success' : 'error',
@@ -278,19 +281,17 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const isFiltered = filter.selected.length > 0;
   const filteredEmpty = isFiltered ? filteredEmptyMessage(filter.selected, filter.options, t) : null;
 
-  const isLoadInProgressRef = useRef(false);
-  const lastAutoLoadTimeRef = useRef(0);
   const selectedSportsRef = useRef(filter.selected);
   selectedSportsRef.current = filter.selected;
 
   // Dynamic Home endpoints loader (banners, menu, live upcoming, live groups, summary)
   const loadDynamicHomeData = useCallback(
-    (selectedSports: string[], correlationId: string) =>
+    (selectedSports: string[], correlationId: string, fresh: boolean) =>
       Promise.all([
         loadBanners(correlationId),
         loadMenu(correlationId),
-        loadLiveUpcoming(selectedSports, correlationId),
-        loadLiveGroups(correlationId),
+        loadLiveUpcoming(selectedSports, correlationId, fresh),
+        loadLiveGroups(correlationId, fresh),
         loadSummary(selectedSports, correlationId),
         loadStats(correlationId),
       ]).then(() => undefined),
@@ -307,45 +308,38 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     [loadSports, loadProfile],
   );
 
+  // `isFresh`: a screen focus or app foreground, which drops the rows held and shows the
+  // loading state until the server answers (AC-10). Pull-to-refresh and the post-create
+  // refresh keep the rows loaded in this open. There is no throttle: every focus fetches.
   const executeHomeLoad = useCallback(
-    async (options?: { isManualRefresh?: boolean; isBootstrap?: boolean }) => {
+    async (options?: { isManualRefresh?: boolean; isBootstrap?: boolean; isFresh?: boolean }) => {
       const isManual = Boolean(options?.isManualRefresh);
       const isBootstrap = Boolean(options?.isBootstrap);
+      const isFresh = Boolean(options?.isFresh);
 
-      // Re-entrancy guard: ignore if a load is already in flight
-      if (isLoadInProgressRef.current) {
-        return;
-      }
-
-      // Minimum gap: automatic reloads run at most once per 30 seconds
-      const now = Date.now();
-      if (!isManual && now - lastAutoLoadTimeRef.current < 30_000) {
-        return;
-      }
-
-      isLoadInProgressRef.current = true;
-      try {
-        await withCorrelationId(async correlationId => {
-          const promises: Promise<unknown>[] = [
-            loadDynamicHomeData(selectedSportsRef.current, correlationId),
-          ];
-          if (isBootstrap || isManual) {
-            promises.push(loadBootstrapData(correlationId));
-          }
-          await Promise.all(promises);
-        });
-        lastAutoLoadTimeRef.current = Date.now();
-      } finally {
-        isLoadInProgressRef.current = false;
-      }
+      await withCorrelationId(async correlationId => {
+        const promises: Promise<unknown>[] = [
+          loadDynamicHomeData(selectedSportsRef.current, correlationId, isFresh),
+        ];
+        if (isBootstrap || isManual) {
+          promises.push(loadBootstrapData(correlationId));
+        }
+        await Promise.all(promises);
+      });
     },
     [loadDynamicHomeData, loadBootstrapData],
   );
 
-  // Initial load on mount (bootstrap + dynamic)
-  useEffect(() => {
-    executeHomeLoad({ isBootstrap: true });
+  // Fetch on every focus (the first included) and when the app returns to the foreground
+  // while Home is the focused screen (AC-10). Sports and profile load on the first call only.
+  const bootstrappedRef = useRef(false);
+  const loadOnOpen = useCallback(() => {
+    const isBootstrap = !bootstrappedRef.current;
+    bootstrappedRef.current = true;
+    refreshUnreadCount();
+    executeHomeLoad({ isBootstrap, isFresh: true });
   }, [executeHomeLoad]);
+  useRefetchOnFocus(navigation, loadOnOpen);
 
   // Re-fetch live upcoming and summary only when sport filter selection changes
   const selectedSportsKey = filter.selected.slice().sort().join(',');
@@ -385,30 +379,6 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       setToastMessage(successMessage);
     }
   }, [refreshKey, successMessage]);
-
-  // Sync bell unread count and throttled dynamic reload on focus
-  useEffect(() => {
-    refreshUnreadCount();
-    const unsubscribe = navigation.addListener('focus', () => {
-      refreshUnreadCount();
-      executeHomeLoad({ isManualRefresh: false, isBootstrap: false });
-    });
-    return unsubscribe;
-  }, [navigation, executeHomeLoad]);
-
-  // Throttled dynamic reload when app returns to foreground
-  useEffect(() => {
-    let previousState = AppState.currentState;
-    const subscription = AppState.addEventListener('change', nextState => {
-      if (previousState?.match(/inactive|background/) && nextState === 'active') {
-        executeHomeLoad({ isManualRefresh: false, isBootstrap: false });
-      }
-      previousState = nextState;
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, [executeHomeLoad]);
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);

@@ -47,3 +47,13 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   }
   return status === 403 ? currentT('mob.errors.forbidden') : fallback;
 }
+
+/**
+ * True for an HTTP 404. The server answers 404 for everything the caller may
+ * not see (access-consistency AC-11), so a 404 on a detail fetch means "gone or
+ * no longer visible": the screen closes with a neutral message, never a
+ * "forbidden" or "removed" one.
+ */
+export function isNotFoundError(error: unknown): boolean {
+  return (error as ErrorLike | null)?.response?.status === 404;
+}

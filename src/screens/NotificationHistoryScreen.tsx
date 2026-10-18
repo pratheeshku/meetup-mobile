@@ -20,7 +20,7 @@
  *   - Undo toast: dark bar #0F2347, 16px side margin, message + "Undo" (#9CC0FF, 44px target), 5-second timer.
  * - D. Icons: RegistryIcon / NotificationIcon mapping matching image 09.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -44,16 +44,14 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { RegistryIcon } from '../components/icons/RegistryIcons';
 import { BackArrowIcon, CheckIcon } from '../components/icons/ActionIcons';
+import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useT, currentT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/LabelsContext';
 import {
   navigateToNotificationTarget,
   resolveNotificationTarget,
 } from '../notifications/notificationRouting';
-import {
-  getUnreadBadgeCount,
-  setUnreadBadgeCount,
-} from '../notifications/unreadCountStore';
+import { setUnreadBadgeCount } from '../notifications/unreadCountStore';
 import { NOTIFICATION_TYPES } from '../types/notification';
 import type {
   NotificationHistoryItem,
@@ -68,7 +66,6 @@ interface UndoState {
   message: string;
   itemIds: string[];
   previousReadAtMap: Record<string, string | null>;
-  previousUnreadCount: number;
 }
 
 function isKnownType(value: string): value is NotificationType {
@@ -115,6 +112,8 @@ interface Props {
   navigation?: {
     goBack?: () => void;
     navigate?: (name: string, params?: any) => void;
+    addListener?: (event: 'focus', callback: () => void) => () => void;
+    isFocused?: () => boolean;
   };
 }
 
@@ -146,37 +145,43 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
     setUnreadBadgeCount(validCount);
   }, []);
 
+  // The unread count always comes from the server (`GET /notifications/unread-count`); it is never
+  // derived from the rows on screen or adjusted locally. A failed read keeps the last count.
+  const syncUnreadCount = useCallback(async () => {
+    if (typeof getUnreadCount !== 'function') {
+      return;
+    }
+    try {
+      const { count } = await getUnreadCount();
+      updateUnreadCount(count);
+    } catch {
+      // Keep the previous count; nothing user-actionable.
+    }
+  }, [updateUnreadCount]);
+
+  // Renders exactly what the API returns (retracted notifications are already hidden by the
+  // server). Every load starts from nothing: no rows are kept across opens (AC-10).
   const loadFirstPage = useCallback(async () => {
+    setItems([]);
+    setNextCursor(null);
     setIsLoading(true);
     setLoadError(false);
     try {
-      const countPromise =
-        typeof getUnreadCount === 'function'
-          ? getUnreadCount().catch(() => ({ count: 0 }))
-          : Promise.resolve({ count: 0 });
-      const [page, countRes] = await Promise.all([
-        getNotificationHistory(),
-        countPromise,
-      ]);
+      const [page] = await Promise.all([getNotificationHistory(), syncUnreadCount()]);
       setItems(page.items);
       setNextCursor(page.next_cursor ?? null);
       if (page.retention_days || page.days) {
         setRetentionDays(page.retention_days ?? page.days ?? 90);
       }
-      // Reconcile count: use server count or unread items in page
-      const pageUnreads = page.items.filter(it => it.read_at === null).length;
-      const initialCount = countRes.count > 0 ? countRes.count : pageUnreads;
-      updateUnreadCount(initialCount);
     } catch {
       setLoadError(true);
     } finally {
       setIsLoading(false);
     }
-  }, [updateUnreadCount]);
+  }, [syncUnreadCount]);
 
-  useEffect(() => {
-    loadFirstPage();
-  }, [loadFirstPage]);
+  // Fetch on every focus and app foreground, not only when the screen mounts.
+  useRefetchOnFocus(navigation, loadFirstPage);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMoreRef.current) {
@@ -218,39 +223,41 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
     setUndoState(null);
   }, []);
 
+  // Read-state changes. The rows update at once (optimistic) but the unread COUNT is never
+  // adjusted locally: after each call settles it is read back from the server.
   // 1. Card tap: mark read if unread, then navigate
   const handlePress = useCallback(
     (item: NotificationHistoryItem) => {
       if (item.read_at === null) {
         const optimisticReadAt = new Date().toISOString();
-        const prevCount = unreadCount;
         setItems(current =>
           current.map(it => (it.id === item.id ? { ...it, read_at: optimisticReadAt } : it)),
         );
-        updateUnreadCount(prevCount - 1);
 
-        markNotificationRead(item.id).catch(() => {
-          // Rollback on failure
-          setItems(current =>
-            current.map(it =>
-              it.id === item.id && it.read_at === optimisticReadAt
-                ? { ...it, read_at: null }
-                : it,
-            ),
-          );
-          updateUnreadCount(prevCount);
-        });
+        markNotificationRead(item.id)
+          .catch(() => {
+            // Rollback on failure
+            setItems(current =>
+              current.map(it =>
+                it.id === item.id && it.read_at === optimisticReadAt
+                  ? { ...it, read_at: null }
+                  : it,
+              ),
+            );
+          })
+          .finally(() => {
+            syncUnreadCount();
+          });
       }
       openNotification(item);
     },
-    [unreadCount, updateUnreadCount],
+    [syncUnreadCount],
   );
 
   // 2. Toggle read via swipe action or accessible long-press
   const handleToggleRead = useCallback(
     (item: NotificationHistoryItem) => {
       const isCurrentlyUnread = item.read_at === null;
-      const prevCount = unreadCount;
       const prevReadAt = item.read_at;
 
       if (isCurrentlyUnread) {
@@ -259,58 +266,60 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
         setItems(current =>
           current.map(it => (it.id === item.id ? { ...it, read_at: optimisticReadAt } : it)),
         );
-        updateUnreadCount(prevCount - 1);
 
         showToast({
           type: 'single_read',
           message: t('mob.notif_history.toast_marked_read'),
           itemIds: [item.id],
           previousReadAtMap: { [item.id]: null },
-          previousUnreadCount: prevCount,
         });
 
-        markNotificationRead(item.id).catch(() => {
-          // Rollback
-          setItems(current =>
-            current.map(it =>
-              it.id === item.id && it.read_at === optimisticReadAt
-                ? { ...it, read_at: null }
-                : it,
-            ),
-          );
-          updateUnreadCount(prevCount);
-          dismissToast();
-        });
+        markNotificationRead(item.id)
+          .catch(() => {
+            // Rollback
+            setItems(current =>
+              current.map(it =>
+                it.id === item.id && it.read_at === optimisticReadAt
+                  ? { ...it, read_at: null }
+                  : it,
+              ),
+            );
+            dismissToast();
+          })
+          .finally(() => {
+            syncUnreadCount();
+          });
       } else {
         // Mark unread
         setItems(current =>
           current.map(it => (it.id === item.id ? { ...it, read_at: null } : it)),
         );
-        updateUnreadCount(prevCount + 1);
 
         showToast({
           type: 'single_unread',
           message: t('mob.notif_history.toast_marked_unread'),
           itemIds: [item.id],
           previousReadAtMap: { [item.id]: prevReadAt },
-          previousUnreadCount: prevCount,
         });
 
-        markNotificationUnread(item.id).catch(() => {
-          // Rollback
-          setItems(current =>
-            current.map(it =>
-              it.id === item.id && it.read_at === null
-                ? { ...it, read_at: prevReadAt }
-                : it,
-            ),
-          );
-          updateUnreadCount(prevCount);
-          dismissToast();
-        });
+        markNotificationUnread(item.id)
+          .catch(() => {
+            // Rollback
+            setItems(current =>
+              current.map(it =>
+                it.id === item.id && it.read_at === null
+                  ? { ...it, read_at: prevReadAt }
+                  : it,
+              ),
+            );
+            dismissToast();
+          })
+          .finally(() => {
+            syncUnreadCount();
+          });
       }
     },
-    [dismissToast, showToast, t, unreadCount, updateUnreadCount],
+    [dismissToast, showToast, syncUnreadCount, t],
   );
 
   // 3. Mark all as read
@@ -320,7 +329,6 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
       return;
     }
 
-    const prevCount = unreadCount;
     const previousMap: Record<string, string | null> = {};
     unreadItems.forEach(it => {
       previousMap[it.id] = it.read_at;
@@ -328,33 +336,34 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
 
     const optimisticReadAt = new Date().toISOString();
     setItems(current => current.map(it => ({ ...it, read_at: it.read_at ?? optimisticReadAt })));
-    updateUnreadCount(0);
 
     showToast({
       type: 'mark_all',
       message: t('mob.notif_history.toast_all_marked_read'),
       itemIds: unreadItems.map(it => it.id),
       previousReadAtMap: previousMap,
-      previousUnreadCount: prevCount,
     });
 
-    markAllNotificationsRead().catch(() => {
-      // Rollback
-      setItems(current =>
-        current.map(it =>
-          previousMap[it.id] !== undefined ? { ...it, read_at: previousMap[it.id] } : it,
-        ),
-      );
-      updateUnreadCount(prevCount);
-      dismissToast();
-    });
-  }, [dismissToast, items, showToast, t, unreadCount, updateUnreadCount]);
+    markAllNotificationsRead()
+      .catch(() => {
+        // Rollback
+        setItems(current =>
+          current.map(it =>
+            previousMap[it.id] !== undefined ? { ...it, read_at: previousMap[it.id] } : it,
+          ),
+        );
+        dismissToast();
+      })
+      .finally(() => {
+        syncUnreadCount();
+      });
+  }, [dismissToast, items, showToast, syncUnreadCount, t]);
 
   // 4. Undo action
   const handleUndo = useCallback(() => {
     if (!undoState) return;
 
-    const { type, itemIds, previousReadAtMap, previousUnreadCount } = undoState;
+    const { type, itemIds, previousReadAtMap } = undoState;
     dismissToast();
 
     if (type === 'single_read') {
@@ -362,27 +371,31 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
       setItems(current =>
         current.map(it => (it.id === id ? { ...it, read_at: null } : it)),
       );
-      updateUnreadCount(previousUnreadCount);
-      markNotificationUnread(id).catch(() => {
-        // Rollback undo if opposite fails
-        setItems(current =>
-          current.map(it => (it.id === id ? { ...it, read_at: new Date().toISOString() } : it)),
-        );
-        updateUnreadCount(previousUnreadCount - 1);
-      });
+      markNotificationUnread(id)
+        .catch(() => {
+          // Rollback undo if opposite fails
+          setItems(current =>
+            current.map(it => (it.id === id ? { ...it, read_at: new Date().toISOString() } : it)),
+          );
+        })
+        .finally(() => {
+          syncUnreadCount();
+        });
     } else if (type === 'single_unread') {
       const id = itemIds[0];
       const prevReadAt = previousReadAtMap[id] ?? new Date().toISOString();
       setItems(current =>
         current.map(it => (it.id === id ? { ...it, read_at: prevReadAt } : it)),
       );
-      updateUnreadCount(previousUnreadCount);
-      markNotificationRead(id).catch(() => {
-        setItems(current =>
-          current.map(it => (it.id === id ? { ...it, read_at: null } : it)),
-        );
-        updateUnreadCount(previousUnreadCount + 1);
-      });
+      markNotificationRead(id)
+        .catch(() => {
+          setItems(current =>
+            current.map(it => (it.id === id ? { ...it, read_at: null } : it)),
+          );
+        })
+        .finally(() => {
+          syncUnreadCount();
+        });
     } else if (type === 'mark_all') {
       setItems(current =>
         current.map(it =>
@@ -391,13 +404,12 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
             : it,
         ),
       );
-      updateUnreadCount(previousUnreadCount);
-      // Call unread for restored items
-      itemIds.forEach(id => {
-        markNotificationUnread(id).catch(() => {});
+      // Call unread for restored items, then read the count back from the server
+      Promise.all(itemIds.map(id => markNotificationUnread(id).catch(() => undefined))).then(() => {
+        syncUnreadCount();
       });
     }
-  }, [dismissToast, undoState, updateUnreadCount]);
+  }, [dismissToast, syncUnreadCount, undoState]);
 
   // Filter items by active tab
   const filteredItems = useMemo(() => {
