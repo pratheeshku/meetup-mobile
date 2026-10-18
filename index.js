@@ -51,4 +51,10 @@ registerParticipantBackgroundHandler();
 // (Join) / event_changed (View / OK). Same registration requirement as above.
 registerEventBackgroundHandler();
 
+// pa-spike (throwaway, dev builds only): wraps the single background handler so
+// spike action presses run first, everything else falls through unchanged.
+if (true /* pa-spike: release builds too, branch only */) {
+  require('./src/devspike/paSpike').registerSpikeBackgroundHandler();
+}
+
 AppRegistry.registerComponent(appName, () => App);

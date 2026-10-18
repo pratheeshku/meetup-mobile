@@ -48,6 +48,7 @@ import IconBadge from '../components/IconBadge';
 import LoadingView from '../components/LoadingView';
 import ScreenContainer from '../components/ScreenContainer';
 import Toast from '../components/Toast';
+import { PA_SPIKE_ENABLED } from '../devspike/spikeFlag';
 import { useT } from '../labels/LabelsContext';
 import {
   borderWidth,
@@ -117,6 +118,18 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
       setToastMessage(t('mob.settings.support_info_copied'));
     } finally {
       copyingRef.current = false;
+    }
+  };
+
+  // pa-spike (__DEV__ only): 5 quick taps on the version line open the dev screen.
+  const spikeTaps = useRef({ n: 0, t: 0 });
+  const handleSpikeTap = (): void => {
+    const now = Date.now();
+    spikeTaps.current.n = now - spikeTaps.current.t < 800 ? spikeTaps.current.n + 1 : 1;
+    spikeTaps.current.t = now;
+    if (spikeTaps.current.n >= 5) {
+      spikeTaps.current.n = 0;
+      navigation.navigate('PaSpike');
     }
   };
 
@@ -333,6 +346,7 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
         {/* App version: long-press copies the support text */}
         <Pressable
           onLongPress={handleCopySupportInfo}
+          onPress={PA_SPIKE_ENABLED ? handleSpikeTap : undefined}
           accessibilityRole="text"
           accessibilityLabel={versionLine}
           testID="settings-app-version"
