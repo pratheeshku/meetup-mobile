@@ -150,3 +150,21 @@ Tests:
 5. Smaller calls for the owner: home-card avatar long-press target (22 px inside a tappable card); text-only owner/organiser names; tournament registrations with null `user_id` or only a nickname.
 
 No commands were run beyond reading and a local glossary check; `npx jest`, `tsc`, lint and `check:labels` were not run because no code changed. Stopped as instructed.
+
+## 5. Update for design v1.3 (brief v1.2 rules)
+
+Design v1.3 and the approved board (`docs/mockups/user-menu/user-menu-board.png`, `.html`) are on `origin/docs/user-details-menu-v1.0-approved` only; they are **not on `main` and not in this working tree** (`docs/mockups/user-menu/` does not exist here). OI-6 is closed there.
+
+**OI-11 pre-check (fields the screens already load, from `src/types`):**
+
+| Person line | Has `user_id` | Has display name | Has photo | Verdict |
+|---|---|---|---|---|
+| Group owner, on `GroupDetail` | `owner_id` | yes, via `members[]` | yes, via `members[].photo_url` | OK |
+| Group owner, on home/list cards | `owner_id` | `owner.display_name` (optional) | **no** | Gap |
+| Game organiser (`Event`) | `organiser_id` | **no** (`organiser_nickname` only) | **no** | Gap |
+| Tournament organiser (`Tournament`) | `organiser_id` | **no** (`organiser_nickname` only) | **no** | Gap |
+| Tournament registration | `user_id` (nullable) | **no** (`nickname` only) | **no** | Gap |
+
+Per OI-11 these gaps mean `ud-mobile` stops and asks for those lines; no field is invented. Players from `getEventParticipants` and group members already have id, name and photo.
+
+**UM-06 fit:** the 22 px home-card avatars (tap only) and selectable search rows (avatar long-press only, row tap selects) follow the stated rules. Group member rows, EventDetail players and the Added lists can take tap = View Details. The only site that needs a ruling is the `EventCard` organiser circle (card-wide `Pressable`, hand-drawn initials, no photo or display name available).
