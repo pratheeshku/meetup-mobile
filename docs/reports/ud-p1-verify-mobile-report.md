@@ -87,7 +87,7 @@ v1 action set mapped to existing mobile API (design AD-3):
 | `remove_admin` | group | `updateMemberRole(groupId, userId, 'member', {correlationId})` | exists (today one toggle button, `handleChangeRole`; the registry splits it in two) |
 | `make_owner` | group | `transferGroupOwnership(groupId, userId, {correlationId})` | exists |
 | `remove_from_group` | group | `removeMember(groupId, userId, {correlationId})` | exists |
-| `remove_player` | game | **none** | **Missing.** `src/api/events.ts` has no organizer remove-participant function (it has `getEventParticipants` at line 357, `withdrawEvent` for self at 237). No client code mentions `participants/{user}`. The endpoint path and method are in `~/meetup`, which I cannot read. The brief says to use an existing function, so this is a STOP-and-ask for `ud-mobile`. |
+| `remove_player` | game | **to add** in `src/api/events.ts` | Not in mobile today (`getEventParticipants` line 357, self `withdrawEvent` line 237 only). Owner confirmed (3rd brief) the backend endpoint exists: `DELETE /events/{event_id}/participants/{user_id}`, optional `reason`, organizer only, returns `EventParticipantResponse`, 100/min; 404 = game gone or not visible. Not a blocker. |
 
 Other callers of the same API in this file, which stay: `inviteMember` (207), `removeMember` for undo (227) and leave (335), `createGroupInvitation` (251), `getGroup` (138).
 
@@ -145,8 +145,8 @@ Tests:
 
 1. **No board for the menu or details view** (design OI-6, Open). The brief says STOP.
 2. **`ud-backend` deployment is unconfirmed**, and `~/meetup` is not available here. Home-card `user_id` and both card routes depend on it.
-3. **`remove_player` has no mobile API function.** Need the organizer remove-participant endpoint (method and path) from `~/meetup`, or a ruling.
-4. `agent-handoff-template.md` is not in the repo.
+3. ~~`remove_player` API function~~: resolved by the owner (endpoint given; `ud-mobile` adds the call).
+4. `agent-handoff-template.md` lives in `~/meetup/docs/`, which is not on this machine; the owner must paste it.
 5. Smaller calls for the owner: home-card avatar long-press target (22 px inside a tappable card); text-only owner/organiser names; tournament registrations with null `user_id` or only a nickname.
 
 No commands were run beyond reading and a local glossary check; `npx jest`, `tsc`, lint and `check:labels` were not run because no code changed. Stopped as instructed.
