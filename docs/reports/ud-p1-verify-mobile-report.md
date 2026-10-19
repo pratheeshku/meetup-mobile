@@ -2,16 +2,16 @@
 
 Repo `meetup-mobile`, branch `claude/busy-faraday-ir0umx`, HEAD `3a5565f`. Line numbers are from that commit.
 
-## 0. Inputs that were not available (read first)
+## 0. Inputs
+
+Updated after the v1.1 brief. Everything below was re-checked against design v1.1.
 
 | Expected input | Status |
 |---|---|
-| `docs/agent-handoff-template.md` | Not in the repo. Not prepended. |
-| `docs/DES-MEETUP-ADDENDUM-user-details-menu.md` v1.0 | Not in the repo. `docs/INDEX.md` does not list it. Design sections 8 (UM-T10), AD-6, AD-8, OI-6 and D-1 could not be read. |
-| `~/meetup` (backend repo, brief `BRIEF-user-details-menu-backend-web.md`, card endpoints) | Not on this machine. `UserCardOut` and the card endpoints are unverified. |
-| Board for the menu and details view | None in `docs/mockups/` (only `group-view/`) or `docs/design*`. Matches design OI-6. |
-
-This report is code facts only, so it is complete for the questions asked. Everything marked **(assumption)** needs the design or the backend to confirm.
+| Design `DES-MEETUP-ADDENDUM-user-details-menu.md` v1.1 | **Read in full** from `origin/docs/user-details-menu-v1.0-approved` (not on `main`, not in the working tree). Pointed to by the brief. |
+| `docs/agent-handoff-template.md` | Still not in the repo. Not prepended. |
+| `~/meetup` (backend repo, backend brief, `ud-p1-verify-report.md`) | Still not on this machine. The card routes and `UserCardOut` are taken from design AD-1/AD-2 only; the deployed state is unverified. |
+| Board for the menu and details view | **Still none** in `docs/mockups/` or `docs/design*` (design OI-6, status Open). |
 
 ## 1. Person sites
 
@@ -45,13 +45,13 @@ Checked, with no person site:
 - `GameRow.tsx`, `GroupRow.tsx`, `NextGameCard.tsx`: no person rendering. They go through `UnifiedCard`.
 - `GroupMultiSelect.tsx` uses `getAvatarTint` for **group** names, not people.
 
-Findings that affect `ud-mobile`:
-1. **#10 cannot call a card.** The preview arrays have no user id. Needs a backend field, or home avatars stay out of scope. Owner decision.
-2. **#15 has a nullable `user_id`.** Team registrations have none. They need "no menu", or a different context.
-3. **Candidate rows (#2, #5, #6, #7, #9) and search rows (#8)** are not members of the entity yet. The brief says search and suggested lists use context `none`. The same reading is the safe one for the staged and just-added rows, but the design is not available to confirm. Owner decision.
-4. **Text-only sites (#11-#14)** are in the brief's "name in text" scope. A long-press on a name inside a card that is itself a `Pressable` conflicts with the card tap. Owner decision before building.
-5. **#13 duplicates avatar logic** instead of using `UserAvatar`, and has the hard-coded "RS". Migrating it also removes that allowlist entry.
-6. **#3, #6 email and #7 email chips** are not persons.
+Findings that affect `ud-mobile`, with what design v1.1 settles:
+1. **#10 home avatars:** settled. The backend adds `user_id` to `AvatarPreview` (AD-4, UM-T5). Mobile types `players_preview` and `members_preview` (`types/event.ts:90`, `types/group.ts:46`) need `user_id` added **only once `ud-backend` is deployed**. The context for a home avatar is the card's own game or group. Open: a 22 px avatar sits inside a card-wide `Pressable`, so the long-press target is small and the board must show the intended behaviour (design OI-3 covers only web).
+2. **#15 tournament registrations and #14 organiser:** settled. Tournament people open View Details from the row identity, no card request, no actions (AD-1, AD-5, OI-8). Gap: `TournamentRegistration` has only `nickname` (no display name or photo) and `user_id` can be null for team registrations; the details view would show the nickname with no photo. Null `user_id` rows get no menu (**assumption**).
+3. **Candidate and search rows (#2, #5, #6, #7, #8, #9):** settled as context `none`, View Details from row data (AD-5, OI-5). `UserSearchResult` already has `id`, `display_name`, `nickname`, `image_url`.
+4. **Text-only sites (#11-#13 owner/organiser names in cards):** still open. Design 4.3 says to check for names without an avatar but does not say they get a menu. Not built unless the board shows them (**assumption**).
+5. **#13 `EventCard`** duplicates avatar logic (initials circle plus hard-coded "RS", allowlisted). Migrating means switching to `UserAvatar` and removing the allowlist entry.
+6. **#3, #6 email and #7 email chips** are not persons; no menu.
 
 ## 2. `GroupDetailScreen` member actions today
 
@@ -79,13 +79,23 @@ Handlers and the `src/api` calls (all in `api/groups.ts`):
 | `handleMakeOwnerPress` | 314-326 | `Alert.alert` with `group_transfer.confirm_prompt {name}`, `confirm_message`, cancel, `confirm_button` (not destructive) | via `handleMakeOwner` (301-312) | | |
 | `handleMakeOwner` | 301-312 | n/a | `transferGroupOwnership(groupId, userId, {correlationId})` = `POST /groups/{id}/transfer-ownership` (api line 484-490) | refetch, then `goToDashboard(t('mob.group_transfer.success'))` | `memberError` = `group_transfer.error` |
 
+v1 action set mapped to existing mobile API (design AD-3):
+
+| Key | Context | Existing mobile function | Status |
+|---|---|---|---|
+| `make_admin` | group | `updateMemberRole(groupId, userId, 'admin', {correlationId})` | exists |
+| `remove_admin` | group | `updateMemberRole(groupId, userId, 'member', {correlationId})` | exists (today one toggle button, `handleChangeRole`; the registry splits it in two) |
+| `make_owner` | group | `transferGroupOwnership(groupId, userId, {correlationId})` | exists |
+| `remove_from_group` | group | `removeMember(groupId, userId, {correlationId})` | exists |
+| `remove_player` | game | **none** | **Missing.** `src/api/events.ts` has no organizer remove-participant function (it has `getEventParticipants` at line 357, `withdrawEvent` for self at 237). No client code mentions `participants/{user}`. The endpoint path and method are in `~/meetup`, which I cannot read. The brief says to use an existing function, so this is a STOP-and-ask for `ud-mobile`. |
+
 Other callers of the same API in this file, which stay: `inviteMember` (207), `removeMember` for undo (227) and leave (335), `createGroupInvitation` (251), `getGroup` (138).
 
 Behaviour drift against the new brief, to confirm with the owner:
 - **All three actions leave the screen today** (`goToDashboard(...)`). The brief says "refresh the host and show `action_done`". These conflict.
 - **No 404 handling** on member actions today. The brief requires the AD-8 close-with-notice (`useUnavailableScreen.onNotFound`, already wired for the detail fetch at 143).
 - **The card fetch and the action share one correlation id** per the brief. Today the correlation id covers only the action and its refetch.
-- Today **a member sees the card with no actions**, but a plain Group member can still open it. Under D-1 it would open View Details.
+- Today any member can open the card, which shows no actions for a plain member. Under D-1 the menu shows View Details first, then only `allowed_actions`.
 
 ## 3. Labels
 
@@ -95,7 +105,7 @@ How `npm run check:labels` works (`scripts/check-labels.js`, uses the TypeScript
 - Exclusions live only in `scripts/check-labels.allowlist.json`, each with a reason.
 - **It does not read `docs/label-inventory-mobile.json`.** The inventory is a documentation mirror (`defaultLabels.ts` header line 8): 530 entries `{key, defaultText, screen, placeholders, status}`. Keys there do not carry the `mob.` prefix.
 
-Drift: brief step 6 says "add them to the mobile label inventory", but that file is under `docs/`, which the hard rules say not to edit. The check passes with `defaultLabels.ts` alone. Needs an owner ruling (edit the inventory, or leave it for the owner).
+Settled by v1.1: `docs/label-inventory-mobile.json` is frozen and is not edited; the new texts go in `src/labels/defaultLabels.ts` only, which is all `check:labels` reads. Existing `mob.group_detail.action_*` keys stay.
 
 Existing keys reusable for the AD-6 set (AD-6 itself is unread):
 
@@ -114,7 +124,10 @@ Existing keys reusable for the AD-6 set (AD-6 itself is unread):
 | Notice for 404 | `mob.access.no_longer_available` | This is no longer available. |
 | Close, generic errors | `mob.common.close`, `mob.errors.server`, `mob.errors.forbidden`, `mob.errors.network` | |
 
-Not present, so the backend seed must supply them: `no_nickname`, `action_done`, a "View Details" label, any "Request ..." labels, and game or tournament actions. A grep for `no_nickname`, `action_done` and `view_details` in `defaultLabels.ts` returned nothing. Check the exact key names against the backend seed before adding. The glossary terms ("Group member", "Player", "Team player") apply to the labels.
+New keys from design AD-6 (22 texts under `mob.user_menu.*`: `view_details`, `menu_a11y`, `details_title`, `no_nickname`, `close`, `make_admin`, `remove_admin`, `make_owner`, `remove_from_group`, `remove_player`, `confirm_title`, `confirm_body_<action>` x5, `confirm_yes`, `confirm_cancel`, `action_done`, `action_failed`, `not_available`, `card_load_failed`). None exist today (0 matches for `mob.user_menu`). The English texts are fixed in AD-6.
+- Reuse by text only: existing "Make admin", "Make owner", "Remove from group" and "This is no longer available." match AD-6 wording, but the new keys are separate (no rename, no reuse by key). `Demote` becomes "Remove admin".
+- I ran the 22 AD-6 texts against the 3 banned-term patterns in `docs/glossary.json`: no hits.
+- Unresolved: the "Request ..." labels are not needed (`requires_approval` is always false in v1; if true, STOP).
 
 ## 4. `MemberActionCard` and its tests
 
@@ -128,11 +141,12 @@ Tests:
 - `src/screens/__tests__/GroupDetailScreen.test.tsx`: **does not reference the card or long-press.** It covers the invite panel and share link (mocks `removeMember`, `transferGroupOwnership`, `updateMemberRole`). The brief's "update the existing group detail tests that asserted the old card" applies to `GroupDetailMembers.test.tsx` only; this file needs at most the mock updates for the new card API.
 - Other tests that render sites from section 1 and may need touching when migrated: `EventDetailPlayers.test.tsx`, `EventDetailScreen.test.tsx`, `InviteMembersScreen.test.tsx`, `UserSearchPicker.test.tsx`, `TournamentInvite.test.tsx`, `CreateGame*.test.tsx`, `InviteSearchConsistency.test.tsx`, `DetailGroupRow.test.tsx`. Not opened, so impact is unknown.
 
-## Blockers for `ud-mobile` (summary)
+## Blockers for `ud-mobile` (gates in the brief)
 
-1. Design addendum, handoff template, backend brief and the card endpoints are not available here. They must be supplied.
-2. No board for the menu and details view (OI-6). The brief says STOP.
-3. `ud-backend` deployment is unconfirmed.
-4. Owner decisions listed in section 1 (home preview avatars without ids, null `user_id` in tournament registrations, candidate-row context, text-only sites, the card-tap conflict), plus the two drifts in section 2 and the label inventory in section 3.
+1. **No board for the menu or details view** (design OI-6, Open). The brief says STOP.
+2. **`ud-backend` deployment is unconfirmed**, and `~/meetup` is not available here. Home-card `user_id` and both card routes depend on it.
+3. **`remove_player` has no mobile API function.** Need the organizer remove-participant endpoint (method and path) from `~/meetup`, or a ruling.
+4. `agent-handoff-template.md` is not in the repo.
+5. Smaller calls for the owner: home-card avatar long-press target (22 px inside a tappable card); text-only owner/organiser names; tournament registrations with null `user_id` or only a nickname.
 
-No commands were run beyond reading; `npx jest`, `tsc`, lint and `check:labels` were not run because no code changed. Stopped as instructed.
+No commands were run beyond reading and a local glossary check; `npx jest`, `tsc`, lint and `check:labels` were not run because no code changed. Stopped as instructed.
