@@ -45,6 +45,7 @@ import {
   displayEventNotification,
   isEventNotificationType,
 } from './eventNotificationHandler';
+import { displayPushActionNotification, isPushActionType } from './pushActions';
 import { NOTIFICATION_TYPES } from '../types/notification';
 import type { NotificationType, PushNotificationPayload } from '../types/notification';
 
@@ -106,6 +107,13 @@ function buildUserAgent(): string {
 }
 
 /**
+ * Push actions capability (DES-MEETUP-ADDENDUM-push-actions AD-3): this build
+ * can render and handle action buttons, so the server may send the action
+ * types data-only (Android) or with a category (iOS) once its flag is on.
+ */
+export const PUSH_ACTIONS_VERSION = 1;
+
+/**
  * `POST /notifications/mobile-subscriptions` — body verified against the
  * live OpenAPI `MobilePushTokenRegisterRequest` (`deviceToken` and
  * `platform` required, `userAgent` optional).
@@ -128,6 +136,7 @@ export async function registerDeviceToken(deviceToken: string): Promise<void> {
     platform: Platform.OS,
     userAgent: buildUserAgent(),
     deviceId,
+    pushActionsVersion: PUSH_ACTIONS_VERSION,
   });
 }
 
@@ -282,6 +291,21 @@ export function onMessage(): () => void {
       return;
     }
 
+    // Action types arrive data-only on Android (no `notification` block) when
+    // the server's push-actions flag is on for this install: render them with
+    // buttons. With a `notification` block (flag off, old path, or iOS) the
+    // existing banner below is unchanged.
+    if (
+      Platform.OS === 'android' &&
+      !remoteMessage.notification &&
+      isPushActionType(remoteMessage.data?.notification_type)
+    ) {
+      displayPushActionNotification(toStringRecord(remoteMessage.data)).catch(() => {
+        console.log('[fcm] push action notification display failed');
+      });
+      return;
+    }
+
     if (isEventNotificationType(remoteMessage.data?.notification_type)) {
       displayEventNotification(toStringRecord(remoteMessage.data)).catch(() => {
         // Display failure (e.g. notification permission revoked) must not
@@ -342,6 +366,16 @@ export function registerBackgroundMessageHandler(): void {
       } catch {
         // Best-effort: a display failure in a headless task has nowhere
         // useful to surface, and must not reject the FCM handler.
+      }
+      return;
+    }
+
+    if (isPushActionType(remoteMessage.data?.notification_type)) {
+      try {
+        // Reaches this handler only when the message is data-only (Android).
+        await displayPushActionNotification(toStringRecord(remoteMessage.data));
+      } catch {
+        // Best-effort, as above.
       }
       return;
     }

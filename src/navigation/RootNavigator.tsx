@@ -102,6 +102,11 @@ import {
   getInitialEventNotification,
   registerEventForegroundHandler,
 } from '../notifications/eventNotificationHandler';
+import {
+  getInitialPushActionNotification,
+  registerPushActionCategories,
+  registerPushActionForegroundHandler,
+} from '../notifications/pushActions';
 
 import { claimAuthHandoff } from './showCompletion';
 import CompletionScreen from '../screens/CompletionScreen';
@@ -123,7 +128,6 @@ import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import EditSkillLevelsScreen from '../screens/EditSkillLevelsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import PaSpikeScreen from '../screens/PaSpikeScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
 import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
 import EditGroupScreen from '../screens/EditGroupScreen';
@@ -137,7 +141,6 @@ import { useT } from '../labels/LabelsContext';
 import ScreenContainer from '../components/ScreenContainer';
 import { perfLog, isPerfCapturing } from '../diagnostics/perfLog';
 import { recordNavChange } from '../hooks/usePerfScreen';
-import { PA_SPIKE_ENABLED } from '../devspike/spikeFlag';
 
 type AppRootParamList = {
   Tabs: undefined;
@@ -316,13 +319,6 @@ function ProfileStack(): React.JSX.Element {
         component={SettingsScreen}
         options={{ headerShown: false }}
       />
-      {PA_SPIKE_ENABLED ? (
-        <ProfileStackNav.Screen
-          name="PaSpike"
-          component={PaSpikeScreen}
-          options={{ title: 'PA spike' }}
-        />
-      ) : null}
       <ProfileStackNav.Screen
         name="NotificationPreferences"
         component={NotificationPreferencesScreen}
@@ -435,7 +431,8 @@ export default function RootNavigator(): React.JSX.Element {
     const payload =
       (await getInitialNotification()) ??
       (await getInitialParticipantNotification()) ??
-      (await getInitialEventNotification());
+      (await getInitialEventNotification()) ??
+      (await getInitialPushActionNotification());
     // Known limitation (consistent with §3.9's own "unauthenticated deep
     // links" note, which this codebase hasn't built the
     // `pendingDestination` mechanism for either): a quit-state tap that
@@ -471,11 +468,18 @@ export default function RootNavigator(): React.JSX.Element {
     // the app is active — same pattern as the participant listener above.
     const unsubscribeEventEvents = registerEventForegroundHandler();
 
+    // Invite / group-added action presses while the app is active, and a
+    // second iOS category registration once labels are loaded (index.js
+    // registers at launch, possibly before the label cache is read).
+    const unsubscribePushActionEvents = registerPushActionForegroundHandler();
+    registerPushActionCategories().catch(() => {});
+
     return () => {
       unsubscribeMessage();
       unsubscribeOpenedApp();
       unsubscribeParticipantEvents();
       unsubscribeEventEvents();
+      unsubscribePushActionEvents();
     };
   }, []);
 

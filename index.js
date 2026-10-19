@@ -7,8 +7,8 @@ import App from './App';
 import { name as appName } from './app.json';
 import { registerBackgroundMessageHandler } from './src/notifications/fcm';
 import { createNotificationChannels } from './src/notifications/channels';
-import { registerParticipantBackgroundHandler } from './src/notifications/participantHandler';
-import { registerEventBackgroundHandler } from './src/notifications/eventNotificationHandler';
+import { registerNotificationBackgroundDispatcher } from './src/notifications/notificationEventDispatcher';
+import { registerPushActionCategories } from './src/notifications/pushActions';
 
 // ── Perf diagnostics bootstrap (perf-diagnostics task) ──────────────────────
 // Imported as early as possible so `now()` is close to true bundle-start time.
@@ -43,18 +43,14 @@ registerBackgroundMessageHandler();
 // failure, which the FCM handlers already contain.
 createNotificationChannels().catch(() => {});
 
-// notify-kit background/quit-state press handler (View / OK buttons). Like the
-// FCM handler it must be registered at top level, outside any React lifecycle.
-registerParticipantBackgroundHandler();
+// notify-kit keeps ONE background handler (the last registration wins), so a
+// single dispatcher routes every notification press by notification_type to
+// the participant, event and push-action handlers. Like the FCM handler it
+// must be registered at top level, outside any React lifecycle.
+registerNotificationBackgroundDispatcher();
 
-// notify-kit background/quit-state press handler for group_event_created
-// (Join) / event_changed (View / OK). Same registration requirement as above.
-registerEventBackgroundHandler();
-
-// pa-spike (throwaway, dev builds only): wraps the single background handler so
-// spike action presses run first, everything else falls through unchanged.
-if (true /* pa-spike: release builds too, branch only */) {
-  require('./src/devspike/paSpike').registerSpikeBackgroundHandler();
-}
+// iOS action categories (invite_game, invite_tournament, group_added) must be
+// registered at every launch, including a background launch from an action.
+registerPushActionCategories().catch(() => {});
 
 AppRegistry.registerComponent(appName, () => App);

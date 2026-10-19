@@ -69,6 +69,7 @@ describe('registerDeviceToken', () => {
       platform: 'android',
       userAgent: 'MeetupMobile-Android/34',
       deviceId: 'mock-android-id',
+      pushActionsVersion: 1,
     });
   });
 

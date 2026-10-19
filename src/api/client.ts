@@ -174,15 +174,14 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
 // share its result. The slot is released only when THIS attempt settles.
 let inFlightRefresh: Promise<string> | null = null;
 
-/**
- * Obtains a fresh access token via `POST /auth/refresh` (no body; the cookie
- * is sent by the networking layer), stores it, and returns it. Throws
- * `SessionEndedError` when the session is over, or the underlying error for
- * anything else (network, 5xx). Never retries.
- */
-export function refreshAccessToken(): Promise<string> {
-  if (inFlightRefresh) {
-    return inFlightRefresh;
+// The network half of a refresh (`POST /auth/refresh`, no persist), shared by
+// `refreshAccessToken` and `refreshAccessTokenForAction` so the two can never
+// run two rotations at once (reuse detection).
+let inFlightFetch: Promise<string> | null = null;
+
+function fetchNewAccessToken(): Promise<string> {
+  if (inFlightFetch) {
+    return inFlightFetch;
   }
 
   const attempt = (async (): Promise<string> => {
@@ -201,6 +200,32 @@ export function refreshAccessToken(): Promise<string> {
     if (!accessToken) {
       throw new SessionEndedError('no-session');
     }
+    return accessToken;
+  })();
+
+  inFlightFetch = attempt;
+  const release = (): void => {
+    if (inFlightFetch === attempt) {
+      inFlightFetch = null;
+    }
+  };
+  attempt.then(release, release);
+  return attempt;
+}
+
+/**
+ * Obtains a fresh access token via `POST /auth/refresh` (no body; the cookie
+ * is sent by the networking layer), stores it, and returns it. Throws
+ * `SessionEndedError` when the session is over, or the underlying error for
+ * anything else (network, 5xx). Never retries.
+ */
+export function refreshAccessToken(): Promise<string> {
+  if (inFlightRefresh) {
+    return inFlightRefresh;
+  }
+
+  const attempt = (async (): Promise<string> => {
+    const accessToken = await fetchNewAccessToken();
     await saveTokens(accessToken);
     return accessToken;
   })();
@@ -213,6 +238,26 @@ export function refreshAccessToken(): Promise<string> {
   };
   attempt.then(release, release);
   return attempt;
+}
+
+/**
+ * Same refresh as `refreshAccessToken`, for a push-notification action running
+ * in the background (push actions AD-5). Shares the single-flight network call
+ * and returns the new access token even when the Keychain write fails (a
+ * locked device): persisting is best effort and never throws to the caller.
+ * Throws exactly as the fetch half does (`SessionEndedError`, network, 5xx).
+ */
+export async function refreshAccessTokenForAction(): Promise<string> {
+  const accessToken = await fetchNewAccessToken();
+  // When a regular refresh is in flight it persists the same token itself.
+  if (!inFlightRefresh) {
+    try {
+      await saveTokens(accessToken);
+    } catch (error) {
+      console.log('[auth] action token not persisted', describeError(error));
+    }
+  }
+  return accessToken;
 }
 
 let endingSession: Promise<void> | null = null;

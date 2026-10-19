@@ -214,4 +214,46 @@ describe('NotificationCard', () => {
 
     expect(texts(rendered)).toContain('Notification');
   });
+
+  describe('action_state outcome label (push actions AD-6)', () => {
+    it.each([
+      ['going', 'Joined'],
+      ['waitlisted', 'Waitlisted'],
+      ['accepted', 'Accepted'],
+      ['declined', 'Declined'],
+      ['left', 'Left group'],
+      ['unavailable', 'No longer available'],
+    ])('shows "%s" as plain text "%s" next to the body, with no extra buttons', (state, label) => {
+      const withState = render(
+        <NotificationCard
+          item={makeItem({ action_state: state })}
+          onPress={jest.fn()}
+          onToggleRead={jest.fn()}
+        />,
+      );
+      const withoutState = render(
+        <NotificationCard item={makeItem()} onPress={jest.fn()} onToggleRead={jest.fn()} />,
+      );
+
+      expect(texts(withState)).toContain(label);
+      expect(texts(withState)).toContain('Game is starting soon');
+      expect(pressables(withState)).toHaveLength(pressables(withoutState).length);
+    });
+
+    it.each([[undefined], [null], ['pending'], ['member'], ['closed'], ['withdrawn']])(
+      'shows nothing extra for action_state %p',
+      state => {
+        const rendered = render(
+          <NotificationCard
+            item={makeItem({ action_state: state as string | null | undefined })}
+            onPress={jest.fn()}
+            onToggleRead={jest.fn()}
+          />,
+        );
+        expect(texts(rendered)).not.toContain('Joined');
+        expect(texts(rendered)).not.toContain('Left group');
+        expect(texts(rendered)).not.toContain('No longer available');
+      },
+    );
+  });
 });

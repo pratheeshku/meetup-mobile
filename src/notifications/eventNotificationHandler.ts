@@ -208,15 +208,6 @@ export async function handleEventNotificationEvent({ type, detail }: Event): Pro
 }
 
 /**
- * Registers the background/quit-state notification event handler. Must be
- * called once at top level in `index.js`, outside any React lifecycle, so
- * it exists when a press wakes the JS runtime before any component mounts.
- */
-export function registerEventBackgroundHandler(): void {
-  notifee.onBackgroundEvent(handleEventNotificationEvent);
-}
-
-/**
  * Registers the foreground event handler (app active when a button or the
  * body is pressed). Returns the unsubscribe function; called from
  * `RootNavigator` alongside the other listeners.
