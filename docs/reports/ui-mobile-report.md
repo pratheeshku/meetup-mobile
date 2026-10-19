@@ -2,7 +2,7 @@
 
 Task: ui-mobile (Part A dashboard sport chips, Part B "+ / −"). Branch `claude/upbeat-lovelace-lnblk2`. Design: AD-18/AD-19, TL-81, TL-82, test 51 (docs on branch `docs/tournament-lifecycle-v1.3-approved`, read-only). No design doc edited, no version chosen.
 
-Status: implemented. NOT self-certified: 15 jest suites fail; one of those failures was mine and was fixed after the run (not re-run); the rest are listed below and none is in the invite or chip code paths I changed, but I did not run a baseline to prove it.
+Status: implemented. NOT self-certified. After the follow-up verification below: jest on the final commit has 14 failing suites, the same 14 as on its parent (no suite fails on the final commit that passes on the parent); UserSearchPicker passes; lint is 32 problems on both.
 
 ## Owner decision recorded (Part A step 3)
 The brief's contrast gate (lightest grey in #E6EAF0..#CBD2DC passing 3:1 for all icons) cannot be met. Owner decision: use #E6EAF0 fixed and accept a documented exception. Numbers measured against #E6EAF0 (best colour of each glyph):
@@ -49,26 +49,439 @@ New/updated and PASSING in the run below:
 - `AddRemoveControl.test.tsx` (9): staged "+" stages / "−" removes and sends nothing; names from labels; touch target >= 44; glyph changes; status chip no glyph; immediate chip only after confirm (not optimistic); double tap sends once; failure returns to "+" with error label and retries; sync throw; entry button "+" 44pt; group rows "+"/"−".
 - `inviteControlsStatic.test.ts` (3): TypeScript-AST scan of every non-test .tsx under src: no per-person/per-group Invite text button outside `AddRemoveControl.tsx` (keys `mob.user_search.invite_button`, `mob.group_detail.invite`, `mob.game_detail.invite_group`, `mob.game_detail.invite_player` allowed only as accessibilityLabel, on AddEntryRow/AddEntryButton, or as a `formTitle` heading). Detector self-check included. No exceptions.
 - Updated and passing: GroupDetailScreen, InviteMembersScreen, TournamentInvite, EventDetailShareInvite, CreateGameInviteeList/Visibility/EmailInvites/OptionalInvites, InviteSearchConsistency, homeComponents SportChipsRow cases.
-- UserSearchPicker.test.tsx: added selection-mode tests and updated row assertions. In the run, 1 test failed (`shows the display name first...`, it read texts of the control instead of the row). I fixed it afterwards by pointing it at `user-search-row-body`; **that fix was not re-run** (one jest run only).
+- UserSearchPicker.test.tsx: added selection-mode tests and updated row assertions. It passes on the final commit (see verification below); a first-run failure (`shows the display name first...`) was fixed by pointing it at `user-search-row-body`.
 
-## Raw command output (run once each, from `cd /home/user/meetup-mobile && pwd`)
-`npx jest` (node v22.22.0, jest 29.7.0, after `npm ci`): 
+## Verification on the final commit vs its parent (run once each)
+Final = 09af54f (code identical to the commit that carries this report). Parent = 5365484, run in a separate git worktree (`git worktree add <dir> 09af54f^`, node_modules symlinked to the main checkout). Same machine, Node v22.22.0, `npx jest` once per tree. Full raw logs are committed next to this report: `ui-mobile-logs/jest-final-09af54f.txt`, `ui-mobile-logs/jest-parent-5365484.txt`, `ui-mobile-logs/lint-final-09af54f.txt`, `ui-mobile-logs/lint-parent-5365484.txt` (jest logs are ~0.5 MB each, so only the summary and the suite lines are pasted here).
+
+### 1. UserSearchPicker on the final commit
 ```
-Test Suites: 15 failed, 159 passed, 174 total
-Tests:       169 failed, 2018 passed, 2187 total
+PASS src/components/__tests__/UserSearchPicker.test.tsx
+(raw line 4492 of ui-mobile-logs/jest-final-09af54f.txt)
+```
+
+### 2. Raw jest summary, both trees
+Final (09af54f):
+```
+Test Suites: 14 failed, 160 passed, 174 total
+Tests:       167 failed, 2020 passed, 2187 total
+Snapshots:   0 total
+Time:        53.99 s, estimated 65 s
 exit 1
 ```
-Failing suites (15) and what they are:
-- NOT in my changed areas, environment or stale tests: ProfileScreen, ProfileScreenLinks, ProfileScreenReportRow, ProfileScreenTerms, ForceUpdateGate, __tests__/AppForceUpdate, shareLink, appConfig (iOS project values), headerIcon (ENOENT `src/assets/shuttlr-icon.png`, binary assets missing in this checkout), keyboardInventory (lists screens with bare TextInput), HomeScreen (`sports-section` testID not found), CreateGameScreen.test (looks for label "🎮 Casual Game"), homeComponents DashboardBanner brand block ×7 (missing `shuttlr-icon-header.png`).
-- EventDetailScreen.test: failures are label mismatches ("Cancel Event", "Invite Individual" while the label is "Invite Player") plus Edit-flow cases. The cases I touched (group invite flow BUILD 3, which selects groups by "Invite {group}") pass; the BUILD C individual-invite cases fail on the stale label "Invite Individual" before reaching my change.
-I did NOT run a baseline of the original code, so "not mine" is from reading the failure messages, not from a before/after comparison.
+Parent (5365484):
+```
+Test Suites: 14 failed, 158 passed, 172 total
+Tests:       168 failed, 2000 passed, 2168 total
+Snapshots:   0 total
+Time:        69.344 s
+exit 1
+```
+(Test counts differ because the final commit adds 2 test files and 19 tests.)
 
+Raw PASS/FAIL suite lines, final commit:
+```
+PASS __tests__/App.test.tsx
+FAIL __tests__/AppForceUpdate.test.tsx
+PASS __tests__/index.test.ts
+FAIL config/__tests__/appConfig.test.ts
+PASS config/__tests__/iosPodDeploymentTarget.test.ts
+PASS config/__tests__/iosSceneLifecycle.test.ts
+PASS src/api/__tests__/config.test.ts
+PASS src/api/__tests__/cookies.test.ts
+PASS src/api/__tests__/events.test.ts
+PASS src/api/__tests__/groups.test.ts
+PASS src/api/__tests__/groupsNoCache.test.ts
+PASS src/api/__tests__/labels.test.ts
+PASS src/api/__tests__/mobileNumber.test.ts
+PASS src/api/__tests__/notifications.test.ts
+PASS src/api/__tests__/profile.test.ts
+PASS src/api/__tests__/profileNormalizer.test.ts
+PASS src/api/__tests__/refresh.test.ts
+PASS src/api/__tests__/refreshForAction.test.ts
+PASS src/api/__tests__/sports.test.ts
+PASS src/api/__tests__/tournaments.test.ts
+PASS src/api/__tests__/users.test.ts
+PASS src/api/__tests__/venues.test.ts
+PASS src/api/__tests__/versionPolicy.test.ts
+FAIL src/assets/__tests__/headerIcon.test.ts
+PASS src/auth/__tests__/AuthContext.push.test.tsx
+PASS src/auth/__tests__/appleAuth.test.ts
+PASS src/auth/__tests__/googleSignInPlatform.test.tsx
+PASS src/auth/__tests__/sessionExpiry.test.tsx
+PASS src/auth/__tests__/signInNoRefreshToken.test.tsx
+PASS src/auth/__tests__/signOut.test.ts
+PASS src/auth/__tests__/signOutSession.test.ts
+PASS src/auth/__tests__/silentRefresh.test.tsx
+PASS src/components/__tests__/AddRemoveControl.test.tsx
+PASS src/components/__tests__/Badge.test.tsx
+PASS src/components/__tests__/Button.test.tsx
+PASS src/components/__tests__/DateTimePickerField.test.tsx
+PASS src/components/__tests__/DropdownField.test.tsx
+PASS src/components/__tests__/EventCard.test.tsx
+FAIL src/components/__tests__/ForceUpdateGate.test.tsx
+PASS src/components/__tests__/GroupCard.test.tsx
+PASS src/components/__tests__/GroupNamesRow.test.tsx
+PASS src/components/__tests__/HeaderAddButton.test.tsx
+PASS src/components/__tests__/KeyboardAwareScreen.test.tsx
+PASS src/components/__tests__/MobileNumberCard.test.tsx
+PASS src/components/__tests__/MobileNumberInput.test.tsx
+PASS src/components/__tests__/NotificationBanner.test.tsx
+PASS src/components/__tests__/NotificationCard.test.tsx
+PASS src/components/__tests__/OptionChips.test.tsx
+PASS src/components/__tests__/SessionCheckRetry.test.tsx
+PASS src/components/__tests__/ShareActionSheet.test.tsx
+PASS src/components/__tests__/Toast.test.tsx
+PASS src/components/__tests__/TournamentsListContent.test.tsx
+PASS src/components/__tests__/UserSearchPicker.test.tsx
+PASS src/components/__tests__/inviteControlsStatic.test.ts
+PASS src/components/__tests__/iosPickerTheme.test.ts
+FAIL src/components/__tests__/keyboardInventory.test.ts
+PASS src/components/auth/__tests__/SocialTermsNotice.test.tsx
+FAIL src/components/home/__tests__/homeComponents.test.tsx
+PASS src/components/icons/__tests__/DashboardIcons.test.tsx
+PASS src/components/icons/__tests__/RegistryIcons.test.tsx
+PASS src/components/skills/__tests__/LevelPerSportCard.test.tsx
+PASS src/components/skills/__tests__/MySportRow.test.tsx
+PASS src/components/skills/__tests__/SkillLevelFlow.test.tsx
+PASS src/components/skills/__tests__/SportPicker.test.tsx
+PASS src/components/venue/__tests__/OthersVenueModal.test.tsx
+PASS src/components/venue/__tests__/VenueDetailCard.test.tsx
+PASS src/components/venue/__tests__/VenueMapFallback.test.tsx
+PASS src/components/venue/__tests__/VenuePicker.test.tsx
+PASS src/hooks/__tests__/useFieldChain.test.tsx
+PASS src/hooks/__tests__/useMobileNumberConfig.test.tsx
+PASS src/hooks/__tests__/useOnboardingRequired.test.tsx
+PASS src/hooks/__tests__/useRefetchOnFocus.test.tsx
+PASS src/hooks/__tests__/useResource.test.tsx
+PASS src/hooks/__tests__/useResourceFresh.test.tsx
+PASS src/hooks/__tests__/useSportFilter.test.tsx
+PASS src/labels/__tests__/LabelsContext.test.tsx
+PASS src/navigation/__tests__/CreateMenu.test.tsx
+PASS src/navigation/__tests__/CreateTabButton.test.tsx
+PASS src/navigation/__tests__/OnboardingOverlay.test.tsx
+PASS src/navigation/__tests__/RootNavigatorHomeTab.test.tsx
+PASS src/navigation/__tests__/accessNotice.test.ts
+PASS src/navigation/__tests__/tabIcons.test.tsx
+PASS src/notifications/__tests__/deviceId.test.ts
+PASS src/notifications/__tests__/deviceIdIos.test.ts
+PASS src/notifications/__tests__/fcm.test.ts
+PASS src/notifications/__tests__/fcmForeground.test.ts
+PASS src/notifications/__tests__/iosPush.test.ts
+PASS src/notifications/__tests__/notificationEventDispatcher.test.ts
+PASS src/notifications/__tests__/notificationRouting.test.ts
+PASS src/notifications/__tests__/pushActions.test.ts
+PASS src/notifications/__tests__/pushActionsDisplay.test.ts
+PASS src/notifications/__tests__/pushActionsIosPress.test.ts
+PASS src/notifications/__tests__/pushRegistration.test.ts
+PASS src/notifications/eventNotificationHandler.test.ts
+PASS src/notifications/participantHandler.test.ts
+PASS src/onboarding/__tests__/steps.test.ts
+PASS src/screens/__tests__/AccessActionNotFound.test.tsx
+PASS src/screens/__tests__/AccessRefetchDetails.test.tsx
+PASS src/screens/__tests__/AccessRefetchLists.test.tsx
+PASS src/screens/__tests__/CreateGameDuration.test.tsx
+PASS src/screens/__tests__/CreateGameDurationRow.test.tsx
+PASS src/screens/__tests__/CreateGameEmailInvites.test.tsx
+PASS src/screens/__tests__/CreateGameGroupCount.test.tsx
+PASS src/screens/__tests__/CreateGameInviteeList.test.tsx
+PASS src/screens/__tests__/CreateGameInviteeVisibility.test.tsx
+PASS src/screens/__tests__/CreateGameMultiGroup.test.tsx
+PASS src/screens/__tests__/CreateGameOptionalInvites.test.tsx
+FAIL src/screens/__tests__/CreateGameScreen.test.tsx
+PASS src/screens/__tests__/CreateGroupScreen.test.tsx
+PASS src/screens/__tests__/DetailGroupRow.test.tsx
+PASS src/screens/__tests__/EditSkillLevelsScreen.test.tsx
+PASS src/screens/__tests__/EventDetailGroups.test.tsx
+PASS src/screens/__tests__/EventDetailPlayers.test.tsx
+PASS src/screens/__tests__/EventDetailRsvpError.test.tsx
+FAIL src/screens/__tests__/EventDetailScreen.test.tsx
+PASS src/screens/__tests__/EventDetailShareInvite.test.tsx
+PASS src/screens/__tests__/ForgotPasswordScreen.test.tsx
+PASS src/screens/__tests__/GamesScreen.test.tsx
+PASS src/screens/__tests__/GroupDetailMembers.test.tsx
+PASS src/screens/__tests__/GroupDetailScreen.test.tsx
+PASS src/screens/__tests__/GroupsHeaderNavigation.test.tsx
+PASS src/screens/__tests__/GroupsScreen.test.tsx
+FAIL src/screens/__tests__/HomeScreen.test.tsx
+PASS src/screens/__tests__/HomeStatsStrip.test.tsx
+PASS src/screens/__tests__/HomeTabs.test.tsx
+PASS src/screens/__tests__/HomeUpcomingJoin.test.tsx
+PASS src/screens/__tests__/InviteMembersScreen.test.tsx
+PASS src/screens/__tests__/InviteSearchConsistency.test.tsx
+PASS src/screens/__tests__/LegacyVenuePayloadContracts.test.tsx
+PASS src/screens/__tests__/LoginScreen.test.tsx
+PASS src/screens/__tests__/NotificationHistoryScreen.test.tsx
+PASS src/screens/__tests__/NotificationPreferencesScreen.test.tsx
+PASS src/screens/__tests__/OnboardingScreen.test.tsx
+PASS src/screens/__tests__/ProfileNoStats.test.tsx
+FAIL src/screens/__tests__/ProfileScreen.test.tsx
+FAIL src/screens/__tests__/ProfileScreenLinks.test.tsx
+FAIL src/screens/__tests__/ProfileScreenReportRow.test.tsx
+PASS src/screens/__tests__/ProfileScreenSkillLevel.test.tsx
+FAIL src/screens/__tests__/ProfileScreenTerms.test.tsx
+PASS src/screens/__tests__/RegisterScreen.test.tsx
+PASS src/screens/__tests__/RegisterScreenKeyboard.test.tsx
+PASS src/screens/__tests__/RegisterScreenPrivacy.test.tsx
+PASS src/screens/__tests__/RegisterScreenTerms.test.tsx
+PASS src/screens/__tests__/SettingsAppVersion.test.tsx
+PASS src/screens/__tests__/SkillRequirementPills.test.tsx
+PASS src/screens/__tests__/TournamentDetailScreen.test.tsx
+PASS src/screens/__tests__/TournamentInvite.test.tsx
+PASS src/screens/__tests__/TournamentRespond.test.tsx
+PASS src/screens/__tests__/TournamentShare.test.tsx
+PASS src/screens/__tests__/VenuePayloadContracts.test.tsx
+PASS src/screens/__tests__/VerifyScreen.test.tsx
+PASS src/screens/__tests__/VerifyScreenOneTimeCode.test.tsx
+PASS src/screens/__tests__/emailAuthSecurityAndAudit.test.tsx
+PASS src/sports/__tests__/style.test.ts
+PASS src/storage/__tests__/tokens.test.ts
+PASS src/theme/__tests__/tokens.test.ts
+PASS src/utils/__tests__/apiError.test.ts
+PASS src/utils/__tests__/avatar.test.ts
+PASS src/utils/__tests__/displayName.test.ts
+PASS src/utils/__tests__/formatEventDateTime.test.ts
+PASS src/utils/__tests__/formatGameTime.test.ts
+PASS src/utils/__tests__/formatRelativeTime.test.ts
+PASS src/utils/__tests__/gameGroups.test.ts
+PASS src/utils/__tests__/gameLists.test.ts
+PASS src/utils/__tests__/httpsUrl.test.ts
+PASS src/utils/__tests__/installedVersion.test.ts
+PASS src/utils/__tests__/labels.test.tsx
+PASS src/utils/__tests__/localDateTime.test.ts
+PASS src/utils/__tests__/logSafeError.test.ts
+PASS src/utils/__tests__/notificationDateUtils.test.ts
+PASS src/utils/__tests__/phoneNumber.test.ts
+PASS src/utils/__tests__/playStoreUrl.test.ts
+FAIL src/utils/__tests__/shareLink.test.ts
+PASS src/utils/__tests__/supportLink.test.ts
+```
+Raw PASS/FAIL suite lines, parent:
+```
+PASS __tests__/App.test.tsx
+FAIL __tests__/AppForceUpdate.test.tsx
+PASS __tests__/index.test.ts
+FAIL config/__tests__/appConfig.test.ts
+PASS config/__tests__/iosPodDeploymentTarget.test.ts
+PASS config/__tests__/iosSceneLifecycle.test.ts
+PASS src/api/__tests__/config.test.ts
+PASS src/api/__tests__/cookies.test.ts
+PASS src/api/__tests__/events.test.ts
+PASS src/api/__tests__/groups.test.ts
+PASS src/api/__tests__/groupsNoCache.test.ts
+PASS src/api/__tests__/labels.test.ts
+PASS src/api/__tests__/mobileNumber.test.ts
+PASS src/api/__tests__/notifications.test.ts
+PASS src/api/__tests__/profile.test.ts
+PASS src/api/__tests__/profileNormalizer.test.ts
+PASS src/api/__tests__/refresh.test.ts
+PASS src/api/__tests__/refreshForAction.test.ts
+PASS src/api/__tests__/sports.test.ts
+PASS src/api/__tests__/tournaments.test.ts
+PASS src/api/__tests__/users.test.ts
+PASS src/api/__tests__/venues.test.ts
+PASS src/api/__tests__/versionPolicy.test.ts
+FAIL src/assets/__tests__/headerIcon.test.ts
+PASS src/auth/__tests__/AuthContext.push.test.tsx
+PASS src/auth/__tests__/appleAuth.test.ts
+PASS src/auth/__tests__/googleSignInPlatform.test.tsx
+PASS src/auth/__tests__/sessionExpiry.test.tsx
+PASS src/auth/__tests__/signInNoRefreshToken.test.tsx
+PASS src/auth/__tests__/signOut.test.ts
+PASS src/auth/__tests__/signOutSession.test.ts
+PASS src/auth/__tests__/silentRefresh.test.tsx
+PASS src/components/__tests__/Badge.test.tsx
+PASS src/components/__tests__/Button.test.tsx
+PASS src/components/__tests__/DateTimePickerField.test.tsx
+PASS src/components/__tests__/DropdownField.test.tsx
+PASS src/components/__tests__/EventCard.test.tsx
+FAIL src/components/__tests__/ForceUpdateGate.test.tsx
+PASS src/components/__tests__/GroupCard.test.tsx
+PASS src/components/__tests__/GroupNamesRow.test.tsx
+PASS src/components/__tests__/HeaderAddButton.test.tsx
+PASS src/components/__tests__/KeyboardAwareScreen.test.tsx
+PASS src/components/__tests__/MobileNumberCard.test.tsx
+PASS src/components/__tests__/MobileNumberInput.test.tsx
+PASS src/components/__tests__/NotificationBanner.test.tsx
+PASS src/components/__tests__/NotificationCard.test.tsx
+PASS src/components/__tests__/OptionChips.test.tsx
+PASS src/components/__tests__/SessionCheckRetry.test.tsx
+PASS src/components/__tests__/ShareActionSheet.test.tsx
+PASS src/components/__tests__/Toast.test.tsx
+PASS src/components/__tests__/TournamentsListContent.test.tsx
+PASS src/components/__tests__/UserSearchPicker.test.tsx
+PASS src/components/__tests__/iosPickerTheme.test.ts
+FAIL src/components/__tests__/keyboardInventory.test.ts
+PASS src/components/auth/__tests__/SocialTermsNotice.test.tsx
+FAIL src/components/home/__tests__/homeComponents.test.tsx
+PASS src/components/icons/__tests__/DashboardIcons.test.tsx
+PASS src/components/icons/__tests__/RegistryIcons.test.tsx
+PASS src/components/skills/__tests__/LevelPerSportCard.test.tsx
+PASS src/components/skills/__tests__/MySportRow.test.tsx
+PASS src/components/skills/__tests__/SkillLevelFlow.test.tsx
+PASS src/components/skills/__tests__/SportPicker.test.tsx
+PASS src/components/venue/__tests__/OthersVenueModal.test.tsx
+PASS src/components/venue/__tests__/VenueDetailCard.test.tsx
+PASS src/components/venue/__tests__/VenueMapFallback.test.tsx
+PASS src/components/venue/__tests__/VenuePicker.test.tsx
+PASS src/hooks/__tests__/useFieldChain.test.tsx
+PASS src/hooks/__tests__/useMobileNumberConfig.test.tsx
+PASS src/hooks/__tests__/useOnboardingRequired.test.tsx
+PASS src/hooks/__tests__/useRefetchOnFocus.test.tsx
+PASS src/hooks/__tests__/useResource.test.tsx
+PASS src/hooks/__tests__/useResourceFresh.test.tsx
+PASS src/hooks/__tests__/useSportFilter.test.tsx
+PASS src/labels/__tests__/LabelsContext.test.tsx
+PASS src/navigation/__tests__/CreateMenu.test.tsx
+PASS src/navigation/__tests__/CreateTabButton.test.tsx
+PASS src/navigation/__tests__/OnboardingOverlay.test.tsx
+PASS src/navigation/__tests__/RootNavigatorHomeTab.test.tsx
+PASS src/navigation/__tests__/accessNotice.test.ts
+PASS src/navigation/__tests__/tabIcons.test.tsx
+PASS src/notifications/__tests__/deviceId.test.ts
+PASS src/notifications/__tests__/deviceIdIos.test.ts
+PASS src/notifications/__tests__/fcm.test.ts
+PASS src/notifications/__tests__/fcmForeground.test.ts
+PASS src/notifications/__tests__/iosPush.test.ts
+PASS src/notifications/__tests__/notificationEventDispatcher.test.ts
+PASS src/notifications/__tests__/notificationRouting.test.ts
+PASS src/notifications/__tests__/pushActions.test.ts
+PASS src/notifications/__tests__/pushActionsDisplay.test.ts
+PASS src/notifications/__tests__/pushActionsIosPress.test.ts
+PASS src/notifications/__tests__/pushRegistration.test.ts
+PASS src/notifications/eventNotificationHandler.test.ts
+PASS src/notifications/participantHandler.test.ts
+PASS src/onboarding/__tests__/steps.test.ts
+PASS src/screens/__tests__/AccessActionNotFound.test.tsx
+PASS src/screens/__tests__/AccessRefetchDetails.test.tsx
+PASS src/screens/__tests__/AccessRefetchLists.test.tsx
+PASS src/screens/__tests__/CreateGameDuration.test.tsx
+PASS src/screens/__tests__/CreateGameDurationRow.test.tsx
+PASS src/screens/__tests__/CreateGameEmailInvites.test.tsx
+PASS src/screens/__tests__/CreateGameGroupCount.test.tsx
+PASS src/screens/__tests__/CreateGameInviteeList.test.tsx
+PASS src/screens/__tests__/CreateGameInviteeVisibility.test.tsx
+PASS src/screens/__tests__/CreateGameMultiGroup.test.tsx
+PASS src/screens/__tests__/CreateGameOptionalInvites.test.tsx
+FAIL src/screens/__tests__/CreateGameScreen.test.tsx
+PASS src/screens/__tests__/CreateGroupScreen.test.tsx
+PASS src/screens/__tests__/DetailGroupRow.test.tsx
+PASS src/screens/__tests__/EditSkillLevelsScreen.test.tsx
+PASS src/screens/__tests__/EventDetailGroups.test.tsx
+PASS src/screens/__tests__/EventDetailPlayers.test.tsx
+PASS src/screens/__tests__/EventDetailRsvpError.test.tsx
+FAIL src/screens/__tests__/EventDetailScreen.test.tsx
+PASS src/screens/__tests__/EventDetailShareInvite.test.tsx
+PASS src/screens/__tests__/ForgotPasswordScreen.test.tsx
+PASS src/screens/__tests__/GamesScreen.test.tsx
+PASS src/screens/__tests__/GroupDetailMembers.test.tsx
+PASS src/screens/__tests__/GroupDetailScreen.test.tsx
+PASS src/screens/__tests__/GroupsHeaderNavigation.test.tsx
+PASS src/screens/__tests__/GroupsScreen.test.tsx
+FAIL src/screens/__tests__/HomeScreen.test.tsx
+PASS src/screens/__tests__/HomeStatsStrip.test.tsx
+PASS src/screens/__tests__/HomeTabs.test.tsx
+PASS src/screens/__tests__/HomeUpcomingJoin.test.tsx
+PASS src/screens/__tests__/InviteMembersScreen.test.tsx
+PASS src/screens/__tests__/InviteSearchConsistency.test.tsx
+PASS src/screens/__tests__/LegacyVenuePayloadContracts.test.tsx
+PASS src/screens/__tests__/LoginScreen.test.tsx
+PASS src/screens/__tests__/NotificationHistoryScreen.test.tsx
+PASS src/screens/__tests__/NotificationPreferencesScreen.test.tsx
+PASS src/screens/__tests__/OnboardingScreen.test.tsx
+PASS src/screens/__tests__/ProfileNoStats.test.tsx
+FAIL src/screens/__tests__/ProfileScreen.test.tsx
+FAIL src/screens/__tests__/ProfileScreenLinks.test.tsx
+FAIL src/screens/__tests__/ProfileScreenReportRow.test.tsx
+PASS src/screens/__tests__/ProfileScreenSkillLevel.test.tsx
+FAIL src/screens/__tests__/ProfileScreenTerms.test.tsx
+PASS src/screens/__tests__/RegisterScreen.test.tsx
+PASS src/screens/__tests__/RegisterScreenKeyboard.test.tsx
+PASS src/screens/__tests__/RegisterScreenPrivacy.test.tsx
+PASS src/screens/__tests__/RegisterScreenTerms.test.tsx
+PASS src/screens/__tests__/SettingsAppVersion.test.tsx
+PASS src/screens/__tests__/SkillRequirementPills.test.tsx
+PASS src/screens/__tests__/TournamentDetailScreen.test.tsx
+PASS src/screens/__tests__/TournamentInvite.test.tsx
+PASS src/screens/__tests__/TournamentRespond.test.tsx
+PASS src/screens/__tests__/TournamentShare.test.tsx
+PASS src/screens/__tests__/VenuePayloadContracts.test.tsx
+PASS src/screens/__tests__/VerifyScreen.test.tsx
+PASS src/screens/__tests__/VerifyScreenOneTimeCode.test.tsx
+PASS src/screens/__tests__/emailAuthSecurityAndAudit.test.tsx
+PASS src/sports/__tests__/style.test.ts
+PASS src/storage/__tests__/tokens.test.ts
+PASS src/theme/__tests__/tokens.test.ts
+PASS src/utils/__tests__/apiError.test.ts
+PASS src/utils/__tests__/avatar.test.ts
+PASS src/utils/__tests__/displayName.test.ts
+PASS src/utils/__tests__/formatEventDateTime.test.ts
+PASS src/utils/__tests__/formatGameTime.test.ts
+PASS src/utils/__tests__/formatRelativeTime.test.ts
+PASS src/utils/__tests__/gameGroups.test.ts
+PASS src/utils/__tests__/gameLists.test.ts
+PASS src/utils/__tests__/httpsUrl.test.ts
+PASS src/utils/__tests__/installedVersion.test.ts
+PASS src/utils/__tests__/labels.test.tsx
+PASS src/utils/__tests__/localDateTime.test.ts
+PASS src/utils/__tests__/logSafeError.test.ts
+PASS src/utils/__tests__/notificationDateUtils.test.ts
+PASS src/utils/__tests__/phoneNumber.test.ts
+PASS src/utils/__tests__/playStoreUrl.test.ts
+FAIL src/utils/__tests__/shareLink.test.ts
+PASS src/utils/__tests__/supportLink.test.ts
+```
+
+Failing suites side by side:
+
+| Suite | Final 09af54f | Parent 5365484 |
+|---|---|---|
+| `__tests__/AppForceUpdate.test.tsx` | FAIL | FAIL |
+| `config/__tests__/appConfig.test.ts` | FAIL | FAIL |
+| `src/assets/__tests__/headerIcon.test.ts` | FAIL | FAIL |
+| `src/components/__tests__/ForceUpdateGate.test.tsx` | FAIL | FAIL |
+| `src/components/__tests__/keyboardInventory.test.ts` | FAIL | FAIL |
+| `src/components/home/__tests__/homeComponents.test.tsx` | FAIL | FAIL |
+| `src/screens/__tests__/CreateGameScreen.test.tsx` | FAIL | FAIL |
+| `src/screens/__tests__/EventDetailScreen.test.tsx` | FAIL | FAIL |
+| `src/screens/__tests__/HomeScreen.test.tsx` | FAIL | FAIL |
+| `src/screens/__tests__/ProfileScreen.test.tsx` | FAIL | FAIL |
+| `src/screens/__tests__/ProfileScreenLinks.test.tsx` | FAIL | FAIL |
+| `src/screens/__tests__/ProfileScreenReportRow.test.tsx` | FAIL | FAIL |
+| `src/screens/__tests__/ProfileScreenTerms.test.tsx` | FAIL | FAIL |
+| `src/utils/__tests__/shareLink.test.ts` | FAIL | FAIL |
+
+Suites failing on the final commit but not on the parent: **none**. Failing test titles on the final commit that do not fail on the parent: none (compared by title). The one title that differs the other way is `ProfileScreen names > titles the profile with display_name`, which fails on the parent only (ProfileScreen is untouched by this task; looks intermittent). The first run's "15 failing suites" included UserSearchPicker; after the fix it passes, so the final commit has 14, identical to the parent.
+
+### 3. Lint (`npm run lint`, i.e. `eslint .`)
+| | Final 09af54f | Parent 5365484 |
+|---|---|---|
+| Problems | 32 (31 errors, 1 warning), exit 1 | 32 (31 errors, 1 warning), exit 1 |
+Files with problems are the same list on both trees (none changed by this task):
+```
+jest.setup.js
+scripts/check-labels.js
+src/components/__tests__/NotificationCard.test.tsx
+src/components/icons/__tests__/RegistryIcons.test.tsx
+```
+
+### 4. New labels (`src/labels/defaultLabels.ts`; to be seeded in `ui_labels`)
+| Key | Default text |
+|---|---|
+| `mob.add_remove.sent` | Invited |
+| `mob.add_remove.error` | Could not send the invitation. Try again. |
+
+### 5. Left unchanged on request
+The Group view `plusSquare` "+" that closes the invite panel, and `UndoAddButton` "−", are untouched in this follow-up (no code change at all in this round).
+
+## Other commands (first run, unchanged)
 `npx tsc --noEmit`: exit 0, no output.
 `npm run lint` (eslint .): exit 1, 32 problems (31 errors, 1 warning), all in files this task did not touch (jest.setup.js, scripts/check-labels.js, NotificationCard.test.tsx, RegistryIcons.test.tsx). Files I changed lint clean (`npx eslint src` shows only the 3 pre-existing test-file errors, same with my changes stashed).
 `npm run check:labels`:
 ```
 check-labels: OK - 231 files scanned, 1012 default labels checked.
 ```
+
 
 ## Deviations / notes
 - docs/agent-handoff-template.md does not exist in the repo; proceeded without it, nothing prepended.
