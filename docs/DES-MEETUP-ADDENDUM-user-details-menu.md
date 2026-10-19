@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-USER-DETAILS-MENU
 
 **Doc ID:** DES-MEETUP-ADDENDUM-USER-DETAILS-MENU
-**Version:** v1.3
-**Status:** APPROVED by the owner, 2026-10-19. v1.1 (same day, owner approved option A after `ud-p1-verify`): tournament actions are deferred and tournament people get View Details only (D-3, OI-8). Non-blocking defaults in section 12 are accepted. UI build (phases 3 and 4) is gated on a board (OI-6). v1.2 (same day, owner decisions on the mobile agent's questions): on mobile a tap on a person's avatar opens View Details (UM-06, UM-11); owner and organizer lines and tournament registrations get an avatar (UM-12, OI-11). v1.3 (same day): the owner approved the board, so OI-6 is closed and phases 3 and 4 are gated only on `ud-backend` being deployed.
+**Version:** v1.4
+**Status:** APPROVED by the owner, 2026-10-19. v1.1 (same day, owner approved option A after `ud-p1-verify`): tournament actions are deferred and tournament people get View Details only (D-3, OI-8). Non-blocking defaults in section 12 are accepted. UI build (phases 3 and 4) is gated on a board (OI-6). v1.2 (same day, owner decisions on the mobile agent's questions): on mobile a tap on a person's avatar opens View Details (UM-06, UM-11); owner and organizer lines and tournament registrations get an avatar (UM-12, OI-11). v1.3 (same day): the owner approved the board, so OI-6 is closed and phases 3 and 4 are gated only on `ud-backend` being deployed. v1.4 (same day): after the mobile OI-11 check, UM-12 is phased; avatars are added only where the data exists today (OI-11).
 **Owner:** Pratheesh
 **Date:** 2026-10-19
 **Scale Tier:** T1
@@ -43,7 +43,7 @@ All of this is one component per platform. Changing the design later means editi
 | UM-09 | The menu and details view show picture, display name and nickname only. No email, mobile number or other personal data. |
 | UM-10 | The menu opens only for people the viewer can already see in that context (access-consistency AD-1). No access means no menu and no details. |
 | UM-11 | Mobile tap on any avatar that carries a user opens View Details (the same sheet as the menu's first item). Own navigation avatars (`HomeTopBar`, `DrawerMenu`) are unchanged and still open the profile. |
-| UM-12 | Mobile: the owner line, the organizer line and tournament registrations show an avatar beside the name and use the same component. With a `user_id` the menu applies (owner and organizer lines usually offer View Details only). A registration without a `user_id` shows a placeholder avatar and the nickname: View Details from row data, no card request. Web keeps its current owner and organizer lines (OI-10). |
+| UM-12 | Mobile: the owner line, the organizer line and tournament registrations show an avatar beside the name and use the same component. With a `user_id` the menu applies (owner and organizer lines usually offer View Details only). A registration without a `user_id` shows a placeholder avatar and the nickname: View Details from row data, no card request. Web keeps its current owner and organizer lines (OI-10). Phased in v1.4 (OI-11): in this release only the lines whose data exists today get the avatar. |
 
 ---
 
@@ -328,10 +328,10 @@ No deviation from `Enterprise_Design_Principles.md` or `design-best-practices.md
 | OI-8 | Tournament actions (remove, disqualification request, committee add and remove) are deferred. Gate: the lifecycle committee and hard-block enforcement is built and enabled, a web step-up flow exists, and a design amendment (v1.2) re-adds the rows with a tournament card endpoint. | 🟡 MEDIUM | Open, deferred by the owner |
 | OI-9 | The organizer remove-participant endpoint accepts invited, withdrawn and organizer targets and cancelled games; only the web UI hides them. P15 says the app layer must enforce it. | 🟡 MEDIUM | Open; separate task |
 | OI-10 | Web sites with no user id or attachable element (notifications, standings, fixtures, seeding, the committee list that prints a raw user id, invitation lists, the organizer row) are outside v1. A follow-up needs the backend to return name, photo and id there. | 🟡 MEDIUM | Open; follow-up |
-| OI-11 | UM-12 needs a `user_id`, photo and name for the game organizer, group owner and tournament registrations in the API responses the mobile screens already load. Not verified. If a response lacks one, that is an additive backend change and a new task; `ud-mobile` STOPS and asks, and does not invent a field. | 🟠 HIGH | Open; checked at the start of `ud-mobile` |
+| OI-11 | UM-12 needs `user_id`, display name and photo on each person line. `ud-mobile` check (verify report section 5): group owner on `GroupDetail` has all three (in scope now); tournament registrations have a nickname and a nullable id (in scope as placeholder plus nickname, View Details from row data); game organiser, tournament organiser, group owner on home cards and the `EventCard` organiser circle lack the display name or photo or both (NOT in this release: left unchanged, no invented fields). A follow-up backend task adds the fields additively, then a mobile task adds those avatars. | 🟠 HIGH | Resolved by owner decision 2026-10-19: phase it; follow-up task to be briefed |
 | OI-12 | The 22 px home-card avatars are a small tap target and sit in stacks that overlap. Accepted by the owner; the board shows size and spacing. | 🟡 MEDIUM | Open; board |
 
-Status: **APPROVED v1.3.** Board approved. Phases 3 and 4 start after `ud-backend` is deployed. OI-11 is checked at the start of `ud-mobile`.
+Status: **APPROVED v1.4.** Board approved. Phases 3 and 4 start after `ud-backend` is deployed. OI-11 is checked at the start of `ud-mobile`.
 
 ---
 
@@ -355,3 +355,4 @@ Status: **APPROVED v1.3.** Board approved. Phases 3 and 4 start after `ud-backen
 | v1.1 | 2026-10-19 | After `ud-p1-verify`: the four tournament rows and the tournament card endpoint removed (owner chose option A; D-3, OI-8); UM-T9 reworded (idempotent repeats are not refusals); rate limit moved to an environment setting (AD-8); `user_id` added to `AvatarPreview`; web scope trimmed to sites with a user id (OI-10); label texts added (AD-6); OI-9 and OI-10 recorded. |
 | v1.2 | 2026-10-19 | Owner decisions: avatar tap opens View Details on mobile (UM-06 changed, UM-11); owner and organizer lines and tournament registrations get an avatar (UM-12); home-card avatars tap only; OI-2 closed; OI-11 (API ids for owner, organizer, registrations) and OI-12 (22 px target) added. Web unchanged. |
 | v1.3 | 2026-10-19 | Owner approved the board (`docs/design/user-menu/user-menu-board.png` and `.html` (mobile repo: `docs/mockups/user-menu/`)). OI-6 closed; phases 3 and 4 gated on the backend deploy only. No requirement changes. |
+| v1.4 | 2026-10-19 | After the mobile OI-11 check: UM-12 phased. Avatars added now for the group owner on `GroupDetail` and tournament registrations; game organiser, tournament organiser, home-card group owner and the `EventCard` organiser circle wait for a follow-up backend task that adds the fields. The UM-06 tap rule applies to them once data exists. |
