@@ -47,6 +47,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - Canvas (human only, agents cannot read it): https://claude.ai/artifact/SRavBx8jwnK8kK1QjVovnM. Board names match it.
 - design-ref-venue/: venue boards. `png/` for the look, `html/` for exact sizes, spacing and tokens (plain inline-styled markup; read it for dimensions). Key boards: Game3When, EditGame2, TournSched*, FXEdit*, GameDetail.
 - design/notifications/: notifications screen captures (`design/notifcations/` is an older misspelt copy).
+- mockups/user-menu/: user details menu board (user-menu-board.png for look, .html for sizes): menu, View Details, confirmation, notices, home-card avatars, tournament rows, web popover. DRAFT for owner review; design OI-6 closes when the owner approves it.
 - ../design-ref/ (group screens), ../design-ref-p23/, ../design-refs/home-v2/ (repo root): earlier reference sets.
 - Boards labelled "Phase 2" are not built. If no board exists for a screen, build it minimal with existing components and tokens, then ask the owner to review.
 
