@@ -38,6 +38,7 @@ import {
   localDateToDate,
 } from '../utils/localDateTime';
 import { useT } from '../labels/LabelsContext';
+import { iosPickerThemeProps } from './iosPickerTheme';
 
 export interface DateTimePickerFieldProps {
   value: string;
@@ -201,6 +202,7 @@ export default function DateTimePickerField({
                 value={iosTempDate}
                 mode={mode}
                 display="spinner"
+                {...iosPickerThemeProps()}
                 onChange={handleIosChange}
               />
             </View>

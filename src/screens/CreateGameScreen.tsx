@@ -35,6 +35,7 @@ import { getSports } from '../api/sports';
 import { createTournament } from '../api/tournaments';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import Button from '../components/Button';
+import { iosPickerThemeProps } from '../components/iosPickerTheme';
 import GroupMultiSelect from '../components/GroupMultiSelect';
 import GroupNamesRow from '../components/GroupNamesRow';
 import DropdownField from '../components/DropdownField';
@@ -791,6 +792,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               value={dateValue}
               mode="date"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              {...iosPickerThemeProps()}
               onChange={handleDateChange}
             />
           )}
@@ -800,6 +802,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               value={dateValue}
               mode="time"
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              {...iosPickerThemeProps()}
               onChange={handleTimeChange}
             />
           )}
