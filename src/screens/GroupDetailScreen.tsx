@@ -46,6 +46,7 @@ import {
 } from '../components/icons/GroupViewIcons';
 import DeleteGroupSheet from '../components/groups/DeleteGroupSheet';
 import MemberActionCard, { type MemberAction } from '../components/groups/MemberActionCard';
+import UndoAddButton from '../components/groups/UndoAddButton';
 import UserAvatar from '../components/UserAvatar';
 import Button from '../components/Button';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
@@ -112,6 +113,9 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
   const [addedEmails, setAddedEmails] = useState<string[]>([]);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const inviteInFlight = useRef(false);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
+  // Bumped after an undo so the invite list refetches and the person reappears with "+".
+  const [searchRefresh, setSearchRefresh] = useState(0);
 
   const [cardMember, setCardMember] = useState<GroupMember | null>(null);
   const [memberError, setMemberError] = useState<string | null>(null);
@@ -206,6 +210,28 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
       setInviteError(tRef.current('mob.group_detail.invite_error'));
     } finally {
       inviteInFlight.current = false;
+    }
+  };
+
+  // Undo of a mistaken "+": the existing `DELETE /groups/{id}/members/{user}` call, no confirmation.
+  // Never the owner or the signed-in user. Email invites have no cancel endpoint, so no undo.
+  const handleUndoUser = async (invitee: UserSearchResult): Promise<void> => {
+    if (inviteInFlight.current || invitee.id === currentUserId || invitee.id === group?.owner_id) return;
+    inviteInFlight.current = true;
+    setUndoingId(invitee.id);
+    setInviteError(null);
+    try {
+      await withCorrelationId(async correlationId => {
+        await removeMember(groupId, invitee.id, { correlationId });
+      });
+      setAddedUsers(current => current.filter(item => item.id !== invitee.id));
+      setSearchRefresh(tick => tick + 1);
+      loadGroup(true);
+    } catch {
+      setInviteError(tRef.current('mob.group_detail.undo_error'));
+    } finally {
+      inviteInFlight.current = false;
+      setUndoingId(null);
     }
   };
 
@@ -465,6 +491,14 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
               <CheckMarkIcon size={16} color={groupView.addedChipText} />
               <Text style={styles.addedChipText}>{t('mob.group_detail.added_chip')}</Text>
             </View>
+            {invitee.id !== currentUserId && invitee.id !== group.owner_id ? (
+              <UndoAddButton
+                onPress={() => handleUndoUser(invitee)}
+                accessibilityLabel={t('mob.group_detail.undo_add_a11y')}
+                busy={undoingId === invitee.id}
+                disabled={undoingId !== null}
+              />
+            ) : null}
           </View>
         ))}
         {addedEmails.map(email => (
@@ -595,6 +629,7 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
             suggestionContext="players"
             entityLabel={t('mob.user_search.entity_player')}
             belowInput={addedList}
+            refreshToken={searchRefresh}
           />
           {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
         </View>

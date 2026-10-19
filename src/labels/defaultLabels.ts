@@ -713,6 +713,8 @@ export const DEFAULT_LABELS = {
   'mob.group_detail.invite_players_subtitle': 'Invite players',
   'mob.group_detail.added_heading': 'Added · {count}',
   'mob.group_detail.added_chip': 'Added',
+  'mob.group_detail.undo_add_a11y': 'Undo add',
+  'mob.group_detail.undo_error': 'Could not undo this. Please try again.',
   'mob.group_detail.member_row_hint': 'Long-press for details',
   'mob.group_detail.member_card_a11y': 'Group member details for {name}',
   'mob.group_detail.action_make_admin': 'Make admin',
