@@ -17,4 +17,5 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 
 ## DES-MEETUP-ADDENDUM-user-details-menu.md
 - v1.0 (2026-10-19): approved by the owner. Reusable user menu (View Details first, role-based actions from per-module card endpoints, one component per platform). Supersedes the PR #39 long-press card (D-1). Phases 3 and 4 gated on a board (OI-6).
+- v1.1 (2026-10-19): after ud-p1-verify, tournament actions and the tournament card endpoint removed (owner chose option A; D-3, OI-8); UM-T9 reworded; rate limit via environment setting; user_id added to AvatarPreview; web scope trimmed (OI-10); label texts added; OI-9, OI-10 recorded. Briefs updated.
 
