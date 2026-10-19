@@ -92,6 +92,35 @@ export const colors = {
   mapCaptionText: '#33426A',
 };
 
+/**
+ * Additive: Group detail (WhatsApp-style) redesign, from the screenshots in
+ * docs/mockups/group-view/. Navy, blue, secondary text and destructive are the
+ * owner-specified values; the rest are sampled from the same screenshots.
+ */
+export const groupView = {
+  navy: '#0B2A5B',
+  blue: '#1B5FD1',
+  textSecondary: '#55607A',
+  destructive: '#B3261E',
+  /** Header sub-lines (counts, description) on navy. */
+  onNavyMuted: '#D6DEEE',
+  sectionBg: '#F1F4FA',
+  divider: '#E6EAF2',
+  searchBg: '#F1F4FA',
+  ownerChipBg: '#FDE8C8',
+  ownerChipText: '#7A3E00',
+  adminChipBg: '#E3ECFB',
+  adminChipText: '#1B4FA8',
+  addedChipBg: '#E3F4E8',
+  addedChipText: '#1B6B35',
+  /** Navy wash over the admin-configured banner image behind the header. */
+  navyScrim: 'rgba(11, 42, 91, 0.78)',
+  /** Backdrop behind the long-press member card. */
+  dim: 'rgba(8, 20, 45, 0.6)',
+  /** Initials-avatar fills (white text); picked by a hash of the name. */
+  avatarPalette: ['#0B2A5B', '#0F7B6C', '#7B3FB0', '#B33A2E', '#1B5FD1', '#B3530E', '#46546A'],
+};
+
 export const spacing = {
   xs: 4,
   sm: 8,

@@ -48,6 +48,7 @@ import ErrorView from '../components/ErrorView';
 import GroupMultiSelect from '../components/GroupMultiSelect';
 import GroupNamesRow from '../components/GroupNamesRow';
 import UserAvatar from '../components/UserAvatar';
+import PersonNames from '../components/PersonNames';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
 import ShareActionSheet from '../components/ShareActionSheet';
@@ -1441,12 +1442,20 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               <Text style={styles.formHint}>{t('mob.game_detail.invite_player_hint')}</Text>
               {selectedInviteUser ? (
                 <View style={styles.selectedInviteRow}>
-                  <Text style={styles.selectedInviteText}>
-                    {t('mob.group_detail.invitee_line', {
-                      nickname: selectedInviteUser.nickname,
-                      name: selectedInviteUser.display_name,
-                    })}
-                  </Text>
+                  <View style={styles.selectedInviteNames}>
+                    <UserAvatar
+                      imageUrl={selectedInviteUser.image_url}
+                      name={selectedInviteUser.display_name}
+                      size={36}
+                      fallback="initials"
+                    />
+                    <View style={styles.selectedInvitePerson}>
+                      <PersonNames
+                        displayName={selectedInviteUser.display_name}
+                        nickname={selectedInviteUser.nickname}
+                      />
+                    </View>
+                  </View>
                   <TextLink
                     label={t('mob.common.change')}
                     onPress={() => setSelectedInviteUser(null)}
@@ -1808,6 +1817,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: spacing.sm,
   },
+  selectedInviteNames: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  selectedInvitePerson: { flexShrink: 1, marginLeft: spacing.sm },
   selectedInviteText: {
     ...typography.bodyBold,
     color: colors.textPrimary,

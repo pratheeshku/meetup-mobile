@@ -9,6 +9,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { withCorrelationId } from '../api/correlationId';
 import { createGroupInvitation, inviteMember } from '../api/groups';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
+import PersonNames from '../components/PersonNames';
+import UserAvatar from '../components/UserAvatar';
 import UserSearchPicker from '../components/UserSearchPicker';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
@@ -34,14 +36,6 @@ function getAvatarTint(name: string) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
   return AVATAR_TINTS[Math.abs(hash) % AVATAR_TINTS.length];
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
-  }
-  return (name.trim().slice(0, 2) || '?').toUpperCase();
 }
 
 export default function InviteMembersScreen({ navigation, route }: Props): React.JSX.Element {
@@ -132,18 +126,17 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.addedRow}>
           {added.map(user => {
-            const tint = getAvatarTint(user.display_name);
-            const firstName = user.display_name.trim().split(/\s+/)[0];
             return (
               <View key={user.id} style={styles.addedItem}>
-                <View style={[styles.avatarCircleLarge, { backgroundColor: tint.bg }]}>
-                  <Text style={[styles.avatarTextLarge, { color: tint.text }]}>
-                    {getInitials(user.display_name)}
-                  </Text>
+                <UserAvatar
+                  imageUrl={user.image_url}
+                  name={user.display_name}
+                  size={48}
+                  fallback="initials"
+                />
+                <View style={styles.addedNames}>
+                  <PersonNames displayName={user.display_name} nickname={user.nickname} centered />
                 </View>
-                <Text style={styles.addedName} numberOfLines={1}>
-                  {firstName}
-                </Text>
               </View>
             );
           })}
@@ -247,8 +240,9 @@ const styles = StyleSheet.create({
   },
   addedItem: {
     alignItems: 'center',
-    width: 60,
+    width: 84,
   },
+  addedNames: { marginTop: spacing.xs, alignSelf: 'stretch' },
   avatarCircleLarge: {
     width: 48,
     height: 48,

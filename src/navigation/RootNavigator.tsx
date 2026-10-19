@@ -251,7 +251,7 @@ function GroupsStack(): React.JSX.Element {
       <GroupsStackNav.Screen
         name="GroupDetail"
         component={GroupDetailScreen}
-        options={{ title: t('mob.nav.title_group') }}
+        options={{ title: t('mob.nav.title_group'), headerShown: false, statusBarStyle: 'light' }}
       />
       <GroupsStackNav.Screen
         name="EditGroup"

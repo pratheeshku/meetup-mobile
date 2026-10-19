@@ -9,7 +9,7 @@ import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { perfImageError, perfImageLoad, perfImageLoadStart } from '../diagnostics/perfLog';
-import { colors, typography } from '../theme/tokens';
+import { colors, groupView, typography } from '../theme/tokens';
 import { toHttpsUrl } from '../utils/httpsUrl';
 
 interface UserAvatarProps {
@@ -20,6 +20,24 @@ interface UserAvatarProps {
   /** When set, image load timing is recorded for this screen. Diagnostics only. */
   perfScreen?: string;
   perfType?: string;
+  /**
+   * Fallback style when there is no usable picture: `letter` (default) is one letter on the
+   * brand colour; `initials` is up to two initials on a coloured circle picked from the name.
+   */
+  fallback?: 'letter' | 'initials';
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+function paletteColor(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash += name.charCodeAt(i);
+  return groupView.avatarPalette[Math.abs(hash) % groupView.avatarPalette.length];
 }
 
 export default function UserAvatar({
@@ -29,6 +47,7 @@ export default function UserAvatar({
   accessibilityLabel,
   perfScreen,
   perfType = 'avatar',
+  fallback = 'letter',
 }: UserAvatarProps): React.JSX.Element {
   const [failed, setFailed] = useState(false);
   const url = toHttpsUrl(imageUrl);
@@ -74,6 +93,21 @@ export default function UserAvatar({
     );
   }
   const initial = ((name ?? '').trim().charAt(0) || '?').toUpperCase();
+  if (fallback === 'initials') {
+    return (
+      <View
+        style={[styles.placeholder, dimension, { backgroundColor: paletteColor(name ?? '') }]}
+        accessible={hasA11y}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole={hasA11y ? 'image' : undefined}
+        testID="user-avatar-placeholder"
+      >
+        <Text style={[styles.initial, { fontSize: Math.round(size * 0.38), lineHeight: Math.round(size * 0.5) }]}>
+          {getInitials(name ?? '')}
+        </Text>
+      </View>
+    );
+  }
   return (
     <View
       style={[styles.placeholder, dimension]}

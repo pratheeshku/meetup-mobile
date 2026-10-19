@@ -63,7 +63,7 @@ import SelectableCard from '../components/SelectableCard';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
 import { useT } from '../labels/LabelsContext';
-import { getAvatarTint, getInitials } from '../utils/avatarTint';
+import { getAvatarTint } from '../utils/avatarTint';
 import { maxGroupsFor, sortByLastActivity } from '../utils/gameGroups';
 import SkillRequirementPicker from '../components/SkillRequirementPicker';
 import {
@@ -92,6 +92,8 @@ import type {
 import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
 import UserSearchPicker from '../components/UserSearchPicker';
+import UserAvatar from '../components/UserAvatar';
+import PersonNames from '../components/PersonNames';
 import { addInviteEmail } from '../utils/inviteEmails';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import {
@@ -1055,17 +1057,17 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           {invitedPlayers.length + invitedEmails.length > 0 ? (
             <View style={styles.inviteeList} testID="invitee-list">
               {invitedPlayers.map(person => {
-                const tint = getAvatarTint(person.display_name);
                 return (
                   <View key={`p-${person.id}`} style={styles.inviteeChip}>
-                    <View style={[styles.inviteeAvatar, { backgroundColor: tint.bg }]}>
-                      <Text style={[styles.inviteeAvatarText, { color: tint.text }]}>
-                        {getInitials(person.display_name)}
-                      </Text>
+                    <UserAvatar
+                      imageUrl={person.image_url}
+                      name={person.display_name}
+                      size={32}
+                      fallback="initials"
+                    />
+                    <View style={styles.inviteeNames}>
+                      <PersonNames displayName={person.display_name} nickname={person.nickname} />
                     </View>
-                    <Text style={styles.inviteeName} numberOfLines={1}>
-                      {person.display_name}
-                    </Text>
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={t('mob.create_game.invitee_remove_a11y', { name: person.display_name })}
@@ -1403,7 +1405,7 @@ const styles = StyleSheet.create({
   inviteeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 36,
+    minHeight: 48,
     maxWidth: '100%',
     paddingLeft: spacing.xs,
     backgroundColor: colors.surface,
@@ -1422,6 +1424,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '700',
   },
+  inviteeNames: { flexShrink: 1, marginHorizontal: spacing.sm },
   inviteeName: {
     ...typography.caption,
     color: colors.textPrimary,

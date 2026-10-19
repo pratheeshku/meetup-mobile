@@ -1,30 +1,22 @@
 /**
- * Group Detail screen (DES-MEETUP-MOBILE.md §4.4, §7.3; R-030, R-031).
+ * Group Detail screen (DES-MEETUP-MOBILE.md §4.4, §7.3; R-030, R-031), rebuilt
+ * WhatsApp group-info style from docs/mockups/group-view/ (1-group-view,
+ * 2-long-press-member, 3-invite-search).
  *
  * Role/permission gating here is UX-only (§3.10, §5.3, R-017/R-082) —
  * every gated action still calls its endpoint normally and the backend
- * remains the sole authority; a stale `current_user_role` can briefly
- * show an affordance that then fails server-side, which §3.10 itself
- * accepts as a trade-off. "Last-owner removal rejected server-side"
- * (§4.4) is likewise left to the backend — no client-side pre-check
- * beyond the UX gates below.
+ * remains the sole authority. The gates are unchanged from the previous
+ * screen: owner/admin may invite, change roles and remove other members
+ * (never themselves, never the owner); only the owner sees "Make owner",
+ * which reuses the existing `POST /groups/{id}/transfer-ownership` call.
+ * "Last-owner removal rejected server-side" (§4.4) is left to the backend.
  *
- * Deviation from the task brief (recorded in the Implementation
- * Report): the brief's Step 4 says "Change member role button (owner
- * only...)", but §4.4 explicitly states "Role management — owner/admin
- * only." Followed the design document over the brief's narrower wording
- * per this project's established fidelity rule (design is the
- * non-negotiable source of truth on behavioral conflicts).
- *
- * Proposed Assumption: role-change and remove controls are also hidden
- * on the owner's own member row (in addition to hiding them on the
- * viewer's own row) — demoting/removing the owner isn't meaningful
- * without an ownership-transfer flow, which is explicitly out of scope
- * for this task, and §4.4 separately notes last-owner removal is
- * rejected server-side regardless.
+ * Member order: owner, then admins, then everyone else, each alphabetical by
+ * display name (case-insensitive, user id as the stable tiebreak).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -34,60 +26,50 @@ import {
   getGroup,
   inviteMember,
   removeMember,
+  transferGroupOwnership,
   updateMemberRole,
 } from '../api/groups';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { isNotFoundError } from '../utils/apiError';
 import { getCachedBanners, type BannerFallback } from '../api/home';
-import { BannerBackground } from '../components/icons/DashboardIcons';
+import { OwnerIcon, TrashIcon } from '../components/icons/ActionIcons';
 import {
-  BackArrowIcon,
-  EditIcon,
-  LockIcon,
-  TrashIcon,
-} from '../components/icons/ActionIcons';
+  CheckMarkIcon,
+  ChevronLeftIcon,
+  LinkIcon,
+  PencilLineIcon,
+  PersonMinusIcon,
+  PersonPlusIcon,
+  ShieldMinusIcon,
+  ShieldPlusIcon,
+} from '../components/icons/GroupViewIcons';
 import DeleteGroupSheet from '../components/groups/DeleteGroupSheet';
-import Badge from '../components/Badge';
+import MemberActionCard, { type MemberAction } from '../components/groups/MemberActionCard';
 import UserAvatar from '../components/UserAvatar';
-import type { BadgeVariant } from '../components/Badge';
 import Button from '../components/Button';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
-import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
+import PersonNames from '../components/PersonNames';
 import ShareActionSheet from '../components/ShareActionSheet';
-import TextLink from '../components/TextLink';
 import Toast from '../components/Toast';
 import UserSearchPicker from '../components/UserSearchPicker';
 import { useAppShare } from '../hooks/useAppShare';
 import { goToDashboard } from '../navigation/goToDashboard';
 import { showCompletion } from '../navigation/showCompletion';
-import { dash } from '../theme/dashboardTheme';
-import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
+import { colors, groupView, sizes, spacing, typography } from '../theme/tokens';
 import type { GroupDetail, GroupMember, GroupMemberRole } from '../types/group';
 import type { UserSearchResult } from '../types/user';
 import type { GroupsStackParamList } from '../navigation/types';
 import { useT } from '../labels/LabelsContext';
-import type { LabelKey } from '../labels/fallbackLabels';
 
-const MEMBER_AVATAR_SIZE = 40;
+const MEMBER_AVATAR_SIZE = 48;
+const LOGO_SIZE = 96;
+const LOGO_SIZE_COMPACT = 40;
+const BUTTON_HEIGHT = 48;
 
 type Props = NativeStackScreenProps<GroupsStackParamList, 'GroupDetail'>;
-
-const ROLE_OPTIONS: GroupMemberRole[] = ['member', 'admin'];
-
-const ROLE_LABEL_KEY: Record<GroupMemberRole, LabelKey> = {
-  owner: 'mob.group_role.owner',
-  admin: 'mob.group_role.admin',
-  member: 'mob.group_role.member',
-};
-
-const ROLE_BADGE_VARIANT: Record<GroupMemberRole, BadgeVariant> = {
-  owner: 'primary',
-  admin: 'primary',
-  member: 'neutral',
-};
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -96,12 +78,27 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
+const ROLE_RANK: Record<GroupMemberRole, number> = { owner: 0, admin: 1, member: 2 };
+
+/** Owner, then admins, then members; alphabetical (case-insensitive) within each; stable. */
+export function sortMembers(members: GroupMember[]): GroupMember[] {
+  return [...members].sort((a, b) => {
+    const byRole = ROLE_RANK[a.role] - ROLE_RANK[b.role];
+    if (byRole !== 0) return byRole;
+    const an = a.display_name.toLowerCase();
+    const bn = b.display_name.toLowerCase();
+    if (an !== bn) return an < bn ? -1 : 1;
+    return a.user_id < b.user_id ? -1 : a.user_id > b.user_id ? 1 : 0;
+  });
+}
+
 export default function GroupDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const { groupId } = route.params;
   const { user } = useAuth();
   const t = useT();
   const tRef = useRef(t);
   tRef.current = t;
+  const insets = useSafeAreaInsets();
   const currentUserId = user?.id;
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
@@ -110,19 +107,14 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
   const [bannerFallback, setBannerFallback] = useState<BannerFallback | null>(null);
   const [isDeleteSheetVisible, setIsDeleteSheetVisible] = useState(false);
 
-  const [isInviteFormOpen, setIsInviteFormOpen] = useState(false);
-  const [selectedInviteUsers, setSelectedInviteUsers] = useState<UserSearchResult[]>([]);
-  const [selectedInviteEmail, setSelectedInviteEmail] = useState<string | null>(null);
-  const [isInviting, setIsInviting] = useState(false);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [addedUsers, setAddedUsers] = useState<UserSearchResult[]>([]);
+  const [addedEmails, setAddedEmails] = useState<string[]>([]);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const inviteInFlight = useRef(false);
 
-  const [editingRoleUserId, setEditingRoleUserId] = useState<string | null>(null);
-  const [roleDraft, setRoleDraft] = useState<GroupMemberRole>('member');
-  const [isSavingRole, setIsSavingRole] = useState(false);
-  const [roleError, setRoleError] = useState<string | null>(null);
-
-  const [removingUserId, setRemovingUserId] = useState<string | null>(null);
-  const [removeError, setRemoveError] = useState<string | null>(null);
+  const [cardMember, setCardMember] = useState<GroupMember | null>(null);
+  const [memberError, setMemberError] = useState<string | null>(null);
 
   const [isLeaving, setIsLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
@@ -182,106 +174,75 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
     });
   }, []);
 
-  const handleOpenInviteForm = (): void => {
+  const sortedMembers = useMemo(() => sortMembers(group?.members ?? []), [group?.members]);
+
+  const handleOpenInvite = (): void => {
     setInviteError(null);
-    setSelectedInviteUsers([]);
-    setSelectedInviteEmail(null);
-    setIsInviteFormOpen(true);
+    setAddedUsers([]);
+    setAddedEmails([]);
+    setIsInviteOpen(true);
   };
 
-  const handleCancelInvite = (): void => {
-    setIsInviteFormOpen(false);
+  const handleCloseInvite = (): void => {
+    setIsInviteOpen(false);
     setInviteError(null);
-    setSelectedInviteUsers([]);
-    setSelectedInviteEmail(null);
   };
 
-  const handleSelectUser = (selected: UserSearchResult): void => {
-    setSelectedInviteEmail(null);
-    setSelectedInviteUsers(prev => {
-      if (prev.some(u => u.id === selected.id)) {
-        return prev;
-      }
-      return [...prev, selected];
-    });
-  };
-
-  const handleSelectEmail = (email: string): void => {
-    setSelectedInviteUsers([]);
-    setSelectedInviteEmail(email);
-  };
-
-  const handleRemoveUser = (userId: string): void => {
-    setSelectedInviteUsers(prev => prev.filter(u => u.id !== userId));
-  };
-
-  const handleRemoveEmail = (): void => {
-    setSelectedInviteEmail(null);
-  };
-
-  const handleSendInvite = async (): Promise<void> => {
-    if (selectedInviteUsers.length === 0 && !selectedInviteEmail) {
-      setInviteError(t('mob.group_detail.invite_choose'));
-      return;
-    }
+  // Same calls as before (`POST /groups/{id}/members`, `POST /groups/invitations`); each "+" tap
+  // sends that one invite, as on the group-create invite step.
+  const handleAddUser = async (invitee: UserSearchResult): Promise<void> => {
+    if (inviteInFlight.current) return;
+    inviteInFlight.current = true;
     setInviteError(null);
-    setIsInviting(true);
     try {
       await withCorrelationId(async correlationId => {
-        if (selectedInviteEmail) {
-          await createGroupInvitation(groupId, { invitedEmail: selectedInviteEmail, correlationId });
-        } else {
-          for (const invitee of selectedInviteUsers) {
-            await inviteMember(groupId, invitee.id, { correlationId });
-          }
-        }
-        setGroup(await getGroup(groupId, { correlationId }));
+        await inviteMember(groupId, invitee.id, { correlationId });
       });
-      setIsInviteFormOpen(false);
-      setSelectedInviteUsers([]);
-      setSelectedInviteEmail(null);
-      goToDashboard(t('mob.success.group_updated'));
+      setAddedUsers(current =>
+        current.some(item => item.id === invitee.id) ? current : [...current, invitee],
+      );
+      loadGroup(true);
     } catch {
-      setInviteError(t('mob.group_detail.invite_error'));
+      setInviteError(tRef.current('mob.group_detail.invite_error'));
     } finally {
-      setIsInviting(false);
+      inviteInFlight.current = false;
     }
   };
 
-  const handleStartEditRole = (member: GroupMember): void => {
-    setRoleError(null);
-    setRoleDraft(member.role === 'admin' ? 'admin' : 'member');
-    setEditingRoleUserId(member.user_id);
-  };
-
-  const handleCancelEditRole = (): void => {
-    setEditingRoleUserId(null);
-    setRoleError(null);
-  };
-
-  const handleSaveRole = async (): Promise<void> => {
-    if (!editingRoleUserId) {
+  const handleAddEmail = async (email: string): Promise<void> => {
+    if (inviteInFlight.current || addedEmails.some(item => item.toLowerCase() === email.toLowerCase())) {
       return;
     }
-    setRoleError(null);
-    setIsSavingRole(true);
+    inviteInFlight.current = true;
+    setInviteError(null);
     try {
       await withCorrelationId(async correlationId => {
-        await updateMemberRole(groupId, editingRoleUserId, roleDraft, { correlationId });
+        await createGroupInvitation(groupId, { invitedEmail: email, correlationId });
+      });
+      setAddedEmails(current => [...current, email]);
+    } catch {
+      setInviteError(tRef.current('mob.group_detail.invite_error'));
+    } finally {
+      inviteInFlight.current = false;
+    }
+  };
+
+  const handleChangeRole = async (member: GroupMember): Promise<void> => {
+    const nextRole: GroupMemberRole = member.role === 'admin' ? 'member' : 'admin';
+    setMemberError(null);
+    try {
+      await withCorrelationId(async correlationId => {
+        await updateMemberRole(groupId, member.user_id, nextRole, { correlationId });
         setGroup(await getGroup(groupId, { correlationId }));
       });
-      setEditingRoleUserId(null);
       goToDashboard(t('mob.success.group_updated'));
     } catch {
-      setRoleError(t('mob.group_detail.role_error'));
-    } finally {
-      setIsSavingRole(false);
+      setMemberError(t('mob.group_detail.role_error'));
     }
   };
 
   const handleRemoveMember = async (userId: string): Promise<void> => {
-    setRemoveError(null);
-    setRemovingUserId(userId);
+    setMemberError(null);
     try {
       await withCorrelationId(async correlationId => {
         await removeMember(groupId, userId, { correlationId });
@@ -289,9 +250,7 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
       });
       goToDashboard(t('mob.success.group_updated'));
     } catch {
-      setRemoveError(t('mob.group_detail.remove_error'));
-    } finally {
-      setRemovingUserId(null);
+      setMemberError(t('mob.group_detail.remove_error'));
     }
   };
 
@@ -300,12 +259,39 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
       t('mob.group_detail.remove_title'),
       t('mob.group_detail.remove_message', { name: member.display_name }),
       [
-      { text: t('mob.common.cancel'), style: 'cancel' },
-      {
-        text: t('mob.common.remove'),
-        style: 'destructive',
-        onPress: () => handleRemoveMember(member.user_id),
-      },
+        { text: t('mob.common.cancel'), style: 'cancel' },
+        {
+          text: t('mob.common.remove'),
+          style: 'destructive',
+          onPress: () => handleRemoveMember(member.user_id),
+        },
+      ],
+    );
+  };
+
+  const handleMakeOwner = async (member: GroupMember): Promise<void> => {
+    setMemberError(null);
+    try {
+      await withCorrelationId(async correlationId => {
+        await transferGroupOwnership(groupId, member.user_id, { correlationId });
+        setGroup(await getGroup(groupId, { correlationId }));
+      });
+      goToDashboard(t('mob.group_transfer.success'));
+    } catch {
+      setMemberError(t('mob.group_transfer.error'));
+    }
+  };
+
+  const handleMakeOwnerPress = (member: GroupMember): void => {
+    Alert.alert(
+      t('mob.group_transfer.confirm_prompt', { name: member.display_name }),
+      t('mob.group_transfer.confirm_message'),
+      [
+        { text: t('mob.common.cancel'), style: 'cancel' },
+        {
+          text: t('mob.group_transfer.confirm_button'),
+          onPress: () => handleMakeOwner(member),
+        },
       ],
     );
   };
@@ -355,334 +341,342 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
 
   // Full-contract-audit fix (2026-09-18, see
   // docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md): the real backend's
-  // `GroupResponse` has no `current_user_role` field, and `api/groups.ts`
-  // cannot derive one (no access to the signed-in user's id). Computed
-  // here instead, from `group.members` (now correctly populated by
-  // `getGroup()`) plus `currentUserId` (already read above via
-  // `useAuth()`) — the same data this screen already uses for `isSelf`
-  // below.
+  // `GroupResponse` has no `current_user_role` field. Computed here from
+  // `group.members` plus `currentUserId`.
   const currentUserRole = group.members.find(m => m.user_id === currentUserId)?.role ?? 'none';
   const isOwner = currentUserRole === 'owner' || group.owner_id === currentUserId;
 
   const canInvite = currentUserRole === 'owner' || currentUserRole === 'admin';
-  // §4.4: "Role management — owner/admin only" (design overrides the
-  // brief's narrower "owner only" wording — see the file-level comment).
+  // §4.4: "Role management — owner/admin only" (unchanged).
   const canChangeRoles = currentUserRole === 'owner' || currentUserRole === 'admin';
   const canRemoveMembers = currentUserRole === 'owner' || currentUserRole === 'admin';
   const canLeave = !isOwner && currentUserRole !== 'none';
 
+  const memberCount = group.member_count ?? group.members.length;
+  const countsLine = t('mob.group_detail.header_line', {
+    group_members: t(memberCount === 1 ? 'mob.group_card.members_one' : 'mob.group_card.members_other', {
+      count: memberCount,
+    }),
+    games: t(
+      (group.upcoming_game_count ?? 0) === 1
+        ? 'mob.group_detail.upcoming_games_one'
+        : 'mob.group_detail.upcoming_games_other',
+      { count: group.upcoming_game_count ?? 0 },
+    ),
+  });
+
+  // Actions offered on the long-press card. Same gates as the old inline controls: never on
+  // yourself, never on the owner; Make owner is owner-only.
+  const buildActions = (member: GroupMember): MemberAction[] => {
+    const actionable = member.user_id !== currentUserId && member.role !== 'owner';
+    if (!actionable) {
+      return [];
+    }
+    const actions: MemberAction[] = [];
+    if (canChangeRoles) {
+      const isAdmin = member.role === 'admin';
+      actions.push({
+        key: 'role',
+        label: t(isAdmin ? 'mob.group_detail.action_demote' : 'mob.group_detail.action_make_admin'),
+        tone: 'default',
+        icon: isAdmin ? (
+          <ShieldMinusIcon size={24} color={groupView.blue} />
+        ) : (
+          <ShieldPlusIcon size={24} color={groupView.blue} />
+        ),
+        onPress: () => {
+          setCardMember(null);
+          handleChangeRole(member);
+        },
+      });
+    }
+    if (isOwner) {
+      actions.push({
+        key: 'owner',
+        label: t('mob.group_detail.action_make_owner'),
+        tone: 'default',
+        icon: <OwnerIcon size={24} color={groupView.blue} />,
+        onPress: () => {
+          setCardMember(null);
+          handleMakeOwnerPress(member);
+        },
+      });
+    }
+    if (canRemoveMembers) {
+      actions.push({
+        key: 'remove',
+        label: t('mob.group_detail.action_remove'),
+        tone: 'destructive',
+        icon: <PersonMinusIcon size={24} color={groupView.destructive} />,
+        onPress: () => {
+          setCardMember(null);
+          handleRemoveMemberPress(member);
+        },
+      });
+    }
+    return actions;
+  };
+
+  const headerBackdrop = bannerFallback?.image_url ? (
+    <>
+      <Image
+        source={{ uri: bannerFallback.image_url }}
+        style={styles.headerBackground}
+        resizeMode="cover"
+        accessibilityLabel={t('mob.group_detail.banner_bg_alt')}
+      />
+      <View style={styles.headerScrim} />
+    </>
+  ) : null;
+
+  const logo = group.logo_url ? (
+    <Image
+      source={{ uri: group.logo_url }}
+      style={isInviteOpen ? styles.logoCompact : styles.logo}
+      resizeMode="cover"
+    />
+  ) : (
+    <View style={isInviteOpen ? styles.logoCompact : styles.logo}>
+      <Text style={isInviteOpen ? styles.logoInitialsCompact : styles.logoInitials}>
+        {getInitials(group.name)}
+      </Text>
+    </View>
+  );
+
+  const addedCount = addedUsers.length + addedEmails.length;
+  const addedList =
+    addedCount > 0 ? (
+      <View>
+        <Text style={styles.sectionHeading} accessibilityRole="header">
+          {t('mob.group_detail.added_heading', { count: addedCount })}
+        </Text>
+        {addedUsers.map(invitee => (
+          <View key={invitee.id} style={styles.personRow}>
+            <UserAvatar
+              imageUrl={invitee.image_url}
+              name={invitee.display_name}
+              size={MEMBER_AVATAR_SIZE}
+              fallback="initials"
+            />
+            <View style={styles.personNames}>
+              <PersonNames displayName={invitee.display_name} nickname={invitee.nickname} />
+            </View>
+            <View style={styles.addedChip}>
+              <CheckMarkIcon size={16} color={groupView.addedChipText} />
+              <Text style={styles.addedChipText}>{t('mob.group_detail.added_chip')}</Text>
+            </View>
+          </View>
+        ))}
+        {addedEmails.map(email => (
+          <View key={email.toLowerCase()} style={styles.personRow}>
+            <UserAvatar name={email} size={MEMBER_AVATAR_SIZE} fallback="initials" />
+            <View style={styles.personNames}>
+              <PersonNames displayName={email} />
+            </View>
+            <View style={styles.addedChip}>
+              <CheckMarkIcon size={16} color={groupView.addedChipText} />
+              <Text style={styles.addedChipText}>{t('mob.group_detail.added_chip')}</Text>
+            </View>
+          </View>
+        ))}
+        <View style={styles.sectionGap} />
+      </View>
+    ) : null;
+
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <View style={styles.headerCard}>
-        {bannerFallback?.image_url ? (
-          <Image
-            source={{ uri: bannerFallback.image_url }}
-            style={styles.headerBackground}
-            resizeMode="cover"
-            accessibilityLabel={t('mob.group_detail.banner_bg_alt')}
-          />
-        ) : (
-          <View style={styles.headerBackgroundFallback}>
-            <BannerBackground width="100%" height="100%" />
-          </View>
-        )}
-        <View style={styles.headerScrim} />
-
-        <View style={styles.headerContent}>
-          <View style={styles.headerTopBar}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.xs }]}>
+        {headerBackdrop}
+        {isInviteOpen ? (
+          <View style={styles.compactBar}>
             <Pressable
-              onPress={() => navigation.goBack()}
-              style={styles.headerCircularButton}
+              onPress={handleCloseInvite}
+              style={styles.iconButton}
               accessibilityRole="button"
               accessibilityLabel={t('mob.common.back')}
             >
-              <BackArrowIcon size={18} color={colors.white} />
+              <ChevronLeftIcon size={26} color={colors.white} />
             </Pressable>
-
-            {isOwner ? (
-              <View style={styles.headerActionRow}>
-                <Pressable
-                  onPress={() => navigation.navigate('EditGroup', { groupId })}
-                  style={styles.headerCircularButton}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('mob.group_detail.edit_group_a11y')}
-                >
-                  <EditIcon size={18} color={colors.white} />
-                </Pressable>
-                <Pressable
-                  onPress={() => setIsDeleteSheetVisible(true)}
-                  style={styles.headerCircularButton}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('mob.group_detail.delete_group_a11y')}
-                >
-                  <TrashIcon size={18} color={colors.white} />
-                </Pressable>
-              </View>
-            ) : <View style={styles.headerActionSpacer} />}
-          </View>
-
-          <View style={styles.headerIdentityCentered}>
-            {group.logo_url ? (
-              <Image source={{ uri: group.logo_url }} style={styles.groupLogo} resizeMode="cover" />
-            ) : (
-              <View style={styles.groupLogoInitials}>
-                <Text style={styles.groupInitialsText}>
-                  {getInitials(group.name)}
-                </Text>
-              </View>
-            )}
-
-            <Text style={styles.groupName}>{group.name}</Text>
-
-            <View style={styles.groupMetaRow}>
-              <Text style={styles.groupCounts}>
-                {t('mob.group_detail.counts_line', {
-                  group_members: t(
-                    (group.member_count ?? group.members.length) === 1
-                      ? 'mob.group_card.members_one'
-                      : 'mob.group_card.members_other',
-                    { count: group.member_count ?? group.members.length },
-                  ),
-                  games: t(
-                    (group.upcoming_game_count ?? 0) === 1
-                      ? 'mob.group_detail.upcoming_games_one'
-                      : 'mob.group_detail.upcoming_games_other',
-                    { count: group.upcoming_game_count ?? 0 },
-                  ),
-                })}
+            {logo}
+            <View style={styles.compactText}>
+              <Text style={styles.compactName} numberOfLines={1}>
+                {group.name}
               </Text>
-              <Text style={styles.metaDot}> · </Text>
-              {isOwner ? (
-                <View style={styles.ownerChip}>
-                  <Text style={styles.ownerChipText}>{t('mob.group_detail.owner_chip')}</Text>
-                </View>
-              ) : (
-                <View style={styles.memberChip}>
-                  <Text style={styles.memberChipText}>{t('mob.group_detail.member_chip')}</Text>
-                </View>
-              )}
+              <Text style={styles.compactSubtitle} numberOfLines={1}>
+                {t('mob.group_detail.invite_players_subtitle')}
+              </Text>
             </View>
           </View>
-        </View>
+        ) : (
+          <>
+            <View style={styles.topBar}>
+              <Pressable
+                onPress={() => navigation.goBack()}
+                style={styles.iconButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('mob.common.back')}
+              >
+                <ChevronLeftIcon size={26} color={colors.white} />
+              </Pressable>
+              {isOwner ? (
+                <View style={styles.topBarActions}>
+                  <Pressable
+                    onPress={() => navigation.navigate('EditGroup', { groupId })}
+                    style={styles.iconButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.group_detail.edit_group_a11y')}
+                  >
+                    <PencilLineIcon size={24} color={colors.white} />
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setIsDeleteSheetVisible(true)}
+                    style={styles.iconButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mob.group_detail.delete_group_a11y')}
+                  >
+                    <TrashIcon size={22} color={colors.white} />
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={styles.identity}>
+              {logo}
+              <Text style={styles.groupName}>{group.name}</Text>
+              <Text style={styles.groupCounts}>{countsLine}</Text>
+              {group.description ? <Text style={styles.description}>{group.description}</Text> : null}
+            </View>
+          </>
+        )}
       </View>
 
-      <Card style={styles.infoCard}>
-        {group.description ? <Text style={styles.description}>{group.description}</Text> : null}
-        <Text style={styles.meta}>
-          {t('mob.group_detail.owned_by', { name: group.owner_display_name || group.owner_nickname || '' })}
-        </Text>
-        {canInvite ? (
-          <Button
-            label={t('mob.group_detail.share_button')}
-            variant="secondary"
-            size="sm"
+      {canInvite ? (
+        <View style={styles.buttonRow}>
+          <Pressable
             onPress={share.open}
-            accessibilityLabel={t('mob.group_detail.share_button')}
-            style={styles.shareGroupBtn}
-          />
-        ) : null}
-      </Card>
+            style={({ pressed }) => [styles.shareButton, pressed ? styles.pressed : null]}
+            accessibilityRole="button"
+            accessibilityLabel={t('mob.group_detail.share_link_a11y')}
+          >
+            <LinkIcon size={22} color={groupView.blue} />
+            <Text style={styles.shareButtonText}>{t('mob.group_detail.share_link_cta')}</Text>
+          </Pressable>
+          {isInviteOpen ? (
+            <Pressable
+              onPress={handleCloseInvite}
+              style={({ pressed }) => [styles.plusSquare, pressed ? styles.pressed : null]}
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.group_detail.invite_collapsed_a11y')}
+            >
+              <Text style={styles.plusSquareText}>+</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={handleOpenInvite}
+              style={({ pressed }) => [styles.inviteButton, pressed ? styles.pressed : null]}
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.group_detail.invite')}
+            >
+              <PersonPlusIcon size={22} color={colors.white} />
+              <Text style={styles.inviteButtonText}>{t('mob.group_detail.invite')}</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
 
-      <Card>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{t('mob.group_detail.members_title')}</Text>
-          {canInvite && !isInviteFormOpen ? (
-            <View style={styles.headerLinksRow}>
-              <TextLink
-                label={t('mob.group_detail.share_link')}
-                accessibilityLabel={t('mob.group_detail.share_link_a11y')}
-                onPress={share.open}
+      {isInviteOpen ? (
+        <View style={styles.invitePanel}>
+          <UserSearchPicker
+            variant="invite"
+            onSelect={handleAddUser}
+            onSelectEmail={handleAddEmail}
+            excludeGroupId={groupId}
+            excludeUserIds={addedUsers.map(invitee => invitee.id)}
+            suggestionContext="players"
+            entityLabel={t('mob.user_search.entity_player')}
+            belowInput={addedList}
+          />
+          {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
+        </View>
+      ) : (
+        <>
+          {canInvite ? <View style={styles.sectionGap} /> : null}
+          <View style={styles.membersHeader}>
+            <Text style={styles.membersTitle} accessibilityRole="header">
+              {t('mob.group_detail.members_title')}
+            </Text>
+            <Text style={styles.membersCount}>{memberCount}</Text>
+          </View>
+
+          {memberError ? <Text style={styles.errorText}>{memberError}</Text> : null}
+
+          {sortedMembers.map(member => (
+            <Pressable
+              key={member.user_id}
+              style={({ pressed }) => [styles.memberRow, pressed ? styles.memberRowPressed : null]}
+              onLongPress={() => setCardMember(member)}
+              delayLongPress={350}
+              accessibilityRole="button"
+              accessibilityLabel={
+                member.role === 'member'
+                  ? member.display_name
+                  : `${member.display_name}, ${t(
+                      member.role === 'owner' ? 'mob.group_role.owner' : 'mob.group_role.admin',
+                    )}`
+              }
+              accessibilityHint={t('mob.group_detail.member_row_hint')}
+            >
+              <UserAvatar
+                imageUrl={member.photo_url}
+                name={member.display_name}
+                size={MEMBER_AVATAR_SIZE}
+                fallback="initials"
               />
-              <TextLink label={t('mob.group_detail.invite')} onPress={handleOpenInviteForm} />
+              <View style={styles.personNames}>
+                <PersonNames displayName={member.display_name} nickname={member.nickname} />
+              </View>
+              {member.role === 'owner' ? (
+                <View style={[styles.roleChip, styles.ownerChip]}>
+                  <Text style={[styles.roleChipText, styles.ownerChipText]}>
+                    {t('mob.group_role.owner')}
+                  </Text>
+                </View>
+              ) : member.role === 'admin' ? (
+                <View style={[styles.roleChip, styles.adminChip]}>
+                  <Text style={[styles.roleChipText, styles.adminChipText]}>
+                    {t('mob.group_role.admin')}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ))}
+
+          {canLeave ? (
+            <View style={styles.leaveSection}>
+              {leaveError ? <Text style={styles.errorText}>{leaveError}</Text> : null}
+              <Button
+                label={t('mob.group_detail.leave_button')}
+                variant="destructive"
+                onPress={handleLeaveGroupPress}
+                loading={isLeaving}
+              />
             </View>
           ) : null}
-        </View>
+        </>
+      )}
 
-        {isInviteFormOpen ? (
-          <View style={styles.editRow}>
-            {selectedInviteEmail ? (
-              <View style={styles.selectedInviteRow}>
-                <Text style={styles.selectedInviteText}>
-                  {t('mob.group_detail.invite_by_email', { email: selectedInviteEmail })}
-                </Text>
-                <TextLink
-                  label={t('mob.common.change')}
-                  accessibilityLabel={t('mob.group_detail.remove_invitee_a11y', { name: selectedInviteEmail })}
-                  onPress={handleRemoveEmail}
-                  disabled={isInviting}
-                />
-              </View>
-            ) : null}
-            {selectedInviteUsers.map(invitee => (
-              <View key={invitee.id} style={styles.selectedInviteRow}>
-                <View style={styles.inviteeNames}>
-                  <Text style={styles.selectedInviteText} numberOfLines={1}>
-                    {invitee.display_name}
-                  </Text>
-                  {invitee.nickname && invitee.nickname !== invitee.display_name ? (
-                    <Text style={styles.nicknameText} numberOfLines={1}>
-                      {invitee.nickname}
-                    </Text>
-                  ) : null}
-                </View>
-                <TextLink
-                  label={selectedInviteUsers.length === 1 ? t('mob.common.change') : t('mob.common.remove')}
-                  accessibilityLabel={t('mob.group_detail.remove_invitee_a11y', { name: invitee.display_name })}
-                  onPress={() => handleRemoveUser(invitee.id)}
-                  disabled={isInviting}
-                />
-              </View>
-            ))}
-            {!selectedInviteEmail ? (
-              <UserSearchPicker
-                onSelect={handleSelectUser}
-                onSelectEmail={handleSelectEmail}
-                excludeGroupId={groupId}
-                excludeUserIds={selectedInviteUsers.map(invitee => invitee.id)}
-                suggestionContext="group_members"
-                disabled={isInviting}
-              />
-            ) : null}
-            {inviteError ? <Text style={styles.errorText}>{inviteError}</Text> : null}
-            <View style={styles.editActionsRow}>
-              <Button
-                label={t('mob.group_detail.send_invite')}
-                size="sm"
-                onPress={handleSendInvite}
-                loading={isInviting}
-                disabled={selectedInviteUsers.length === 0 && !selectedInviteEmail}
-                style={styles.actionSpacing}
-              />
-              <Button
-                label={t('mob.common.cancel')}
-                size="sm"
-                variant="secondary"
-                onPress={handleCancelInvite}
-                disabled={isInviting}
-              />
-            </View>
-          </View>
-        ) : null}
-
-        {removeError ? <Text style={styles.errorText}>{removeError}</Text> : null}
-
-        {group.members.map(member => {
-          const isSelf = member.user_id === currentUserId;
-          const isMemberOwner = member.role === 'owner';
-          const showRoleControl = canChangeRoles && !isSelf && !isMemberOwner;
-          const showRemoveControl = canRemoveMembers && !isSelf && !isMemberOwner;
-          const isEditingThisRole = editingRoleUserId === member.user_id;
-
-          return (
-            <View key={member.user_id} style={styles.memberRow}>
-              <View style={styles.memberInfo}>
-                <View style={styles.memberAvatar}>
-                  <UserAvatar imageUrl={member.photo_url} name={member.display_name} size={MEMBER_AVATAR_SIZE} />
-                </View>
-                <View style={styles.memberNames}>
-                  <Text style={styles.memberDisplayName} numberOfLines={1}>
-                    {member.display_name}
-                  </Text>
-                  {member.nickname && member.nickname !== member.display_name ? (
-                    <Text style={styles.nicknameText} numberOfLines={1}>
-                      {member.nickname}
-                    </Text>
-                  ) : null}
-                </View>
-                <Badge
-                  label={t(ROLE_LABEL_KEY[member.role])}
-                  variant={ROLE_BADGE_VARIANT[member.role]}
-                />
-              </View>
-
-              {isEditingThisRole ? (
-                <View style={styles.editRow}>
-                  <View style={styles.rolePickerRow}>
-                    {ROLE_OPTIONS.map(option => (
-                      <Pressable
-                        key={option}
-                        style={[
-                          styles.roleOption,
-                          roleDraft === option && styles.roleOptionSelected,
-                        ]}
-                        onPress={() => setRoleDraft(option)}
-                        disabled={isSavingRole}
-                      >
-                        <Text
-                          style={[
-                            styles.roleOptionText,
-                            roleDraft === option && styles.roleOptionTextSelected,
-                          ]}
-                        >
-                          {t(ROLE_LABEL_KEY[option])}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  {roleError ? <Text style={styles.errorText}>{roleError}</Text> : null}
-                  <View style={styles.editActionsRow}>
-                    <Button
-                      label={t('mob.common.save')}
-                      size="sm"
-                      onPress={handleSaveRole}
-                      loading={isSavingRole}
-                      style={styles.actionSpacing}
-                    />
-                    <Button
-                      label={t('mob.common.cancel')}
-                      size="sm"
-                      variant="secondary"
-                      onPress={handleCancelEditRole}
-                      disabled={isSavingRole}
-                    />
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.memberActionsRow}>
-                  {showRoleControl ? (
-                    <TextLink
-                      label={t('mob.group_detail.change_role')}
-                      onPress={() => handleStartEditRole(member)}
-                      style={styles.linkSpacing}
-                    />
-                  ) : null}
-                  {showRemoveControl ? (
-                    <TextLink
-                      label={t('mob.common.remove')}
-                      tone="destructive"
-                      onPress={() => handleRemoveMemberPress(member)}
-                      loading={removingUserId === member.user_id}
-                    />
-                  ) : null}
-                </View>
-              )}
-            </View>
-          );
-        })}
-      </Card>
-
-      {!isOwner ? (
-        <View style={styles.memberNoticeBanner}>
-          <LockIcon size={16} color={colors.primary} />
-          <Text style={styles.memberNoticeText}>{t('mob.group_detail.owner_only_note')}</Text>
-        </View>
-      ) : null}
-
-      {canLeave ? (
-        <View style={styles.leaveSection}>
-          {leaveError ? <Text style={styles.errorText}>{leaveError}</Text> : null}
-          <Button
-            label={t('mob.group_detail.leave_button')}
-            variant="destructive"
-            onPress={handleLeaveGroupPress}
-            loading={isLeaving}
-          />
-        </View>
-      ) : null}
+      <MemberActionCard
+        visible={cardMember !== null}
+        displayName={cardMember?.display_name ?? ''}
+        nickname={cardMember?.nickname ?? null}
+        photoUrl={cardMember?.photo_url ?? null}
+        actions={cardMember ? buildActions(cardMember) : []}
+        onClose={() => setCardMember(null)}
+      />
       <DeleteGroupSheet
         groupId={group.id}
         groupName={group.name}
-        memberCount={group.member_count ?? group.members.length}
+        memberCount={memberCount}
         visible={isDeleteSheetVisible}
         onClose={() => setIsDeleteSheetVisible(false)}
         onNotFound={unavailable.onNotFound}
@@ -714,213 +708,187 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
 }
 
 const styles = StyleSheet.create({
-  container: { padding: spacing.md },
-  headerCard: {
-    borderRadius: radius.lg,
-    overflow: 'hidden',
-    position: 'relative',
-    marginBottom: spacing.md,
-  },
-  headerBackground: {
-    ...StyleSheet.absoluteFill,
-    width: '100%',
-    height: '100%',
-  },
-  headerBackgroundFallback: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: dash.brand,
-    overflow: 'hidden',
-  },
-  headerScrim: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: colors.scrim,
-  },
-  headerContent: {
-    padding: spacing.md,
-    paddingTop: spacing.sm,
+  container: { paddingBottom: spacing.xl, backgroundColor: colors.surface },
+  header: {
+    backgroundColor: groupView.navy,
+    paddingHorizontal: spacing.sm,
     paddingBottom: spacing.lg,
+    overflow: 'hidden',
   },
-  headerTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  headerCircularButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.overlayWhite25,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerActionSpacer: {
-    width: 36,
-    height: 36,
-  },
-  headerActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  headerIdentityCentered: {
+  headerBackground: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
+  headerScrim: { ...StyleSheet.absoluteFill, backgroundColor: groupView.navyScrim },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topBarActions: { flexDirection: 'row', alignItems: 'center' },
+  iconButton: {
+    width: sizes.touchTarget,
+    height: sizes.touchTarget,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  groupLogo: {
-    width: 88,
-    height: 88,
-    borderRadius: 24,
+  identity: { alignItems: 'center', paddingHorizontal: spacing.md },
+  logo: {
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    borderRadius: LOGO_SIZE / 2,
     borderWidth: 3,
     borderColor: colors.white,
-  },
-  groupLogoInitials: {
-    width: 88,
-    height: 88,
-    borderRadius: 24,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
+    backgroundColor: groupView.blue,
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: colors.white,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  groupInitialsText: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: colors.primary,
-  },
+  logoInitials: { fontSize: 38, fontWeight: '700', color: colors.white },
   groupName: {
     ...typography.h2,
     color: colors.white,
     textAlign: 'center',
-    marginTop: spacing.sm,
-    marginBottom: 4,
-  },
-  groupMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
+    marginTop: spacing.md,
   },
   groupCounts: {
-    ...typography.caption,
-    color: colors.white,
+    ...typography.body,
+    color: groupView.onNavyMuted,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
-  metaDot: {
-    ...typography.caption,
-    color: colors.white,
+  description: {
+    ...typography.body,
+    color: groupView.onNavyMuted,
+    textAlign: 'center',
+    marginTop: spacing.sm,
   },
-  ownerChip: {
-    backgroundColor: colors.ownerChipBg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-    alignSelf: 'center',
-  },
-  ownerChipText: {
-    ...typography.label,
-    color: colors.ownerChipText,
-    fontWeight: '700',
-  },
-  memberChip: {
-    backgroundColor: colors.white,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: radius.full,
-    alignSelf: 'center',
-  },
-  memberChipText: {
-    ...typography.label,
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  memberNoticeBanner: {
-    flexDirection: 'row',
+  compactBar: { flexDirection: 'row', alignItems: 'center', minHeight: sizes.touchTarget },
+  logoCompact: {
+    width: LOGO_SIZE_COMPACT,
+    height: LOGO_SIZE_COMPACT,
+    borderRadius: LOGO_SIZE_COMPACT / 2,
+    borderWidth: 2,
+    borderColor: colors.white,
+    backgroundColor: groupView.blue,
     alignItems: 'center',
-    backgroundColor: colors.primaryLight,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  memberNoticeText: {
-    ...typography.caption,
-    color: colors.textPrimary,
-    marginLeft: spacing.sm,
-    flex: 1,
-  },
-  infoCard: { marginBottom: spacing.md },
-  shareGroupBtn: {
-    marginTop: spacing.md,
-    alignSelf: 'flex-start',
-  },
-  title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.sm },
-  description: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.md },
-  meta: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xs },
-  sectionHeaderRow: {
+  logoInitialsCompact: { fontSize: 15, fontWeight: '700', color: colors.white },
+  compactText: { flex: 1, marginLeft: spacing.sm },
+  compactName: { ...typography.h3, color: colors.white },
+  compactSubtitle: { ...typography.caption, color: groupView.onNavyMuted },
+  buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  headerLinksRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  sectionTitle: { ...typography.h3, color: colors.textPrimary },
-  memberRow: {
-    paddingVertical: spacing.sm,
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: colors.border,
-  },
-  memberInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
     gap: spacing.sm,
   },
-  memberAvatar: { width: MEMBER_AVATAR_SIZE, height: MEMBER_AVATAR_SIZE },
-  memberNames: { flex: 1, minWidth: 0 },
-  memberDisplayName: { ...typography.bodyBold, color: colors.textPrimary },
-  nicknameText: { ...typography.caption, color: colors.textSecondary },
-  inviteeNames: { flexShrink: 1 },
-  memberActionsRow: { flexDirection: 'row', marginTop: spacing.sm },
-  linkSpacing: { marginRight: spacing.md },
-  editRow: { marginTop: spacing.sm, width: '100%' },
-  selectedInviteRow: {
+  shareButton: {
+    flex: 1,
+    height: BUTTON_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: groupView.blue,
+    backgroundColor: colors.surface,
+  },
+  shareButtonText: {
+    ...typography.button,
+    color: groupView.blue,
+    marginLeft: spacing.sm,
+  },
+  inviteButton: {
+    flex: 1,
+    height: BUTTON_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: groupView.blue,
+  },
+  inviteButtonText: { ...typography.button, color: colors.white, marginLeft: spacing.sm },
+  plusSquare: {
+    width: BUTTON_HEIGHT,
+    height: BUTTON_HEIGHT,
+    borderRadius: 14,
+    backgroundColor: groupView.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plusSquareText: { fontSize: 28, lineHeight: 32, color: colors.white },
+  pressed: { opacity: 0.85 },
+  sectionGap: { height: spacing.sm, backgroundColor: groupView.sectionBg },
+  invitePanel: { paddingHorizontal: spacing.md },
+  sectionHeading: {
+    ...typography.label,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: groupView.textSecondary,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  membersHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  selectedInviteText: { ...typography.body, color: colors.textPrimary, flexShrink: 1 },
-  editActionsRow: { flexDirection: 'row', marginTop: spacing.xs },
-  actionSpacing: { marginRight: spacing.sm },
-  rolePickerRow: { flexDirection: 'row', marginBottom: spacing.sm },
-  roleOption: {
-    minHeight: sizes.controlSmall,
-    justifyContent: 'center',
-    borderWidth: borderWidth.thin,
-    borderColor: colors.primary,
-    borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    marginRight: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  roleOptionSelected: { backgroundColor: colors.primary },
-  roleOptionText: {
-    ...typography.bodyBold,
-    color: colors.primary,
-    textTransform: 'capitalize',
+  membersTitle: { ...typography.h3, color: colors.textPrimary },
+  membersCount: { ...typography.body, color: groupView.textSecondary },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 64,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: groupView.divider,
+    backgroundColor: colors.surface,
   },
-  roleOptionTextSelected: { color: colors.white },
+  memberRowPressed: { backgroundColor: groupView.sectionBg },
+  personRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 64,
+    paddingVertical: spacing.sm,
+  },
+  personNames: { flex: 1, minWidth: 0, marginLeft: spacing.md },
+  roleChip: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.md,
+    minHeight: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleChipText: { ...typography.label, fontWeight: '700' },
+  ownerChip: { backgroundColor: groupView.ownerChipBg },
+  ownerChipText: { color: groupView.ownerChipText },
+  adminChip: { backgroundColor: groupView.adminChipBg },
+  adminChipText: { color: groupView.adminChipText },
+  addedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.md,
+    minHeight: 32,
+    borderRadius: 16,
+    backgroundColor: groupView.addedChipBg,
+  },
+  addedChipText: {
+    ...typography.label,
+    fontWeight: '700',
+    color: groupView.addedChipText,
+    marginLeft: spacing.xs,
+  },
   leaveSection: {
     marginTop: spacing.xl,
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: colors.border,
-    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
   },
   errorText: {
     ...typography.body,
-    color: colors.error,
+    color: groupView.destructive,
+    paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
     textAlign: 'center',
   },
