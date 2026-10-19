@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-USER-DETAILS-MENU
 
 **Doc ID:** DES-MEETUP-ADDENDUM-USER-DETAILS-MENU
-**Version:** v1.1
-**Status:** APPROVED by the owner, 2026-10-19. v1.1 (same day, owner approved option A after `ud-p1-verify`): tournament actions are deferred and tournament people get View Details only (D-3, OI-8). Non-blocking defaults in section 12 are accepted. UI build (phases 3 and 4) is gated on a board (OI-6).
+**Version:** v1.2
+**Status:** APPROVED by the owner, 2026-10-19. v1.1 (same day, owner approved option A after `ud-p1-verify`): tournament actions are deferred and tournament people get View Details only (D-3, OI-8). Non-blocking defaults in section 12 are accepted. UI build (phases 3 and 4) is gated on a board (OI-6). v1.2 (same day, owner decisions on the mobile agent's questions): on mobile a tap on a person's avatar opens View Details (UM-06, UM-11); owner and organizer lines and tournament registrations get an avatar (UM-12, OI-11).
 **Owner:** Pratheesh
 **Date:** 2026-10-19
 **Scale Tier:** T1
@@ -16,12 +16,13 @@
 2. `solution-design` references `PRINCIPLES.md` P1-P23. The authoritative file is `Enterprise_Design_Principles.md` v1.1 (P1-P17). P1-P17 are used.
 3. BP-01 limit: the role matrix (AD-3) and the list of tap points (section 4.3) are drawn from the code read on 2026-10-19 and from the approved addenda, not from a full audit. Phase 1 (`ud-p1-verify`) re-verifies every claim; where code and this document disagree the agent reports and stops. It does not invent.
 4. v1.1: `ud-p1-verify` (2026-10-19, report `docs/reports/ud-p1-verify-report.md`) found that all four tournament rows of the v1.0 AD-3 differ from the as-built code. They had been written from the approved lifecycle design, which is largely unbuilt. The owner chose option A: no tournament actions in v1 (D-3).
+5. v1.2: the owner changed UM-06 (a plain tap used to keep today's behaviour) after the mobile agent asked about 22 px home-card avatars, plain-text owner and organizer names and tournament rows without a user id. Mobile tap behaviour was not audited per site in this design; `ud-mobile` applies UM-06 and reports any site it does not fit.
 
 ---
 
 ## Plain-language summary
 
-Everywhere a person's picture or name appears (groups, games, tournaments, invite lists), long-pressing it on mobile, or clicking it on web, opens the same small menu. The first item is always **View Details**, which shows the picture, display name and nickname. Below it come only the actions the person looking is allowed to take on that user in that place: make admin, remove from group, remove player, and so on. A plain member sees View Details only. Tournament people show View Details only in this release; tournament actions come later with the tournament lifecycle.
+Everywhere a person's picture or name appears (groups, games, tournaments, invite lists), long-pressing it on mobile, or clicking it on web, opens the same small menu. The first item is always **View Details**, which shows the picture, display name and nickname. Below it come only the actions the person looking is allowed to take on that user in that place: make admin, remove from group, remove player, and so on. A plain member sees View Details only. On mobile, a tap on a person's picture opens View Details directly; a long-press opens the full menu. Tournament people show View Details only in this release; tournament actions come later with the tournament lifecycle.
 
 All of this is one component per platform. Changing the design later means editing that one component, not every screen. Which actions appear is decided by the server, so the rules live in one place too.
 
@@ -36,11 +37,13 @@ All of this is one component per platform. Changing the design later means editi
 | UM-03 | Below it, the menu lists only the actions the viewer may take on that user in that context. The viewer's role in the context decides (group owner, group admin, game organizer, member). A member sees View Details only. |
 | UM-04 | Implemented once per platform as a reusable component. Every call site uses it. No screen builds its own menu or details view. |
 | UM-05 | Every new label is managed through the admin label store (no maker/checker, immediate effect). |
-| UM-06 | A plain tap on mobile keeps today's behaviour on each screen. On web the click opens the menu. |
+| UM-06 | Mobile: a tap on a person's avatar opens View Details (owner: a tap on an avatar does nothing today). Long-press opens the full menu (View Details plus actions). Where the avatar sits inside a row or card whose tap already does something, the avatar tap opens View Details and does not trigger the row or card action; the rest of the row or card keeps its behaviour. Exception: selectable rows (invite and search lists) keep tap-to-select on the row and use long-press on the avatar. The 22 px home-card avatars have tap only, no long-press, and open View Details with no card request. Web: the click opens the menu. |
 | UM-07 | The viewer's own avatar and name show details only, no actions. |
 | UM-08 | Actions that need two-person approval raise a request. They never act immediately, and their labels say "Request ...". No such action exists in v1 (tournament actions are deferred, OI-8); the rule applies when they are added. |
 | UM-09 | The menu and details view show picture, display name and nickname only. No email, mobile number or other personal data. |
 | UM-10 | The menu opens only for people the viewer can already see in that context (access-consistency AD-1). No access means no menu and no details. |
+| UM-11 | Mobile tap on any avatar that carries a user opens View Details (the same sheet as the menu's first item). Own navigation avatars (`HomeTopBar`, `DrawerMenu`) are unchanged and still open the profile. |
+| UM-12 | Mobile: the owner line, the organizer line and tournament registrations show an avatar beside the name and use the same component. With a `user_id` the menu applies (owner and organizer lines usually offer View Details only). A registration without a `user_id` shows a placeholder avatar and the nickname: View Details from row data, no card request. Web keeps its current owner and organizer lines (OI-10). |
 
 ---
 
@@ -247,7 +250,7 @@ Risk classification: card endpoints and `allowed_user_actions` **High** (authori
 | UM-T7 | Response key set is exactly `UserCardOut`; no email or mobile number appears. |
 | UM-T8 | Rate limit returns 429 above the configured rate. |
 | UM-T9 | Parity: for every action key offered, the matching action endpoint accepts the same viewer and target; for a viewer without the right, the endpoint refuses. An idempotent repeat (for example setting the role a person already has) returns 200 and is not a refusal. |
-| UM-T10 | Client (mobile jest): long-press opens the menu; View Details first; no actions on card failure; 404 closes with the notice; unknown key ignored; own avatar shows View Details only; tournament and no-context people open View Details with no card request. |
+| UM-T10 | Client (mobile jest): avatar tap opens View Details and does not trigger the row or card action; selectable rows still select on row tap; long-press opens the menu; View Details first; no actions on card failure; 404 closes with the notice; unknown key ignored; own avatar shows View Details only; tournament and no-context people open View Details with no card request. |
 | UM-T11 | Client (web): click and keyboard open, Escape closes, card click is not triggered by an avatar click. |
 | UM-T12 | Mobile `npm run check:labels` and the terminology scan pass with the new keys. |
 
@@ -316,7 +319,7 @@ No deviation from `Enterprise_Design_Principles.md` or `design-best-practices.md
 | ID | Item | Severity | Status |
 |---|---|---|---|
 | OI-1 | Admin console user lists are out of v1; they keep their own actions and approval flows. | 🟢 LOW | Default accepted; revisit on owner request |
-| OI-2 | A plain tap keeps today's behaviour per screen on mobile. | 🟢 LOW | Default accepted |
+| OI-2 | Superseded by UM-06 in v1.2: avatar tap opens View Details on mobile. | 🟢 LOW | Closed by owner decision |
 | OI-3 | On web, avatars inside clickable home cards open the menu and stop propagation so the card navigation does not fire. | 🟡 MEDIUM | Default accepted; board shows the exact behaviour |
 | OI-4 | AD-3 rows are verified against as-built policies and endpoints. | 🟠 HIGH | Resolved 2026-10-19: group and game rows confirmed; the four tournament rows differed and were removed (D-3) |
 | OI-5 | Search and suggested-player lists show View Details from row data with no actions and no card request. | 🟡 MEDIUM | Resolved 2026-10-19: both search endpoints return display name, nickname and photo; they also return extra fields (`shared_group`, `created_at`, a raw storage key) which View Details ignores |
@@ -325,8 +328,10 @@ No deviation from `Enterprise_Design_Principles.md` or `design-best-practices.md
 | OI-8 | Tournament actions (remove, disqualification request, committee add and remove) are deferred. Gate: the lifecycle committee and hard-block enforcement is built and enabled, a web step-up flow exists, and a design amendment (v1.2) re-adds the rows with a tournament card endpoint. | 🟡 MEDIUM | Open, deferred by the owner |
 | OI-9 | The organizer remove-participant endpoint accepts invited, withdrawn and organizer targets and cancelled games; only the web UI hides them. P15 says the app layer must enforce it. | 🟡 MEDIUM | Open; separate task |
 | OI-10 | Web sites with no user id or attachable element (notifications, standings, fixtures, seeding, the committee list that prints a raw user id, invitation lists, the organizer row) are outside v1. A follow-up needs the backend to return name, photo and id there. | 🟡 MEDIUM | Open; follow-up |
+| OI-11 | UM-12 needs a `user_id`, photo and name for the game organizer, group owner and tournament registrations in the API responses the mobile screens already load. Not verified. If a response lacks one, that is an additive backend change and a new task; `ud-mobile` STOPS and asks, and does not invent a field. | 🟠 HIGH | Open; checked at the start of `ud-mobile` |
+| OI-12 | The 22 px home-card avatars are a small tap target and sit in stacks that overlap. Accepted by the owner; the board shows size and spacing. | 🟡 MEDIUM | Open; board |
 
-Status: **APPROVED v1.1.** No blocking items for phase 2. Phases 3 and 4 gated on OI-6.
+Status: **APPROVED v1.2.** No blocking items for phase 2. Phases 3 and 4 gated on OI-6.
 
 ---
 
@@ -336,7 +341,7 @@ Status: **APPROVED v1.1.** No blocking items for phase 2. Phases 3 and 4 gated o
 |---|---|---|
 | R-1 | A call site is missed and still has its own press behaviour | Phase 1 audit with file and line; `<UserPressable>` and the web attribute helpers make the right thing the default; a grep check in review |
 | R-2 | The menu offers an action the endpoint refuses | AD-3 single policy source; parity test UM-T9; endpoint stays the authority |
-| R-3 | Long-press has no visible cue on mobile | Accepted by the owner; web has the click target |
+| R-3 | Long-press has no visible cue on mobile | Accepted by the owner; avatar tap now gives a visible path to View Details |
 | R-4 | Card endpoints become a user-lookup oracle | Current-relationship check, 404 on everything else, rate limit, exact-field test |
 | R-5 | The two endpoints drift apart | One shared schema and one parity test per module |
 
@@ -348,3 +353,4 @@ Status: **APPROVED v1.1.** No blocking items for phase 2. Phases 3 and 4 gated o
 |---|---|---|
 | v1.0 | 2026-10-19 | First version, approved by the owner on his instruction after elicitation (long-press and click open a menu with View Details first, role-based actions, reusable component, labels via admin, tap keeps today's behaviour). Requirements UM-01 to UM-10. Phases 3 and 4 gated on a board (OI-6). |
 | v1.1 | 2026-10-19 | After `ud-p1-verify`: the four tournament rows and the tournament card endpoint removed (owner chose option A; D-3, OI-8); UM-T9 reworded (idempotent repeats are not refusals); rate limit moved to an environment setting (AD-8); `user_id` added to `AvatarPreview`; web scope trimmed to sites with a user id (OI-10); label texts added (AD-6); OI-9 and OI-10 recorded. |
+| v1.2 | 2026-10-19 | Owner decisions: avatar tap opens View Details on mobile (UM-06 changed, UM-11); owner and organizer lines and tournament registrations get an avatar (UM-12); home-card avatars tap only; OI-2 closed; OI-11 (API ids for owner, organizer, registrations) and OI-12 (22 px target) added. Web unchanged. |
