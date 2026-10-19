@@ -18,7 +18,9 @@
  * No pre-flight offline check (deviation D-4): the call is attempted and a
  * failure becomes the generic message. One attempt, no retry.
  *
- * Never logs tokens, titles, bodies, entity ids or delivery ids (R-111).
+ * Never logs tokens, titles, bodies, entity ids or delivery ids (R-111). The
+ * switchable diagnostics layer (`perfLog`, off by default) records only event
+ * shape: event type, press action id, which fields are present, data key names.
  * Push title and body are displayed exactly as received.
  */
 import { Platform } from 'react-native';
@@ -27,6 +29,7 @@ import type { Event, IOSNotificationCategory, Notification } from 'react-native-
 
 import { apiClient, refreshAccessTokenForAction } from '../api/client';
 import { withCorrelationId } from '../api/correlationId';
+import { perfLog } from '../diagnostics/perfLog';
 import { currentT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/LabelsContext';
 import type { NotificationType, PushNotificationPayload } from '../types/notification';
@@ -85,6 +88,37 @@ export const PUSH_ACTION_SCOPE: Record<PushActionType, ActionScope> = {
 
 export function isPushActionType(value: unknown): value is PushActionType {
   return typeof value === 'string' && (PUSH_ACTION_TYPES as readonly string[]).includes(value);
+}
+
+const KNOWN_PRESS_IDS: readonly string[] = [
+  ACCEPT_ACTION_ID,
+  LEAVE_ACTION_ID,
+  IGNORE_ACTION_ID,
+  DEFAULT_PRESS_ID,
+];
+const MAX_LOGGED_DATA_KEYS = 20;
+
+/**
+ * Shape-only description of a notify-kit event for diagnostics: event type,
+ * press action id (known ids only, anything else is "other"), whether the
+ * notification, its id, `notification_type` and `delivery_id` are present, and
+ * the NAMES of the data keys. Never values, so no tokens, ids, titles or PII.
+ */
+export function describeNotificationEvent(event: Event): Record<string, unknown> {
+  const notification = event.detail?.notification;
+  const data = notification?.data ?? {};
+  const pressId = event.detail?.pressAction?.id;
+  return {
+    platform: Platform.OS,
+    eventType: event.type,
+    pressAction:
+      typeof pressId === 'string' ? (KNOWN_PRESS_IDS.includes(pressId) ? pressId : 'other') : 'none',
+    hasNotification: Boolean(notification),
+    hasId: Boolean(notification?.id),
+    hasType: typeof data.notification_type === 'string' && data.notification_type !== '',
+    hasDeliveryId: typeof data.delivery_id === 'string' && data.delivery_id !== '',
+    dataKeys: Object.keys(data).slice(0, MAX_LOGGED_DATA_KEYS),
+  };
 }
 
 /** Notifications with an action in flight, keyed by notification id. */
@@ -356,9 +390,12 @@ async function runIgnore(notificationId: string, deliveryId: string): Promise<vo
  * - Ignore (`ACTION_PRESS`): see `runIgnore`.
  * A second press on the same notification while one runs is ignored.
  */
-export async function handlePushActionEvent({ type, detail }: Event): Promise<void> {
+export async function handlePushActionEvent(event: Event): Promise<void> {
+  const { type, detail } = event;
+  perfLog('push_action_event', describeNotificationEvent(event));
   const data = dataOf(detail.notification);
   if (!isPushActionType(data.notification_type)) {
+    perfLog('push_action_skip', { reason: 'no_push_action_type' });
     return;
   }
   const actionType = data.notification_type;
@@ -372,15 +409,25 @@ export async function handlePushActionEvent({ type, detail }: Event): Promise<vo
     return;
   }
 
-  const notificationId = detail.notification?.id;
+  // A remote push on iOS may arrive without a usable notification id; the server's
+  // `delivery_id` is the same per-delivery key, so use it for in-flight tracking and for
+  // the result notification.
+  const notificationId = detail.notification?.id || data.delivery_id;
   const actionId = detail.pressAction?.id;
-  if (!notificationId || data.push_action_result === '1') {
+  if (!notificationId) {
+    perfLog('push_action_skip', { reason: 'no_id_and_no_delivery_id' });
+    return;
+  }
+  if (data.push_action_result === '1') {
+    perfLog('push_action_skip', { reason: 'result_notification' });
     return;
   }
   if (actionId !== scope.primary && actionId !== IGNORE_ACTION_ID) {
+    perfLog('push_action_skip', { reason: 'unknown_action' });
     return;
   }
   if (inFlight.has(notificationId)) {
+    perfLog('push_action_skip', { reason: 'in_flight' });
     return;
   }
 

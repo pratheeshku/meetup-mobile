@@ -17,15 +17,26 @@
 import notifee from 'react-native-notify-kit';
 import type { Event } from 'react-native-notify-kit';
 
+import { perfLog } from '../diagnostics/perfLog';
 import { handleEventNotificationEvent, isEventNotificationType } from './eventNotificationHandler';
 import {
   handleParticipantNotificationEvent,
   isParticipantNotificationType,
 } from './participantHandler';
-import { handlePushActionEvent, isPushActionType } from './pushActions';
+import { describeNotificationEvent, handlePushActionEvent, isPushActionType } from './pushActions';
 
 export async function dispatchNotificationEvent(event: Event): Promise<void> {
   const type = event.detail.notification?.data?.notification_type;
+  perfLog('notif_dispatch', {
+    ...describeNotificationEvent(event),
+    route: isPushActionType(type)
+      ? 'push_action'
+      : isParticipantNotificationType(type)
+        ? 'participant'
+        : isEventNotificationType(type)
+          ? 'event'
+          : 'none',
+  });
   if (isPushActionType(type)) {
     await handlePushActionEvent(event);
   } else if (isParticipantNotificationType(type)) {
