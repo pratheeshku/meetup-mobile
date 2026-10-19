@@ -52,12 +52,12 @@ New/updated and PASSING in the run below:
 - UserSearchPicker.test.tsx: added selection-mode tests and updated row assertions. It passes on the final commit (see verification below); a first-run failure (`shows the display name first...`) was fixed by pointing it at `user-search-row-body`.
 
 ## Verification on the final commit vs its parent (run once each)
-Final = 09af54f (code identical to the commit that carries this report). Parent = 5365484, run in a separate git worktree (`git worktree add <dir> 09af54f^`, node_modules symlinked to the main checkout). Same machine, Node v22.22.0, `npx jest` once per tree. Full raw logs are committed next to this report: `ui-mobile-logs/jest-final-09af54f.txt`, `ui-mobile-logs/jest-parent-5365484.txt`, `ui-mobile-logs/lint-final-09af54f.txt`, `ui-mobile-logs/lint-parent-5365484.txt` (jest logs are ~0.5 MB each, so only the summary and the suite lines are pasted here).
+Final = 09af54f (code identical to the commit that carries this report). Parent = 5365484, run in a separate git worktree (`git worktree add <dir> 09af54f^`, node_modules symlinked to the main checkout). Same machine, Node v22.22.0, `npx jest` once per tree. The full raw logs (jest ~0.5 MB each, plus the two lint logs) were removed after review; only the summary and the suite lines are pasted here.
 
 ### 1. UserSearchPicker on the final commit
 ```
 PASS src/components/__tests__/UserSearchPicker.test.tsx
-(raw line 4492 of ui-mobile-logs/jest-final-09af54f.txt)
+(raw line 4492 of the jest log for 09af54f; the log was removed after review)
 ```
 
 ### 2. Raw jest summary, both trees
