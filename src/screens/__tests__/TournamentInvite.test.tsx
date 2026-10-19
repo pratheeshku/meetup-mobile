@@ -115,8 +115,8 @@ describe('endpoints and payloads', () => {
     const root = await mountTournament({ my_invite_access: 'full' });
     mockPost.mockResolvedValue({ data: [{ id: 'i-1', status: 'pending' }] }); // one new invitation per group
     await press(root, 'Invite Group');
-    await press(root, 'Sunday Footballers');
-    await press(root, 'Office League');
+    await press(root, 'Invite Sunday Footballers');
+    await press(root, 'Invite Office League');
     await press(root, 'Send Group Invite');
 
     const calls = mockPost.mock.calls.filter(c => c[0] === '/tournaments/t-1/invite-group');
@@ -143,7 +143,7 @@ describe('endpoints and payloads', () => {
     const root = await mountTournament({ my_invite_access: 'full' });
     mockPost.mockResolvedValue({ data: [] });
     await press(root, 'Invite Group');
-    await press(root, 'Sunday Footballers');
+    await press(root, 'Invite Sunday Footballers');
     await press(root, 'Send Group Invite');
     expect(has(root, 'Everyone in that group is already invited.')).toBe(true);
   });
@@ -207,7 +207,7 @@ describe('errors', () => {
     const root = await mountTournament({ my_invite_access: 'full' });
     mockPost.mockRejectedValueOnce(httpError(404, 'Not Found'));
     await press(root, 'Invite Group');
-    await press(root, 'Sunday Footballers');
+    await press(root, 'Invite Sunday Footballers');
     await press(root, 'Send Group Invite');
     expect(has(root, 'Invite Group')).toBe(false);
     expect(has(root, 'Share app link')).toBe(true);

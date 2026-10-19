@@ -40,12 +40,12 @@ import {
   LinkIcon,
   PencilLineIcon,
   PersonMinusIcon,
-  PersonPlusIcon,
   ShieldMinusIcon,
   ShieldPlusIcon,
 } from '../components/icons/GroupViewIcons';
 import DeleteGroupSheet from '../components/groups/DeleteGroupSheet';
 import MemberActionCard, { type MemberAction } from '../components/groups/MemberActionCard';
+import { AddEntryButton } from '../components/AddRemoveControl';
 import UndoAddButton from '../components/groups/UndoAddButton';
 import UserAvatar from '../components/UserAvatar';
 import Button from '../components/Button';
@@ -193,9 +193,13 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
   };
 
   // Same calls as before (`POST /groups/{id}/members`, `POST /groups/invitations`); each "+" tap
-  // sends that one invite, as on the group-create invite step.
+  // sends that one invite, as on the group-create invite step. The promise rejects on failure so
+  // the shared "+" control returns to "+" with the error label (AD-19); it resolves only once the
+  // server confirmed.
   const handleAddUser = async (invitee: UserSearchResult): Promise<void> => {
-    if (inviteInFlight.current) return;
+    if (inviteInFlight.current) {
+      throw new Error('invite busy');
+    }
     inviteInFlight.current = true;
     setInviteError(null);
     try {
@@ -206,8 +210,6 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         current.some(item => item.id === invitee.id) ? current : [...current, invitee],
       );
       loadGroup(true);
-    } catch {
-      setInviteError(tRef.current('mob.group_detail.invite_error'));
     } finally {
       inviteInFlight.current = false;
     }
@@ -236,8 +238,11 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
   };
 
   const handleAddEmail = async (email: string): Promise<void> => {
-    if (inviteInFlight.current || addedEmails.some(item => item.toLowerCase() === email.toLowerCase())) {
+    if (addedEmails.some(item => item.toLowerCase() === email.toLowerCase())) {
       return;
+    }
+    if (inviteInFlight.current) {
+      throw new Error('invite busy');
     }
     inviteInFlight.current = true;
     setInviteError(null);
@@ -246,8 +251,6 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         await createGroupInvitation(groupId, { invitedEmail: email, correlationId });
       });
       setAddedEmails(current => [...current, email]);
-    } catch {
-      setInviteError(tRef.current('mob.group_detail.invite_error'));
     } finally {
       inviteInFlight.current = false;
     }
@@ -605,15 +608,11 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
               <Text style={styles.plusSquareText}>+</Text>
             </Pressable>
           ) : (
-            <Pressable
+            <AddEntryButton
+              label={t('mob.group_detail.invite')}
               onPress={handleOpenInvite}
-              style={({ pressed }) => [styles.inviteButton, pressed ? styles.pressed : null]}
-              accessibilityRole="button"
-              accessibilityLabel={t('mob.group_detail.invite')}
-            >
-              <PersonPlusIcon size={22} color={colors.white} />
-              <Text style={styles.inviteButtonText}>{t('mob.group_detail.invite')}</Text>
-            </Pressable>
+              testID="group-invite-entry"
+            />
           )}
         </View>
       ) : null}
@@ -622,6 +621,7 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         <View style={styles.invitePanel}>
           <UserSearchPicker
             variant="invite"
+            selectionMode="immediate"
             onSelect={handleAddUser}
             onSelectEmail={handleAddEmail}
             excludeGroupId={groupId}
@@ -830,16 +830,6 @@ const styles = StyleSheet.create({
     color: groupView.blue,
     marginLeft: spacing.sm,
   },
-  inviteButton: {
-    flex: 1,
-    height: BUTTON_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    backgroundColor: groupView.blue,
-  },
-  inviteButtonText: { ...typography.button, color: colors.white, marginLeft: spacing.sm },
   plusSquare: {
     width: BUTTON_HEIGHT,
     height: BUTTON_HEIGHT,

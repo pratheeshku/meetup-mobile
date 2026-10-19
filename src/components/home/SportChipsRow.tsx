@@ -10,7 +10,8 @@
  * the row scrolls horizontally.
  *
  * Chips are buttons with a pressed state; a selected chip has a 2px brand
- * ring.
+ * ring and its sport tint in a rounded tile; an unselected chip is a full
+ * circle in the neutral idle grey.
  */
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -56,7 +57,7 @@ function Chip({
         testID={selected ? 'sport-chip-ring' : undefined}
         style={[
           styles.tile,
-          { backgroundColor: tileColor },
+          selected ? { backgroundColor: tileColor } : null,
           selected ? styles.tileSelected : styles.tileIdle,
         ]}
       >
@@ -136,7 +137,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tileIdle: { borderWidth: dashSize.chipRing, borderColor: 'transparent' },
+  tileIdle: {
+    borderWidth: dashSize.chipRing,
+    borderColor: 'transparent',
+    borderRadius: dashSize.sportTile / 2,
+    backgroundColor: sportTileColors.idle,
+  },
   tileSelected: { borderWidth: dashSize.chipRing, borderColor: dash.brand },
   label: {
     fontSize: dashSize.sportLabel,

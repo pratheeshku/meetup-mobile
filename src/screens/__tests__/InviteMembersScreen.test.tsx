@@ -166,13 +166,14 @@ it('inviting the same email in a different case makes only one call', async () =
   expect(texts(root)).toContain('1 added');
 });
 
-it('a failed invite shows the existing error and adds nobody', async () => {
+it('a failed invite returns the row to "+" with the error label and adds nobody', async () => {
   mockInviteEmail.mockRejectedValueOnce(new Error('boom'));
   const root = await mount();
   await type(root, 'x@example.com');
   await tap(emailBtn(root, 'x@example.com') as Instance);
-  expect(texts(root)).toContain('Could not add this person to the group. Please try again.');
+  expect(texts(root)).toContain('Could not send the invitation. Try again.');
   expect(texts(root)).not.toContain('1 added');
+  expect(emailBtn(root, 'x@example.com')).toBeDefined(); // still "+", can be retried
 });
 
 it('finishing reports members and invited emails together', async () => {
