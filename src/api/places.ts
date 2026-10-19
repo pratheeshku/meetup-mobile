@@ -1,3 +1,38 @@
+import axios from 'axios';
+import uuid from 'react-native-uuid';
+import { describeError } from '../utils/logSafeError';
+import { isNetworkError } from '../utils/networkError';
+
+const PLACES_BASE_URL = 'https://places.googleapis.com/v1';
+const PLACES_TIMEOUT_MS = 10000;
+
+// One Places session = autocomplete requests followed by one details call.
+// Screens do not pass a token, so it is held here and rotated after details.
+let activeSessionToken: string | null = null;
+
+function newSessionToken(): string {
+  return uuid.v4() as string;
+}
+
+function currentSessionToken(explicit?: string): string {
+  if (explicit) {
+    return explicit;
+  }
+  if (!activeSessionToken) {
+    activeSessionToken = newSessionToken();
+  }
+  return activeSessionToken;
+}
+
+// Never log the key, the URL, the input text or the error object (R-111).
+function logPlacesFailure(op: string, error: unknown): void {
+  console.warn(
+    `[places] ${op} failed: ${
+      isNetworkError(error) ? 'network' : describeError(error)
+    }`,
+  );
+}
+
 export interface PlacePrediction {
   place_id: string;
   description: string;
@@ -14,25 +49,39 @@ export async function fetchPlacePredictions(
     return [];
   }
   try {
-    const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
-    url.searchParams.append('input', query.trim());
-    url.searchParams.append('key', apiKey);
-    if (sessionToken) {
-      url.searchParams.append('sessiontoken', sessionToken);
+    const response = await axios.post(
+      `${PLACES_BASE_URL}/places:autocomplete`,
+      {
+        input: query.trim(),
+        includedRegionCodes: ['sg'],
+        sessionToken: currentSessionToken(sessionToken),
+      },
+      {
+        headers: {
+          'X-Goog-Api-Key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        timeout: PLACES_TIMEOUT_MS,
+      },
+    );
+    const suggestions = response.data?.suggestions;
+    if (!Array.isArray(suggestions)) {
+      return [];
     }
-
-    const response = await fetch(url.toString());
-    const data = await response.json();
-    if (data.status === 'OK' && Array.isArray(data.predictions)) {
-      return data.predictions.map((p: any) => ({
-        place_id: p.place_id,
-        description: p.description,
-        main_text: p.structured_formatting?.main_text ?? p.description,
-        secondary_text: p.structured_formatting?.secondary_text ?? '',
-      }));
-    }
-    return [];
-  } catch {
+    return suggestions
+      .map((s: any) => s?.placePrediction)
+      .filter((p: any) => p && typeof p.placeId === 'string')
+      .map((p: any) => {
+        const description: string = p.text?.text ?? '';
+        return {
+          place_id: p.placeId,
+          description,
+          main_text: p.structuredFormat?.mainText?.text ?? description,
+          secondary_text: p.structuredFormat?.secondaryText?.text ?? '',
+        };
+      });
+  } catch (error) {
+    logPlacesFailure('autocomplete', error);
     return [];
   }
 }
@@ -54,29 +103,34 @@ export async function fetchPlaceDetails(
     return null;
   }
   try {
-    const url = new URL('https://maps.googleapis.com/maps/api/place/details/json');
-    url.searchParams.append('place_id', placeId);
-    url.searchParams.append('fields', 'geometry,formatted_address,name');
-    url.searchParams.append('key', apiKey);
-    if (sessionToken) {
-      url.searchParams.append('sessiontoken', sessionToken);
+    const response = await axios.get(
+      `${PLACES_BASE_URL}/places/${encodeURIComponent(placeId)}`,
+      {
+        headers: {
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
+        },
+        params: { sessionToken: currentSessionToken(sessionToken) },
+        timeout: PLACES_TIMEOUT_MS,
+      },
+    );
+    const result = response.data;
+    if (!result) {
+      return null;
     }
-
-    const response = await fetch(url.toString());
-    const data = await response.json();
-    if (data.status === 'OK' && data.result) {
-      const { result } = data;
-      return {
-        place_id: placeId,
-        name: result.name ?? '',
-        formatted_address: result.formatted_address ?? '',
-        lat: result.geometry?.location?.lat ?? 0,
-        lng: result.geometry?.location?.lng ?? 0,
-      };
-    }
+    return {
+      place_id: placeId,
+      name: result.displayName?.text ?? '',
+      formatted_address: result.formattedAddress ?? '',
+      lat: result.location?.latitude ?? 0,
+      lng: result.location?.longitude ?? 0,
+    };
+  } catch (error) {
+    logPlacesFailure('details', error);
     return null;
-  } catch {
-    return null;
+  } finally {
+    // The session ends with the details call, success or not.
+    activeSessionToken = null;
   }
 }
 
@@ -99,7 +153,8 @@ export async function reverseGeocodeCoordinates(
       const top = data.results[0];
       return {
         place_id: top.place_id ?? '',
-        name: top.formatted_address?.split(',')[0] ?? top.formatted_address ?? '',
+        name:
+          top.formatted_address?.split(',')[0] ?? top.formatted_address ?? '',
         formatted_address: top.formatted_address ?? '',
         lat: top.geometry?.location?.lat ?? lat,
         lng: top.geometry?.location?.lng ?? lng,
