@@ -45,14 +45,13 @@ import Button from '../components/Button';
 import { iosPickerThemeProps } from '../components/iosPickerTheme';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
+import AddRemoveControl, { AddEntryRow, GroupInviteList } from '../components/AddRemoveControl';
 import GroupMultiSelect from '../components/GroupMultiSelect';
 import GroupNamesRow from '../components/GroupNamesRow';
 import UserAvatar from '../components/UserAvatar';
 import PersonNames from '../components/PersonNames';
 import LoadingView from '../components/LoadingView';
-import OptionChips from '../components/OptionChips';
 import ShareActionSheet from '../components/ShareActionSheet';
-import TextLink from '../components/TextLink';
 import Toast from '../components/Toast';
 import UserSearchPicker from '../components/UserSearchPicker';
 import { useAppShare } from '../hooks/useAppShare';
@@ -76,10 +75,8 @@ import { useSportRecord, useSportVisual } from '../sports/catalog';
 import {
   CalendarIcon,
   ClockIcon,
-  GroupsIcon,
   LinkIcon,
   PeopleIcon,
-  PersonIcon,
   PinIcon,
   TargetIcon,
 } from '../components/icons/SharedIcons';
@@ -1329,47 +1326,16 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           {/* Organiser actions: Invite Group, Invite Individual, Share (restored) */}
           {isOrganiserActionsVisible && !isInviteGroupOpen && !isInviteUserOpen ? (
             <Card style={styles.infoCard}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('mob.game_detail.invite_group')}
+              <AddEntryRow
+                title={t('mob.game_detail.invite_group')}
                 onPress={handleOpenInviteGroup}
-                style={[styles.actionBtn, styles.whiteActionBtn]}
-              >
-                <View style={styles.actionBtnContent}>
-                  <View
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                    aria-hidden={true}
-                    style={styles.actionBtnIcon}
-                  >
-                    <GroupsIcon size={18} />
-                  </View>
-                  <Text style={styles.whiteActionBtnText}>
-                    {stripIconGlyphs(t('mob.game_detail.invite_group'))}
-                  </Text>
-                </View>
-              </Pressable>
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('mob.game_detail.invite_player')}
+                testID="invite-group-entry"
+              />
+              <AddEntryRow
+                title={t('mob.game_detail.invite_player')}
                 onPress={handleOpenInviteUser}
-                style={[styles.actionBtn, styles.whiteActionBtn]}
-              >
-                <View style={styles.actionBtnContent}>
-                  <View
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                    aria-hidden={true}
-                    style={styles.actionBtnIcon}
-                  >
-                    <PersonIcon size={18} />
-                  </View>
-                  <Text style={styles.whiteActionBtnText}>
-                    {stripIconGlyphs(t('mob.game_detail.invite_player'))}
-                  </Text>
-                </View>
-              </Pressable>
+                testID="invite-player-entry"
+              />
 
               <Pressable
                 accessibilityRole="button"
@@ -1404,10 +1370,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               ) : myGroups.length === 0 ? (
                 <Text style={styles.formHint}>{t('mob.create_game.no_groups')}</Text>
               ) : (
-                <OptionChips
-                  options={myGroups.map(g => ({ value: g.id, label: g.name }))}
-                  value={selectedGroupIds}
-                  onChange={handleToggleGroup}
+                <GroupInviteList
+                  groups={myGroups}
+                  selectedIds={selectedGroupIds}
+                  onToggle={handleToggleGroup}
                   disabled={isInviteGroupSubmitting}
                 />
               )}
@@ -1456,9 +1422,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                       />
                     </View>
                   </View>
-                  <TextLink
-                    label={t('mob.common.change')}
-                    onPress={() => setSelectedInviteUser(null)}
+                  <AddRemoveControl
+                    mode="staged"
+                    staged
+                    name={selectedInviteUser.display_name}
+                    onStage={noop}
+                    onUnstage={() => setSelectedInviteUser(null)}
                     disabled={isInviteUserSubmitting}
                   />
                 </View>
@@ -1467,9 +1436,12 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                   <Text style={styles.selectedInviteText}>
                     {t('mob.group_detail.invite_by_email', { email: selectedInviteEmail })}
                   </Text>
-                  <TextLink
-                    label={t('mob.common.change')}
-                    onPress={() => setSelectedInviteEmail(null)}
+                  <AddRemoveControl
+                    mode="staged"
+                    staged
+                    name={selectedInviteEmail}
+                    onStage={noop}
+                    onUnstage={() => setSelectedInviteEmail(null)}
                     disabled={isInviteUserSubmitting}
                   />
                 </View>
@@ -1599,6 +1571,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     </View>
   );
 }
+
+/** A staged selection is already added: its control only offers "−". */
+const noop = (): void => undefined;
 
 const styles = StyleSheet.create({
   screen: {

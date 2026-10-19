@@ -10,7 +10,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  Pressable,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -36,6 +35,7 @@ import { createTournament } from '../api/tournaments';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import Button from '../components/Button';
 import { iosPickerThemeProps } from '../components/iosPickerTheme';
+import AddRemoveControl from '../components/AddRemoveControl';
 import GroupMultiSelect from '../components/GroupMultiSelect';
 import GroupNamesRow from '../components/GroupNamesRow';
 import DropdownField from '../components/DropdownField';
@@ -1068,14 +1068,13 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
                     <View style={styles.inviteeNames}>
                       <PersonNames displayName={person.display_name} nickname={person.nickname} />
                     </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t('mob.create_game.invitee_remove_a11y', { name: person.display_name })}
-                      onPress={() => removeInvitedPlayer(person.id)}
-                      style={styles.inviteeRemove}
-                    >
-                      <CrossIcon size={14} color={colors.textSecondary} />
-                    </Pressable>
+                    <AddRemoveControl
+                      mode="staged"
+                      staged
+                      name={person.display_name}
+                      onStage={noop}
+                      onUnstage={() => removeInvitedPlayer(person.id)}
+                    />
                   </View>
                 );
               })}
@@ -1091,14 +1090,13 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
                     <Text style={styles.inviteeName} numberOfLines={1}>
                       {email}
                     </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t('mob.create_game.invitee_remove_a11y', { name: email })}
-                      onPress={() => removeInvitedEmail(email)}
-                      style={styles.inviteeRemove}
-                    >
-                      <CrossIcon size={14} color={colors.textSecondary} />
-                    </Pressable>
+                    <AddRemoveControl
+                      mode="staged"
+                      staged
+                      name={email}
+                      onStage={noop}
+                      onUnstage={() => removeInvitedEmail(email)}
+                    />
                   </View>
                 );
               })}
@@ -1246,6 +1244,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     </View>
   );
 }
+
+/** A staged invitee is already added: its control only offers "−". */
+const noop = (): void => undefined;
 
 const styles = StyleSheet.create({
   screen: {
@@ -1430,12 +1431,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginHorizontal: spacing.sm,
     flexShrink: 1,
-  },
-  inviteeRemove: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   searchInput: {
     flex: 1,

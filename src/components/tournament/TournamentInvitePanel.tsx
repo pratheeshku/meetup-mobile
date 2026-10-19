@@ -31,12 +31,11 @@ import type { TournamentInviteAccess } from '../../types/tournament';
 import type { UserSearchResult } from '../../types/user';
 import { isInvitesClosed, readTournamentInviteError } from '../../utils/tournamentInviteError';
 import { stripIconGlyphs } from '../../utils/labels';
+import AddRemoveControl, { AddEntryRow, GroupInviteList } from '../AddRemoveControl';
 import Button from '../Button';
 import Card from '../Card';
-import { GroupsIcon, LinkIcon, PersonIcon } from '../icons/SharedIcons';
-import OptionChips from '../OptionChips';
+import { LinkIcon } from '../icons/SharedIcons';
 import ShareActionSheet from '../ShareActionSheet';
-import TextLink from '../TextLink';
 import Toast from '../Toast';
 import PersonNames from '../PersonNames';
 import UserAvatar from '../UserAvatar';
@@ -194,17 +193,17 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
       {showButtons ? (
         <Card style={styles.card}>
           {canInviteGroup ? (
-            <ActionButton
-              label={t('mob.game_detail.invite_group')}
-              icon={<GroupsIcon size={18} />}
+            <AddEntryRow
+              title={t('mob.game_detail.invite_group')}
               onPress={openGroup}
+              testID="invite-group-entry"
             />
           ) : null}
           {canInviteUser ? (
-            <ActionButton
-              label={t('mob.game_detail.invite_player')}
-              icon={<PersonIcon size={18} />}
+            <AddEntryRow
+              title={t('mob.game_detail.invite_player')}
               onPress={openUser}
+              testID="invite-player-entry"
             />
           ) : null}
           <ActionButton
@@ -225,10 +224,10 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
           ) : myGroups.length === 0 ? (
             <Text style={styles.formHint}>{t('mob.create_game.no_groups')}</Text>
           ) : (
-            <OptionChips
-              options={myGroups.map(g => ({ value: g.id, label: g.name }))}
-              value={selectedGroupIds}
-              onChange={toggleGroup}
+            <GroupInviteList
+              groups={myGroups}
+              selectedIds={selectedGroupIds}
+              onToggle={toggleGroup}
               disabled={groupSubmitting}
             />
           )}
@@ -271,9 +270,12 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
                   <PersonNames displayName={pickedUser.display_name} nickname={pickedUser.nickname} />
                 </View>
               </View>
-              <TextLink
-                label={t('mob.common.change')}
-                onPress={() => setPickedUser(null)}
+              <AddRemoveControl
+                mode="staged"
+                staged
+                name={pickedUser.display_name}
+                onStage={noop}
+                onUnstage={() => setPickedUser(null)}
                 disabled={userSubmitting}
               />
             </View>
@@ -282,9 +284,12 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
               <Text style={styles.selectedText}>
                 {t('mob.group_detail.invite_by_email', { email: pickedEmail })}
               </Text>
-              <TextLink
-                label={t('mob.common.change')}
-                onPress={() => setPickedEmail(null)}
+              <AddRemoveControl
+                mode="staged"
+                staged
+                name={pickedEmail}
+                onStage={noop}
+                onUnstage={() => setPickedEmail(null)}
                 disabled={userSubmitting}
               />
             </View>
@@ -363,6 +368,9 @@ function ActionButton({
     </Pressable>
   );
 }
+
+/** A staged selection is already added: its control only offers "−". */
+const noop = (): void => undefined;
 
 const styles = StyleSheet.create({
   card: { marginBottom: spacing.md },

@@ -81,6 +81,10 @@ const searchInput = (root: Instance): Instance =>
 const searchRows = (root: Instance): Instance[] =>
   root.findAll(node => node.props.testID === 'user-search-row' && typeof node.props.onPress === 'function');
 
+/** The whole result row (names and the "+" control), for text assertions. */
+const rowBodies = (root: Instance): Instance[] =>
+  root.findAll(node => typeof node.type === 'string' && node.props.testID === 'user-search-row-body');
+
 const undoButtons = (root: Instance): Instance[] =>
   root.findAll(node => node.props.testID === 'undo-add-button' && typeof node.props.onPress === 'function');
 
@@ -139,7 +143,7 @@ describe('invite panel', () => {
     const root = await mount();
     await openInvite(root);
     await search(root, 'alex');
-    const t = texts(searchRows(root)[0]);
+    const t = texts(rowBodies(root)[0]);
     expect(t.indexOf('Alex Chan')).toBeGreaterThanOrEqual(0);
     expect(t.indexOf('Alex Chan')).toBeLessThan(t.indexOf('alexc'));
   });
@@ -172,7 +176,7 @@ describe('invite panel', () => {
     expect(undoButtons(root)).toHaveLength(0);
     expect(mockGetGroup.mock.calls.length).toBeGreaterThan(groupLoads); // group refreshed
     expect(searchRows(root)).toHaveLength(1);
-    expect(texts(searchRows(root)[0])).toContain('Alex Chan');
+    expect(texts(rowBodies(root)[0])).toContain('Alex Chan');
   });
 
   it('a failed undo keeps the row and shows an inline error', async () => {
@@ -225,7 +229,8 @@ describe('share link', () => {
   it('shows Share link and Invite to the owner', async () => {
     const root = await mount();
     expect(pressableWithText(root, 'Share link')).toBeDefined();
-    expect(pressableWithText(root, 'Invite')).toBeDefined();
+    // Entry is the shared "+" (AD-19): icon only, accessible name keeps the word Invite.
+    expect(pressableLabelled(root, 'Invite')).toBeDefined();
   });
 
   it('shows neither to a regular group member', async () => {

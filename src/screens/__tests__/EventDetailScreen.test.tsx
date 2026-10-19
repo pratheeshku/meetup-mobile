@@ -686,7 +686,7 @@ describe('BUILD 3: Group Invite Flow', () => {
 
     // Select Badminton Club
     await act(async () => {
-      pressableLabelled(root, 'Badminton Club').props.onPress();
+      pressableLabelled(root, 'Invite Badminton Club').props.onPress();
     });
 
     await act(async () => {
@@ -730,7 +730,7 @@ describe('BUILD 3: Group Invite Flow', () => {
     });
 
     await act(async () => {
-      pressableLabelled(root, 'Badminton Club').props.onPress();
+      pressableLabelled(root, 'Invite Badminton Club').props.onPress();
     });
 
     await act(async () => {
@@ -771,10 +771,10 @@ describe('BUILD 3: Group Invite Flow', () => {
 
     // Select both groups
     await act(async () => {
-      pressableLabelled(root, 'Badminton Club').props.onPress();
+      pressableLabelled(root, 'Invite Badminton Club').props.onPress();
     });
     await act(async () => {
-      pressableLabelled(root, 'Weekend Runners').props.onPress();
+      pressableLabelled(root, 'Invite Weekend Runners').props.onPress();
     });
 
     await act(async () => {
@@ -815,7 +815,8 @@ describe('BUILD C: Individual Invite Flow', () => {
     });
 
     expect(has(root, 'alex (Alex C)')).toBe(true);
-    expect(has(root, 'Change')).toBe(true);
+    // The staged person shows the shared "−" (remove), not a Change link.
+    expect(pressableLabelled(root, 'Remove Alex C')).toBeDefined();
 
     // Send Invite
     await act(async () => {
@@ -905,7 +906,8 @@ describe('BUILD C: Individual Invite Flow', () => {
     });
 
     expect(has(root, 'Invite by email: newcomer@example.com')).toBe(true);
-    expect(has(root, 'Change')).toBe(true);
+    // The staged person shows the shared "−" (remove), not a Change link.
+    expect(pressableLabelled(root, 'Remove Alex C')).toBeDefined();
 
     // Send Invite
     await act(async () => {

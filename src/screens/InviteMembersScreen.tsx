@@ -56,8 +56,12 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
 
   // One search field: a name adds that person; a valid email that matches nobody
   // is invited by email (same `POST /groups/invitations` call as Group Detail).
+  // Both handlers REJECT on failure so the shared "+" control returns to "+" with the error
+  // label; they resolve only once the server confirmed (AD-19).
   const handleAdd = async (user: UserSearchResult): Promise<void> => {
-    if (inFlight.current) return;
+    if (inFlight.current) {
+      throw new Error('invite busy');
+    }
     inFlight.current = true;
     setError(null);
     try {
@@ -67,8 +71,6 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
       setAdded(current =>
         current.some(item => item.id === user.id) ? current : [...current, user],
       );
-    } catch {
-      setError(t('mob.invite.add_error'));
     } finally {
       inFlight.current = false;
     }
@@ -97,7 +99,10 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
 
   const handleAddEmail = async (email: string): Promise<void> => {
     const next = addInviteEmail(addedEmails, email);
-    if (!next.ok || inFlight.current) return; // already invited (case-insensitive) or busy
+    if (!next.ok) return; // already invited (case-insensitive)
+    if (inFlight.current) {
+      throw new Error('invite busy');
+    }
     inFlight.current = true;
     setError(null);
     try {
@@ -105,8 +110,6 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
         createGroupInvitation(groupId, { invitedEmail: email, correlationId }),
       );
       setAddedEmails(next.emails);
-    } catch {
-      setError(t('mob.invite.add_error'));
     } finally {
       inFlight.current = false;
     }
@@ -207,6 +210,7 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
         contentContainerStyle={styles.content}
       >
         <UserSearchPicker
+          selectionMode="immediate"
           onSelect={handleAdd}
           onSelectEmail={handleAddEmail}
           excludeGroupId={groupId}

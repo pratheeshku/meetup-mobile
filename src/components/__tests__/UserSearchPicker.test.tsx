@@ -10,6 +10,7 @@ import { searchUsers } from '../../api/users';
 import { act, render, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import type { UserSearchResult } from '../../types/user';
+import { MinusIcon, PlusIcon } from '../icons/ActionIcons';
 import UserSearchPicker from '../UserSearchPicker';
 
 jest.mock('../../api/users', () => ({ searchUsers: jest.fn() }));
@@ -141,10 +142,11 @@ describe('results', () => {
     type(root, 'sam');
     await settle();
 
-    const row = root.find(
-      node => node.props.accessibilityRole === 'button' && node.props.accessibilityLabel === 'Sam Smith, sam99',
+    // The shared "+" control is the row's action; its name comes from the label system.
+    const control = root.find(
+      node => node.props.accessibilityRole === 'button' && node.props.accessibilityLabel === 'Invite Sam Smith',
     );
-    act(() => row.props.onPress());
+    act(() => control.props.onPress());
 
     expect(onSelect).toHaveBeenCalledWith(USER);
     expect(searchInput(root).props.value).toBe('');
@@ -157,7 +159,7 @@ describe('results', () => {
     type(root, 'sam');
     await settle();
 
-    const row = root.find(node => node.props.testID === 'user-search-row' && typeof node.props.onPress === 'function');
+    const row = root.find(node => typeof node.type === 'string' && node.props.testID === 'user-search-row-body');
     const t = texts(row);
     expect(t.indexOf('Sam Smith')).toBeLessThan(t.indexOf('sam99'));
     const nameNode = row.find(n => (n.type as unknown) === 'Text' && n.props.children === 'Sam Smith');
@@ -179,7 +181,7 @@ describe('results', () => {
     const t = texts(root);
     expect(t).toContain('Suggested players');
     expect(t).toContain('Other players');
-    expect(t.filter(x => x === '+')).toHaveLength(2);
+    expect(root.findAll(n => n.type === PlusIcon)).toHaveLength(2);
     expect(t).not.toContain('Invite');
   });
 
@@ -192,14 +194,66 @@ describe('results', () => {
     await settle();
 
     expect(texts(root)).toContain('Pending');
-    const row = root.find(
-      node =>
-        node.props.accessibilityRole === 'button' &&
-        node.props.accessibilityLabel === 'Sam Smith, sam99, already invited',
-    );
-    expect(row.props.accessibilityState).toEqual({ disabled: true, busy: false });
-    act(() => row.props.onPress());
+    // No "+" for a pending match: the status text stands in, and nothing can be selected.
+    expect(root.findAll(node => node.props.testID === 'user-search-row')).toHaveLength(0);
+    expect(root.findAll(n => n.type === PlusIcon)).toHaveLength(0);
+    expect(
+      root.findAll(node => node.props.accessibilityLabel === 'Sam Smith, sam99, already invited').length,
+    ).toBeGreaterThan(0);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe('selection modes (AD-19)', () => {
+  const control = (root: ReturnType<typeof render>) =>
+    root.find(node => node.props.testID === 'user-search-row' && typeof node.props.onPress === 'function');
+
+  it('staged: a staged person shows "−" and removing calls onUnstage without selecting', async () => {
+    mockSearchUsers.mockResolvedValue([USER]);
+    const onSelect = jest.fn();
+    const onUnstage = jest.fn();
+    const root = render(<UserSearchPicker onSelect={onSelect} stagedUserIds={['u-1']} onUnstage={onUnstage} />);
+    type(root, 'sam');
+    await settle();
+    expect(root.findAll(n => n.type === MinusIcon)).toHaveLength(1);
+    expect(root.findAll(n => n.type === PlusIcon)).toHaveLength(0);
+    act(() => control(root).props.onPress());
+    expect(onUnstage).toHaveBeenCalledWith(USER);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('immediate: the chip appears only after onSelect resolves, and a double tap selects once', async () => {
+    mockSearchUsers.mockResolvedValue([USER]);
+    let resolveSend!: () => void;
+    const onSelect = jest.fn(() => new Promise<void>(resolve => (resolveSend = resolve)));
+    const root = render(<UserSearchPicker onSelect={onSelect} selectionMode="immediate" />);
+    type(root, 'sam');
+    await settle();
+    const press = control(root);
+    act(() => {
+      press.props.onPress();
+      press.props.onPress();
+    });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(texts(root)).not.toContain('Invited');
+    await act(async () => {
+      resolveSend();
+    });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('immediate: a failed send leaves the row on "+" with the error label', async () => {
+    mockSearchUsers.mockResolvedValue([USER]);
+    const onSelect = jest.fn().mockRejectedValue(new Error('boom'));
+    const root = render(<UserSearchPicker onSelect={onSelect} selectionMode="immediate" />);
+    type(root, 'sam');
+    await settle();
+    await act(async () => {
+      control(root).props.onPress();
+    });
+    expect(root.findAll(n => n.type === PlusIcon)).toHaveLength(1);
+    expect(texts(root)).toContain('Could not send the invitation. Try again.');
+    expect(texts(root)).not.toContain('Invited');
   });
 });
 

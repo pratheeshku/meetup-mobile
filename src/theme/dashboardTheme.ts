@@ -34,6 +34,12 @@ export const dash = {
 /** "All sports" chip fill. Per-sport fills come from the sports API colour. */
 export const sportTileColors = {
   all: '#F1F5F9',
+  /**
+   * Unselected chip circle (all chips, including "All"). Lightest grey that
+   * gives the sport icons their best contrast (WCAG 1.4.11); four glyphs
+   * stay below 3:1 as a documented exception (docs/reports/ui-mobile-report.md).
+   */
+  idle: '#E6EAF0',
 } as const;
 
 export const dashRadius = {

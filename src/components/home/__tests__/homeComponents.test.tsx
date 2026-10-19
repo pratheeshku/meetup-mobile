@@ -11,7 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { makeEvent } from '../../../test-utils/makeEvent';
 import { act, pressableLabelled, pressables, render, texts } from '../../../test-utils/render';
 import type { Instance } from '../../../test-utils/render';
-import { brandBlock, dash, dashRadius, dashSize } from '../../../theme/dashboardTheme';
+import { brandBlock, dash, dashRadius, dashSize, sportTileColors } from '../../../theme/dashboardTheme';
 import { invalidateSportsCatalog, primeSportsCatalogForTests } from '../../../sports/catalog';
 import type { Group } from '../../../types/group';
 import { FootballIcon, GroupsIcon, SportIcon } from '../../icons/DashboardIcons';
@@ -281,6 +281,49 @@ describe('SportChipsRow', () => {
     const rings = hostsByTestId(root, 'sport-chip-ring');
     expect(rings).toHaveLength(1);
     expect(flat(rings[0])).toMatchObject({ borderWidth: 2, borderColor: dash.brand });
+  });
+
+  it('draws an unselected chip (including All) as a full 60px circle in the idle grey, keeping the transparent 2px border', () => {
+    const root = render(
+      <SportChipsRow options={options} selected={['badminton']} onToggle={jest.fn()} />,
+    );
+    const tileOf = (label: string): Instance => {
+      const button = pressableLabelled(root, label);
+      return button.findAll(
+        node => typeof node.type === 'string' && node.props.style && flat(node).width === dashSize.sportTile,
+      )[0];
+    };
+    for (const label of ['All', 'Curling']) {
+      expect(flat(tileOf(label))).toMatchObject({
+        width: 60,
+        height: 60,
+        borderRadius: dashSize.sportTile / 2,
+        backgroundColor: sportTileColors.idle,
+        borderWidth: 2,
+        borderColor: 'transparent',
+      });
+    }
+    expect(sportTileColors.idle).toBe('#E6EAF0');
+  });
+
+  it('leaves the selected chip as before: rounded tile, sport tint, brand ring', () => {
+    const root = render(
+      <SportChipsRow options={options} selected={['badminton']} onToggle={jest.fn()} />,
+    );
+    const ring = hostsByTestId(root, 'sport-chip-ring')[0];
+    expect(flat(ring)).toMatchObject({
+      borderRadius: dashRadius.sportTile,
+      borderColor: dash.brand,
+      borderWidth: 2,
+    });
+    expect(flat(ring).backgroundColor).not.toBe(sportTileColors.idle);
+  });
+
+  it('keeps the pressed opacity and a 44pt minimum touch target on every chip', () => {
+    const root = render(<SportChipsRow options={options} selected={[]} onToggle={jest.fn()} />);
+    const button = pressableLabelled(root, 'Curling');
+    expect(button.props.style({ pressed: true })).toContainEqual({ opacity: 0.7 });
+    expect(flat(button).minHeight).toBeGreaterThanOrEqual(44);
   });
 
   it('reports taps: sport key for a chip, null for All', () => {

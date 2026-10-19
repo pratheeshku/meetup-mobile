@@ -19,13 +19,14 @@
  * group names and search text are never logged.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { withCorrelationId } from '../api/correlationId';
 import { searchUsers } from '../api/users';
 import { borderWidth, colors, groupView, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { UserSearchResult } from '../types/user';
 import { SearchIcon } from './icons/ActionIcons';
+import AddRemoveControl from './AddRemoveControl';
 import PersonNames from './PersonNames';
 import TextField from './TextField';
 import UserAvatar from './UserAvatar';
@@ -35,14 +36,14 @@ import { useT } from '../labels/LabelsContext';
 const DEBOUNCE_MS = 300;
 const AVATAR_SIZE = 40;
 const INVITE_AVATAR_SIZE = 44;
-const PLUS_SIZE = 36;
 const DOT_SIZE = 10;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * `classic`: the original boxed list with an "Invite" pill per row.
+ * `classic`: the original boxed list.
  * `invite`: the WhatsApp-style Group invite list (docs/mockups/group-view/3-invite-search.png):
- * rounded search box, uppercase section headings, a "+" button per row.
+ * rounded search box, uppercase section headings.
+ * Both draw the shared "+" / "−" control (AddRemoveControl, AD-19) per row.
  */
 export type UserSearchVariant = 'classic' | 'invite';
 
@@ -56,7 +57,7 @@ const HEADING_KEYS: Record<SuggestionContext, LabelKey> = {
 
 interface UserSearchPickerProps {
   onSelect: (user: UserSearchResult) => void | Promise<void>;
-  onSelectEmail?: (email: string) => void;
+  onSelectEmail?: (email: string) => void | Promise<void>;
   entityLabel?: string;
   excludeGroupId?: string;
   excludeEventId?: string;
@@ -71,6 +72,17 @@ interface UserSearchPickerProps {
   /** Optional content rendered directly under the text field, above the results (e.g. who was added). */
   belowInput?: React.ReactNode;
   variant?: UserSearchVariant;
+  /**
+   * `staged` (default): the host screen has a submit step. "+" calls `onSelect`
+   * to stage the person; a staged person (`stagedUserIds`) shows "−", which
+   * calls `onUnstage`. `immediate`: the host has no submit step. "+" calls
+   * `onSelect`, which must RESOLVE only when the server confirmed and REJECT
+   * on failure; the row then shows the status chip or returns to "+" with the
+   * error label.
+   */
+  selectionMode?: 'staged' | 'immediate';
+  stagedUserIds?: string[];
+  onUnstage?: (user: UserSearchResult) => void;
 }
 
 export default function UserSearchPicker({
@@ -87,6 +99,9 @@ export default function UserSearchPicker({
   refreshToken = 0,
   belowInput,
   variant = 'classic',
+  selectionMode = 'staged',
+  stagedUserIds,
+  onUnstage,
 }: UserSearchPickerProps): React.JSX.Element {
   const t = useT();
   const tRef = useRef(t);
@@ -199,11 +214,35 @@ export default function UserSearchPicker({
     resetAfterPick();
   };
 
+  /** Immediate mode: the list is reset only after the server confirmed. */
+  const sendImmediate = async (user: UserSearchResult): Promise<void> => {
+    if (user.pending || selecting.current || disabled) {
+      return;
+    }
+    selecting.current = true;
+    setBusyId(user.id);
+    try {
+      await onSelect(user);
+    } finally {
+      selecting.current = false;
+      setBusyId(null);
+    }
+    resetAfterPick();
+  };
+
   const handleSelectEmail = (email: string): void => {
     if (!onSelectEmail) {
       return;
     }
     onSelectEmail(email);
+    resetAfterPick();
+  };
+
+  const sendEmailImmediate = async (email: string): Promise<void> => {
+    if (!onSelectEmail) {
+      return;
+    }
+    await onSelectEmail(email);
     resetAfterPick();
   };
 
@@ -228,6 +267,7 @@ export default function UserSearchPicker({
   const otherRows = sectioned ? visibleResults.filter(user => !user.in_my_groups) : visibleResults;
 
   const isInvite = variant === 'invite';
+  const emailLabel = t('mob.user_search.invite_email_a11y', { email: trimmed, entity });
 
   const renderRow = (user: UserSearchResult, inGroup: boolean): React.JSX.Element => {
     const count = user.shared_group_count ?? 0;
@@ -248,24 +288,42 @@ export default function UserSearchPicker({
           })
         : t('mob.user_search.result_a11y', { nickname: user.nickname, name: user.display_name });
     const locked = user.pending || busyId !== null || disabled;
+    const immediate = selectionMode === 'immediate';
+    const control = user.pending ? (
+      <Text style={styles.pendingLabel}>{t('mob.user_search.pending')}</Text>
+    ) : immediate ? (
+      <AddRemoveControl
+        mode="immediate"
+        name={user.display_name}
+        onSend={() => sendImmediate(user)}
+        disabled={locked}
+        testID="user-search-row"
+      />
+    ) : busyId === user.id ? (
+      <ActivityIndicator size="small" color={colors.primary} />
+    ) : (
+      <AddRemoveControl
+        mode="staged"
+        name={user.display_name}
+        staged={stagedUserIds?.includes(user.id) ?? false}
+        onStage={() => handleSelect(user)}
+        onUnstage={() => onUnstage?.(user)}
+        disabled={locked}
+        testID="user-search-row"
+      />
+    );
     return (
-      <Pressable
+      <View
         key={user.id}
-        style={({ pressed }) => [
+        testID="user-search-row-body"
+        style={[
           styles.resultRow,
           isInvite ? styles.resultRowInvite : null,
           inGroup && !isInvite ? styles.resultRowGroup : null,
           user.pending ? styles.resultRowDisabled : null,
-          pressed && !locked ? styles.resultRowPressed : null,
         ]}
-        onPress={() => handleSelect(user)}
-        disabled={locked}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled: locked, busy: busyId === user.id }}
-        testID="user-search-row"
       >
-        <View style={styles.resultLeft}>
+        <View style={styles.resultLeft} accessible accessibilityLabel={label}>
           <UserAvatar
             imageUrl={user.image_url}
             name={user.display_name}
@@ -283,22 +341,8 @@ export default function UserSearchPicker({
             ) : null}
           </View>
         </View>
-        {user.pending ? (
-          <Text style={styles.pendingLabel}>{t('mob.user_search.pending')}</Text>
-        ) : busyId === user.id ? (
-          <ActivityIndicator size="small" color={colors.primary} />
-        ) : isInvite ? (
-          <View style={styles.plusButton}>
-            <Text style={styles.plusText}>+</Text>
-          </View>
-        ) : (
-          <View style={[styles.inviteButton, inGroup ? styles.inviteButtonGroup : null]}>
-            <Text style={[styles.inviteButtonText, inGroup ? styles.inviteButtonTextGroup : null]}>
-              {t('mob.user_search.invite_button')}
-            </Text>
-          </View>
-        )}
-      </Pressable>
+        {control}
+      </View>
     );
   };
 
@@ -357,23 +401,35 @@ export default function UserSearchPicker({
       {showEmpty ? <Text style={styles.emptyText}>{t('mob.user_search.no_matches')}</Text> : null}
       {showEmailAffordance ? (
         <View style={isInvite ? undefined : styles.resultsList}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.resultRow,
-              isInvite ? styles.resultRowInvite : null,
-              pressed ? styles.resultRowPressed : null,
-            ]}
-            onPress={() => handleSelectEmail(trimmed)}
-            accessibilityRole="button"
-            accessibilityLabel={t('mob.user_search.invite_email_a11y', { email: trimmed, entity })}
-          >
+          <View style={[styles.resultRow, isInvite ? styles.resultRowInvite : null]}>
             <View style={styles.resultText}>
               <Text style={styles.emailAffordanceTitle}>
                 {t('mob.user_search.invite_email_title', { email: trimmed, entity })}
               </Text>
               <Text style={styles.resultDisplayName}>{t('mob.user_search.invite_email_hint')}</Text>
             </View>
-          </Pressable>
+            {selectionMode === 'immediate' ? (
+              <AddRemoveControl
+                mode="immediate"
+                name={trimmed}
+                accessibilityLabelOverride={emailLabel}
+                onSend={() => sendEmailImmediate(trimmed)}
+                disabled={disabled}
+                testID="user-search-email-row"
+              />
+            ) : (
+              <AddRemoveControl
+                mode="staged"
+                name={trimmed}
+                accessibilityLabelOverride={emailLabel}
+                staged={false}
+                onStage={() => handleSelectEmail(trimmed)}
+                onUnstage={() => undefined}
+                disabled={disabled}
+                testID="user-search-email-row"
+              />
+            )}
+          </View>
         </View>
       ) : null}
       {!isInvite && !isSearching && visibleResults.length > 0 ? (
@@ -450,7 +506,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   resultRowGroup: { backgroundColor: colors.primaryLight },
-  resultRowPressed: { backgroundColor: colors.background },
   resultRowDisabled: { opacity: 0.6 },
   resultLeft: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
   resultText: { flexShrink: 1, marginLeft: spacing.md },
@@ -466,16 +521,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   chipText: { ...typography.caption, color: colors.primaryDark },
-  inviteButton: {
-    marginLeft: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.md,
-    backgroundColor: colors.track,
-  },
-  inviteButtonGroup: { backgroundColor: colors.ctaBlue },
-  inviteButtonText: { ...typography.caption, color: colors.textSecondary },
-  inviteButtonTextGroup: { color: colors.white },
   emailAffordanceTitle: { ...typography.bodyBold, color: colors.primary },
   inviteInput: {
     backgroundColor: groupView.searchBg,
@@ -504,15 +549,5 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     minHeight: sizes.touchTarget + 8,
   },
-  plusButton: {
-    width: PLUS_SIZE,
-    height: PLUS_SIZE,
-    borderRadius: PLUS_SIZE / 2,
-    borderWidth: 1.5,
-    borderColor: groupView.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  plusText: { fontSize: 22, lineHeight: 26, color: groupView.blue },
   pendingLabel: { ...typography.caption, color: colors.textMuted },
 });
