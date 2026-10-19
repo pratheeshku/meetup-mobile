@@ -10,6 +10,7 @@ import React from 'react';
 import { Platform } from 'react-native';
 
 import { act, pressableLabelled, render, texts } from '../../test-utils/render';
+import { colors } from '../../theme/tokens';
 import DateTimePickerField from '../DateTimePickerField';
 
 describe('DateTimePickerField — Presentation', () => {
@@ -112,6 +113,8 @@ describe('DateTimePickerField — iOS flow', () => {
     expect(picker).toBeDefined();
     expect(picker.props.mode).toBe('datetime');
     expect(picker.props.display).toBe('spinner');
+    expect(picker.props.themeVariant).toBe('light');
+    expect(picker.props.textColor).toBe(colors.textPrimary);
 
     // Simulate picker date change
     act(() => {
@@ -214,6 +217,8 @@ describe('DateTimePickerField — Android flow', () => {
 
     const picker = root.find(n => n.props.testID === 'dt-android-date-picker');
     expect(picker.props.mode).toBe('date');
+    expect(picker.props.themeVariant).toBeUndefined();
+    expect(picker.props.textColor).toBeUndefined();
 
     act(() => {
       picker.props.onChange({ type: 'set' }, new Date(2026, 7, 10));

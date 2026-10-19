@@ -42,6 +42,7 @@ import { getMyGroups } from '../api/groups';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
 import Button from '../components/Button';
+import { iosPickerThemeProps } from '../components/iosPickerTheme';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
 import GroupMultiSelect from '../components/GroupMultiSelect';
@@ -899,6 +900,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                     value={editDateValue}
                     mode="date"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    {...iosPickerThemeProps()}
                     onChange={handleDateChange}
                   />
                 )}
@@ -908,6 +910,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                     value={editDateValue}
                     mode="time"
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    {...iosPickerThemeProps()}
                     onChange={handleTimeChange}
                   />
                 )}

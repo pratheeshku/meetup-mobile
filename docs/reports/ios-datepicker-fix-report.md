@@ -1,6 +1,6 @@
 # Blocked Report: ios-datepicker-fix
 
-Status: **BLOCKED. No code changed.** Step 3 applies (no documented upstream fix). Machine: Claude Code cloud sandbox, not the MacBook. Repo used: `/home/user/meetup-mobile` (`~/Developer/meetup-mobile` does not exist here). Base `origin/main` = `e0b0182`.
+Status: **Original: BLOCKED (no documented upstream fix). Continuation: owner chose option C (implemented) and option D (drafted). A and B NOT implemented. UNVERIFIED on iOS 27.** Machine: Claude Code cloud sandbox, not the MacBook. Repo used: `/home/user/meetup-mobile` (`~/Developer/meetup-mobile` does not exist here). Base `origin/main` = `e0b0182`.
 
 ## Deviations from the brief
 - `docs/agent-handoff-template.md` **does not exist** on origin/main (`git ls-files | grep -i handoff` is empty), so it could not be prepended. Please supply it if required.
@@ -47,3 +47,47 @@ npm run check:labels: check-labels: OK - 225 files scanned, 993 default labels c
 
 ## 6. Git evidence
 Only this report was added. Branch `pa/ios-datepicker-fix`. See the final chat message for `git ls-remote` vs local HEAD.
+
+---
+
+# Continuation (owner decision: implement C, draft D)
+
+## What changed
+- New `src/components/iosPickerTheme.ts`: `iosPickerThemeProps()` returns `{ themeVariant: 'light', textColor: colors.textPrimary }` on iOS and `{}` on any other platform (theme token, no literal colour).
+- Spread into every iOS `DateTimePicker`:
+  - `src/components/DateTimePickerField.tsx` (modal)
+  - `src/screens/CreateGameScreen.tsx` (date + time inline spinners)
+  - `src/screens/EventDetailScreen.tsx` (date + time inline spinners)
+- `display="spinner"`, layout, sizes, copy and labels unchanged. Android gets `{}`, so its props are unchanged; its dialog flow is untouched.
+- Why light: the pickers sit on `colors.surface` containers. Both props exist in the installed library (`src/datetimepicker.ios.js` passes `textColor` and `themeVariant` to the native view).
+- Limitation: the root cause is still not shown. C may have no effect if the wheel is not drawn at all.
+- Option D: `docs/reports/ios-datepicker-upstream-issue.md`, a draft, NOT posted. TODOs left for the owner (iPad iOS version, architecture, build type, repro confirmation, workaround outcome).
+
+## Tests
+- New `src/components/__tests__/iosPickerTheme.test.ts` (iOS returns props, Android returns `{}`).
+- `DateTimePickerField.test.tsx`: iOS modal picker asserts `themeVariant === 'light'` and `textColor === colors.textPrimary`; Android picker asserts both are undefined.
+- Gap: the two screens spread the same helper but have no screen-level assertion (their suites, CreateGameScreen/EventDetailScreen, are in the baseline failing set).
+
+Raw tail output, after change vs baseline (origin/main `e0b0182`):
+```
+                    baseline            after
+jest suites failed  15                  15   (same failing files)
+jest tests failed   174                 174
+jest suites passed  155 / 170 total     156 / 171 total  (+1 new suite)
+jest tests passed   1968 / 2142         1970 / 2144      (+2 new tests, +2 new assertions in existing)
+tsc --noEmit        exit 0              exit 0
+lint                31 errors, 1 warn   31 errors, 1 warn (none in changed files)
+check:labels        OK, 225 files       OK, 226 files
+```
+Delta: **0 new failures.** (Failing-suite lists differ only in timing text.)
+
+## UNVERIFIED. TestFlight verification (needs an iPhone on iOS 27)
+This was not tested on any iOS device or simulator, and iOS 27 cannot be run here. Do not treat C as a fix until confirmed.
+
+Ask the friend with the iPhone 16 / iOS 27.0.1 to install the new TestFlight build, Dark Mode off, then:
+1. Create Game: tap the date field, then the time field. **Expect:** visible dark-grey wheels with the selected row legible; scrolling changes the value and the field updates.
+2. Event Detail (host edit mode): tap the date and time fields. **Expect:** same.
+3. Any screen using the date field modal (`DateTimePickerField`). **Expect:** wheels visible above Cancel/Done; Done saves the chosen value; Cancel discards.
+4. Repeat once with Dark Mode on. **Expect:** wheels still visible (light variant is pinned).
+5. Regression on an iPad: still shows the picker as before.
+Pass = wheels visible on all three. Fail = still invisible: then post the option D issue (fill its TODOs) and bring options A/B with a board.
