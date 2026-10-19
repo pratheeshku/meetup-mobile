@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-USER-DETAILS-MENU
 
 **Doc ID:** DES-MEETUP-ADDENDUM-USER-DETAILS-MENU
-**Version:** v1.2
-**Status:** APPROVED by the owner, 2026-10-19. v1.1 (same day, owner approved option A after `ud-p1-verify`): tournament actions are deferred and tournament people get View Details only (D-3, OI-8). Non-blocking defaults in section 12 are accepted. UI build (phases 3 and 4) is gated on a board (OI-6). v1.2 (same day, owner decisions on the mobile agent's questions): on mobile a tap on a person's avatar opens View Details (UM-06, UM-11); owner and organizer lines and tournament registrations get an avatar (UM-12, OI-11).
+**Version:** v1.3
+**Status:** APPROVED by the owner, 2026-10-19. v1.1 (same day, owner approved option A after `ud-p1-verify`): tournament actions are deferred and tournament people get View Details only (D-3, OI-8). Non-blocking defaults in section 12 are accepted. UI build (phases 3 and 4) is gated on a board (OI-6). v1.2 (same day, owner decisions on the mobile agent's questions): on mobile a tap on a person's avatar opens View Details (UM-06, UM-11); owner and organizer lines and tournament registrations get an avatar (UM-12, OI-11). v1.3 (same day): the owner approved the board, so OI-6 is closed and phases 3 and 4 are gated only on `ud-backend` being deployed.
 **Owner:** Pratheesh
 **Date:** 2026-10-19
 **Scale Tier:** T1
@@ -63,7 +63,7 @@ All of this is one component per platform. Changing the design later means editi
 - Authorisation lives in `policies.py` (P15). No RLS, DB triggers or DB-side validation.
 - Migrations are written, never executed by agents. The owner runs them.
 - Mobile may not invent endpoints or fields; this addendum is the contract (AD-2).
-- Mobile: theme tokens only, no literal colours; UI must match a board (OI-6).
+- Mobile: theme tokens only, no literal colours; UI must match the approved board (OI-6, closed v1.3): `docs/design/user-menu/user-menu-board.png` and `.html` (mobile repo: `docs/mockups/user-menu/`).
 - Additive only (P14): no existing endpoint or field changes.
 
 ---
@@ -323,7 +323,7 @@ No deviation from `Enterprise_Design_Principles.md` or `design-best-practices.md
 | OI-3 | On web, avatars inside clickable home cards open the menu and stop propagation so the card navigation does not fire. | 🟡 MEDIUM | Default accepted; board shows the exact behaviour |
 | OI-4 | AD-3 rows are verified against as-built policies and endpoints. | 🟠 HIGH | Resolved 2026-10-19: group and game rows confirmed; the four tournament rows differed and were removed (D-3) |
 | OI-5 | Search and suggested-player lists show View Details from row data with no actions and no card request. | 🟡 MEDIUM | Resolved 2026-10-19: both search endpoints return display name, nickname and photo; they also return extra fields (`shared_group`, `created_at`, a raw storage key) which View Details ignores |
-| OI-6 | No board exists for the menu or the details view. Repo rule: UI work must match a board. The owner needs a mockup (menu, details view, web variant, own-avatar case) before phases 3 and 4. Not blocking phases 1 and 2. | 🟠 HIGH | **Open; gates phases 3 and 4** |
+| OI-6 | Board for the menu, View Details, confirmation and notices, home-card avatars, tournament rows and the web popover. Repo rule: UI work must match a board. | 🟠 HIGH | **Closed 2026-10-19: owner approved the board.** `docs/design/user-menu/user-menu-board.png` and `.html` (mobile repo: `docs/mockups/user-menu/`) |
 | OI-7 | Privacy-policy wording: no change expected (fields already visible to the same viewers). Owner confirms with the `meetup-privacy-tnc` review. | 🟢 LOW | Open, non-blocking |
 | OI-8 | Tournament actions (remove, disqualification request, committee add and remove) are deferred. Gate: the lifecycle committee and hard-block enforcement is built and enabled, a web step-up flow exists, and a design amendment (v1.2) re-adds the rows with a tournament card endpoint. | 🟡 MEDIUM | Open, deferred by the owner |
 | OI-9 | The organizer remove-participant endpoint accepts invited, withdrawn and organizer targets and cancelled games; only the web UI hides them. P15 says the app layer must enforce it. | 🟡 MEDIUM | Open; separate task |
@@ -331,7 +331,7 @@ No deviation from `Enterprise_Design_Principles.md` or `design-best-practices.md
 | OI-11 | UM-12 needs a `user_id`, photo and name for the game organizer, group owner and tournament registrations in the API responses the mobile screens already load. Not verified. If a response lacks one, that is an additive backend change and a new task; `ud-mobile` STOPS and asks, and does not invent a field. | 🟠 HIGH | Open; checked at the start of `ud-mobile` |
 | OI-12 | The 22 px home-card avatars are a small tap target and sit in stacks that overlap. Accepted by the owner; the board shows size and spacing. | 🟡 MEDIUM | Open; board |
 
-Status: **APPROVED v1.2.** No blocking items for phase 2. Phases 3 and 4 gated on OI-6.
+Status: **APPROVED v1.3.** Board approved. Phases 3 and 4 start after `ud-backend` is deployed. OI-11 is checked at the start of `ud-mobile`.
 
 ---
 
@@ -354,3 +354,4 @@ Status: **APPROVED v1.2.** No blocking items for phase 2. Phases 3 and 4 gated o
 | v1.0 | 2026-10-19 | First version, approved by the owner on his instruction after elicitation (long-press and click open a menu with View Details first, role-based actions, reusable component, labels via admin, tap keeps today's behaviour). Requirements UM-01 to UM-10. Phases 3 and 4 gated on a board (OI-6). |
 | v1.1 | 2026-10-19 | After `ud-p1-verify`: the four tournament rows and the tournament card endpoint removed (owner chose option A; D-3, OI-8); UM-T9 reworded (idempotent repeats are not refusals); rate limit moved to an environment setting (AD-8); `user_id` added to `AvatarPreview`; web scope trimmed to sites with a user id (OI-10); label texts added (AD-6); OI-9 and OI-10 recorded. |
 | v1.2 | 2026-10-19 | Owner decisions: avatar tap opens View Details on mobile (UM-06 changed, UM-11); owner and organizer lines and tournament registrations get an avatar (UM-12); home-card avatars tap only; OI-2 closed; OI-11 (API ids for owner, organizer, registrations) and OI-12 (22 px target) added. Web unchanged. |
+| v1.3 | 2026-10-19 | Owner approved the board (`docs/design/user-menu/user-menu-board.png` and `.html` (mobile repo: `docs/mockups/user-menu/`)). OI-6 closed; phases 3 and 4 gated on the backend deploy only. No requirement changes. |
