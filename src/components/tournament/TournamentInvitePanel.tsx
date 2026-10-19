@@ -38,6 +38,8 @@ import OptionChips from '../OptionChips';
 import ShareActionSheet from '../ShareActionSheet';
 import TextLink from '../TextLink';
 import Toast from '../Toast';
+import PersonNames from '../PersonNames';
+import UserAvatar from '../UserAvatar';
 import UserSearchPicker from '../UserSearchPicker';
 
 interface Props {
@@ -258,12 +260,17 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
           <Text style={styles.formHint}>{t('mob.tournament.invite_player_hint')}</Text>
           {pickedUser ? (
             <View style={styles.selectedRow}>
-              <Text style={styles.selectedText}>
-                {t('mob.group_detail.invitee_line', {
-                  nickname: pickedUser.nickname,
-                  name: pickedUser.display_name,
-                })}
-              </Text>
+              <View style={styles.selectedNames}>
+                <UserAvatar
+                  imageUrl={pickedUser.image_url}
+                  name={pickedUser.display_name}
+                  size={36}
+                  fallback="initials"
+                />
+                <View style={styles.selectedPerson}>
+                  <PersonNames displayName={pickedUser.display_name} nickname={pickedUser.nickname} />
+                </View>
+              </View>
               <TextLink
                 label={t('mob.common.change')}
                 onPress={() => setPickedUser(null)}
@@ -408,4 +415,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   selectedText: { ...typography.bodyBold, color: colors.textPrimary },
+  selectedNames: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
+  selectedPerson: { flexShrink: 1, marginLeft: spacing.sm },
 });

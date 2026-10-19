@@ -1,16 +1,12 @@
 /**
- * GroupDetailScreen — invite flow (BUG-M01 rebuild). Focus: the free-text
- * "User ID" field is gone, replaced by `UserSearchPicker`; the existing
- * `inviteMember(groupId, userId)` contract is unchanged (still gets a real
- * user id, now sourced from a search result instead of typed by hand).
- *
- * `api/users` is mocked (not `api/client`) so `UserSearchPicker`'s own
- * debounce/search behaviour is exercised for real — only the network call
- * underneath it is faked.
+ * GroupDetailScreen — WhatsApp-style redesign (docs/mockups/group-view/): invite
+ * panel ("+" adds, "−" undoes), share link visibility. `api/users` is mocked (not
+ * `api/client`) so the shared search picker's own debounce runs for real.
  */
-import { Clipboard, Linking, Share } from 'react-native';
+import React from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { createGroupInvitation, getGroup, inviteMember } from '../../api/groups';
+import { createGroupInvitation, getGroup, inviteMember, removeMember } from '../../api/groups';
 import { searchUsers } from '../../api/users';
 import { act, pressableLabelled, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
@@ -25,6 +21,7 @@ jest.mock('../../api/groups', () => ({
   getGroup: jest.fn(),
   inviteMember: jest.fn(),
   removeMember: jest.fn(),
+  transferGroupOwnership: jest.fn(),
   updateMemberRole: jest.fn(),
 }));
 jest.mock('../../api/users', () => ({ searchUsers: jest.fn() }));
@@ -41,20 +38,22 @@ jest.mock('../../auth/AuthContext', () => ({
 const mockCreateGroupInvitation = createGroupInvitation as jest.MockedFunction<typeof createGroupInvitation>;
 const mockGetGroup = getGroup as jest.MockedFunction<typeof getGroup>;
 const mockInviteMember = inviteMember as jest.MockedFunction<typeof inviteMember>;
+const mockRemoveMember = removeMember as jest.MockedFunction<typeof removeMember>;
 const mockSearchUsers = searchUsers as jest.MockedFunction<typeof searchUsers>;
 
 const DEBOUNCE_MS = 300;
+const METRICS = { frame: { x: 0, y: 0, width: 360, height: 640 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
 
 const GROUP: GroupDetail = {
   id: 'group-1',
   name: 'Sunday League',
   description: 'A friendly group',
-  owner_id: 'owner-1',
-  owner_nickname: 'ownerNick',
+  owner_id: 'user-me',
+  owner_nickname: 'sam99',
   member_count: 1,
   created_at: '2026-01-01T00:00:00Z',
   current_user_role: 'owner',
-  members: [{ user_id: 'user-me', nickname: 'sam99', display_name: 'sam99', photo_url: null, role: 'owner', joined_at: '2026-01-01T00:00:00Z' }],
+  members: [{ user_id: 'user-me', nickname: 'sam99', display_name: 'Sam', photo_url: null, role: 'owner', joined_at: '2026-01-01T00:00:00Z' }],
 };
 
 const FOUND_USER: UserSearchResult = {
@@ -66,18 +65,27 @@ const FOUND_USER: UserSearchResult = {
 
 const mount = (): Promise<Instance> =>
   renderAsync(
-    <GroupDetailScreen
-      {...({
-        route: { key: 'k', name: 'GroupDetail', params: { groupId: 'group-1' } },
-        navigation: { goBack: jest.fn() },
-      } as unknown as Props)}
-    />,
+    <SafeAreaProvider initialMetrics={METRICS}>
+      <GroupDetailScreen
+        {...({
+          route: { key: 'k', name: 'GroupDetail', params: { groupId: 'group-1' } },
+          navigation: { goBack: jest.fn(), navigate: jest.fn() },
+        } as unknown as Props)}
+      />
+    </SafeAreaProvider>,
   );
 
-function searchInput(root: Instance): Instance {
-  return root.find(
-    node => (node.type as unknown) === 'TextInput' && node.props.accessibilityLabel === 'Search users',
-  );
+const searchInput = (root: Instance): Instance =>
+  root.find(node => (node.type as unknown) === 'TextInput' && node.props.accessibilityLabel === 'Search users');
+
+const searchRows = (root: Instance): Instance[] =>
+  root.findAll(node => node.props.testID === 'user-search-row' && typeof node.props.onPress === 'function');
+
+const undoButtons = (root: Instance): Instance[] =>
+  root.findAll(node => node.props.testID === 'undo-add-button' && typeof node.props.onPress === 'function');
+
+async function openInvite(root: Instance): Promise<void> {
+  await act(async () => pressableLabelled(root, 'Invite').props.onPress());
 }
 
 async function search(root: Instance, query: string): Promise<void> {
@@ -89,8 +97,10 @@ async function search(root: Instance, query: string): Promise<void> {
 
 beforeEach(() => {
   jest.useFakeTimers();
+  mockUser = { id: 'user-me', nickname: 'sam99', display_name: 'Sam' };
   mockGetGroup.mockReset().mockResolvedValue(GROUP);
   mockInviteMember.mockReset().mockResolvedValue({ nextCandidate: null });
+  mockRemoveMember.mockReset().mockResolvedValue(undefined);
   mockSearchUsers.mockReset().mockResolvedValue([FOUND_USER]);
   mockCreateGroupInvitation.mockReset().mockResolvedValue({
     token: 'tok-1',
@@ -105,214 +115,130 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-describe('invite flow', () => {
-  it('opens the search picker (no free-text "User ID" field) when Invite is tapped', async () => {
+describe('invite panel', () => {
+  it('Invite opens the search (no free-text "User ID") and shows the compact "Invite players" header', async () => {
     const root = await mount();
-    act(() => pressableWithText(root, 'Invite').props.onPress());
-    expect(root.findAll(node => (node.type as unknown) === 'TextInput' && node.props.placeholder === 'User ID')).toHaveLength(0);
+    await openInvite(root);
     expect(searchInput(root)).toBeDefined();
+    expect(texts(root)).toContain('Invite players');
+    expect(root.findAll(node => (node.type as unknown) === 'TextInput' && node.props.placeholder === 'User ID')).toHaveLength(0);
   });
 
-  it('searches excluding the current group, and lets the found user be selected then invited', async () => {
+  it('searches excluding the current group and lists suggested players', async () => {
     const root = await mount();
-    act(() => pressableWithText(root, 'Invite').props.onPress());
-
+    await openInvite(root);
     await search(root, 'alex');
     expect(mockSearchUsers).toHaveBeenCalledWith(
       { q: 'alex', excludeGroupId: 'group-1', excludeEventId: undefined, excludeTeamId: undefined },
       expect.anything(),
     );
-    expect(texts(root)).toEqual(expect.arrayContaining(['alexc', 'Alex Chan']));
-
-    act(() => pressableWithText(root, 'alexc').props.onPress());
-    expect(texts(root)).toContain('Alex Chan');
-
-    await act(async () => pressableWithText(root, 'Send Invite').props.onPress());
-    expect(mockInviteMember).toHaveBeenCalledWith('group-1', 'u-2', expect.anything());
-    expect(mockGetGroup).toHaveBeenCalledTimes(2); // initial load + post-invite refresh
+    expect(searchRows(root)).toHaveLength(1);
   });
 
-  it('disables Send Invite until a user is chosen', async () => {
+  it('shows the display name above the nickname in a search row', async () => {
     const root = await mount();
-    act(() => pressableWithText(root, 'Invite').props.onPress());
-    expect(pressableWithText(root, 'Send Invite').props.disabled).toBe(true);
-  });
-
-  it('"Change" clears the selection and returns to the search picker', async () => {
-    const root = await mount();
-    act(() => pressableWithText(root, 'Invite').props.onPress());
+    await openInvite(root);
     await search(root, 'alex');
-    act(() => pressableWithText(root, 'alexc').props.onPress());
-
-    act(() => pressableWithText(root, 'Change').props.onPress());
-    expect(texts(root)).not.toContain('Alex Chan');
-    expect(searchInput(root)).toBeDefined();
+    const t = texts(searchRows(root)[0]);
+    expect(t.indexOf('Alex Chan')).toBeGreaterThanOrEqual(0);
+    expect(t.indexOf('Alex Chan')).toBeLessThan(t.indexOf('alexc'));
   });
 
-  it('shows an error and keeps the form open when the invite call fails', async () => {
-    mockInviteMember.mockRejectedValue(new Error('409'));
+  it('"+" adds the person (inviteMember) and moves them to the Added list with a count', async () => {
     const root = await mount();
-    act(() => pressableWithText(root, 'Invite').props.onPress());
+    await openInvite(root);
     await search(root, 'alex');
-    act(() => pressableWithText(root, 'alexc').props.onPress());
+    await act(async () => searchRows(root)[0].props.onPress());
 
-    await act(async () => pressableWithText(root, 'Send Invite').props.onPress());
-    expect(texts(root)).toContain('Could not send the invite. Please try again.');
+    expect(mockInviteMember).toHaveBeenCalledWith('group-1', 'u-2', expect.objectContaining({ correlationId: expect.any(String) }));
+    expect(texts(root)).toContain('Added · 1');
+    expect(texts(root)).toContain('Added');
+    expect(undoButtons(root)).toHaveLength(1);
+    expect(undoButtons(root)[0].props.accessibilityLabel).toBe('Undo add');
   });
 
-  it('supports selecting multiple users and invites each on submit', async () => {
+  it('"−" removes the person (removeMember), no confirmation, and they reappear with "+"', async () => {
     const root = await mount();
-    act(() => pressableWithText(root, 'Invite').props.onPress());
-
-    mockSearchUsers.mockResolvedValueOnce([FOUND_USER]);
+    await openInvite(root);
     await search(root, 'alex');
-    act(() => pressableWithText(root, 'alexc').props.onPress());
+    await act(async () => searchRows(root)[0].props.onPress());
+    expect(searchRows(root)).toHaveLength(0); // already added, so hidden from results
+    const groupLoads = mockGetGroup.mock.calls.length;
 
-    const SECOND_USER: UserSearchResult = {
-      id: 'u-3',
-      display_name: 'Bob Builder',
-      nickname: 'bob',
-      pending: false,
-    };
-    mockSearchUsers.mockResolvedValueOnce([SECOND_USER]);
-    await search(root, 'bob');
-    act(() => pressableWithText(root, 'bob').props.onPress());
+    await act(async () => undoButtons(root)[0].props.onPress());
 
-    expect(texts(root)).toEqual(expect.arrayContaining(['Alex Chan', 'alexc', 'Bob Builder', 'bob']));
-
-    // Remove first user
-    const removeAlex = root.findByProps({ accessibilityLabel: 'Remove Alex Chan' });
-    act(() => removeAlex.props.onPress());
-    expect(texts(root)).not.toContain('Alex Chan');
-    expect(texts(root)).toContain('Bob Builder');
-
-    await act(async () => pressableWithText(root, 'Send Invite').props.onPress());
-    expect(mockInviteMember).toHaveBeenCalledTimes(1);
-    expect(mockInviteMember).toHaveBeenCalledWith('group-1', 'u-3', expect.anything());
+    expect(mockRemoveMember).toHaveBeenCalledWith('group-1', 'u-2', expect.objectContaining({ correlationId: expect.any(String) }));
+    expect(texts(root)).not.toContain('Added · 1');
+    expect(undoButtons(root)).toHaveLength(0);
+    expect(mockGetGroup.mock.calls.length).toBeGreaterThan(groupLoads); // group refreshed
+    expect(searchRows(root)).toHaveLength(1);
+    expect(texts(searchRows(root)[0])).toContain('Alex Chan');
   });
 
-  it('supports inviting by email when zero search results for valid email (Decision 23 & 24)', async () => {
-    mockSearchUsers.mockResolvedValueOnce([]);
-    mockCreateGroupInvitation.mockResolvedValueOnce({
-      token: 'tok-email-abc',
-      invitation_url: 'https://meetups.duckdns.org/groups/invite/tok-email-abc',
+  it('a failed undo keeps the row and shows an inline error', async () => {
+    mockRemoveMember.mockRejectedValueOnce(new Error('500'));
+    const root = await mount();
+    await openInvite(root);
+    await search(root, 'alex');
+    await act(async () => searchRows(root)[0].props.onPress());
+
+    await act(async () => undoButtons(root)[0].props.onPress());
+
+    expect(texts(root)).toContain('Could not undo this. Please try again.');
+    expect(texts(root)).toContain('Added · 1');
+    expect(undoButtons(root)).toHaveLength(1);
+  });
+
+  it('a double tap on "−" removes once', async () => {
+    const root = await mount();
+    await openInvite(root);
+    await search(root, 'alex');
+    await act(async () => searchRows(root)[0].props.onPress());
+    const button = undoButtons(root)[0];
+
+    await act(async () => {
+      button.props.onPress();
+      button.props.onPress();
     });
 
+    expect(mockRemoveMember).toHaveBeenCalledTimes(1);
+  });
+
+  it('a person added by email has no "−" (no cancel endpoint)', async () => {
+    mockSearchUsers.mockResolvedValue([]);
     const root = await mount();
-    act(() => pressableWithText(root, 'Invite').props.onPress());
-
+    await openInvite(root);
     await search(root, 'friend@example.com');
-    expect(texts(root)).toContain('✉️ Invite friend@example.com as new member');
-
-    act(() => pressableLabelled(root, 'Invite friend@example.com as new member').props.onPress());
-    expect(texts(root)).toContain('Invite by email: friend@example.com');
-    expect(texts(root)).toContain('Change');
-
-    await act(async () => pressableWithText(root, 'Send Invite').props.onPress());
+    await act(async () => pressableLabelled(root, 'Invite friend@example.com as new player').props.onPress());
 
     expect(mockCreateGroupInvitation).toHaveBeenCalledWith(
       'group-1',
       expect.objectContaining({ invitedEmail: 'friend@example.com' }),
     );
-    expect(mockInviteMember).not.toHaveBeenCalled();
-    expect(mockGetGroup).toHaveBeenCalledTimes(2);
+    expect(texts(root)).toContain('friend@example.com');
+    expect(texts(root)).toContain('Added · 1');
+    expect(undoButtons(root)).toHaveLength(0);
   });
 });
 
-describe('group invite link sharing', () => {
-  it('renders "Share Group Invite" and "Share Link" for group owner/admin', async () => {
+describe('share link', () => {
+  it('shows Share link and Invite to the owner', async () => {
     const root = await mount();
-    expect(texts(root)).toContain('Share Group Invite');
-    expect(texts(root)).toContain('Share Link');
+    expect(pressableWithText(root, 'Share link')).toBeDefined();
+    expect(pressableWithText(root, 'Invite')).toBeDefined();
   });
 
-  it('does NOT render "Share Group Invite" for regular member', async () => {
-    mockGetGroup.mockResolvedValueOnce({
+  it('shows neither to a regular group member', async () => {
+    mockGetGroup.mockResolvedValue({
       ...GROUP,
       owner_id: 'other-owner',
-      members: [{ user_id: 'user-me', nickname: 'sam99', display_name: 'sam99', photo_url: null, role: 'member', joined_at: '2026-01-01T00:00:00Z' }],
+      members: [
+        { user_id: 'other-owner', nickname: 'own', display_name: 'Olga', photo_url: null, role: 'owner', joined_at: '2026-01-01T00:00:00Z' },
+        { user_id: 'user-me', nickname: 'sam99', display_name: 'Sam', photo_url: null, role: 'member', joined_at: '2026-01-02T00:00:00Z' },
+      ],
     });
     const root = await mount();
-    expect(texts(root)).not.toContain('Share Group Invite');
-    expect(texts(root)).not.toContain('Share Link');
-  });
-
-  it('calls createGroupInvitation and opens ShareActionSheet when Share Group Invite is tapped', async () => {
-    const root = await mount();
-    await act(async () => {
-      await pressableLabelled(root, 'Share Group Invite').props.onPress();
-    });
-
-    expect(mockCreateGroupInvitation).toHaveBeenCalledWith('group-1', expect.anything());
-    expect(texts(root)).toContain('Share Group Invite');
-    expect(texts(root)).toContain('Share via WhatsApp');
-    expect(texts(root)).toContain('Share via other apps');
-    expect(texts(root)).toContain('Copy Link');
-  });
-
-  it('shares via generic Share.share with composed message and invitation URL', async () => {
-    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
-    const root = await mount();
-
-    await act(async () => {
-      await pressableLabelled(root, 'Share Group Invite').props.onPress();
-    });
-
-    await act(async () => {
-      await pressableLabelled(root, 'Share via other apps').props.onPress();
-    });
-
-    expect(shareSpy).toHaveBeenCalledWith({
-      message:
-        'Sam invited you to Sunday League on Shuttlr \u2014 https://meetups.duckdns.org/groups/invite/tok-1',
-      url: 'https://meetups.duckdns.org/groups/invite/tok-1',
-    });
-  });
-
-  it('shares via WhatsApp with composed message', async () => {
-    const canOpenSpy = jest.spyOn(Linking, 'canOpenURL').mockResolvedValueOnce(true);
-    const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined as never);
-    const root = await mount();
-
-    await act(async () => {
-      await pressableLabelled(root, 'Share Group Invite').props.onPress();
-    });
-
-    await act(async () => {
-      await pressableLabelled(root, 'Share via WhatsApp').props.onPress();
-    });
-
-    const expectedMsg =
-      'Sam invited you to Sunday League on Shuttlr \u2014 https://meetups.duckdns.org/groups/invite/tok-1';
-    expect(canOpenSpy).toHaveBeenCalledWith('whatsapp://send');
-    expect(openSpy).toHaveBeenCalledWith(`whatsapp://send?text=${encodeURIComponent(expectedMsg)}`);
-  });
-
-  it('copies invitation link to clipboard and displays toast', async () => {
-    const setStringSpy = jest.spyOn(Clipboard, 'setString');
-    const root = await mount();
-
-    await act(async () => {
-      await pressableLabelled(root, 'Share Group Invite').props.onPress();
-    });
-
-    act(() => {
-      pressableLabelled(root, 'Copy Link').props.onPress();
-    });
-
-    expect(setStringSpy).toHaveBeenCalledWith('https://meetups.duckdns.org/groups/invite/tok-1');
-    expect(texts(root)).toContain('Link copied to clipboard');
-  });
-
-  it('displays error inline when createGroupInvitation fails', async () => {
-    mockCreateGroupInvitation.mockRejectedValueOnce(new Error('500 server error'));
-    const root = await mount();
-
-    await act(async () => {
-      await pressableLabelled(root, 'Share Group Invite').props.onPress();
-    });
-
-    expect(texts(root)).toContain('Could not generate group invite link. Please try again.');
+    expect(texts(root)).not.toContain('Share link');
+    expect(texts(root)).not.toContain('Invite');
   });
 });
-

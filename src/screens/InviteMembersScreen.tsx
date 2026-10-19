@@ -7,8 +7,12 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
-import { createGroupInvitation, inviteMember } from '../api/groups';
+import { createGroupInvitation, inviteMember, removeMember } from '../api/groups';
+import { useAuth } from '../auth/AuthContext';
+import UndoAddButton from '../components/groups/UndoAddButton';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
+import PersonNames from '../components/PersonNames';
+import UserAvatar from '../components/UserAvatar';
 import UserSearchPicker from '../components/UserSearchPicker';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
@@ -36,23 +40,19 @@ function getAvatarTint(name: string) {
   return AVATAR_TINTS[Math.abs(hash) % AVATAR_TINTS.length];
 }
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
-  }
-  return (name.trim().slice(0, 2) || '?').toUpperCase();
-}
-
 export default function InviteMembersScreen({ navigation, route }: Props): React.JSX.Element {
   const { groupId } = route.params;
   const t = useT();
+  const { user: currentUser } = useAuth();
 
   const [added, setAdded] = useState<UserSearchResult[]>([]);
   const [addedEmails, setAddedEmails] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const inFlight = useRef(false);
+  const [undoingId, setUndoingId] = useState<string | null>(null);
+  // Bumped after an undo so the list refetches and the person reappears with "+".
+  const [searchRefresh, setSearchRefresh] = useState(0);
 
   // One search field: a name adds that person; a valid email that matches nobody
   // is invited by email (same `POST /groups/invitations` call as Group Detail).
@@ -71,6 +71,27 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
       setError(t('mob.invite.add_error'));
     } finally {
       inFlight.current = false;
+    }
+  };
+
+  // Undo of a mistaken "+": existing `DELETE /groups/{id}/members/{user}`, no confirmation.
+  // Email invites have no cancel endpoint, so they get no undo.
+  const handleUndo = async (user: UserSearchResult): Promise<void> => {
+    if (inFlight.current || user.id === currentUser?.id) return;
+    inFlight.current = true;
+    setUndoingId(user.id);
+    setError(null);
+    try {
+      await withCorrelationId(correlationId =>
+        removeMember(groupId, user.id, { correlationId }),
+      );
+      setAdded(current => current.filter(item => item.id !== user.id));
+      setSearchRefresh(tick => tick + 1);
+    } catch {
+      setError(t('mob.group_detail.undo_error'));
+    } finally {
+      inFlight.current = false;
+      setUndoingId(null);
     }
   };
 
@@ -132,18 +153,25 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.addedRow}>
           {added.map(user => {
-            const tint = getAvatarTint(user.display_name);
-            const firstName = user.display_name.trim().split(/\s+/)[0];
             return (
               <View key={user.id} style={styles.addedItem}>
-                <View style={[styles.avatarCircleLarge, { backgroundColor: tint.bg }]}>
-                  <Text style={[styles.avatarTextLarge, { color: tint.text }]}>
-                    {getInitials(user.display_name)}
-                  </Text>
+                <UserAvatar
+                  imageUrl={user.image_url}
+                  name={user.display_name}
+                  size={48}
+                  fallback="initials"
+                />
+                <View style={styles.addedNames}>
+                  <PersonNames displayName={user.display_name} nickname={user.nickname} centered />
                 </View>
-                <Text style={styles.addedName} numberOfLines={1}>
-                  {firstName}
-                </Text>
+                {user.id !== currentUser?.id ? (
+                  <UndoAddButton
+                    onPress={() => handleUndo(user)}
+                    accessibilityLabel={t('mob.group_detail.undo_add_a11y')}
+                    busy={undoingId === user.id}
+                    disabled={undoingId !== null}
+                  />
+                ) : null}
               </View>
             );
           })}
@@ -186,6 +214,7 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
           suggestionContext="group_members"
           placeholder={t('mob.create_game.search_players_placeholder')}
           belowInput={addedCard}
+          refreshToken={searchRefresh}
         />
 
         <Text style={styles.helperText}>{t('mob.invite.suggested_players_hint')}</Text>
@@ -247,8 +276,9 @@ const styles = StyleSheet.create({
   },
   addedItem: {
     alignItems: 'center',
-    width: 60,
+    width: 84,
   },
+  addedNames: { marginTop: spacing.xs, alignSelf: 'stretch' },
   avatarCircleLarge: {
     width: 48,
     height: 48,

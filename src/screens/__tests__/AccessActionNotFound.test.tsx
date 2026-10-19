@@ -164,6 +164,13 @@ function byLabel(root: Instance, label: string, which: 'first' | 'last' = 'first
   }
   return which === 'first' ? matches[0] : matches[matches.length - 1];
 }
+/** Long-press a member row on Group detail to open its action card. */
+const openMemberCard = (root: Instance, displayName: string): Promise<void> =>
+  act(async () => {
+    root
+      .findAll(n => typeof n.props.onLongPress === 'function' && texts(n).includes(displayName))[0]
+      .props.onLongPress();
+  });
 const goneNow = (): boolean => isAccessNoticeShowing();
 const noticeText = 'This is no longer available.';
 
@@ -282,7 +289,8 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
         buttons?.find(b => b.style === 'destructive')?.onPress?.();
       });
-      await press(byLabel(root, 'Remove'));
+      await openMemberCard(root, 'Alex');
+      await press(byLabel(root, 'Remove from group'));
       await act(async () => {});
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(false);
@@ -293,9 +301,9 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
     it('change role 404: keeps today\'s error, no goBack, no notice', async () => {
       mockGetGroup.mockResolvedValue(GROUP_OWNER);
       const root = await mountGroup();
-      await press(byLabel(root, 'Change Role'));
       (updateMemberRole as jest.Mock).mockRejectedValueOnce(NOT_FOUND);
-      await press(byLabel(root, 'Save'));
+      await openMemberCard(root, 'Alex');
+      await press(byLabel(root, 'Make admin'));
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(false);
       expect(texts(root)).toContain('Could not update this group member’s role. Please try again.');
@@ -305,9 +313,9 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
     it('change role with another error keeps the role error', async () => {
       mockGetGroup.mockResolvedValue(GROUP_OWNER);
       const root = await mountGroup();
-      await press(byLabel(root, 'Change Role'));
       (updateMemberRole as jest.Mock).mockRejectedValueOnce({ response: { status: 500 } });
-      await press(byLabel(root, 'Save'));
+      await openMemberCard(root, 'Alex');
+      await press(byLabel(root, 'Make admin'));
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(false);
       expect(texts(root)).toContain('Could not update this group member’s role. Please try again.');

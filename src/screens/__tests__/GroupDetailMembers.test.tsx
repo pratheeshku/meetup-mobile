@@ -1,12 +1,17 @@
-/** Group detail: members show display name first, nickname underneath, photo or initials. */
+/**
+ * Group detail member list (WhatsApp-style): ordering, display name over nickname,
+ * photo or initials, and the long-press card with its per-role actions.
+ */
+import React from 'react';
 import { Alert, Image, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { getGroup } from '../../api/groups';
+import { getGroup, updateMemberRole } from '../../api/groups';
 import { searchUsers } from '../../api/users';
-import { act, pressableWithText, renderAsync, texts } from '../../test-utils/render';
+import { act, pressableLabelled, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
-import type { GroupDetail } from '../../types/group';
-import GroupDetailScreen from '../GroupDetailScreen';
+import type { GroupDetail, GroupMember } from '../../types/group';
+import GroupDetailScreen, { sortMembers } from '../GroupDetailScreen';
 
 type Props = React.ComponentProps<typeof GroupDetailScreen>;
 
@@ -15,126 +20,218 @@ jest.mock('../../api/groups', () => ({
   getGroup: jest.fn(),
   inviteMember: jest.fn(),
   removeMember: jest.fn(),
+  transferGroupOwnership: jest.fn(),
   updateMemberRole: jest.fn(),
 }));
 jest.mock('../../api/users', () => ({ searchUsers: jest.fn() }));
-jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-me', nickname: 'sam99', display_name: 'Sam' } }) }));
+
+let mockUserId = 'user-me';
+jest.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({ user: { id: mockUserId, nickname: 'sam99', display_name: 'Sam' } }),
+}));
+
+const METRICS = { frame: { x: 0, y: 0, width: 360, height: 640 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
+
+const member = (id: string, display: string, role: GroupMember['role'], nickname = id, photo: string | null = null): GroupMember => ({
+  user_id: id,
+  nickname,
+  display_name: display,
+  photo_url: photo,
+  role,
+  joined_at: '2026-01-01T00:00:00Z',
+});
+
+const MEMBERS: GroupMember[] = [
+  member('u-ben', 'ben lim', 'member', 'benl'),
+  member('u-zoe', 'Zoe Tan', 'admin', 'zoe'),
+  member('u-aisha', 'Aisha Rahman', 'member', 'aisha_r', 'https://cdn.example.com/aisha.jpg'),
+  member('user-me', 'Sam Smith', 'owner', 'samnick'),
+  member('u-dan', 'Daniel Tan', 'admin', 'dtan'),
+  member('u-chen', 'Chen Wei', 'member', 'chenwei'),
+  member('u-bob', 'bob', 'member', 'bob'),
+];
 
 const GROUP: GroupDetail = {
   id: 'group-1',
   name: 'Sunday League',
   description: 'A friendly group',
   owner_id: 'user-me',
-  owner_nickname: 'samnick',
-  owner_display_name: 'Sam Smith',
-  member_count: 3,
+  member_count: MEMBERS.length,
   created_at: '2026-01-01T00:00:00Z',
   current_user_role: 'owner',
-  members: [
-    { user_id: 'user-me', nickname: 'samnick', display_name: 'Sam Smith', photo_url: null, role: 'owner', joined_at: '2026-01-01T00:00:00Z' },
-    { user_id: 'u-2', nickname: 'alexc', display_name: 'Alex Chan', photo_url: 'https://cdn.example.com/alex.jpg', role: 'member', joined_at: '2026-01-02T00:00:00Z' },
-    { user_id: 'u-3', nickname: 'bob', display_name: 'bob', photo_url: null, role: 'member', joined_at: '2026-01-03T00:00:00Z' },
-  ],
+  members: MEMBERS,
 };
 
 const mount = (): Promise<Instance> =>
   renderAsync(
-    <GroupDetailScreen
-      {...({
-        route: { key: 'k', name: 'GroupDetail', params: { groupId: 'group-1' } },
-        navigation: { goBack: jest.fn() },
-      } as unknown as Props)}
-    />,
+    <SafeAreaProvider initialMetrics={METRICS}>
+      <GroupDetailScreen
+        {...({
+          route: { key: 'k', name: 'GroupDetail', params: { groupId: 'group-1' } },
+          navigation: { goBack: jest.fn(), navigate: jest.fn() },
+        } as unknown as Props)}
+      />
+    </SafeAreaProvider>,
   );
 
-/** The member list row for this user id's display name. */
-const memberRow = (root: Instance, displayName: string): Instance =>
-  root
-    .findAll(n => typeof n.type === 'string' && StyleSheet.flatten(n.props.style)?.paddingVertical === 8 && texts(n).includes(displayName))
-    .pop() as Instance;
+/** Long-pressable member rows in screen order. */
+const memberRows = (root: Instance): Instance[] =>
+  root.findAll(n => typeof n.props.onLongPress === 'function' && typeof n.props.accessibilityLabel === 'string');
+const rowFor = (root: Instance, displayName: string): Instance =>
+  memberRows(root).filter(n => texts(n).includes(displayName))[0];
+const longPress = (root: Instance, displayName: string): void => {
+  act(() => rowFor(root, displayName).props.onLongPress());
+};
+const hasAction = (root: Instance, label: string): boolean =>
+  root.findAll(n => n.props.accessibilityRole === 'button' && n.props.accessibilityLabel === label).length > 0;
+const ACTIONS = ['Make admin', 'Demote', 'Make owner', 'Remove from group'];
+const shownActions = (root: Instance): string[] => ACTIONS.filter(label => hasAction(root, label));
 
 beforeEach(() => {
+  mockUserId = 'user-me';
   (getGroup as jest.Mock).mockReset().mockResolvedValue(GROUP);
+  (updateMemberRole as jest.Mock).mockReset().mockResolvedValue(undefined);
   (searchUsers as jest.Mock).mockReset().mockResolvedValue([]);
 });
 
-describe('member list', () => {
-  it('shows the display name as the primary name and the nickname underneath, smaller and secondary', async () => {
+describe('member order', () => {
+  it('sortMembers: owner, then admins A-Z, then members A-Z, case-insensitive', () => {
+    expect(sortMembers(MEMBERS).map(m => m.display_name)).toEqual([
+      'Sam Smith',
+      'Daniel Tan',
+      'Zoe Tan',
+      'Aisha Rahman',
+      'ben lim',
+      'bob',
+      'Chen Wei',
+    ]);
+  });
+
+  it('is stable for equal names (user id tiebreak) and does not mutate the input', () => {
+    const twins = [member('b', 'Sam', 'member'), member('a', 'sam', 'member')];
+    expect(sortMembers(twins).map(m => m.user_id)).toEqual(['a', 'b']);
+    expect(twins.map(m => m.user_id)).toEqual(['b', 'a']);
+  });
+
+  it('renders the rows in that order', async () => {
     const root = await mount();
-    const row = memberRow(root, 'Alex Chan');
+    const order = memberRows(root).map(row => String(row.props.accessibilityLabel).split(', ')[0]);
+    expect(order).toEqual(['Sam Smith', 'Daniel Tan', 'Zoe Tan', 'Aisha Rahman', 'ben lim', 'bob', 'Chen Wei']);
+  });
+
+  it('shows an Owner chip and Admin chips only on those rows', async () => {
+    const root = await mount();
+    expect(texts(rowFor(root, 'Sam Smith'))).toContain('Owner');
+    expect(texts(rowFor(root, 'Daniel Tan'))).toContain('Admin');
+    expect(texts(rowFor(root, 'Aisha Rahman'))).not.toContain('Admin');
+    expect(texts(rowFor(root, 'Aisha Rahman'))).not.toContain('Owner');
+  });
+});
+
+describe('member row', () => {
+  it('shows the display name first and the nickname underneath, smaller and secondary', async () => {
+    const root = await mount();
+    const row = rowFor(root, 'Aisha Rahman');
     const t = texts(row);
-    expect(t.indexOf('Alex Chan')).toBeLessThan(t.indexOf('alexc'));
-    const nameNode = row.find(n => (n.type as unknown) === 'Text' && n.props.children === 'Alex Chan');
-    const nickNode = row.find(n => (n.type as unknown) === 'Text' && n.props.children === 'alexc');
+    expect(t.indexOf('Aisha Rahman')).toBeLessThan(t.indexOf('aisha_r'));
+    const nameNode = row.find(n => (n.type as unknown) === 'Text' && n.props.children === 'Aisha Rahman');
+    const nickNode = row.find(n => (n.type as unknown) === 'Text' && n.props.children === 'aisha_r');
     const name = StyleSheet.flatten(nameNode.props.style);
     const nick = StyleSheet.flatten(nickNode.props.style);
     expect(nick.fontSize as number).toBeLessThan(name.fontSize as number);
-    expect(nick.color).not.toBe(name.color); // secondary text colour
+    expect(nick.color).not.toBe(name.color);
   });
 
   it('does not repeat the nickname when it equals the display name', async () => {
     const root = await mount();
-    expect(texts(memberRow(root, 'bob')).filter(x => x === 'bob')).toHaveLength(1);
+    expect(texts(rowFor(root, 'bob')).filter(x => x === 'bob')).toHaveLength(1);
   });
 
-  it('shows the photo when there is one', async () => {
+  it('shows the photo when there is one, otherwise two initials', async () => {
     const root = await mount();
-    const images = memberRow(root, 'Alex Chan').findAllByType(Image);
+    const images = rowFor(root, 'Aisha Rahman').findAllByType(Image);
     expect(images).toHaveLength(1);
-    expect(images[0].props.source).toEqual({ uri: 'https://cdn.example.com/alex.jpg' });
-  });
-
-  it('shows initials when there is no photo', async () => {
-    const root = await mount();
-    const row = memberRow(root, 'Sam Smith');
-    expect(row.findAllByType(Image)).toHaveLength(0);
-    expect(texts(row)).toContain('S');
+    expect(images[0].props.source).toEqual({ uri: 'https://cdn.example.com/aisha.jpg' });
+    const plain = rowFor(root, 'Sam Smith');
+    expect(plain.findAllByType(Image)).toHaveLength(0);
+    expect(texts(plain)).toContain('SS');
   });
 });
 
-describe('other places a member is named', () => {
-  it('"Owned by" uses the owner\'s display name', async () => {
+describe('long-press card', () => {
+  it('owner on a member: Make admin, Make owner, Remove from group', async () => {
     const root = await mount();
-    expect(texts(root)).toContain('Owned by Sam Smith');
+    longPress(root, 'Aisha Rahman');
+    expect(shownActions(root)).toEqual(['Make admin', 'Make owner', 'Remove from group']);
   });
 
-  it('"Owned by" falls back to the nickname when there is no display name', async () => {
-    (getGroup as jest.Mock).mockResolvedValue({ ...GROUP, owner_display_name: undefined });
+  it('owner on an admin: Demote instead of Make admin', async () => {
     const root = await mount();
-    expect(texts(root)).toContain('Owned by samnick');
+    longPress(root, 'Daniel Tan');
+    expect(shownActions(root)).toEqual(['Demote', 'Make owner', 'Remove from group']);
   });
 
-  it('the remove-member confirmation names the member by display name', async () => {
+  it('the card shows the display name above the nickname', async () => {
+    const root = await mount();
+    longPress(root, 'Aisha Rahman');
+    const all = texts(root);
+    // list row text comes first in the tree; the card repeats the pair after it
+    const last = all.lastIndexOf('Aisha Rahman');
+    expect(all[last + 1]).toBe('aisha_r');
+  });
+
+  it('admin on a member: Make admin and Remove only (no Make owner)', async () => {
+    mockUserId = 'u-dan';
+    const root = await mount();
+    longPress(root, 'Aisha Rahman');
+    expect(shownActions(root)).toEqual(['Make admin', 'Remove from group']);
+  });
+
+  it('regular member sees the details card with no actions', async () => {
+    mockUserId = 'u-chen';
+    const root = await mount();
+    longPress(root, 'Aisha Rahman');
+    expect(shownActions(root)).toEqual([]);
+    expect(texts(root).filter(x => x === 'Aisha Rahman').length).toBeGreaterThan(1); // row + card
+  });
+
+  it('nobody gets actions on their own row, and nobody on the owner row', async () => {
+    const root = await mount();
+    longPress(root, 'Sam Smith'); // owner on self
+    expect(shownActions(root)).toEqual([]);
+
+    mockUserId = 'u-dan';
+    const asAdmin = await mount();
+    longPress(asAdmin, 'Daniel Tan'); // admin on self
+    expect(shownActions(asAdmin)).toEqual([]);
+    longPress(asAdmin, 'Sam Smith'); // admin on owner
+    expect(shownActions(asAdmin)).toEqual([]);
+  });
+
+  it('Remove from group asks for confirmation naming the member by display name', async () => {
     const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const root = await mount();
-    const row = memberRow(root, 'Alex Chan');
-    const remove = row.find(n => typeof n.props.onPress === 'function' && texts(n).includes('Remove'));
-    act(() => remove.props.onPress());
+    longPress(root, 'Aisha Rahman');
+    act(() => pressableLabelled(root, 'Remove from group').props.onPress());
     expect(spy).toHaveBeenCalled();
-    expect(String(spy.mock.calls[0][1])).toContain('Alex Chan');
-    expect(String(spy.mock.calls[0][1])).not.toContain('alexc');
+    expect(String(spy.mock.calls[0][1])).toContain('Aisha Rahman');
+    expect(String(spy.mock.calls[0][1])).not.toContain('aisha_r');
     spy.mockRestore();
   });
-});
 
-describe('invitee rows', () => {
-  it('show the display name with the nickname underneath', async () => {
-    jest.useFakeTimers();
-    (searchUsers as jest.Mock).mockResolvedValue([{ id: 'u-9', display_name: 'Casey Lee', nickname: 'casey', pending: false }]);
+  it('Make owner asks for the existing transfer confirmation', async () => {
+    const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const root = await mount();
-    act(() => pressableWithText(root, 'Invite').props.onPress());
-    const input = root.find(n => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Search users');
-    act(() => input.props.onChangeText('cas'));
-    await act(async () => {
-      jest.advanceTimersByTime(300);
-    });
-    act(() => pressableWithText(root, 'casey').props.onPress());
-    const row = root.findAll(n => typeof n.type === 'string' && texts(n).includes('Casey Lee') && texts(n).includes('casey') && texts(n).includes('Change')).pop() as Instance;
-    const t = texts(row);
-    expect(t.indexOf('Casey Lee')).toBeLessThan(t.indexOf('casey'));
-    act(() => {
-      jest.runOnlyPendingTimers();
-    });
-    jest.useRealTimers();
+    longPress(root, 'Aisha Rahman');
+    act(() => pressableLabelled(root, 'Make owner').props.onPress());
+    expect(String(spy.mock.calls[0][0])).toBe('Transfer ownership to Aisha Rahman?');
+    spy.mockRestore();
+  });
+
+  it('Make admin changes the role through updateMemberRole', async () => {
+    const root = await mount();
+    longPress(root, 'Aisha Rahman');
+    await act(async () => pressableLabelled(root, 'Make admin').props.onPress());
+    expect(updateMemberRole).toHaveBeenCalledWith('group-1', 'u-aisha', 'admin', expect.anything());
   });
 });

@@ -2,7 +2,7 @@
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { createGroupInvitation, inviteMember } from '../../api/groups';
+import { createGroupInvitation, inviteMember, removeMember } from '../../api/groups';
 import { searchUsers } from '../../api/users';
 import { showCompletion } from '../../navigation/showCompletion';
 import { act, pressableLabelled, renderAsync, texts } from '../../test-utils/render';
@@ -11,7 +11,8 @@ import InviteMembersScreen from '../InviteMembersScreen';
 
 type Props = React.ComponentProps<typeof InviteMembersScreen>;
 
-jest.mock('../../api/groups', () => ({ inviteMember: jest.fn(), createGroupInvitation: jest.fn() }));
+jest.mock('../../api/groups', () => ({ inviteMember: jest.fn(), createGroupInvitation: jest.fn(), removeMember: jest.fn() }));
+jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-me' } }) }));
 jest.mock('../../api/users', () => ({ searchUsers: jest.fn() }));
 jest.mock('../../navigation/showCompletion', () => ({ showCompletion: jest.fn() }));
 
@@ -22,6 +23,9 @@ const METRICS = { frame: { x: 0, y: 0, width: 360, height: 640 }, insets: { top:
 const mockInviteMember = inviteMember as jest.Mock;
 const mockInviteEmail = createGroupInvitation as jest.Mock;
 const mockSearch = searchUsers as jest.Mock;
+const mockRemoveMember = removeMember as jest.Mock;
+const undoButtons = (root: Instance): Instance[] =>
+  root.findAll(n => n.props.testID === 'undo-add-button' && typeof n.props.onPress === 'function');
 
 async function mount(): Promise<Instance> {
   const props = {
@@ -59,6 +63,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   mockInviteMember.mockReset().mockResolvedValue({ nextCandidate: null });
   mockInviteEmail.mockReset().mockResolvedValue({});
+  mockRemoveMember.mockReset().mockResolvedValue(undefined);
   (showCompletion as jest.Mock).mockReset();
   mockSearch.mockReset().mockImplementation(async ({ q }: { q: string }) => {
     const needle = q.trim().toLowerCase();
@@ -86,11 +91,47 @@ it('a name search adds the member (inviteMember) and removes them from the sugge
   await tap(rows(root)[0]);
   expect(mockInviteMember).toHaveBeenCalledWith('g-1', 'u-1', expect.objectContaining({ correlationId: expect.any(String) }));
   expect(texts(root)).toContain('1 added');
-  expect(texts(root)).toContain('Alex');
+  expect(texts(root)).toContain('Alex Chen');
+  expect(texts(root)).toContain('alex');
   await act(async () => {
     jest.advanceTimersByTime(300);
   });
   expect(rows(root).some(r => String(r.props.accessibilityLabel).includes('Alex Chen'))).toBe(false);
+});
+
+it('"−" undoes the add (removeMember) and the person reappears in the suggestions', async () => {
+  const root = await mount();
+  await type(root, 'alex');
+  await tap(rows(root)[0]);
+  expect(undoButtons(root)).toHaveLength(1);
+  expect(undoButtons(root)[0].props.accessibilityLabel).toBe('Undo add');
+
+  await tap(undoButtons(root)[0]);
+  await act(async () => {
+    jest.advanceTimersByTime(300);
+  });
+
+  expect(mockRemoveMember).toHaveBeenCalledWith('g-1', 'u-1', expect.objectContaining({ correlationId: expect.any(String) }));
+  expect(texts(root)).not.toContain('1 added');
+  expect(rows(root).some(r => String(r.props.accessibilityLabel).includes('Alex Chen'))).toBe(true);
+});
+
+it('a failed undo keeps the person and shows the error', async () => {
+  mockRemoveMember.mockRejectedValueOnce(new Error('boom'));
+  const root = await mount();
+  await type(root, 'alex');
+  await tap(rows(root)[0]);
+  await tap(undoButtons(root)[0]);
+  expect(texts(root)).toContain('Could not undo this. Please try again.');
+  expect(texts(root)).toContain('1 added');
+});
+
+it('an email invite has no "−"', async () => {
+  const root = await mount();
+  await type(root, 'new.person@example.com');
+  await tap(emailBtn(root, 'new.person@example.com') as Instance);
+  expect(texts(root)).toContain('new.person@example.com');
+  expect(undoButtons(root)).toHaveLength(0);
 });
 
 it('a valid email that matches nobody shows the Invite button and invites by email like Group Detail', async () => {

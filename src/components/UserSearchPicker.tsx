@@ -23,8 +23,10 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import { withCorrelationId } from '../api/correlationId';
 import { searchUsers } from '../api/users';
-import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
+import { borderWidth, colors, groupView, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { UserSearchResult } from '../types/user';
+import { SearchIcon } from './icons/ActionIcons';
+import PersonNames from './PersonNames';
 import TextField from './TextField';
 import UserAvatar from './UserAvatar';
 import type { LabelKey } from '../labels/fallbackLabels';
@@ -32,8 +34,17 @@ import { useT } from '../labels/LabelsContext';
 
 const DEBOUNCE_MS = 300;
 const AVATAR_SIZE = 40;
+const INVITE_AVATAR_SIZE = 44;
+const PLUS_SIZE = 36;
 const DOT_SIZE = 10;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * `classic`: the original boxed list with an "Invite" pill per row.
+ * `invite`: the WhatsApp-style Group invite list (docs/mockups/group-view/3-invite-search.png):
+ * rounded search box, uppercase section headings, a "+" button per row.
+ */
+export type UserSearchVariant = 'classic' | 'invite';
 
 export type SuggestionContext = 'players' | 'group_members' | 'team_players';
 
@@ -59,6 +70,7 @@ interface UserSearchPickerProps {
   refreshToken?: number;
   /** Optional content rendered directly under the text field, above the results (e.g. who was added). */
   belowInput?: React.ReactNode;
+  variant?: UserSearchVariant;
 }
 
 export default function UserSearchPicker({
@@ -74,6 +86,7 @@ export default function UserSearchPicker({
   suggestionContext = 'players',
   refreshToken = 0,
   belowInput,
+  variant = 'classic',
 }: UserSearchPickerProps): React.JSX.Element {
   const t = useT();
   const tRef = useRef(t);
@@ -214,6 +227,8 @@ export default function UserSearchPicker({
   const groupRows = sectioned ? visibleResults.filter(user => user.in_my_groups) : [];
   const otherRows = sectioned ? visibleResults.filter(user => !user.in_my_groups) : visibleResults;
 
+  const isInvite = variant === 'invite';
+
   const renderRow = (user: UserSearchResult, inGroup: boolean): React.JSX.Element => {
     const count = user.shared_group_count ?? 0;
     const groupName = (user.shared_group ?? '').trim();
@@ -238,7 +253,8 @@ export default function UserSearchPicker({
         key={user.id}
         style={({ pressed }) => [
           styles.resultRow,
-          inGroup ? styles.resultRowGroup : null,
+          isInvite ? styles.resultRowInvite : null,
+          inGroup && !isInvite ? styles.resultRowGroup : null,
           user.pending ? styles.resultRowDisabled : null,
           pressed && !locked ? styles.resultRowPressed : null,
         ]}
@@ -253,30 +269,28 @@ export default function UserSearchPicker({
           <UserAvatar
             imageUrl={user.image_url}
             name={user.display_name}
-            size={AVATAR_SIZE}
+            size={isInvite ? INVITE_AVATAR_SIZE : AVATAR_SIZE}
+            fallback={isInvite ? 'initials' : 'letter'}
           />
           <View style={styles.resultText}>
-            <View style={styles.nicknameRow}>
-              <Text style={styles.resultNickname} numberOfLines={1}>
-                {user.nickname}
-              </Text>
-              {chip ? (
-                <View style={styles.chip}>
-                  <Text style={styles.chipText} numberOfLines={1}>
-                    {chip}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={styles.resultDisplayName} numberOfLines={1}>
-              {user.display_name}
-            </Text>
+            <PersonNames displayName={user.display_name} nickname={user.nickname} />
+            {chip && !isInvite ? (
+              <View style={styles.chip}>
+                <Text style={styles.chipText} numberOfLines={1}>
+                  {chip}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
         {user.pending ? (
           <Text style={styles.pendingLabel}>{t('mob.user_search.pending')}</Text>
         ) : busyId === user.id ? (
           <ActivityIndicator size="small" color={colors.primary} />
+        ) : isInvite ? (
+          <View style={styles.plusButton}>
+            <Text style={styles.plusText}>+</Text>
+          </View>
         ) : (
           <View style={[styles.inviteButton, inGroup ? styles.inviteButtonGroup : null]}>
             <Text style={[styles.inviteButtonText, inGroup ? styles.inviteButtonTextGroup : null]}>
@@ -288,7 +302,12 @@ export default function UserSearchPicker({
     );
   };
 
-  const renderHeading = (text: string, inGroup: boolean): React.JSX.Element => (
+  const renderHeading = (text: string, inGroup: boolean): React.JSX.Element =>
+    isInvite ? (
+      <Text style={styles.inviteHeading} accessibilityRole="header">
+        {text}
+      </Text>
+    ) : (
     <View style={styles.headingRow}>
       <View style={[styles.dot, inGroup ? styles.dotGroup : styles.dotOther]} />
       <Text
@@ -300,19 +319,34 @@ export default function UserSearchPicker({
     </View>
   );
 
+  const field = (
+    <TextField
+      style={isInvite ? styles.inviteInput : styles.input}
+      placeholder={placeholder ?? t('mob.user_search.placeholder')}
+      value={query}
+      onChangeText={setQuery}
+      onFocus={handleFocus}
+      editable={!disabled}
+      autoCapitalize="none"
+      autoCorrect={false}
+      accessibilityLabel={t('mob.user_search.a11y')}
+    />
+  );
+
+  const suggestedHeading = t(HEADING_KEYS[suggestionContext]);
+
   return (
     <View>
-      <TextField
-        style={styles.input}
-        placeholder={placeholder ?? t('mob.user_search.placeholder')}
-        value={query}
-        onChangeText={setQuery}
-        onFocus={handleFocus}
-        editable={!disabled}
-        autoCapitalize="none"
-        autoCorrect={false}
-        accessibilityLabel={t('mob.user_search.a11y')}
-      />
+      {isInvite ? (
+        <View style={styles.inviteSearchWrap}>
+          <View style={styles.inviteSearchIcon} pointerEvents="none">
+            <SearchIcon size={20} color={groupView.textSecondary} />
+          </View>
+          {field}
+        </View>
+      ) : (
+        field
+      )}
       {belowInput}
       {isSearching ? (
         <View style={styles.statusRow}>
@@ -322,10 +356,11 @@ export default function UserSearchPicker({
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {showEmpty ? <Text style={styles.emptyText}>{t('mob.user_search.no_matches')}</Text> : null}
       {showEmailAffordance ? (
-        <View style={styles.resultsList}>
+        <View style={isInvite ? undefined : styles.resultsList}>
           <Pressable
             style={({ pressed }) => [
               styles.resultRow,
+              isInvite ? styles.resultRowInvite : null,
               pressed ? styles.resultRowPressed : null,
             ]}
             onPress={() => handleSelectEmail(trimmed)}
@@ -341,22 +376,29 @@ export default function UserSearchPicker({
           </Pressable>
         </View>
       ) : null}
-      {!isSearching && visibleResults.length > 0 ? (
+      {!isInvite && !isSearching && visibleResults.length > 0 ? (
         <Text style={styles.listTitle} accessibilityRole="header">
-          {t(HEADING_KEYS[suggestionContext])}
+          {suggestedHeading}
         </Text>
       ) : null}
       {!isSearching && visibleResults.length > 0 ? (
-        <View style={styles.resultsList}>
+        <View style={isInvite ? undefined : styles.resultsList}>
           {groupRows.length > 0 ? (
             <>
-              {renderHeading(t('mob.user_search.heading_in_your_groups'), true)}
+              {renderHeading(isInvite ? suggestedHeading : t('mob.user_search.heading_in_your_groups'), true)}
               {groupRows.map(user => renderRow(user, true))}
             </>
           ) : null}
+          {isInvite && groupRows.length > 0 && otherRows.length > 0 ? (
+            <View style={styles.inviteSectionGap} />
+          ) : null}
           {otherRows.length > 0 ? (
             <>
-              {sectioned ? renderHeading(t('mob.user_search.heading_other'), false) : null}
+              {sectioned
+                ? renderHeading(t('mob.user_search.heading_other'), false)
+                : isInvite
+                  ? renderHeading(suggestedHeading, true)
+                  : null}
               {otherRows.map(user => renderRow(user, false))}
             </>
           ) : null}
@@ -412,8 +454,6 @@ const styles = StyleSheet.create({
   resultRowDisabled: { opacity: 0.6 },
   resultLeft: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
   resultText: { flexShrink: 1, marginLeft: spacing.md },
-  nicknameRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
-  resultNickname: { ...typography.bodyBold, color: colors.textPrimary, flexShrink: 1 },
   resultDisplayName: { ...typography.caption, color: colors.textSecondary },
   chip: {
     marginLeft: spacing.sm,
@@ -437,5 +477,42 @@ const styles = StyleSheet.create({
   inviteButtonText: { ...typography.caption, color: colors.textSecondary },
   inviteButtonTextGroup: { color: colors.white },
   emailAffordanceTitle: { ...typography.bodyBold, color: colors.primary },
+  inviteInput: {
+    backgroundColor: groupView.searchBg,
+    borderWidth: 0,
+    borderRadius: 14,
+    paddingLeft: 48,
+    minHeight: sizes.touchTarget + 8,
+  },
+  inviteSearchWrap: { justifyContent: 'center', marginBottom: spacing.sm },
+  inviteSearchIcon: { position: 'absolute', left: spacing.md, zIndex: 1 },
+  inviteHeading: {
+    ...typography.label,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: groupView.textSecondary,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  inviteSectionGap: {
+    height: spacing.sm,
+    backgroundColor: groupView.sectionBg,
+    marginHorizontal: -spacing.md,
+  },
+  resultRowInvite: {
+    paddingHorizontal: 0,
+    borderBottomWidth: 0,
+    minHeight: sizes.touchTarget + 8,
+  },
+  plusButton: {
+    width: PLUS_SIZE,
+    height: PLUS_SIZE,
+    borderRadius: PLUS_SIZE / 2,
+    borderWidth: 1.5,
+    borderColor: groupView.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plusText: { fontSize: 22, lineHeight: 26, color: groupView.blue },
   pendingLabel: { ...typography.caption, color: colors.textMuted },
 });

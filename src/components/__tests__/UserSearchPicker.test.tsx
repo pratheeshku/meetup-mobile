@@ -4,6 +4,7 @@
  * race-guard logic run for real, driven with fake timers.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
 
 import { searchUsers } from '../../api/users';
 import { act, render, texts } from '../../test-utils/render';
@@ -141,13 +142,45 @@ describe('results', () => {
     await settle();
 
     const row = root.find(
-      node => node.props.accessibilityRole === 'button' && node.props.accessibilityLabel === 'sam99, Sam Smith',
+      node => node.props.accessibilityRole === 'button' && node.props.accessibilityLabel === 'Sam Smith, sam99',
     );
     act(() => row.props.onPress());
 
     expect(onSelect).toHaveBeenCalledWith(USER);
     expect(searchInput(root).props.value).toBe('');
     expect(texts(root)).not.toContain('sam99');
+  });
+
+  it('shows the display name first and the nickname underneath, smaller, in every row', async () => {
+    mockSearchUsers.mockResolvedValue([USER]);
+    const root = render(<UserSearchPicker onSelect={jest.fn()} />);
+    type(root, 'sam');
+    await settle();
+
+    const row = root.find(node => node.props.testID === 'user-search-row' && typeof node.props.onPress === 'function');
+    const t = texts(row);
+    expect(t.indexOf('Sam Smith')).toBeLessThan(t.indexOf('sam99'));
+    const nameNode = row.find(n => (n.type as unknown) === 'Text' && n.props.children === 'Sam Smith');
+    const nickNode = row.find(n => (n.type as unknown) === 'Text' && n.props.children === 'sam99');
+    expect(StyleSheet.flatten(nickNode.props.style).fontSize as number).toBeLessThan(
+      StyleSheet.flatten(nameNode.props.style).fontSize as number,
+    );
+  });
+
+  it('invite variant: "+" button per row, uppercase-style section headings', async () => {
+    mockSearchUsers.mockResolvedValue([
+      { ...USER, has_group_info: true, in_my_groups: true },
+      { ...USER, id: 'u-2', display_name: 'Rachel Ong', nickname: 'rachelo', has_group_info: true, in_my_groups: false },
+    ]);
+    const root = render(<UserSearchPicker variant="invite" suggestionContext="players" onSelect={jest.fn()} />);
+    type(root, 'sam');
+    await settle();
+
+    const t = texts(root);
+    expect(t).toContain('Suggested players');
+    expect(t).toContain('Other players');
+    expect(t.filter(x => x === '+')).toHaveLength(2);
+    expect(t).not.toContain('Invite');
   });
 
   it('shows a pending match as unselectable, labelled "Pending"', async () => {
@@ -162,7 +195,7 @@ describe('results', () => {
     const row = root.find(
       node =>
         node.props.accessibilityRole === 'button' &&
-        node.props.accessibilityLabel === 'sam99, Sam Smith, already invited',
+        node.props.accessibilityLabel === 'Sam Smith, sam99, already invited',
     );
     expect(row.props.accessibilityState).toEqual({ disabled: true, busy: false });
     act(() => row.props.onPress());
