@@ -14,3 +14,7 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - v1.3 (2026-10-18): group deletion guard and group invitations need membership (backend/web scope; mobile only shows the server's 409 message on delete group). Copy synced from ~/meetup.
 - v1.2 (2026-10-18): owner decisions after ac-p1-verify. Copy of the backend repo's document.
 - v1.5 (2026-10-18): D-10 test-data exception to the AD-9 membership audit (backend scope; no mobile change). Copy of the backend repo's document.
+
+## DES-MEETUP-ADDENDUM-user-details-menu.md
+- v1.0 (2026-10-19): approved by the owner. Reusable user menu (View Details first, role-based actions from per-module card endpoints, one component per platform). Supersedes the PR #39 long-press card (D-1). Phases 3 and 4 gated on a board (OI-6).
+

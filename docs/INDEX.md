@@ -25,6 +25,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - DES-MEETUP-ADDENDUM-tournament-lifecycle.md: tournament v2 (see also the mobile brief for it).
 - DES-MEETUP-ADDENDUM-invitation-response.md: Accept on a game invitation means joining (going or waitlisted); mobile scope is task ia-clients (show the outcome, keep Accept/Decline on refusal). Brief: `~/meetup/docs/briefs/BRIEF-invitation-response.md`.
 - DES-MEETUP-ADDENDUM-access-consistency.md: no access means no view; mobile scope is AD-8 only (refetch on open, 404 closes the screen). Brief: `~/meetup/docs/briefs/BRIEF-access-consistency-mobile.md`.
+- DES-MEETUP-ADDENDUM-user-details-menu.md: one reusable user menu on every avatar or name (long-press on mobile, click on web), View Details first, server-computed role actions, labels via admin. UI build gated on a board (OI-6). Tasks ud-p1-verify, ud-backend, ud-mobile, ud-web.
 - DES-MEETUP-ADDENDUM-approval-context-signing.md, -profile-onboarding.md: approvals, first-run profile steps.
 - DES-MEETUP-MOBILE-ADDENDUM-shareable-links.md: share links and deep links.
 - MOBILE-ADDENDUM-skill-level-delete.md, MOBILE-ADDENDUM-sports-filter-preselect.md: mobile-only features.
