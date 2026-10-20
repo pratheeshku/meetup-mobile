@@ -25,6 +25,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - DES-MEETUP-ADDENDUM-tournament-lifecycle.md: tournament v2 (see also the mobile brief for it).
 - DES-MEETUP-ADDENDUM-invitation-response.md: Accept on a game invitation means joining (going or waitlisted); mobile scope is task ia-clients (show the outcome, keep Accept/Decline on refusal). Brief: `~/meetup/docs/briefs/BRIEF-invitation-response.md`.
 - DES-MEETUP-ADDENDUM-access-consistency.md: no access means no view; mobile scope is AD-8 only (refetch on open, 404 closes the screen). Brief: `~/meetup/docs/briefs/BRIEF-access-consistency-mobile.md`.
+- DES-MEETUP-ADDENDUM-user-details-menu.md: one reusable user menu on every avatar or name (mobile: tap opens View Details, long-press opens the menu; web: click), View Details first, server-computed role actions, labels via admin. Mobile scope is tasks ud-p1-verify-mobile and ud-mobile; UI build gated on a board (OI-6) and on ud-backend being deployed. Brief: `~/meetup/docs/briefs/BRIEF-user-details-menu-mobile.md`.
 - DES-MEETUP-ADDENDUM-approval-context-signing.md, -profile-onboarding.md: approvals, first-run profile steps.
 - DES-MEETUP-MOBILE-ADDENDUM-shareable-links.md: share links and deep links.
 - MOBILE-ADDENDUM-skill-level-delete.md, MOBILE-ADDENDUM-sports-filter-preselect.md: mobile-only features.
@@ -38,7 +39,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - Enterprise_Design_Principles.md (P1-P17) and design-best-practices.md (BP-01-BP-13). Not in this repo; they live in the owner's Architect Project and the Sadhana repo.
 
 ## Active work
-- Build briefs live in the backend repo: `~/meetup/docs/briefs/` (tournament Release 1 mobile, venue catalogue mobile, access consistency mobile). Read only the brief for your task ID.
+- Build briefs live in the backend repo: `~/meetup/docs/briefs/` (tournament Release 1 mobile, venue catalogue mobile, access consistency mobile, user details menu mobile). Read only the brief for your task ID.
 - status/: per-task status files (for example `vc-m-*-status.md`). Update the one for your task ID.
 - ../implementation-status-*.md (repo root): per-design implementation status.
 
@@ -46,6 +47,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - Canvas (human only, agents cannot read it): https://claude.ai/artifact/SRavBx8jwnK8kK1QjVovnM. Board names match it.
 - design-ref-venue/: venue boards. `png/` for the look, `html/` for exact sizes, spacing and tokens (plain inline-styled markup; read it for dimensions). Key boards: Game3When, EditGame2, TournSched*, FXEdit*, GameDetail.
 - design/notifications/: notifications screen captures (`design/notifcations/` is an older misspelt copy).
+- mockups/user-menu/: user details menu board (user-menu-board.png for look, .html for sizes): menu, View Details, confirmation, notices, home-card avatars, tournament rows, web popover. APPROVED by the owner 2026-10-19 (design v1.3, OI-6 closed).
 - ../design-ref/ (group screens), ../design-ref-p23/, ../design-refs/home-v2/ (repo root): earlier reference sets.
 - Boards labelled "Phase 2" are not built. If no board exists for a screen, build it minimal with existing components and tokens, then ask the owner to review.
 
