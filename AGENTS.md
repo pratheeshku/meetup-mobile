@@ -34,5 +34,6 @@ api (Axios client, correlation IDs, auth event bus) · auth · storage (Keychain
 | Build or change a feature (task ID) | docs/INDEX.md, then the DES addendum and the brief in `~/meetup/docs/briefs/` for that task |
 | Build or change any screen, form or navigation | docs/INDEX.md, section "Design reference (UI)": open the matching board (png for look, html for sizes) before writing UI |
 | Build or change profile stats (Played, Won, Hosted), game or tournament status chips, the Upcoming games count or list, the Games list filter, past-date validation, or anything after a game's end time | docs/DES-MEETUP-ADDENDUM-closure-report.md (approved 2026-10-20; the source of truth) |
+| Build or change Accept, Decline, Join or Withdraw on a game or tournament, the Declined state, the organizer response list, or the invitation push buttons | docs/DES-MEETUP-ADDENDUM-decline-response.md (approved 2026-10-20; the source of truth) |
 | Check what a requirement or design says | docs/INDEX.md |
 | Need a doc's amendment history | docs/CHANGELOG-DOCS.md |

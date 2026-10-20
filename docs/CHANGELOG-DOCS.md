@@ -4,6 +4,10 @@ One section per document. Version and amendment narrative belongs here; document
 ## DES-MEETUP-MOBILE.md and addenda
 Not yet migrated. Amendment narrative still sits in each document's header and review log and moves here in a separate architect edit.
 
+## DES-MEETUP-ADDENDUM-decline-response.md
+- v1.0 (2026-10-20): approved by the owner; no content change from v0.1. Copy of the backend repo's document; the backend copy is the one the owner updates.
+- v0.1 (2026-10-20): first draft. Decisions: Accept/Decline on invited, public and joined items; public decline hides the item and tells the organizer; Outlook-style organizer response list; tournament Accepted = invitation reply; no decline notification; push buttons Accept and Decline. Deviations D-1 to D-3.
+
 ## DES-MEETUP-ADDENDUM-closure-report.md
 - v1.0 (2026-10-20): approved by the owner. Copy of the backend repo's document; the backend copy is the one the owner updates. Mobile scope: task cr-mobile, after cr-backend is deployed.
 
