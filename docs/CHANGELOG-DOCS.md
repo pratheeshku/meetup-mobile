@@ -11,6 +11,7 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - v1.0 wording (2026-10-20, owner answers): OI-1 closed (no boards, existing components only), OI-2 and OI-4 confirmed, OI-6 notes the flag is a `platform_config` key editable in admin. No scope change.
 - v1.0 (2026-10-20): approved by the owner; no content change from v0.1. Copy of the backend repo's document; the backend copy is the one the owner updates.
 - v0.1 (2026-10-20): first draft. Decisions: Accept/Decline on invited, public and joined items; public decline hides the item and tells the organizer; Outlook-style organizer response list; tournament Accepted = invitation reply; no decline notification; push buttons Accept and Decline. Deviations D-1 to D-3.
+- v1.1 (2026-10-20): owner decision, option A. New AD-11 (a declined invitee keeps view of the invitation-only game or invite tournament while a current decline record exists) and DR-T14; AD-4 wording; OI-6 corrected (`app_config`, no admin editor, verified true in prod 2026-10-20). Found by `test_dr_t1` in the first full pytest run.
 
 ## DES-MEETUP-ADDENDUM-closure-report.md
 - v1.0 (2026-10-20): approved by the owner. Copy of the backend repo's document; the backend copy is the one the owner updates. Mobile scope: task cr-mobile, after cr-backend is deployed.
@@ -32,6 +33,7 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - v1.3 (2026-10-18): group deletion guard and group invitations need membership (backend/web scope; mobile only shows the server's 409 message on delete group). Copy synced from ~/meetup.
 - v1.2 (2026-10-18): owner decisions after ac-p1-verify. Copy of the backend repo's document.
 - v1.5 (2026-10-18): D-10 test-data exception to the AD-9 membership audit (backend scope; no mobile change). Copy of the backend repo's document.
+- v1.6 (2026-10-20): AD-1 gains one narrow view basis for a declined invitee with a current decline record (decline-response AD-11); mandated test 7 updated. The group-leaver and no-record cases still deny.
 
 ## DES-MEETUP-ADDENDUM-user-details-menu.md
 - v1.0 (2026-10-19): approved by the owner. Reusable user menu (View Details first, role-based actions from per-module card endpoints, one component per platform). Supersedes the PR #39 long-press card (D-1). Phases 3 and 4 gated on a board (OI-6).

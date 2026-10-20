@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
 
 **Doc ID:** DES-MEETUP-ADDENDUM-ACCESS-CONSISTENCY
-**Version:** v1.5
+**Version:** v1.6
 **Status:** APPROVED by the owner, 2026-10-18 (v1.1 amendment, same day: owner constraint on DB-side validation). v1.2 (same day) records the owner's decisions after `ac-p1-verify` (D-5 to D-8, approved 2026-10-18). The Phase 6 policy removal is gated on OI-10 (live counts and the reconcile); all other phases are unblocked. v1.3 (same day) records the owner's decisions on group deletion and group invitations (AC-15, AC-16, AD-13, AD-14, D-9, tests 23-29) and repairs the v1.2 edit, which had dropped rows D-4 and OI-8 and left two tables malformed. v1.4 (same day, owner approved) adds the recurring-games job to the attach paths of AD-13, fixes the tournament status list (no draft status; `dissolved` is closed) and adds test 30 (task `ac-bug-2b`). v1.5 (same day) adds D-10: the regression-suite sweeper may delete audit rows of its own synthetic accounts (owner instruction 2026-10-18 14:34 SGT; AC-12, AD-9, section 5.1, section 6, test 31, OI-13).
 **Owner:** Pratheesh
 **Date:** 2026-10-18
@@ -85,6 +85,8 @@ Group membership changes (added, removed, left, role changed, ownership moved, a
 | Tournament `invite` | organizer; active committee; platform admin; invitation in `pending` or `accepted` where, if group-sourced, the user is a current member of the source group |
 
 Participant rows, registration rows and team roster rows **never** grant view. A denied read is 404. Every group-membership basis also requires `groups.is_deleted = false` (D-5).
+
+**v1.6 amendment (2026-10-20, owner decision; `DES-MEETUP-ADDENDUM-decline-response` AD-11):** one added basis for `invite_only` games and `invite` tournaments. An invitation in status `declined` grants view only while the caller also has a current decline record (`cleared_at IS NULL`) for that item and, if the invitation is group-sourced, is a current member of its `source_group_id`. `revoked`, `expired`, and a `declined` invitation with no decline record still deny. This keeps the 2026-10-17/18 incident closed (a person who left a group, or whose invitation was declined by other means, sees nothing) while letting a person who declined through the Decline action see the Declined state and Accept again.
 **Code today (BP-01):** `events/policies.py:64` ORs `_participant` (line 57) and `_invited` (line 51, status only); `tournaments/policies.py:134` ORs `_registered` (line 119) and `_invited` (line 95). These are the defects. The inline invite check in `events/router.py:170` and the inline pre-filter in `events/repository.py:64-70` duplicate the rule and are removed so one rule remains (lineage §5.2).
 
 **AD-2: Derived versus explicit access (AC-06).**
@@ -294,7 +296,7 @@ Risk classification (blast × exploitability): view policies **High**; cascade *
 4. Removing a group from a game (organizer edit) removes access for users who had it only through that group; users with a direct invitation or the organizer keep it.
 5. A direct invitee and an organizer-added participant of a group game keep access and can RSVP after leaving or never being in the group.
 6. Participant, registration and roster rows alone grant no view (public aside), for games and tournaments.
-7. `invite_only` game: a `declined` or `revoked` invitation denies; a pending or accepted one allows.
+7. `invite_only` game: a `declined` or `revoked` invitation denies; a pending or accepted one allows. (v1.6: a `declined` invitation with a current decline record allows, per decline-response AD-11; a `declined` one without a record, and a `revoked` one, still deny.)
 8. Denied reads return 404 and never 403.
 9. Concurrent RSVP and removal: no orphan `going` row and no deadlock.
 10. Cascade failure rolls back the membership change.

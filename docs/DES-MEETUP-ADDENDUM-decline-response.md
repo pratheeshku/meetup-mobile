@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-DECLINE-RESPONSE
 
 **Doc ID:** DES-MEETUP-ADDENDUM-DECLINE-RESPONSE
-**Version:** v1.0
-**Status:** APPROVED by the owner, 2026-10-20, as drafted in v0.1 (OI-1 to OI-5 stay open and non-blocking unless marked).
+**Version:** v1.1
+**Status:** APPROVED by the owner, 2026-10-20, as drafted in v0.1 (OI-1 to OI-5 stay open and non-blocking unless marked). v1.1 (2026-10-20, owner decision, option A): adds AD-11 (a declined invitee keeps view of the invitation-only item) and DR-T14; amends `DES-MEETUP-ADDENDUM-access-consistency` AD-1 to v1.6; corrects OI-6.
 **Owner:** Pratheesh
 **Date:** 2026-10-20
 **Scale Tier:** T1
@@ -61,7 +61,9 @@ The organizer sees a response list like an Outlook meeting: **Accepted**, **Pend
 - **No new join or accept route.** Accept on an invitation is `POST .../invitations/respond` `accept: true`; Join is the existing RSVP or registration. Each of those, on success, sets `cleared_at` on the caller's decline row in the same transaction.
 - The push Decline for an invitee calls `.../invitations/respond` with `accept: false` (push-actions PA-11 stays true: no new action endpoint). `respond(accept=false)` now also upserts the decline row, so every decline path produces the same record.
 
-**AD-4: Lists and counts (DR-03).** For the caller, items with a current decline row are excluded from: `GET /events` and `GET /tournaments` default and `view=active` result, the Public scope, `GET /home/upcoming`, the Upcoming badge and tab count, and `GET /home/menu` / `GET /home/summary` counts (they use the single upcoming function, closure addendum AD-8). Under `view=all` they are included with the caller's badge `Declined`. Access is unchanged: a declined item still opens by link or notification (no view or access rule changes). Items and detail responses gain additive `my_declined` (bool). `GameBadge` gains the value `Declined`. Old clients that send nothing keep working.
+**AD-4: Lists and counts (DR-03).** For the caller, items with a current decline row are excluded from: `GET /events` and `GET /tournaments` default and `view=active` result, the Public scope, `GET /home/upcoming`, the Upcoming badge and tab count, and `GET /home/menu` / `GET /home/summary` counts (they use the single upcoming function, closure addendum AD-8). Under `view=all` they are included with the caller's badge `Declined`. A declined item still opens by link or notification: public, group and joined items through the existing view rules, and an invited item through the narrow view basis in AD-11 (v1.1). Items and detail responses gain additive `my_declined` (bool). `GameBadge` gains the value `Declined`. Old clients that send nothing keep working.
+
+**AD-11: View basis for a declined invitee (v1.1; amends access-consistency AD-1; owner decision 2026-10-20, option A).** Access-consistency AD-1 lets only a `pending` or `accepted` invitation grant view. Without a change, a person who declines an `invite_only` game or an `invite` tournament would lose the item (404), could not see the Declined state under All games, and could not Accept again (DR-03, DR-05). Found by `test_dr_t1` in the first full pytest run. A new narrow basis is added to each module's view rule: the caller holds an invitation in status `declined` **and** a current decline record (`cleared_at IS NULL`) for that item **and**, if the invitation is group-sourced, is a current member of its `source_group_id`. Status `revoked` and `expired` never grant. A `declined` invitation with no current decline record (declined before this feature, or declined through an organizer re-add) still denies, so the incident class that access-consistency closed stays closed. The basis lives in `events/policies.py` and `tournaments/policies.py` and reads that module's own decline table (no sibling import). When the user accepts or joins again the decline record is cleared and the invitation becomes `accepted`, so the normal basis applies. The same predicate feeds detail, list, counts, search, streams and notification audience (one rule per object type, access-consistency AC-01).
 
 **AD-5: Organizer response list (DR-06, DR-07).** `GET .../responses` returns:
 
@@ -166,6 +168,7 @@ Correlation id per action (`withCorrelationId()` on clients). Request-log metric
 | DR-T11 | Push Decline path (`respond` `accept:false`) produces the same decline row as the in-app Decline. |
 | DR-T12 | Old client (no new fields) lists and detail unchanged; response additions are additive only. |
 | DR-T13 | Closure candidates and Played/Won/Hosted unaffected by declines. |
+| DR-T14 | (v1.1, AD-11) `invite_only` game and `invite` tournament: after decline the invitee gets 200 on detail with `my_declined` true, sees the item under `view=all` with the Declined badge, and can Accept again. A declined, group-sourced invitee who has left the source group gets 404. A `declined` invitation with no decline record gets 404. A `revoked` invitation after a decline gets 404. Also assert on list, counts and search, not only detail. |
 
 Mobile and web: control states per item type (invited, public, joined), Declined badge under All games, responses sections, push action buttons Accept and Decline, result messages, `npm run check:labels` / label checks.
 
@@ -231,7 +234,7 @@ Rollback: redeploy the previous version; the tables are additive and stay; hidde
 | OI-3 | Verify whether the existing withdraw path notifies the organizer; if so, suppress for decline | 🟡 MEDIUM | Phase 1 verify |
 | OI-4 | On a joined item, the existing withdraw/leave control takes the Decline label (owner confirmed 2026-10-20); Phase 1 only checks the screens do not already show both | 🟡 MEDIUM | Closed, Phase 1 check remains |
 | OI-5 | P17 rate limit on the new routes | 🟡 MEDIUM | Phase 1 verify |
-| OI-6 | `meetup.tournament.invitations.enabled` (a `platform_config` key, seeded false, editable in the admin config console) must be true in production for tournament Accept/Decline (the respond endpoint answers 404 otherwise) | 🟠 HIGH | Verify before `dr-web`; same as push-actions OI-5 |
+| OI-6 | `meetup.tournament.invitations.enabled` must be true in production for tournament Accept/Decline (the respond endpoint answers 404 otherwise). v1.1 correction: it is a row in the `app_config` table (not `platform_config`), seeded false by migration `b3f7a2c91d48`, and the admin console has no editor for it; the human changes it with SQL. Verified true in production on 2026-10-20 (set 2026-10-17) | 🟠 HIGH | Closed |
 
 ## 15. Risks and mitigations
 
@@ -246,5 +249,6 @@ Rollback: redeploy the previous version; the tables are additive and stay; hidde
 
 | Version | Date | Note |
 |---|---|---|
+| v1.1 | 2026-10-20 | Owner chose option A after the first full pytest run found the conflict with access-consistency AD-1 (`test_dr_t1`). Adds AD-11 and DR-T14; amends AD-4 wording; OI-6 corrected (`app_config`, not the admin console). |
 | v1.0 | 2026-10-20 | Approved by the owner, no content change from v0.1. |
 | v0.1 | 2026-10-20 | First draft after elicitation (scope all items, option 2 organizer visibility, tournament Accepted = invitation reply, no notification, push Accept/Decline). Code facts read from `meetup` `main`. |
