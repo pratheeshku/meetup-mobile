@@ -21,8 +21,9 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 ## Design addenda (read together with the baseline)
 - DES-MEETUP-ADDENDUM-IOS-App.md, -IOS-PN-Support.md: iOS app and iOS push.
 - DES-MEETUP-ADDENDUM-email-auth.md, -social-login.md: email auth and login providers.
-- DES-MEETUP-ADDENDUM-dashboard.md: dashboard and the bottom bar navigation rules.
-- DES-MEETUP-ADDENDUM-tournament-lifecycle.md: tournament v2 (see also the mobile brief for it).
+- DES-MEETUP-ADDENDUM-dashboard.md: dashboard and the bottom bar navigation rules. v1.9 adds the Upcoming games definition (AD-20) and the Games screen status filter (AD-21).
+- DES-MEETUP-ADDENDUM-tournament-lifecycle.md: tournament v2 (see also the mobile brief for it). v1.3 adds the tournament closure report (AD-18).
+- DES-MEETUP-ADDENDUM-closure-report.md: game and tournament closure report, computed lifecycle status (active, cancelled, past, closed), Played/Won/Hosted source, upcoming window, past-date validation, active/all toggle. Approved 2026-10-20. Mobile scope is task cr-mobile, after cr-backend is deployed. Brief: `~/meetup/docs/briefs/BRIEF-closure-report-mobile.md`.
 - DES-MEETUP-ADDENDUM-invitation-response.md: Accept on a game invitation means joining (going or waitlisted); mobile scope is task ia-clients (show the outcome, keep Accept/Decline on refusal). Brief: `~/meetup/docs/briefs/BRIEF-invitation-response.md`.
 - DES-MEETUP-ADDENDUM-access-consistency.md: no access means no view; mobile scope is AD-8 only (refetch on open, 404 closes the screen). Brief: `~/meetup/docs/briefs/BRIEF-access-consistency-mobile.md`.
 - DES-MEETUP-ADDENDUM-user-details-menu.md: one reusable user menu on every avatar or name (mobile: tap opens View Details, long-press opens the menu; web: click), View Details first, server-computed role actions, labels via admin. Mobile scope is tasks ud-p1-verify-mobile and ud-mobile; UI build gated on a board (OI-6) and on ud-backend being deployed. Brief: `~/meetup/docs/briefs/BRIEF-user-details-menu-mobile.md`.
@@ -39,7 +40,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - Enterprise_Design_Principles.md (P1-P17) and design-best-practices.md (BP-01-BP-13). Not in this repo; they live in the owner's Architect Project and the Sadhana repo.
 
 ## Active work
-- Build briefs live in the backend repo: `~/meetup/docs/briefs/` (tournament Release 1 mobile, venue catalogue mobile, access consistency mobile, user details menu mobile). Read only the brief for your task ID.
+- Build briefs live in the backend repo: `~/meetup/docs/briefs/` (tournament Release 1 mobile, venue catalogue mobile, access consistency mobile, user details menu mobile, closure report mobile). Read only the brief for your task ID.
 - status/: per-task status files (for example `vc-m-*-status.md`). Update the one for your task ID.
 - ../implementation-status-*.md (repo root): per-design implementation status.
 

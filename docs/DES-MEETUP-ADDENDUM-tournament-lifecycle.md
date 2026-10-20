@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-LIFECYCLE
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-LIFECYCLE
-**Version:** v1.2.2 (amends v1.2.1; review rounds 1–9: see §15)
-**Status:** v1.1 APPROVED (owner, 2026-10-14). **v1.2 APPROVED (owner, 2026-10-16). v1.2.1 (`my_invitation_status`) APPROVED (owner, 2026-10-16). v1.2.2 (implementation rulings) APPROVED (owner, 2026-10-16).** Non-blocking open items remain in §14 (OI-5–OI-9, OI-12–OI-14).
+**Version:** v1.3 (amends v1.2.2; review rounds 1–9: see §15)
+**Status:** v1.1 APPROVED (owner, 2026-10-14). **v1.2 APPROVED (owner, 2026-10-16). v1.2.1 (`my_invitation_status`) APPROVED (owner, 2026-10-16). v1.2.2 (implementation rulings) APPROVED (owner, 2026-10-16).** **v1.3 (closure report, AD-18) APPROVED (owner, 2026-10-20) together with `DES-MEETUP-ADDENDUM-closure-report.md` v1.0.** Non-blocking open items remain in §14 (OI-5–OI-9, OI-12–OI-14).
 **Owner:** Pratheesh
 **Date:** 2026-10-16
 **Scale Tier:** T1
@@ -45,6 +45,13 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 4. **Visibility is unchanged:** `public`, `group`, `invite`. No `private` value, no visibility migration.
 5. **Existing (v1) tournaments get invitations too**, behind a flag. The one v1 behaviour change: on an `invite` tournament, an invited person who has accepted may register themselves (today only the organizer registers people).
 6. Housekeeping: the §10 inconsistency about when v2 creation is enabled is fixed (Phase 10). New TL-71 to TL-73, config keys, tests 35–42, OI-12, OI-13, deviations D-6 and D-7.
+
+### v1.3 amendment (what changed, approved 2026-10-20)
+
+1. **A tournament gets a closure report** (owner decision, 2026-10-20): after the end time the organizer or an active committee member records whether it was completed or not held, who took part, the winner and the runner-up (a player or a team). Full design, schema and tests: `DES-MEETUP-ADDENDUM-closure-report.md` (AD-3). Summary in AD-18, requirements TL-74 to TL-77.
+2. **The profile counts Won, Played and Hosted from closure reports.** The fixture-win count behind "Won" and the RSVP counts are retired. Fixtures and results (AD-10) are unchanged and stay the record of matches; they are no longer a stats source.
+3. **Lifecycle status** shown in lists: active, cancelled (`cancelled` or `dissolved`), past (shown as Pending closure) and closed (has a closure report). Computed, no stored status is added, and the status machine of AD-6 is untouched. Stored `completed` (close-out) does not mean closed.
+4. **Lock after the end time**: details, registration, invitations and committee membership are locked from the end time. Result entry, standings publication and close-out stay open (closure addendum D-3, OI-1).
 
 ---
 
@@ -104,6 +111,10 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 | TL-71 | Invitations apply to every tournament, v1 and v2, behind `meetup.tournament.invitations.enabled`. Visibility values stay `public`, `group`, `invite`. (v1.2) |
 | TL-72 | An invitation by email works for people without an account: the emailed link claims the invitation at sign-up, as for games. Accepting an invitation to an `invite` tournament makes the invitee eligible to register; it does not register them. (v1.2) |
 | TL-73 | Invitations are accepted only while registration is open. After that the committee adds individuals (TL-15). (v1.2) |
+| TL-74 | After the tournament's end time (`coalesce(ends_at, starts_at)`), the organizer or an active committee member can submit a closure report: outcome `completed` or `not_held`; if completed, which registrations took part, the winner and the runner-up. No scores, no free text. (v1.3) |
+| TL-75 | The closure report can be edited after submission. Every submission is a numbered, append-only version. (v1.3) |
+| TL-76 | Played, Won and Hosted on the profile come only from closure reports. Each person in a winning team registration gets one Won; the member set is a snapshot taken at submission. Fixture wins no longer count. (v1.3) |
+| TL-77 | Lists show a computed lifecycle status (active, cancelled, past, closed) and an "All tournaments" toggle (default: active only), as for games. Tournaments that ended before release are not backfilled and show as Pending closure. (v1.3) |
 
 ---
 
@@ -262,6 +273,14 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 - **Failure behaviour:** parse or validation failure → 422 with up to 50 row reasons, no draft, no state change. The file is processed in the request within `upload_max_seconds`; timeout → 503 with no draft. Concurrent uploads to the same tournament are serialised by the existing tournament advisory lock (AD-6 ordering).
 - **Audit:** `admin_action_log`/committee audit entry per upload (who, when, hash, row count, pass/fail and reason codes). File contents are not logged.
 - **Sockets for Release 2:** `source` CHECK already admits `engine`; `meetup.tournament.fixture_engine.enabled` (default false) gates AD-8 endpoints; the draft screen and approval flow are source-agnostic. Enabling the engine is configuration plus the AD-8 build, not a rewrite. OI-2 (AI provider wording and DPA) is **not needed for Release 1**; it must still be confirmed before `fixture_engine.enabled` is turned on.
+
+**AD-18 — Tournament closure report and lifecycle status (v1.3).** Full design in `DES-MEETUP-ADDENDUM-closure-report.md`; this AD records only what binds the tournaments module.
+- **Closure report:** `tournament_closures`, `tournament_closure_players`, `tournament_closure_revisions` (closure addendum §5.1), written only by `tournaments/closure_service.py`. Submitted by the organizer or an active committee member under the AD-7 rule, from `coalesce(ends_at, starts_at)`, never for a `cancelled` or `dissolved` tournament. Winner, runner-up and attendees are `tournament_registrations` with `status = 'registered'`; one winner registration; runner-up required when two or more registrations took part. Every submission is a numbered, append-only version with an `expected_version` check.
+- **Credit:** one row per person at submission (the user of an individual registration; each member of a team registration under the AD-6 member rule). Roster changes after submission never change past stats.
+- **Lifecycle status** (computed, closure addendum AD-1): `closed` (a closure row exists), `cancelled` (`cancelled` or `dissolved`), `past` (no closure, end reached), `active`. No new stored status; the `chk_tournaments_status` list is not changed. Stored `completed` (close-out, AD-10 and TL-35) is independent and does not imply `closed`.
+- **Close-out feedback** (`tournament_closeouts`) is not merged with the closure report (closure addendum §7, deferred with a gate).
+- **Lock:** from the end time, tournament details, registration, invitations and committee membership return 409. Result entry, standings publication and close-out are not locked (closure addendum D-3).
+- **Retired:** the "Won" count from `tournament_fixtures.winner_registration_id` in `users/repository.py::get_profile_summary`. Fixtures, results and standings are unchanged.
 - Rejected: parsing names (ambiguous, PII-fragile); CSV (encoding and injection ambiguity); storing the raw file (unscanned binary at rest, no benefit since the payload is the evidence); inferring advancement from round order (silently wrong for third-place and groups-then-knockout).
 
 ---
@@ -502,6 +521,7 @@ Risk classification (blast × exploitability): committee flow v2 **High**, resul
 40. Group invite creates one invitation per current member, skips the organizer, is idempotent, and a later group joiner gets none. (v1.2)
 41. Invitations flag off → routes 404 and the v1 organizer-only `invite` rule holds; flag on → test 38 applies. (v1.2)
 42. Share (client tests): the Share action calls no tournament route; the shared URL equals the game share URL on mobile; on web it is the `/public/share` redirect (the web game share sends the event URL, which is existing game behaviour and out of scope; v1.2.2); the button visibility follows `my_invite_access` (`full` or `individuals` shows it, `none` hides it). (v1.2)
+43. Closure (v1.3; the full list is closure addendum §9, tests 1 to 6 and 9): non-organizer and non-committee callers get 403 and callers without view access get 404, with no database backstop; closure before the end time or on a cancelled or dissolved tournament returns 409; winner and runner-up must be registered attendees and differ; a stale `expected_version` returns 409; a team win credits each snapshot member once and a later roster change does not alter stats; stored `completed` without a closure row reads as `past`; details, registration, invitations and committee changes return 409 after the end time while result entry and close-out still work.
 42a. `my_invitation_status` is `pending` or `accepted` for the invitee, null for everyone else and for revoked, declined or expired rows; another user's status is never returned. Accept or decline buttons follow it on web and mobile. (v1.2.1)
 
 **Other:** generator determinism (same seed ⇒ identical draft), property tests (no rematch in round 1 of group, byes only top seeds, qualifiers ∈ {2,4,8,16}), template validation table tests, migration up/down tests on a copy, contract tests for AI response schema.
@@ -649,6 +669,7 @@ Migration `a91d4e7c2b18` (revises `e8c1a4b72d09`) is written and was not execute
 | TL-40 | AD-2 |
 | TL-41–TL-62 | Part A (§10) |
 | TL-63–TL-69 | AD-17, §10 phase 6a |
+| TL-74–TL-77 | AD-18; closure addendum AD-1, AD-3, AD-5, AD-10 |
 | TL-70 | AD-16, §10 phase N |
 | TL-71–TL-73 | AD-4, AD-6, §10 phase 3 |
 
@@ -670,6 +691,7 @@ Deferred (named): multi-venue scheduling, fees, umpires, v1 contract phase, Rele
 | OI-8 | Part A requirement text and formal REQ addendum. | 🟢 LOW | No |
 | OI-9 | Native mobile app: show the bottom bar on wizards, forms and detail screens, or only on top-level screens? AD-16 binds web only. Owner to decide. | 🟡 MEDIUM | No |
 | OI-12 | Part A (multi-group games) is not built: `GAME_MAX_GROUPS_V1 = 1` in `events/service.py`. Tournament invitations cap distinct invited groups at 20, independent of the single `tournaments.group_id`. Confirm the cap semantics when Part A lands. | 🟢 LOW | No |
+| OI-15 | (v1.3) Closure report for tournaments: confirm that result entry, standings and close-out stay open after the end time (closure addendum D-3 and OI-1), and name the committee table and registration-member source used for team credit (closure addendum OI-2; depends on OI-5). Owner: architect. | 🟡 MEDIUM | No |
 | OI-14 | (v1.2.2) Group invite by a non-organizer group owner or admin is web-only: the groups list exposes no role field, so mobile offers group invite to `full` access only and web lists only groups the user owns. Closes when the groups API exposes the caller's role (additive). Owner: architect. |
 | OI-13 | Retention of `invited_email` on unclaimed, declined or expired tournament invitations (P12). Same open question as games. Owner to set a period. | 🟡 MEDIUM | No |
 

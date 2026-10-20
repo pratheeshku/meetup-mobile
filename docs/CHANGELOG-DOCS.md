@@ -4,6 +4,15 @@ One section per document. Version and amendment narrative belongs here; document
 ## DES-MEETUP-MOBILE.md and addenda
 Not yet migrated. Amendment narrative still sits in each document's header and review log and moves here in a separate architect edit.
 
+## DES-MEETUP-ADDENDUM-closure-report.md
+- v1.0 (2026-10-20): approved by the owner. Copy of the backend repo's document; the backend copy is the one the owner updates. Mobile scope: task cr-mobile, after cr-backend is deployed.
+
+## DES-MEETUP-ADDENDUM-dashboard.md
+- v1.9 (2026-10-20): approved by the owner. Copy of the backend repo's document. AD-20 (Upcoming games), AD-21 (Games screen status filter and chips).
+
+## DES-MEETUP-ADDENDUM-tournament-lifecycle.md
+- v1.3 (2026-10-20): approved by the owner. Copy of the backend repo's document. AD-18 (tournament closure report, computed lifecycle status).
+
 ## DES-MEETUP-ADDENDUM-invitation-response.md
 - v0.1 (2026-10-18): first draft.
 - v1.0 (2026-10-18): approved by the owner. Mobile scope: task ia-clients, after ia-backend is deployed and OI-2 (no board for the outcome message) is resolved.
