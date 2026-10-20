@@ -40,6 +40,9 @@ import Toast from '../Toast';
 import PersonNames from '../PersonNames';
 import UserAvatar from '../UserAvatar';
 import UserSearchPicker from '../UserSearchPicker';
+import UserMenuSheet from '../user/UserMenuSheet';
+import UserPressable from '../user/UserPressable';
+import { useUserMenu } from '../../hooks/useUserMenu';
 
 interface Props {
   tournamentId: string;
@@ -51,6 +54,8 @@ type OpenForm = 'none' | 'group' | 'user';
 export default function TournamentInvitePanel({ tournamentId, access }: Props): React.JSX.Element | null {
   const t = useT();
   const share = useAppShare();
+  // A picked invitee is in no context of the viewer's yet: View Details only, no card request.
+  const candidateMenu = useUserMenu({ context: { type: 'none' } });
   const [form, setForm] = useState<OpenForm>('none');
   const [unavailable, setUnavailable] = useState(false);
 
@@ -259,7 +264,16 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
           <Text style={styles.formHint}>{t('mob.tournament.invite_player_hint')}</Text>
           {pickedUser ? (
             <View style={styles.selectedRow}>
-              <View style={styles.selectedNames}>
+              <UserPressable
+                person={{
+                  userId: pickedUser.id,
+                  displayName: pickedUser.display_name,
+                  nickname: pickedUser.nickname ?? null,
+                  photoUrl: pickedUser.image_url,
+                }}
+                menu={candidateMenu}
+                style={styles.selectedNames}
+              >
                 <UserAvatar
                   imageUrl={pickedUser.image_url}
                   name={pickedUser.display_name}
@@ -269,7 +283,7 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
                 <View style={styles.selectedPerson}>
                   <PersonNames displayName={pickedUser.display_name} nickname={pickedUser.nickname} />
                 </View>
-              </View>
+              </UserPressable>
               <AddRemoveControl
                 mode="staged"
                 staged
@@ -323,6 +337,7 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
         </Card>
       ) : null}
 
+      <UserMenuSheet menu={candidateMenu} />
       <ShareActionSheet
         visible={share.sheetVisible}
         title={t('mob.game_detail.share_title')}

@@ -257,6 +257,24 @@ describe('selection modes (AD-19)', () => {
   });
 });
 
+describe('person long-press (UM-06: selectable rows keep tap-to-select, avatar gets long-press only)', () => {
+  it('the avatar and names have a long-press that opens View Details and no tap handler; no card request', async () => {
+    mockSearchUsers.mockResolvedValue([USER]);
+    const onSelect = jest.fn();
+    const root = render(<UserSearchPicker onSelect={onSelect} />);
+    type(root, 'sam');
+    await settle();
+    const person = root.find(
+      node => node.props.testID === 'user-pressable' && typeof node.props.onLongPress === 'function',
+    );
+    expect(person.props.onPress).toBeUndefined();
+    await act(async () => person.props.onLongPress());
+    expect(root.findAll(n => n.props.testID === 'user-menu-view-details').length).toBeGreaterThan(0);
+    expect(root.findAll(n => String(n.props.testID ?? '').startsWith('user-menu-action-'))).toHaveLength(0);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
 describe('stale-response guard', () => {
   it('a slow earlier search can never overwrite a newer one’s results', async () => {
     let resolveFirst!: (value: UserSearchResult[]) => void;

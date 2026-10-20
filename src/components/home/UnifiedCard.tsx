@@ -42,10 +42,15 @@ import { displayStatusOf } from '../../utils/gameLists';
 import type { GameBadge } from '../../utils/gameLists';
 import { useSportDisplayName } from '../../utils/labels';
 import type { LabelKey } from '../../labels/fallbackLabels';
+import { useUserMenu } from '../../hooks/useUserMenu';
+import UserMenuSheet from '../user/UserMenuSheet';
+import UserPressable from '../user/UserPressable';
 
 interface AvatarItem {
   display_name: string;
   photo_url: string | null;
+  /** Added by ud-backend on `players_preview` and `members_preview`; identifies the person. */
+  user_id?: string;
 }
 
 interface UnifiedCardProps {
@@ -80,8 +85,11 @@ export function UnifiedCard({
 }: UnifiedCardProps): React.JSX.Element {
   const t = useT();
   const hasAvatars = (avatars && avatars.length > 0) || moreCount > 0;
+  // The 22 px avatars: tap only, View Details from the card's own data, no card request (UM-06).
+  const menu = useUserMenu({ context: { type: 'none' } });
 
   return (
+    <>
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -102,20 +110,26 @@ export function UnifiedCard({
           {hasAvatars ? (
             <View style={styles.avatarRow}>
               {avatars.slice(0, 4).map((person, idx) => (
-                <View
-                  key={idx}
-                  style={[styles.avatarOverlap, { zIndex: 10 - idx }]}
-                  accessible
-                  accessibilityRole="image"
-                  accessibilityLabel={person.display_name}
-                >
-                  <UserAvatar
-                    imageUrl={person.photo_url}
-                    name={person.display_name}
-                    size={22}
+                <View key={idx} style={[styles.avatarOverlap, { zIndex: 10 - idx }]}>
+                  <UserPressable
+                    person={{
+                      userId: person.user_id ?? null,
+                      displayName: person.display_name,
+                      photoUrl: person.photo_url,
+                    }}
+                    menu={menu}
+                    longPress={false}
                     accessibilityLabel={person.display_name}
-                    perfScreen={perfScreen}
-                  />
+                    testID="card-avatar"
+                  >
+                    <UserAvatar
+                      imageUrl={person.photo_url}
+                      name={person.display_name}
+                      size={22}
+                      accessibilityLabel={person.display_name}
+                      perfScreen={perfScreen}
+                    />
+                  </UserPressable>
                 </View>
               ))}
               {moreCount > 0 ? (
@@ -151,6 +165,8 @@ export function UnifiedCard({
         </View>
       </View>
     </Pressable>
+    <UserMenuSheet menu={menu} />
+    </>
   );
 }
 

@@ -105,6 +105,9 @@ import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
+import { useUserMenu } from '../hooks/useUserMenu';
+import UserMenuSheet from '../components/user/UserMenuSheet';
+import UserPressable from '../components/user/UserPressable';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import { groupFromGame, maxGroupsFor } from '../utils/gameGroups';
 import { displayStatusOf, isOrganiserOf } from '../utils/gameLists';
@@ -241,6 +244,15 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     }, [loadEvent, eventId, unavailable]),
     eventId,
   );
+
+  // Player menu: actions come from the server (card endpoint); the host only refetches.
+  const playerMenu = useUserMenu({
+    context: { type: 'game', id: eventId },
+    currentUserId: user?.id,
+    onChanged: () => loadEvent(true),
+  });
+  // A person picked for an invitation is in no context of the viewer's yet: View Details only.
+  const candidateMenu = useUserMenu({ context: { type: 'none' }, currentUserId: user?.id });
 
   useEffect(() => {
     getClientConfig().then(cfg => {
@@ -1309,9 +1321,21 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               {goingParticipants.map(p => {
                 const name = p.user_display_name || p.user_nickname || 'Player';
                 return (
-                  <View key={p.id || p.user_id} style={styles.playerAvatarCircle} testID="player-avatar">
-                    <UserAvatar imageUrl={p.user_photo_url} name={name} size={PLAYER_AVATAR_SIZE} />
-                  </View>
+                  <UserPressable
+                    key={p.id || p.user_id}
+                    person={{
+                      userId: p.user_id,
+                      displayName: name,
+                      nickname: p.user_nickname ?? null,
+                      photoUrl: p.user_photo_url,
+                    }}
+                    menu={playerMenu}
+                    testID={`player-${p.user_id}`}
+                  >
+                    <View style={styles.playerAvatarCircle} testID="player-avatar">
+                      <UserAvatar imageUrl={p.user_photo_url} name={name} size={PLAYER_AVATAR_SIZE} />
+                    </View>
+                  </UserPressable>
                 );
               })}
 
@@ -1408,7 +1432,16 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               <Text style={styles.formHint}>{t('mob.game_detail.invite_player_hint')}</Text>
               {selectedInviteUser ? (
                 <View style={styles.selectedInviteRow}>
-                  <View style={styles.selectedInviteNames}>
+                  <UserPressable
+                    person={{
+                      userId: selectedInviteUser.id,
+                      displayName: selectedInviteUser.display_name,
+                      nickname: selectedInviteUser.nickname ?? null,
+                      photoUrl: selectedInviteUser.image_url,
+                    }}
+                    menu={candidateMenu}
+                    style={styles.selectedInviteNames}
+                  >
                     <UserAvatar
                       imageUrl={selectedInviteUser.image_url}
                       name={selectedInviteUser.display_name}
@@ -1421,7 +1454,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                         nickname={selectedInviteUser.nickname}
                       />
                     </View>
-                  </View>
+                  </UserPressable>
                   <AddRemoveControl
                     mode="staged"
                     staged
@@ -1503,6 +1536,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         </View>
       </ScrollView>
 
+      <UserMenuSheet menu={playerMenu} />
+      <UserMenuSheet menu={candidateMenu} />
       <ShareActionSheet
         visible={share.sheetVisible}
         title={t('mob.game_detail.share_title')}

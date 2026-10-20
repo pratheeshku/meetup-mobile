@@ -36,6 +36,9 @@ import VenuePicker, { type SelectedVenueState } from '../components/venue/VenueP
 import Button from '../components/Button';
 import { iosPickerThemeProps } from '../components/iosPickerTheme';
 import AddRemoveControl from '../components/AddRemoveControl';
+import UserMenuSheet from '../components/user/UserMenuSheet';
+import UserPressable from '../components/user/UserPressable';
+import { useUserMenu } from '../hooks/useUserMenu';
 import GroupMultiSelect from '../components/GroupMultiSelect';
 import GroupNamesRow from '../components/GroupNamesRow';
 import DropdownField from '../components/DropdownField';
@@ -195,6 +198,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
   // Submission & errors
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // An invitee chosen here is in no context of the viewer's yet: View Details only, no card request.
+  const candidateMenu = useUserMenu({ context: { type: 'none' } });
   const [error, setError] = useState<string | null>(null);
 
   // Tournament specific state
@@ -1059,15 +1064,26 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               {invitedPlayers.map(person => {
                 return (
                   <View key={`p-${person.id}`} style={styles.inviteeChip}>
-                    <UserAvatar
-                      imageUrl={person.image_url}
-                      name={person.display_name}
-                      size={32}
-                      fallback="initials"
-                    />
-                    <View style={styles.inviteeNames}>
-                      <PersonNames displayName={person.display_name} nickname={person.nickname} />
-                    </View>
+                    <UserPressable
+                      person={{
+                        userId: person.id,
+                        displayName: person.display_name,
+                        nickname: person.nickname ?? null,
+                        photoUrl: person.image_url,
+                      }}
+                      menu={candidateMenu}
+                      style={styles.inviteePerson}
+                    >
+                      <UserAvatar
+                        imageUrl={person.image_url}
+                        name={person.display_name}
+                        size={32}
+                        fallback="initials"
+                      />
+                      <View style={styles.inviteeNames}>
+                        <PersonNames displayName={person.display_name} nickname={person.nickname} />
+                      </View>
+                    </UserPressable>
                     <AddRemoveControl
                       mode="staged"
                       staged
@@ -1200,6 +1216,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
   return (
     <View style={styles.screen}>
+      <UserMenuSheet menu={candidateMenu} />
       <WizardHeader
         title={step === 1 ? t('mob.create_game.wizard_title_create') : t('mob.create_game.wizard_title_create_game')}
         currentStep={step}
@@ -1425,6 +1442,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '700',
   },
+  inviteePerson: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
   inviteeNames: { flexShrink: 1, marginHorizontal: spacing.sm },
   inviteeName: {
     ...typography.caption,

@@ -14,6 +14,9 @@ import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import PersonNames from '../components/PersonNames';
 import UserAvatar from '../components/UserAvatar';
 import UserSearchPicker from '../components/UserSearchPicker';
+import UserMenuSheet from '../components/user/UserMenuSheet';
+import UserPressable from '../components/user/UserPressable';
+import { useUserMenu } from '../hooks/useUserMenu';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
 import { useT } from '../labels/LabelsContext';
@@ -48,6 +51,8 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
   const [added, setAdded] = useState<UserSearchResult[]>([]);
   const [addedEmails, setAddedEmails] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // People just added are in no context of the viewer's here: View Details only, no card request.
+  const candidateMenu = useUserMenu({ context: { type: 'none' }, currentUserId: currentUser?.id });
 
   const inFlight = useRef(false);
   const [undoingId, setUndoingId] = useState<string | null>(null);
@@ -158,15 +163,26 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
           {added.map(user => {
             return (
               <View key={user.id} style={styles.addedItem}>
-                <UserAvatar
-                  imageUrl={user.image_url}
-                  name={user.display_name}
-                  size={48}
-                  fallback="initials"
-                />
-                <View style={styles.addedNames}>
-                  <PersonNames displayName={user.display_name} nickname={user.nickname} centered />
-                </View>
+                <UserPressable
+                  person={{
+                    userId: user.id,
+                    displayName: user.display_name,
+                    nickname: user.nickname ?? null,
+                    photoUrl: user.image_url,
+                  }}
+                  menu={candidateMenu}
+                  style={styles.addedPerson}
+                >
+                  <UserAvatar
+                    imageUrl={user.image_url}
+                    name={user.display_name}
+                    size={48}
+                    fallback="initials"
+                  />
+                  <View style={styles.addedNames}>
+                    <PersonNames displayName={user.display_name} nickname={user.nickname} centered />
+                  </View>
+                </UserPressable>
                 {user.id !== currentUser?.id ? (
                   <UndoAddButton
                     onPress={() => handleUndo(user)}
@@ -226,6 +242,8 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
       </KeyboardAwareScreen>
 
+      <UserMenuSheet menu={candidateMenu} />
+
       <WizardFooter
         nextLabel={t('mob.invite.create_group_button')}
         backLabel={t('mob.invite.skip_for_now')}
@@ -282,6 +300,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 84,
   },
+  addedPerson: { alignItems: 'center', alignSelf: 'stretch' },
   addedNames: { marginTop: spacing.xs, alignSelf: 'stretch' },
   avatarCircleLarge: {
     width: 48,

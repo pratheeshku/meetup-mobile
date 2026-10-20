@@ -49,6 +49,10 @@ import {
 } from '../api/tournaments';
 import { getClientConfig } from '../api/config';
 import Button from '../components/Button';
+import UserAvatar from '../components/UserAvatar';
+import UserMenuSheet from '../components/user/UserMenuSheet';
+import UserPressable from '../components/user/UserPressable';
+import { useUserMenu } from '../hooks/useUserMenu';
 import Card from '../components/Card';
 import VenueDetailCard from '../components/venue/VenueDetailCard';
 import TournamentInvitationBanner from '../components/tournament/TournamentInvitationBanner';
@@ -79,6 +83,8 @@ function formatDateTime(isoString: string): string {
   });
 }
 
+const REGISTRATION_AVATAR_SIZE = 40;
+
 export default function TournamentDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
   const { tournamentId } = route.params;
@@ -86,6 +92,9 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const currentUserId = user?.id;
   const tRef = useRef(t);
   tRef.current = t;
+
+  // Tournament people: View Details from the row, no card request, no actions in v1.
+  const personMenu = useUserMenu({ context: { type: 'tournament', id: tournamentId } });
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [fixtures, setFixtures] = useState<TournamentFixture[]>([]);
@@ -430,12 +439,32 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         ) : (
           registrations.map(registration => (
             <View key={registration.id} style={styles.listRow}>
-              <Text style={styles.memberNickname}>{registration.nickname}</Text>
-              <Text style={styles.fixtureMeta}>
-                {t('mob.tournament.registered_at', {
-                  when: formatDateTime(registration.registered_at),
-                })}
-              </Text>
+              {/* Tournament people open View Details from the row only: no card request, no actions
+                  (design OI-8). A registration with no user id shows a placeholder avatar. */}
+              <UserPressable
+                person={{
+                  userId: registration.user_id,
+                  displayName: registration.nickname,
+                  photoUrl: null,
+                }}
+                menu={personMenu}
+                style={styles.registrationPerson}
+                testID={`registration-${registration.id}`}
+              >
+                <UserAvatar
+                  name={registration.user_id ? registration.nickname : null}
+                  size={REGISTRATION_AVATAR_SIZE}
+                  fallback="initials"
+                />
+                <View style={styles.registrationText}>
+                  <Text style={styles.memberNickname}>{registration.nickname}</Text>
+                  <Text style={styles.fixtureMeta}>
+                    {t('mob.tournament.registered_at', {
+                      when: formatDateTime(registration.registered_at),
+                    })}
+                  </Text>
+                </View>
+              </UserPressable>
             </View>
           ))
         )}
@@ -452,6 +481,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           />
         </View>
       ) : null}
+    <UserMenuSheet menu={personMenu} />
     </ScrollView>
   );
 }
@@ -500,6 +530,8 @@ const styles = StyleSheet.create({
   },
   fixtureTeams: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.xs },
   fixtureMeta: { ...typography.caption, color: colors.textSecondary },
+  registrationPerson: { flexDirection: 'row', alignItems: 'center' },
+  registrationText: { flex: 1, minWidth: 0, marginLeft: spacing.md },
   memberNickname: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.xs },
   cancelSection: {
     marginTop: spacing.lg,
