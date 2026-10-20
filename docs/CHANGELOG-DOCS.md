@@ -8,6 +8,7 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - v1.0 (2026-10-20): approved by the owner. Copy of the backend repo's document; the backend copy is the one the owner updates. Mobile scope: task cr-mobile, after cr-backend is deployed.
 
 ## DES-MEETUP-ADDENDUM-dashboard.md
+- v1.9 wording (2026-10-20, owner decision): the "All games" button is a two-segment toggle, Active games | All games; no label flip. No scope change.
 - v1.9 (2026-10-20): approved by the owner. Copy of the backend repo's document. AD-20 (Upcoming games), AD-21 (Games screen status filter and chips).
 
 ## DES-MEETUP-ADDENDUM-tournament-lifecycle.md
