@@ -4,6 +4,9 @@ One section per document. Version and amendment narrative belongs here; document
 ## DES-MEETUP-MOBILE.md and addenda
 Not yet migrated. Amendment narrative still sits in each document's header and review log and moves here in a separate architect edit.
 
+## Amendments by DES-MEETUP-ADDENDUM-decline-response (2026-10-20, owner approved)
+- closure-report v1.0 AD-4: decline is a locked game write, responses stay readable. dashboard v1.9 AD-20/21: declined items leave the default Games list and Public scope. invitation-response v1.0 AD-8 (new): decline is also recorded. Wording only on the approved versions; versions not bumped.
+
 ## DES-MEETUP-ADDENDUM-decline-response.md
 - v1.0 wording (2026-10-20, owner answers): OI-1 closed (no boards, existing components only), OI-2 and OI-4 confirmed, OI-6 notes the flag is a `platform_config` key editable in admin. No scope change.
 - v1.0 (2026-10-20): approved by the owner; no content change from v0.1. Copy of the backend repo's document; the backend copy is the one the owner updates.

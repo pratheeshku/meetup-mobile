@@ -96,6 +96,7 @@ Users said the home screen feels dull. The current screen (baseline screenshot, 
 - Clients render the `items` returned by `GET /home/upcoming` and never assemble the list from `GET /events`.
 - Empty state: the existing "No upcoming games yet" message, with the window in the text, for example "No games in the next 7 days". The number comes from `window_days` in the response.
 - Row content and tap target are unchanged from the game row (section 4).
+- (Amended 2026-10-20 by DES-MEETUP-ADDENDUM-decline-response AD-4.) A game the user has declined is excluded from the default Games list and the Public scope for that user. It appears under the All games segment with the badge Declined. It was never in this tab, because the tab lists only games the user organizes or is going to or waitlisted for.
 
 **AD-21 Games screen: status filter and chips (v1.9).** Applies to the Games segment of AD-15 and to the web events page, and to the Tournaments segment (closure addendum CR-13).
 - Default view: active games only (closure addendum AD-1), still made of My games plus Open games (AD-15), with past, cancelled and closed removed.

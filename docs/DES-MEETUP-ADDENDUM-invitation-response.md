@@ -45,6 +45,8 @@ After this change, **Accept means "I'm playing"**. In one step you are marked as
 
 **AD-7: Clients.** After Accept the screen shows the outcome (going or waitlisted); after a refusal the invitation remains actionable with the server's reason. Use the existing label system and an existing component. No board exists for the confirmation text: the agent must stop and ask rather than invent (repo rule). Detail and list screens refetch as in the access-consistency AD-8.
 
+**AD-8 (amended 2026-10-20 by DES-MEETUP-ADDENDUM-decline-response):** decline (IR-02) now also records the user in `event_declines` (and `tournament_declines` for tournaments) so the organizer's response list and the user's own lists agree. Accept clears that record in the same transaction. Nothing else in this addendum changes: decline still creates no participant row, and the response contract (AD-3) is unchanged.
+
 ## 3. Deviations
 
 | ID | Deviation | From | Rationale |

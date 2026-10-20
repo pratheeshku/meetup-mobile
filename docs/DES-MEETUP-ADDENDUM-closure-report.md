@@ -85,7 +85,7 @@
 - The tournament's own status machine, close-out feedback and standings publication are untouched (D-3).
 
 **AD-4 Post-end lock.**
-- Games: from `now >= coalesce(ends_at, starts_at)` every game write returns 409 `game_ended`: edit, cancel, join, withdraw, waitlist promotion by a user action, invitations (create, accept, revoke). Only the closure report is writable. Tests list every write route (§9).
+- Games: from `now >= coalesce(ends_at, starts_at)` every game write returns 409 `game_ended`: edit, cancel, join, withdraw, waitlist promotion by a user action, invitations (create, accept, decline, revoke). Only the closure report is writable. (Amended 2026-10-20 by DES-MEETUP-ADDENDUM-decline-response AD-8: the new `POST /events/{id}/decline` is a locked game write; `GET /events/{id}/responses` is a read and stays available.) Tests list every write route (§9).
 - Tournaments: from the same boundary the tournament's details, registration, invitations and committee membership are locked. Result entry, standings publication and close-out stay open, because a tournament can overrun its stated end date and its record keeping must not be blocked (D-3).
 - A write route not listed in §9 and not named here is a gap: the implementer files a blocked report.
 
