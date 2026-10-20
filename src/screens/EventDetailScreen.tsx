@@ -2,7 +2,7 @@
  * Event Detail screen (DES-MEETUP-MOBILE.md §4.3; design-ref-p23/GameDetail.png,
  * EditGame.png..EditGame4.png, DeleteGame.png).
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Image,
   Modal,
@@ -23,10 +23,12 @@ import Geolocation from '@react-native-community/geolocation';
 import {
   cancelEvent,
   getEvent,
+  getEventClosure,
   getEventParticipants,
   inviteEmailToEvent,
   inviteGroupToEvent,
   inviteUserToEvent,
+  putEventClosure,
   rsvpEvent,
   updateEvent,
   withdrawEvent,
@@ -81,7 +83,9 @@ import {
   TargetIcon,
 } from '../components/icons/SharedIcons';
 import { useT } from '../labels/LabelsContext';
-import GameStatusPill from '../components/GameStatusPill';
+import LifecycleStatusChip from '../components/LifecycleStatusChip';
+import ClosureSummaryCard from '../components/closure/ClosureSummaryCard';
+import ClosureModal, { type CandidateItem } from '../components/closure/ClosureModal';
 import SkillRequirementPicker from '../components/SkillRequirementPicker';
 import {
   DEFAULT_SKILL_REQUIREMENT,
@@ -99,7 +103,13 @@ import {
   spacing,
   typography,
 } from '../theme/tokens';
-import type { Event, EventParticipant, EventSkillLevel, UpdateEventInput } from '../types/event';
+import type {
+  ClosureResponse,
+  Event,
+  EventParticipant,
+  EventSkillLevel,
+  UpdateEventInput,
+} from '../types/event';
 import type { Group } from '../types/group';
 import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
@@ -160,6 +170,29 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Closure state
+  const [closure, setClosure] = useState<ClosureResponse | null>(null);
+  const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
+  const [isClosureSubmitting, setIsClosureSubmitting] = useState(false);
+  const [closureError, setClosureError] = useState<string | null>(null);
+
+  const closureCandidates: CandidateItem[] = useMemo(() => {
+    if (closure?.candidates && closure.candidates.length > 0) {
+      return closure.candidates.map(c => ({
+        id: c.user_id ?? '',
+        displayName: c.display_name,
+        photoUrl: c.photo_url,
+      }));
+    }
+    return participants
+      .filter(p => p.status === 'going')
+      .map(p => ({
+        id: p.user_id,
+        displayName: p.user_display_name || p.user_nickname || 'Player',
+        photoUrl: p.user_photo_url ?? null,
+      }));
+  }, [closure?.candidates, participants]);
+
   // Edit wizard state
   const [isEditing, setIsEditing] = useState(false);
   const [editStep, setEditStep] = useState(1);
@@ -202,15 +235,19 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         setLoadError(null);
       }
       try {
-        const [data, parts] = await Promise.all([
+        const [data, parts, closureData] = await Promise.all([
           getEvent(eventId),
           getEventParticipants(eventId).catch(() => null),
+          getEventClosure(eventId).catch(() => null),
         ]);
         setEvent(data);
         if (Array.isArray(parts)) {
           setParticipants(parts);
         } else if (!silent) {
           setParticipants([]);
+        }
+        if (closureData) {
+          setClosure(closureData);
         }
       } catch (error) {
         // The server answers 404 for a game that is gone or no longer visible to this user
@@ -590,6 +627,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       return;
     }
     if (editStep === 2) {
+      if (editDateValue.getTime() < Date.now()) {
+        setEditError(t('mob.closure.start_in_past'));
+        return;
+      }
       if (venueCatalogueEnabled && (!editCatalogueVenue || !editCatalogueVenue.name)) {
         setEditError(t('mob.create_game.venue_label'));
         return;
@@ -689,10 +730,22 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         primary: 'dashboard',
         secondary: { button: 'view_game', id: eventId },
       });
-    } catch (e) {
+    } catch (e: any) {
       // 404: the game is gone or no longer visible (AC-11): close with the neutral message.
       if (isNotFoundError(e)) {
         unavailable.onNotFound();
+      } else if (
+        e?.response?.status === 422 &&
+        (e?.response?.data?.code === 'start_in_past' ||
+          e?.response?.data?.detail === "Start time can't be in the past")
+      ) {
+        setEditError(t('mob.closure.start_in_past'));
+      } else if (
+        e?.response?.status === 409 &&
+        (e?.response?.data?.code === 'game_ended' ||
+          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
+      ) {
+        setEditError(t('mob.closure.game_ended'));
       } else {
         setEditError(getApiErrorMessage(e, t('mob.game_detail.edit_error')));
       }
@@ -746,9 +799,15 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         await rsvpEvent(eventId, { correlationId });
         await loadEvent(true);
       });
-    } catch (e) {
+    } catch (e: any) {
       if (isNotFoundError(e)) {
         unavailable.onNotFound();
+      } else if (
+        e?.response?.status === 409 &&
+        (e?.response?.data?.code === 'game_ended' ||
+          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
+      ) {
+        setActionError(t('mob.closure.game_ended'));
       } else {
         // Backend 4xx detail (e.g. skill level or membership) when present, else the generic message.
         setActionError(getApiErrorMessage(e, t('mob.game_detail.join_error')));
@@ -769,14 +828,100 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         unavailable.markOwnAction();
         await loadEvent(true);
       });
-    } catch (e) {
+    } catch (e: any) {
       if (isNotFoundError(e)) {
         unavailable.onNotFound();
+      } else if (
+        e?.response?.status === 409 &&
+        (e?.response?.data?.code === 'game_ended' ||
+          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
+      ) {
+        setActionError(t('mob.closure.game_ended'));
       } else {
         setActionError(t('mob.game_detail.leave_error'));
       }
     } finally {
       setIsActionLoading(false);
+    }
+  };
+
+  const handleSaveClosure = async (payload: {
+    outcome: 'completed' | 'not_held';
+    attendeeIds: string[];
+    winnerId: string | null;
+    runnerUpId: string | null;
+    expectedVersion: number;
+  }) => {
+    setIsClosureSubmitting(true);
+    setClosureError(null);
+    try {
+      await withCorrelationId(async correlationId => {
+        const updated = await putEventClosure(
+          eventId,
+          {
+            outcome: payload.outcome,
+            attendee_user_ids: payload.attendeeIds,
+            winner_user_id: payload.winnerId,
+            runner_up_user_id: payload.runnerUpId,
+            expected_version: payload.expectedVersion,
+          },
+          { correlationId },
+        );
+        setClosure(updated);
+        setIsClosureModalOpen(false);
+        await loadEvent(true);
+
+        const winnerCandidate = updated.candidates?.find(c => c.user_id === payload.winnerId);
+        const runnerCandidate = updated.candidates?.find(c => c.user_id === payload.runnerUpId);
+
+        const rows: CompletionRow[] = [
+          { label: t('mob.done.f_title'), value: event?.title ?? '' },
+          {
+            label: t('mob.closure.title'),
+            value:
+              payload.outcome === 'completed'
+                ? t('mob.closure.outcome.played')
+                : t('mob.closure.outcome.not_held'),
+          },
+        ];
+        if (payload.outcome === 'completed' && winnerCandidate) {
+          rows.push({
+            label: t('mob.closure.winner'),
+            value: winnerCandidate.display_name,
+          });
+        }
+        if (payload.outcome === 'completed' && runnerCandidate) {
+          rows.push({
+            label: t('mob.closure.runner_up'),
+            value: runnerCandidate.display_name,
+          });
+        }
+
+        showCompletion({
+          flow: 'game_closed',
+          rows,
+          primary: 'dashboard',
+        });
+      });
+    } catch (err: any) {
+      const code = err?.response?.data?.code;
+      const detail = err?.response?.data?.detail;
+      if (
+        err?.response?.status === 409 &&
+        (code === 'version_conflict' || (typeof detail === 'object' && detail?.message))
+      ) {
+        setClosureError(t('mob.closure.version_conflict'));
+        try {
+          const reloaded = await getEventClosure(eventId);
+          setClosure(reloaded);
+        } catch {
+          // Keep current
+        }
+      } else {
+        setClosureError(getApiErrorMessage(err, t('mob.game_detail.load_error')));
+      }
+    } finally {
+      setIsClosureSubmitting(false);
     }
   };
 
@@ -810,6 +955,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       : '';
     const hasTimeChanged = originalTime !== formattedEditTime;
     const hasCapacityChanged = event.capacity !== editCapacity;
+    const isEditDateInPast = editDateValue.getTime() < Date.now();
 
     return (
       <View style={styles.screen}>
@@ -890,7 +1036,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 <View style={styles.row}>
                   <TouchableOpacity style={styles.halfField} onPress={() => setShowDatePicker(true)}>
                     <Text style={styles.fieldLabel}>{t('mob.create_game.date_label')}</Text>
-                    <View style={styles.pickerBox}>
+                    <View style={[styles.pickerBox, isEditDateInPast && styles.pickerBoxError]}>
                       <CalendarIcon size={18} />
                       <Text style={styles.pickerBoxText}>{formattedEditDate}</Text>
                     </View>
@@ -898,17 +1044,24 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
                   <TouchableOpacity style={styles.halfField} onPress={() => setShowTimePicker(true)}>
                     <Text style={styles.fieldLabel}>{t('mob.create_game.start_time_label')}</Text>
-                    <View style={styles.pickerBox}>
+                    <View style={[styles.pickerBox, isEditDateInPast && styles.pickerBoxError]}>
                       <ClockIcon size={18} />
                       <Text style={styles.pickerBoxText}>{formattedEditTime}</Text>
                     </View>
                   </TouchableOpacity>
                 </View>
 
+                {isEditDateInPast ? (
+                  <Text style={styles.pastDateErrorText} testID="edit-game-past-date-error">
+                    {t('mob.closure.start_in_past')}
+                  </Text>
+                ) : null}
+
                 {showDatePicker && (
                   <DateTimePicker
                     value={editDateValue}
                     mode="date"
+                    minimumDate={new Date()}
                     display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                     {...iosPickerThemeProps()}
                     onChange={handleDateChange}
@@ -1185,10 +1338,20 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     .join(', ');
 
   const displayStatus = displayStatusOf(event);
-  // Cancelled / completed games are read-only: no edit, cancel, Join or Leave.
+  const endInstant = event.ends_at
+    ? Date.parse(event.ends_at)
+    : event.starts_at
+    ? Date.parse(event.starts_at)
+    : NaN;
+  const isGameEnded = !Number.isNaN(endInstant) && Date.now() >= endInstant;
+
+  // Cancelled / completed / closed games are read-only: no edit, cancel, Join or Leave.
   const isClosed =
-    displayStatus !== 'active' || event.status === 'cancelled' || event.status === 'completed';
-  const isOrganiserActionsVisible = isOrganiser && !isClosed;
+    displayStatus !== 'active' ||
+    event.status === 'cancelled' ||
+    event.status === 'completed' ||
+    event.lifecycle_status === 'closed';
+  const isOrganiserActionsVisible = isOrganiser && !isClosed && !isGameEnded;
   const totalCapacity = event.capacity || 4;
   // The backend's going count for the game: withdrawn and waitlisted people are not joined.
   const joinedCount = event.participant_count;
@@ -1251,7 +1414,13 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 <Text style={styles.hostPillText}>{t('mob.game_detail.host_badge')}</Text>
               </View>
             ) : null}
-            <GameStatusPill status={displayStatus} />
+            <LifecycleStatusChip
+              status={
+                event.lifecycle_status ??
+                (displayStatus === 'cancelled' ? 'cancelled' : 'active')
+              }
+              outcome={event.closure_outcome}
+            />
           </View>
         </View>
 
@@ -1305,47 +1474,77 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             ) : null}
           </Card>
 
-          {/* Card 2: Players */}
-          <Card style={styles.infoCard}>
-            <View style={styles.playersCardHeader}>
-              <Text style={styles.playersCardTitle}>{t('mob.game_detail.players')}</Text>
-              <Text style={styles.playersJoinedCount}>
-                {t('mob.game_detail.players_joined', {
-                  joined: joinedCount,
-                  capacity: totalCapacity,
+          {event.lifecycle_status === 'closed' ? (
+            <ClosureSummaryCard
+              outcome={event.closure_outcome ?? closure?.outcome ?? 'completed'}
+              winnerName={closure?.winner?.display_name}
+              runnerUpName={closure?.runner_up?.display_name}
+              canEdit={isOrganiser && (closure?.can_close ?? true)}
+              onEditPress={() => setIsClosureModalOpen(true)}
+            />
+          ) : null}
+
+          {/* Card 2: Players (hidden from non-organizers when closed) */}
+          {event.lifecycle_status !== 'closed' || isOrganiser ? (
+            <Card style={styles.infoCard}>
+              <View style={styles.playersCardHeader}>
+                <Text style={styles.playersCardTitle}>{t('mob.game_detail.players')}</Text>
+                <Text style={styles.playersJoinedCount}>
+                  {t('mob.game_detail.players_joined', {
+                    joined: joinedCount,
+                    capacity: totalCapacity,
+                  })}
+                </Text>
+              </View>
+
+              <View style={styles.playerAvatarsRow}>
+                {goingParticipants.map(p => {
+                  const name = p.user_display_name || p.user_nickname || 'Player';
+                  return (
+                    <UserPressable
+                      key={p.id || p.user_id}
+                      person={{
+                        userId: p.user_id,
+                        displayName: name,
+                        nickname: p.user_nickname ?? null,
+                        photoUrl: p.user_photo_url,
+                      }}
+                      menu={playerMenu}
+                      testID={`player-${p.user_id}`}
+                    >
+                      <View style={styles.playerAvatarCircle} testID="player-avatar">
+                        <UserAvatar imageUrl={p.user_photo_url} name={name} size={PLAYER_AVATAR_SIZE} />
+                      </View>
+                    </UserPressable>
+                  );
                 })}
-              </Text>
-            </View>
 
-            <View style={styles.playerAvatarsRow}>
-              {goingParticipants.map(p => {
-                const name = p.user_display_name || p.user_nickname || 'Player';
-                return (
-                  <UserPressable
-                    key={p.id || p.user_id}
-                    person={{
-                      userId: p.user_id,
-                      displayName: name,
-                      nickname: p.user_nickname ?? null,
-                      photoUrl: p.user_photo_url,
-                    }}
-                    menu={playerMenu}
-                    testID={`player-${p.user_id}`}
-                  >
-                    <View style={styles.playerAvatarCircle} testID="player-avatar">
-                      <UserAvatar imageUrl={p.user_photo_url} name={name} size={PLAYER_AVATAR_SIZE} />
-                    </View>
-                  </UserPressable>
-                );
-              })}
+                {Array.from({ length: emptySpotsCount }).map((_, idx) => (
+                  <View key={`empty-${idx}`} style={styles.emptyAvatarCircle}>
+                    <Text style={styles.emptyAvatarText}>?</Text>
+                  </View>
+                ))}
+              </View>
+            </Card>
+          ) : null}
 
-              {Array.from({ length: emptySpotsCount }).map((_, idx) => (
-                <View key={`empty-${idx}`} style={styles.emptyAvatarCircle}>
-                  <Text style={styles.emptyAvatarText}>?</Text>
-                </View>
-              ))}
-            </View>
-          </Card>
+          {/* Organiser closure notice / action when not closed */}
+          {event.lifecycle_status !== 'closed' && isOrganiser ? (
+            !isGameEnded ? (
+              <View style={styles.closureNoticeBox} testID="closure-opens-notice">
+                <Text style={styles.closureNoticeText}>{t('mob.closure.opens_when_ended')}</Text>
+              </View>
+            ) : (
+              <View style={styles.closureActionContainer}>
+                <Button
+                  label={t('mob.closure.action.close_game')}
+                  variant="primary"
+                  onPress={() => setIsClosureModalOpen(true)}
+                  testID="close-game-button"
+                />
+              </View>
+            )
+          ) : null}
 
           {/* Organiser actions: Invite Group, Invite Individual, Share (restored) */}
           {isOrganiserActionsVisible && !isInviteGroupOpen && !isInviteUserOpen ? (
@@ -1512,7 +1711,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           ) : null}
 
           {/* Non-organiser RSVP Actions */}
-          {!isOrganiser && !isClosed ? (
+          {!isOrganiser && !isClosed && !isGameEnded ? (
             <View style={styles.rsvpActionContainer}>
               {event.current_user_rsvp_status === 'going' ? (
                 <Button
@@ -1603,6 +1802,24 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           </ScreenContainer>
         </View>
       </Modal>
+
+      <ClosureModal
+        visible={isClosureModalOpen}
+        onClose={() => {
+          setIsClosureModalOpen(false);
+          setClosureError(null);
+        }}
+        entityType="event"
+        candidates={closureCandidates}
+        initialOutcome={event.closure_outcome ?? closure?.outcome}
+        initialAttendeeIds={closure?.attendees?.map(a => a.user_id ?? '').filter(Boolean)}
+        initialWinnerId={closure?.winner?.user_id}
+        initialRunnerUpId={closure?.runner_up?.user_id}
+        expectedVersion={closure?.version ?? 0}
+        onSubmit={handleSaveClosure}
+        isSubmitting={isClosureSubmitting}
+        error={closureError}
+      />
     </View>
   );
 }
@@ -1926,6 +2143,31 @@ const styles = StyleSheet.create({
   pickerBoxText: {
     ...typography.bodyBold,
     color: colors.textPrimary,
+  },
+  pickerBoxError: {
+    borderColor: colors.error,
+    borderWidth: borderWidth.medium,
+  },
+  pastDateErrorText: {
+    ...typography.caption,
+    color: colors.error,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  closureNoticeBox: {
+    backgroundColor: colors.track,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+  },
+  closureNoticeText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  closureActionContainer: {
+    marginBottom: spacing.md,
   },
   searchBox: {
     flexDirection: 'row',

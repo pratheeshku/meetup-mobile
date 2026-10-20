@@ -12,6 +12,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import appConfig from '../../config/appConfig.json';
 import { apiClient } from './client';
+import type { Event } from '../types/event';
+import { type EventApiItem, mapEventApiItem } from './events';
 
 export interface BannerItem {
   id: string;
@@ -269,5 +271,29 @@ export async function getTermsVersion(options?: RequestOptions): Promise<string>
     // Non-blocking fallback
   }
   return (appConfig as { terms_version?: string }).terms_version || '';
+}
+
+export interface HomeUpcomingResponse {
+  total: number;
+  window_days: number;
+  items: Event[];
+}
+
+/**
+ * Fetch upcoming games (DES-MEETUP-ADDENDUM-closure-report AD-8, DES-MEETUP-ADDENDUM-dashboard AD-20).
+ * Server-computed rolling window. No sport filtering.
+ */
+export async function getUpcoming(options?: RequestOptions): Promise<HomeUpcomingResponse> {
+  const { data } = await apiClient.get<{ total: number; window_days: number; items: EventApiItem[] }>(
+    '/home/upcoming',
+    {
+      correlationId: options?.correlationId,
+    },
+  );
+  return {
+    total: data.total,
+    window_days: data.window_days,
+    items: Array.isArray(data.items) ? data.items.map(mapEventApiItem) : [],
+  };
 }
 

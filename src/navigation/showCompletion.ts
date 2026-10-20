@@ -29,7 +29,9 @@ export type CompletionFlow =
   | 'group_left'
   | 'account_created'
   | 'account_deleted'
-  | 'onboarding_done';
+  | 'onboarding_done'
+  | 'game_closed'
+  | 'tournament_closed';
 
 export type CompletionPrimary = 'dashboard' | 'groups' | 'profile' | 'signin' | 'get_started';
 

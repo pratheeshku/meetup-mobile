@@ -15,6 +15,7 @@ interface CardProps {
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
+  testID?: string;
 }
 
 export default function Card({
@@ -22,10 +23,12 @@ export default function Card({
   onPress,
   style,
   accessibilityLabel,
+  testID,
 }: CardProps): React.JSX.Element {
   if (onPress) {
     return (
       <Pressable
+        testID={testID}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         onPress={onPress}
@@ -36,7 +39,7 @@ export default function Card({
     );
   }
 
-  return <View style={[styles.card, style]}>{children}</View>;
+  return <View testID={testID} style={[styles.card, style]}>{children}</View>;
 }
 
 const styles = StyleSheet.create({

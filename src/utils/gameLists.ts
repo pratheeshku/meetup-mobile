@@ -150,13 +150,29 @@ export function selectOpenGames(events: readonly Event[], options: GameListOptio
   return select(events, event => isOpenGame(event, options.userId), options);
 }
 
-/** The Games screen list: My games ∪ Open games by scope (AD-15). */
+/** The Games screen list: My games ∪ Open games by scope (AD-15, AD-21). */
 export function selectGames(
   events: readonly Event[],
   scope: GamesScope,
   options: GameListOptions,
+  view: 'active' | 'all' = 'active',
 ): Event[] {
-  const { userId } = options;
+  const { userId, sportKeys = [], now = Date.now() } = options;
+  if (view === 'all') {
+    if (scope === 'open') {
+      return selectOpenGames(events, options);
+    }
+    if (scope === 'mine') {
+      return selectMyGamesWithHistory(events, options);
+    }
+    // scope === 'all': my games (with history) + open games (active only per AD-21)
+    const matching = events.filter(event => matchesSports(event, sportKeys));
+    const openActive = matching.filter(event => isOpenGame(event, userId) && isUpcomingActive(event, now));
+    const myGames = matching.filter(event => isMyGame(event, userId));
+    const upcoming = [...myGames.filter(event => isUpcomingActive(event, now)), ...openActive].sort(compareGames);
+    const past = myGames.filter(event => !isUpcomingActive(event, now)).sort((a, b) => compareGames(b, a));
+    return [...upcoming, ...past];
+  }
   return select(
     events,
     event =>

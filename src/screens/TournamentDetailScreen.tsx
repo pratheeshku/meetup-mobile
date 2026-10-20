@@ -33,7 +33,7 @@
  * explicit "confirmation alert" instructions for their destructive
  * actions.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -44,6 +44,8 @@ import {
   getFixtures,
   getRegistrations,
   getTournament,
+  getTournamentClosure,
+  putTournamentClosure,
   registerForTournament,
   withdrawFromTournament,
 } from '../api/tournaments';
@@ -54,6 +56,9 @@ import UserMenuSheet from '../components/user/UserMenuSheet';
 import UserPressable from '../components/user/UserPressable';
 import { useUserMenu } from '../hooks/useUserMenu';
 import Card from '../components/Card';
+import LifecycleStatusChip from '../components/LifecycleStatusChip';
+import ClosureSummaryCard from '../components/closure/ClosureSummaryCard';
+import ClosureModal, { type CandidateItem } from '../components/closure/ClosureModal';
 import VenueDetailCard from '../components/venue/VenueDetailCard';
 import TournamentInvitationBanner from '../components/tournament/TournamentInvitationBanner';
 import TournamentInvitePanel from '../components/tournament/TournamentInvitePanel';
@@ -61,11 +66,17 @@ import ErrorView from '../components/ErrorView';
 import GroupNamesRow from '../components/GroupNamesRow';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
-import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
-import { showCompletion } from '../navigation/showCompletion';
+import type {
+  Tournament,
+  TournamentClosurePerson,
+  TournamentClosureResponse,
+  TournamentFixture,
+  TournamentRegistration,
+} from '../types/tournament';
+import { showCompletion, type CompletionRow } from '../navigation/showCompletion';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
-import { isNotFoundError } from '../utils/apiError';
+import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
 import { useSportDisplayName } from '../utils/labels';
 import { formatEventDate } from '../utils/formatEventDateTime';
 import type { TournamentsStackParamList } from '../navigation/types';
@@ -115,6 +126,27 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
+  // Closure state
+  const [closure, setClosure] = useState<TournamentClosureResponse | null>(null);
+  const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
+  const [isClosureSubmitting, setIsClosureSubmitting] = useState(false);
+  const [closureError, setClosureError] = useState<string | null>(null);
+
+  const closureCandidates: CandidateItem[] = useMemo(() => {
+    if (closure?.candidates && closure.candidates.length > 0) {
+      return closure.candidates.map((c: TournamentClosurePerson) => ({
+        id: c.registration_id ?? '',
+        displayName: c.display_name,
+        photoUrl: c.photo_url ?? null,
+      }));
+    }
+    return registrations.map(r => ({
+      id: r.id,
+      displayName: r.nickname,
+      photoUrl: null,
+    }));
+  }, [closure?.candidates, registrations]);
+
   const [venueCatalogueEnabled, setVenueCatalogueEnabled] = useState(false);
 
   useEffect(() => {
@@ -135,14 +167,19 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         setLoadError(null);
       }
       try {
-        const [tournamentData, fixturesData, registrationsData] = await Promise.all([
-          getTournament(tournamentId),
-          getFixtures(tournamentId),
-          getRegistrations(tournamentId),
-        ]);
+        const [tournamentData, fixturesData, registrationsData, closureData] =
+          await Promise.all([
+            getTournament(tournamentId),
+            getFixtures(tournamentId),
+            getRegistrations(tournamentId),
+            getTournamentClosure(tournamentId).catch(() => null),
+          ]);
         setTournament(tournamentData);
         setFixtures(fixturesData);
         setRegistrations(registrationsData);
+        if (closureData) {
+          setClosure(closureData);
+        }
       } catch (error) {
         // 404 = gone or no longer visible to this user (AC-11, AC-07: a registered player who
         // lost access sees nothing): close with the neutral message, once.
@@ -204,9 +241,16 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         setTournament(tournamentData);
         setRegistrations(registrationsData);
       });
-    } catch (e) {
+    } catch (e: any) {
       if (isNotFoundError(e)) {
         unavailable.onNotFound();
+      } else if (
+        e?.response?.status === 409 &&
+        (e?.response?.data?.code === 'game_ended' ||
+          e?.response?.data?.code === 'tournament_ended' ||
+          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
+      ) {
+        setRegisterError(t('mob.closure.game_ended'));
       } else {
         setRegisterError(t('mob.tournament.register_error'));
       }
@@ -235,14 +279,105 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         setTournament(tournamentData);
         setRegistrations(registrationsData);
       });
-    } catch (e) {
+    } catch (e: any) {
       if (isNotFoundError(e)) {
         unavailable.onNotFound();
+      } else if (
+        e?.response?.status === 409 &&
+        (e?.response?.data?.code === 'game_ended' ||
+          e?.response?.data?.code === 'tournament_ended' ||
+          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
+      ) {
+        setWithdrawError(t('mob.closure.game_ended'));
       } else {
         setWithdrawError(t('mob.tournament.withdraw_error'));
       }
     } finally {
       setIsWithdrawing(false);
+    }
+  };
+
+  const handleSaveClosure = async (payload: {
+    outcome: 'completed' | 'not_held';
+    attendeeIds: string[];
+    winnerId: string | null;
+    runnerUpId: string | null;
+    expectedVersion: number;
+  }) => {
+    setIsClosureSubmitting(true);
+    setClosureError(null);
+    try {
+      await withCorrelationId(async correlationId => {
+        const updated = await putTournamentClosure(
+          tournamentId,
+          {
+            outcome: payload.outcome,
+            attendee_registration_ids: payload.attendeeIds,
+            winner_registration_id: payload.winnerId,
+            runner_up_registration_id: payload.runnerUpId,
+            expected_version: payload.expectedVersion,
+          },
+          { correlationId },
+        );
+        setClosure(updated);
+        setIsClosureModalOpen(false);
+        await loadAll(true);
+
+        const winnerCandidate = updated.candidates?.find(
+          c => c.registration_id === payload.winnerId,
+        );
+        const runnerCandidate = updated.candidates?.find(
+          c => c.registration_id === payload.runnerUpId,
+        );
+
+        const rows: CompletionRow[] = [
+          { label: t('mob.done.f_title'), value: tournament?.name ?? '' },
+          {
+            label: t('mob.closure.title'),
+            value:
+              payload.outcome === 'completed'
+                ? t('mob.closure.outcome.played')
+                : t('mob.closure.outcome.not_held'),
+          },
+        ];
+        if (payload.outcome === 'completed' && winnerCandidate) {
+          rows.push({
+            label: t('mob.closure.winner'),
+            value: winnerCandidate.display_name,
+          });
+        }
+        if (payload.outcome === 'completed' && runnerCandidate) {
+          rows.push({
+            label: t('mob.closure.runner_up'),
+            value: runnerCandidate.display_name,
+          });
+        }
+
+        showCompletion({
+          flow: 'tournament_closed',
+          rows,
+          primary: 'dashboard',
+        });
+      });
+    } catch (err: any) {
+      const code = err?.response?.data?.code;
+      const detail = err?.response?.data?.detail;
+      if (
+        err?.response?.status === 409 &&
+        (code === 'version_conflict' || (typeof detail === 'object' && detail?.message))
+      ) {
+        setClosureError(t('mob.closure.version_conflict'));
+        try {
+          const reloaded = await getTournamentClosure(tournamentId);
+          setClosure(reloaded);
+        } catch {
+          // Keep current
+        }
+      } else {
+        setClosureError(getApiErrorMessage(err, t('mob.tournament.load_error')));
+      }
+    } finally {
+      setIsClosureSubmitting(false);
     }
   };
 
@@ -297,12 +432,30 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const currentUserRegistrationStatus = myRegistration?.status ?? 'none';
   const isOrganiser = tournament.organiser_id === currentUserId;
 
+  const endInstant = tournament.ends_at
+    ? Date.parse(tournament.ends_at)
+    : tournament.starts_at
+    ? Date.parse(tournament.starts_at)
+    : NaN;
+  const isTournamentEnded = !Number.isNaN(endInstant) && Date.now() >= endInstant;
+
   const canRegister =
-    tournament.registration_open && currentUserRegistrationStatus === 'none' && !isOrganiser;
-  const canWithdraw = currentUserRegistrationStatus === 'registered';
+    !isTournamentEnded &&
+    tournament.registration_open &&
+    currentUserRegistrationStatus === 'none' &&
+    !isOrganiser;
+  const canWithdraw = !isTournamentEnded && currentUserRegistrationStatus === 'registered';
   const showRegistrationClosedMessage =
-    !tournament.registration_open && currentUserRegistrationStatus === 'none' && !isOrganiser;
-  const canCancel = isOrganiser && tournament.status !== 'completed' && tournament.status !== 'cancelled';
+    !isTournamentEnded &&
+    !tournament.registration_open &&
+    currentUserRegistrationStatus === 'none' &&
+    !isOrganiser;
+  const canCancel =
+    !isTournamentEnded &&
+    isOrganiser &&
+    tournament.status !== 'completed' &&
+    tournament.status !== 'cancelled' &&
+    tournament.lifecycle_status !== 'closed';
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -311,9 +464,15 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         <Text style={styles.meta}>
           {sportLabel} · {tournament.format}
         </Text>
-        <Text style={styles.meta}>
-          {t('mob.tournament.status_line', { status: tournament.status })}
-        </Text>
+        <View style={styles.statusChipRow}>
+          <LifecycleStatusChip
+            status={
+              tournament.lifecycle_status ??
+              (tournament.status === 'cancelled' ? 'cancelled' : 'active')
+            }
+            outcome={tournament.closure_outcome}
+          />
+        </View>
         <Text style={styles.meta}>
           {t('mob.tournament.organised_by', { name: tournament.organiser_nickname })}
         </Text>
@@ -335,6 +494,36 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           <GroupNamesRow names={tournament.group_name ? [tournament.group_name] : []} />
         ) : null}
       </Card>
+
+      {tournament.lifecycle_status === 'closed' ? (
+        <ClosureSummaryCard
+          outcome={tournament.closure_outcome ?? closure?.outcome ?? 'completed'}
+          winnerName={closure?.winner?.display_name}
+          runnerUpName={closure?.runner_up?.display_name}
+          canEdit={isOrganiser && (closure?.can_close ?? true)}
+          onEditPress={() => setIsClosureModalOpen(true)}
+          entityType="tournament"
+        />
+      ) : null}
+
+      {tournament.lifecycle_status !== 'closed' && isOrganiser ? (
+        !isTournamentEnded ? (
+          <View style={styles.closureNoticeBox} testID="tournament-closure-opens-notice">
+            <Text style={styles.closureNoticeText}>
+              {t('mob.closure.opens_when_ended_tournament')}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.closureActionContainer}>
+            <Button
+              label={t('mob.closure.action.close_tournament')}
+              variant="primary"
+              onPress={() => setIsClosureModalOpen(true)}
+              testID="close-tournament-button"
+            />
+          </View>
+        )
+      ) : null}
 
       <TournamentInvitationBanner
         tournamentId={tournament.id}
@@ -481,7 +670,26 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           />
         </View>
       ) : null}
-    <UserMenuSheet menu={personMenu} />
+
+      <ClosureModal
+        visible={isClosureModalOpen}
+        onClose={() => {
+          setIsClosureModalOpen(false);
+          setClosureError(null);
+        }}
+        entityType="tournament"
+        candidates={closureCandidates}
+        initialOutcome={tournament.closure_outcome ?? closure?.outcome}
+        initialAttendeeIds={closure?.attendees?.map(a => a.registration_id ?? '').filter(Boolean)}
+        initialWinnerId={closure?.winner?.registration_id}
+        initialRunnerUpId={closure?.runner_up?.registration_id}
+        expectedVersion={closure?.version ?? 0}
+        onSubmit={handleSaveClosure}
+        isSubmitting={isClosureSubmitting}
+        error={closureError}
+      />
+
+      <UserMenuSheet menu={personMenu} />
     </ScrollView>
   );
 }
@@ -490,6 +698,26 @@ const styles = StyleSheet.create({
   container: { padding: spacing.md },
   infoCard: { marginBottom: spacing.md },
   title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.sm },
+  statusChipRow: {
+    marginVertical: spacing.xs,
+    alignItems: 'flex-start',
+  },
+  closureNoticeBox: {
+    padding: spacing.md,
+    backgroundColor: colors.track,
+    borderRadius: radius.md,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+  },
+  closureNoticeText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  closureActionContainer: {
+    marginBottom: spacing.md,
+  },
   meta: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xs },
   description: { ...typography.body, color: colors.textPrimary, marginTop: spacing.sm },
   closedNotice: {

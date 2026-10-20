@@ -18,14 +18,17 @@
 import { apiClient } from './client';
 import type { UserCardOut } from '../types/userMenu';
 import type {
+  ClosureResponse,
   CreateEventInput,
   Event,
+  EventClosurePut,
   EventInvitation,
   EventsListResponse,
   EventSkillLevel,
   EventVisibility,
   EventStatus,
   GameDisplayStatus,
+  LifecycleStatus,
   RsvpStatus,
   UpdateEventInput,
 } from '../types/event';
@@ -37,6 +40,8 @@ export interface GetEventsParams {
   upcoming?: boolean;
   /** Also return past (completed and cancelled) games; used by the My games scope. */
   history?: boolean;
+  /** DES-MEETUP-ADDENDUM-closure-report AD-10: 'active' (default) or 'all' */
+  view?: 'active' | 'all';
   limit?: number;
   page?: number;
   page_size?: number;
@@ -73,7 +78,7 @@ interface RequestOptions {
  * gap there per the full-API-contract audit (`docs/reports/AUDIT-API-CONTRACTS-2026-09-18.md`)
  * and fixed below.
  */
-interface EventApiItem {
+export interface EventApiItem {
   id: string;
   organizer_id: string;
   sport: string;
@@ -89,6 +94,8 @@ interface EventApiItem {
   recurrence_rule_id: string | null;
   status: string;
   display_status?: string | null;
+  lifecycle_status?: string | null;
+  closure_outcome?: string | null;
   venue_name: string | null;
   venue_address: string | null;
   organizer_nickname: string | null;
@@ -138,7 +145,7 @@ function resolveDisplayStatus(raw: string | null | undefined, status: string): G
   return status === 'cancelled' ? 'cancelled' : 'active';
 }
 
-function mapEventApiItem(raw: EventApiItem): Event {
+export function mapEventApiItem(raw: EventApiItem): Event {
   return {
     id: raw.id,
     title: raw.title,
@@ -173,6 +180,8 @@ function mapEventApiItem(raw: EventApiItem): Event {
     // Older servers send only group_id / group_name: a one-item list.
     group_ids: raw.group_ids ?? (raw.group_id ? [raw.group_id] : []),
     group_names: raw.group_names ?? (raw.group_name ? [raw.group_name] : []),
+    lifecycle_status: (raw.lifecycle_status as LifecycleStatus) ?? 'active',
+    closure_outcome: raw.closure_outcome ?? null,
   };
 }
 
@@ -399,6 +408,35 @@ export async function getEventParticipants(
     `/events/${eventId}/participants`,
     { correlationId: options?.correlationId },
   );
+  return data;
+}
+
+/**
+ * Fetch game closure report (DES-MEETUP-ADDENDUM-closure-report AD-2).
+ * Viewers see outcome, winner, runner_up. Organizer also sees attendees, candidates.
+ */
+export async function getEventClosure(
+  eventId: string,
+  options?: RequestOptions,
+): Promise<ClosureResponse> {
+  const { data } = await apiClient.get<ClosureResponse>(`/events/${eventId}/closure`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
+/**
+ * Submit or update game closure report (DES-MEETUP-ADDENDUM-closure-report AD-2).
+ * Organizer only.
+ */
+export async function putEventClosure(
+  eventId: string,
+  payload: EventClosurePut,
+  options?: RequestOptions,
+): Promise<ClosureResponse> {
+  const { data } = await apiClient.put<ClosureResponse>(`/events/${eventId}/closure`, payload, {
+    correlationId: options?.correlationId,
+  });
   return data;
 }
 

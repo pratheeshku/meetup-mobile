@@ -40,8 +40,17 @@ jest.mock('../../api/events', () => ({ getEvents: jest.fn() }));
 jest.mock('../../api/groups', () => ({
   getMyGroups: jest.fn(),
 }));
-jest.mock('../../api/profile', () => ({ getProfile: jest.fn() }));
+jest.mock('../../api/profile', () => ({ getProfile: jest.fn(), getProfileSummary: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
+jest.mock('../../api/home', () => ({
+  BUNDLED_FALLBACK_BANNER: { fallback: { id: 'fb', alt_text: 'fallback' }, banners: [], interval_seconds: 5 },
+  getCachedBanners: jest.fn().mockResolvedValue(null),
+  getCachedMenu: jest.fn().mockResolvedValue(null),
+  getHomeBanners: jest.fn().mockRejectedValue(new Error('offline')),
+  getHomeMenu: jest.fn().mockResolvedValue(null),
+  getHomeSummary: jest.fn().mockRejectedValue(new Error('offline')),
+  getUpcoming: jest.fn().mockResolvedValue({ total: 0, items: [], window_days: 7 }),
+}));
 const mockUnread = { count: 0 };
 const mockRefreshUnread = jest.fn();
 jest.mock('../../hooks/useUnreadCount', () => ({

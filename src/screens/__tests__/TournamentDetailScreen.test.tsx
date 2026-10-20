@@ -23,6 +23,8 @@ jest.mock('../../api/tournaments', () => ({
   registerForTournament: jest.fn(),
   withdrawFromTournament: jest.fn(),
   cancelTournament: jest.fn(),
+  getTournamentClosure: jest.fn().mockResolvedValue(null),
+  putTournamentClosure: jest.fn(),
 }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 jest.mock('../../auth/AuthContext', () => ({
