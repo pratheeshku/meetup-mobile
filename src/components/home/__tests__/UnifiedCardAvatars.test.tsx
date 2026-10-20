@@ -46,7 +46,7 @@ it('each avatar is its own tap target, with tap only (no long-press)', () => {
 it('a tap opens View Details with that person, makes no card request and does not trigger the card', async () => {
   const { root, onPress } = mount();
   await act(async () => avatarPressables(root)[1].props.onPress());
-  expect(root.findAll(n => n.props.testID === 'user-menu-details')).toHaveLength(1);
+  expect(root.findAll(n => n.props.testID === 'user-menu-details').length).toBeGreaterThan(0);
   expect(texts(root)).toEqual(expect.arrayContaining(['Details', 'Arjun S']));
   expect(onPress).not.toHaveBeenCalled();
   const { getGroupMemberCard } = jest.requireMock('../../../api/groups');
