@@ -226,10 +226,10 @@ Rollback: redeploy the previous version; the tables are additive and stay; hidde
 
 | ID | Item | Severity | Status |
 |---|---|---|---|
-| OI-1 | No UI board for the Accept/Decline controls, Declined badge or the organizer Responses section. Build minimal with existing components and tokens, screenshots for review (INDEX rule). The Games list and dashboard layouts stay as today (owner, 2026-10-20) | 🟡 MEDIUM | Open; non-blocking |
-| OI-2 | Decline of a team registration: only individual registrations in v1; a team registration returns the existing refusal and the user withdraws from the team screen | 🟡 MEDIUM | Open; confirm with owner |
+| OI-1 | No UI board is drawn for the Accept/Decline controls, Declined badge or the organizer Responses section. Owner decision 2026-10-20: no boards; use existing components and tokens only, screenshots for review. The Games list and dashboard layouts stay as today | 🟡 MEDIUM | Closed |
+| OI-2 | Decline of a team registration: only individual registrations in v1; a team registration returns the existing refusal and the user withdraws from the team screen | 🟡 MEDIUM | Closed (owner confirmed 2026-10-20) |
 | OI-3 | Verify whether the existing withdraw path notifies the organizer; if so, suppress for decline | 🟡 MEDIUM | Phase 1 verify |
-| OI-4 | On a joined item, the existing withdraw/leave control takes the Decline label; confirm the screens do not already show both | 🟡 MEDIUM | Phase 1 verify |
+| OI-4 | On a joined item, the existing withdraw/leave control takes the Decline label (owner confirmed 2026-10-20); Phase 1 only checks the screens do not already show both | 🟡 MEDIUM | Closed, Phase 1 check remains |
 | OI-5 | P17 rate limit on the new routes | 🟡 MEDIUM | Phase 1 verify |
 | OI-6 | `meetup.tournament.invitations.enabled` must be true in production for tournament Accept/Decline (the respond endpoint answers 404 otherwise) | 🟠 HIGH | Verify before `dr-web`; same as push-actions OI-5 |
 
