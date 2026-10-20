@@ -128,5 +128,14 @@ check-labels: OK - 234 files scanned, 1034 default labels checked.
 ```
 Screenshots: not produced. This sandbox has no Android emulator or iOS simulator, so no screenshot next to the board; the sheet follows the board's structure and the token sizes (88 px picture, 48 px rows, 28 px icon boxes), but I could not compare pixels.
 
+## 6b. Re-run after the owner's change (all five actions confirm)
+`npx jest` on the final code commit (no coverage flag; the failing-suite list is identical to the parent's 14 above):
+```
+Test Suites: 14 failed, 163 passed, 177 total
+Tests:       167 failed, 2059 passed, 2226 total
+exit 1
+```
+A first run right after the change showed 15 failing suites: three UM-T10 action tests still pressed an action and expected it to run without the confirmation. I fixed those tests and ran again; the block above is that second run. Failing suites on the final commit that do not fail on the parent: none. Changed tests: the make_admin / remove_admin case in `UserMenu.test.tsx` (asks first, then runs), a new "all five ask first" case, `GroupDetailMembers.test.tsx` (Make admin) and `AccessActionNotFound.test.tsx` (two Make admin cases). `tsc` exit 0; lint unchanged.
+
 ## 7. Git evidence
 Branch `claude/upbeat-lovelace-lnblk2` from `origin/main` 45a7109. Commits: `ud-mobile: user details menu ...`, `ud-mobile: update tests for the new menu behaviour` (code, 05609b8), then this report. `git rm src/components/groups/MemberActionCard.tsx`. No secrets, no `docs/` edit other than this report, no change to `HomeTopBar` or `DrawerMenu`.
