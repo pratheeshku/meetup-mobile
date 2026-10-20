@@ -257,11 +257,14 @@ describe('user menu on member rows', () => {
     expect((getGroup as jest.Mock).mock.calls.length).toBeGreaterThan(loads); // host refreshed in place
   });
 
-  it('Make admin changes the role through updateMemberRole', async () => {
+  it('Make admin asks first, then changes the role through updateMemberRole', async () => {
     (getGroupMemberCard as jest.Mock).mockResolvedValue(card('u-aisha', 'Aisha Rahman', 'member', ['make_admin']));
     const root = await mount();
     await longPress(root, 'Aisha Rahman');
     await act(async () => byTestId(root, 'user-menu-action-make_admin')[0].props.onPress());
+    expect(updateMemberRole).not.toHaveBeenCalled();
+    expect(texts(root)).toContain('Make Aisha Rahman an admin of this group?');
+    await act(async () => byTestId(root, 'user-menu-confirm-yes')[0].props.onPress());
     expect(updateMemberRole).toHaveBeenCalledWith('group-1', 'u-aisha', 'admin', expect.anything());
   });
 });

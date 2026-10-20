@@ -318,6 +318,7 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       await openMemberCard(root, 'Alex');
       const loads = mockGetGroup.mock.calls.length;
       await press(byLabel(root, 'Make admin'));
+      await press(byLabel(root, 'Yes'));
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(true);
       expect(mockGetGroup.mock.calls.length).toBeGreaterThan(loads);
@@ -330,6 +331,7 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       (updateMemberRole as jest.Mock).mockRejectedValueOnce({ response: { status: 500 } });
       await openMemberCard(root, 'Alex');
       await press(byLabel(root, 'Make admin'));
+      await press(byLabel(root, 'Yes'));
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(false);
       expect(texts(root)).toContain('Could not complete this action. Please try again.');

@@ -47,7 +47,7 @@ interface ActionDef {
   confirmBodyKey: LabelKey;
   icon: ActionIconKey;
   tone: 'default' | 'destructive';
-  /** Asks first. Destructive actions always do; "Make owner" keeps the confirmation it had. */
+  /** Asks first. All five v1 actions do (owner decision); kept as a flag in the registry. */
   confirm: boolean;
   context: 'group' | 'game';
   run: (contextId: string, userId: string, correlationId: string) => Promise<unknown>;
@@ -60,7 +60,7 @@ const REGISTRY: Record<UserActionKey, ActionDef> = {
     confirmBodyKey: 'mob.user_menu.confirm_body_make_admin',
     icon: 'shield_plus',
     tone: 'default',
-    confirm: false,
+    confirm: true,
     context: 'group',
     run: (id, userId, correlationId) => updateMemberRole(id, userId, 'admin', { correlationId }),
   },
@@ -69,7 +69,7 @@ const REGISTRY: Record<UserActionKey, ActionDef> = {
     confirmBodyKey: 'mob.user_menu.confirm_body_remove_admin',
     icon: 'shield_minus',
     tone: 'default',
-    confirm: false,
+    confirm: true,
     context: 'group',
     run: (id, userId, correlationId) => updateMemberRole(id, userId, 'member', { correlationId }),
   },

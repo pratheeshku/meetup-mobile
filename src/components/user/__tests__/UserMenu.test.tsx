@@ -350,15 +350,43 @@ describe('actions', () => {
     expect(actionKeys(root)).toEqual(['remove_from_group']);
   });
 
-  it('Make admin and Remove admin set the role through updateMemberRole', async () => {
+  it('Make admin and Remove admin ask first (confirm_body_<action>), then set the role through updateMemberRole', async () => {
     (getGroupMemberCard as jest.Mock).mockResolvedValue(card({ allowed_actions: allow('make_admin', 'remove_admin') }));
     const root = render(<Host context={GROUP} />);
     await longPress(who(root));
     await press(byId(root, 'user-menu-action-make_admin')[0]);
+    expect(updateMemberRole).not.toHaveBeenCalled();
+    expect(texts(root)).toEqual(expect.arrayContaining(['Are you sure?', 'Make Ravi Kumar an admin of this group?']));
+    await press(byId(root, 'user-menu-confirm-yes')[0]);
     expect(updateMemberRole).toHaveBeenLastCalledWith('g-1', 'u-ravi', 'admin', expect.anything());
     await longPress(who(root));
     await press(byId(root, 'user-menu-action-remove_admin')[0]);
+    expect(updateMemberRole).toHaveBeenCalledTimes(1);
+    expect(texts(root)).toContain('Remove Ravi Kumar as an admin of this group?');
+    await press(byId(root, 'user-menu-confirm-yes')[0]);
     expect(updateMemberRole).toHaveBeenLastCalledWith('g-1', 'u-ravi', 'member', expect.anything());
+  });
+
+  it('all five v1 actions ask before running', async () => {
+    const cases: [string, 'group' | 'game', string][] = [
+      ['make_admin', 'group', 'Make Ravi Kumar an admin of this group?'],
+      ['remove_admin', 'group', 'Remove Ravi Kumar as an admin of this group?'],
+      ['make_owner', 'group', 'Make Ravi Kumar the owner of this group?'],
+      ['remove_from_group', 'group', 'Remove Ravi Kumar from this group?'],
+      ['remove_player', 'game', 'Remove Ravi Kumar from this game?'],
+    ];
+    for (const [key, type, body] of cases) {
+      (getGroupMemberCard as jest.Mock).mockResolvedValue(card({ allowed_actions: allow(key) }));
+      (getEventPlayerCard as jest.Mock).mockResolvedValue(card({ allowed_actions: allow(key) }));
+      const root = render(<Host context={type === 'group' ? GROUP : GAME} />);
+      await longPress(who(root));
+      await press(byId(root, `user-menu-action-${key}`)[0]);
+      expect(texts(root)).toEqual(expect.arrayContaining(['Are you sure?', body]));
+    }
+    expect(updateMemberRole).not.toHaveBeenCalled();
+    expect(transferGroupOwnership).not.toHaveBeenCalled();
+    expect(removeMember).not.toHaveBeenCalled();
+    expect(removeEventPlayer).not.toHaveBeenCalled();
   });
 
   it('Make owner asks first, then calls transferGroupOwnership', async () => {
