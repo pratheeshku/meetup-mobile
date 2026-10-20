@@ -20,6 +20,7 @@ import type { UserCardOut } from '../types/userMenu';
 import type {
   ClosureResponse,
   CreateEventInput,
+  DeclineAck,
   Event,
   EventClosurePut,
   EventInvitation,
@@ -29,6 +30,7 @@ import type {
   EventStatus,
   GameDisplayStatus,
   LifecycleStatus,
+  ResponsesResponse,
   RsvpStatus,
   UpdateEventInput,
 } from '../types/event';
@@ -109,6 +111,7 @@ export interface EventApiItem {
   group_id?: string | null;
   group_ids?: string[] | null;
   group_names?: string[] | null;
+  my_declined?: boolean | null;
 }
 
 /**
@@ -202,6 +205,7 @@ export function mapEventApiItem(raw: EventApiItem): Event {
     group_names: raw.group_names ?? (raw.group_name ? [raw.group_name] : []),
     lifecycle_status: resolveLifecycleStatus(raw),
     closure_outcome: raw.closure_outcome ?? null,
+    my_declined: Boolean(raw.my_declined),
   };
 }
 
@@ -455,6 +459,44 @@ export async function putEventClosure(
   options?: RequestOptions,
 ): Promise<ClosureResponse> {
   const { data } = await apiClient.put<ClosureResponse>(`/events/${eventId}/closure`, payload, {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
+/** `POST /events/{id}/invitations/respond` `{ accept }` (the invitee only). */
+export async function respondToEventInvitation(
+  id: string,
+  accept: boolean,
+  options?: RequestOptions,
+): Promise<{ participation_status?: string | null }> {
+  const { data } = await apiClient.post<{ participation_status?: string | null }>(
+    `/events/${id}/invitations/respond`,
+    { accept },
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+/** `POST /events/{id}/decline` (DES-MEETUP-ADDENDUM-decline-response AD-3). */
+export async function declineEvent(
+  id: string,
+  options?: RequestOptions,
+): Promise<DeclineAck> {
+  const { data } = await apiClient.post<DeclineAck>(
+    `/events/${id}/decline`,
+    {},
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+/** `GET /events/{id}/responses` (DES-MEETUP-ADDENDUM-decline-response AD-5). Organizer only. */
+export async function getEventResponses(
+  id: string,
+  options?: RequestOptions,
+): Promise<ResponsesResponse> {
+  const { data } = await apiClient.get<ResponsesResponse>(`/events/${id}/responses`, {
     correlationId: options?.correlationId,
   });
   return data;

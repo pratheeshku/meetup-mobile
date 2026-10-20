@@ -34,7 +34,7 @@ import type { TranslateFn } from '../labels/LabelsContext';
 /** Rows a Home section shows before "View all" (AD-14). */
 export const HOME_SECTION_ROWS = 2;
 
-export type GameBadge = 'Hosting' | 'Going' | 'Waitlisted' | 'Open';
+export type GameBadge = 'Hosting' | 'Going' | 'Waitlisted' | 'Open' | 'Declined';
 export type GamesScope = 'all' | 'mine' | 'open';
 
 /** `is_organiser` is a stub (always false) — also compare ids. */
@@ -86,22 +86,27 @@ export function compareGames(a: Event, b: Event): number {
 
 export function isMyGame(event: Event, userId: string | undefined): boolean {
   return (
-    isOrganiserOf(event, userId) ||
-    event.current_user_rsvp_status === 'going' ||
-    event.current_user_rsvp_status === 'waitlisted'
+    !event.my_declined &&
+    (isOrganiserOf(event, userId) ||
+      event.current_user_rsvp_status === 'going' ||
+      event.current_user_rsvp_status === 'waitlisted')
   );
 }
 
 export function isOpenGame(event: Event, userId: string | undefined): boolean {
   return (
+    !event.my_declined &&
     (event.visibility === 'public' || event.visibility === 'group') &&
     !isOrganiserOf(event, userId) &&
     event.current_user_rsvp_status === 'none'
   );
 }
 
-/** One badge per row: Hosting > Going > Waitlisted > Open; `null` otherwise. */
+/** One badge per row: Declined > Hosting > Going > Waitlisted > Open; `null` otherwise. */
 export function getGameBadge(event: Event, userId: string | undefined): GameBadge | null {
+  if (event.my_declined) {
+    return 'Declined';
+  }
   if (isOrganiserOf(event, userId)) {
     return 'Hosting';
   }

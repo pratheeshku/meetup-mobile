@@ -23,6 +23,8 @@ import { apiClient } from './client';
 import type { VenueSnapshot } from '../types/venue';
 import type {
   CreateTournamentInput,
+  DeclineAck,
+  ResponsesResponse,
   TournamentClosurePut,
   TournamentClosureResponse,
   TournamentInvitation,
@@ -72,6 +74,7 @@ interface TournamentApiItem {
   venue_snapshot?: VenueSnapshot | null;
   lifecycle_status?: string | null;
   closure_outcome?: string | null;
+  my_declined?: boolean | null;
 }
 
 /** Unknown, null or absent -> `'none'` (never a value that shows buttons). */
@@ -119,6 +122,7 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     venue_snapshot: raw.venue_snapshot ?? null,
     lifecycle_status: (raw.lifecycle_status as any) ?? 'active',
     closure_outcome: raw.closure_outcome ?? null,
+    my_declined: Boolean(raw.my_declined),
   };
 }
 
@@ -340,6 +344,30 @@ export async function putTournamentClosure(
   options?: RequestOptions,
 ): Promise<TournamentClosureResponse> {
   const { data } = await apiClient.put<TournamentClosureResponse>(`/tournaments/${id}/closure`, payload, {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
+/** `POST /tournaments/{id}/decline` (DES-MEETUP-ADDENDUM-decline-response AD-3). */
+export async function declineTournament(
+  id: string,
+  options?: RequestOptions,
+): Promise<DeclineAck> {
+  const { data } = await apiClient.post<DeclineAck>(
+    `/tournaments/${id}/decline`,
+    {},
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+/** `GET /tournaments/{id}/responses` (DES-MEETUP-ADDENDUM-decline-response AD-5). Organizer or committee only. */
+export async function getTournamentResponses(
+  id: string,
+  options?: RequestOptions,
+): Promise<ResponsesResponse> {
+  const { data } = await apiClient.get<ResponsesResponse>(`/tournaments/${id}/responses`, {
     correlationId: options?.correlationId,
   });
   return data;

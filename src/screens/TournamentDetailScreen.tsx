@@ -41,12 +41,15 @@ import { useAuth } from '../auth/AuthContext';
 import { withCorrelationId } from '../api/correlationId';
 import {
   cancelTournament,
+  declineTournament,
   getFixtures,
   getRegistrations,
   getTournament,
   getTournamentClosure,
+  getTournamentResponses,
   putTournamentClosure,
   registerForTournament,
+  respondToTournamentInvitation,
   withdrawFromTournament,
 } from '../api/tournaments';
 import { getClientConfig } from '../api/config';
@@ -57,6 +60,7 @@ import UserPressable from '../components/user/UserPressable';
 import { useUserMenu } from '../hooks/useUserMenu';
 import Card from '../components/Card';
 import LifecycleStatusChip from '../components/LifecycleStatusChip';
+import ResponsesSection from '../components/responses/ResponsesSection';
 import ClosureSummaryCard from '../components/closure/ClosureSummaryCard';
 import ClosureModal, { type CandidateItem } from '../components/closure/ClosureModal';
 import VenueDetailCard from '../components/venue/VenueDetailCard';
@@ -67,6 +71,7 @@ import GroupNamesRow from '../components/GroupNamesRow';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type {
+  ResponsesResponse,
   Tournament,
   TournamentClosurePerson,
   TournamentClosureResponse,
@@ -132,6 +137,9 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const [isClosureSubmitting, setIsClosureSubmitting] = useState(false);
   const [closureError, setClosureError] = useState<string | null>(null);
 
+  // Organizer responses state (dr-mobile / DES-MEETUP-ADDENDUM-decline-response AD-5)
+  const [responses, setResponses] = useState<ResponsesResponse | null>(null);
+
   const closureCandidates: CandidateItem[] = useMemo(() => {
     if (closure?.candidates && closure.candidates.length > 0) {
       return closure.candidates.map((c: TournamentClosurePerson) => ({
@@ -167,7 +175,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         setLoadError(null);
       }
       try {
-        const [tournamentData, fixturesData, registrationsData, closureData] =
+        const [tournamentData, fixturesData, registrationsData, closureData, responsesData] =
           await Promise.all([
             getTournament(tournamentId),
             getFixtures(tournamentId),
@@ -175,12 +183,20 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             typeof getTournamentClosure === 'function'
               ? getTournamentClosure(tournamentId).catch(() => null)
               : Promise.resolve(null),
+            typeof getTournamentResponses === 'function'
+              ? getTournamentResponses(tournamentId).catch(() => null)
+              : Promise.resolve(null),
           ]);
         setTournament(tournamentData);
         setFixtures(fixturesData);
         setRegistrations(registrationsData);
         if (closureData) {
           setClosure(closureData);
+        }
+        if (responsesData && responsesData.accepted) {
+          setResponses(responsesData);
+        } else {
+          setResponses(null);
         }
       } catch (error) {
         // 404 = gone or no longer visible to this user (AC-11, AC-07: a registered player who
@@ -292,7 +308,62 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       ) {
         setWithdrawError(t('mob.closure.game_ended'));
       } else {
-        setWithdrawError(t('mob.tournament.withdraw_error'));
+        const reason = e?.response?.data?.detail || e?.response?.data?.reason;
+        setWithdrawError(reason ?? t('mob.tournament.withdraw_error'));
+      }
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
+  const handleAcceptInvite = async (): Promise<void> => {
+    setRegisterError(null);
+    setIsRegistering(true);
+    try {
+      await withCorrelationId(async correlationId => {
+        await respondToTournamentInvitation(tournamentId, true, { correlationId });
+        await loadAll(true);
+      });
+    } catch (e: any) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else if (
+        e?.response?.status === 409 &&
+        (e?.response?.data?.code === 'game_ended' ||
+          e?.response?.data?.code === 'tournament_ended' ||
+          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
+      ) {
+        setRegisterError(t('mob.closure.game_ended'));
+      } else {
+        setRegisterError(t('mob.tournament.register_error'));
+      }
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const handleDecline = async (): Promise<void> => {
+    setWithdrawError(null);
+    setIsWithdrawing(true);
+    try {
+      await withCorrelationId(async correlationId => {
+        await declineTournament(tournamentId, { correlationId });
+        unavailable.markOwnAction();
+        await loadAll(true);
+      });
+    } catch (e: any) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else if (
+        e?.response?.status === 409 &&
+        (e?.response?.data?.code === 'game_ended' ||
+          e?.response?.data?.code === 'tournament_ended' ||
+          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
+      ) {
+        setWithdrawError(t('mob.closure.game_ended'));
+      } else {
+        const reason = e?.response?.data?.detail || e?.response?.data?.reason;
+        setWithdrawError(reason ?? t('mob.tournament.withdraw_error'));
       }
     } finally {
       setIsWithdrawing(false);
@@ -469,6 +540,11 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           {sportLabel} · {tournament.format}
         </Text>
         <View style={styles.statusChipRow}>
+          {!isOrganiser && tournament.my_declined ? (
+            <View style={styles.declinedPill} testID="tournament-declined-badge">
+              <Text style={styles.declinedPillText}>{t('mob.respond.declined')}</Text>
+            </View>
+          ) : null}
           <LifecycleStatusChip
             status={
               tournament.lifecycle_status ??
@@ -553,29 +629,72 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         />
       ) : null}
 
+      {isOrganiser && responses ? (
+        <ResponsesSection responses={responses} />
+      ) : null}
+
       {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
       {withdrawError ? <Text style={styles.errorText}>{withdrawError}</Text> : null}
 
-      {canRegister ? (
-        <Button
-          label={t('mob.tournament.register')}
-          onPress={handleRegister}
-          loading={isRegistering}
-          style={styles.button}
-        />
+      {!isTournamentEnded && !isOrganiser ? (
+        canWithdraw ? (
+          <Button
+            label={t('mob.respond.decline')}
+            accessibilityLabel={t('mob.tournament.withdraw')}
+            variant="secondary"
+            onPress={handleWithdraw}
+            loading={isWithdrawing}
+            style={styles.button}
+            testID="tournament-decline-button"
+          />
+        ) : tournament.my_declined ? (
+          <Button
+            label={
+              tournament.visibility === 'invite' || tournament.my_invitation_status !== null
+                ? t('mob.respond.accept')
+                : t('mob.tournament.register')
+            }
+            onPress={
+              tournament.visibility === 'invite' || tournament.my_invitation_status !== null
+                ? handleAcceptInvite
+                : handleRegister
+            }
+            loading={isRegistering}
+            style={styles.button}
+            testID="tournament-recover-button"
+          />
+        ) : canRegister && tournament.my_invitation_status !== 'pending' ? (
+          tournament.my_invitation_status === 'accepted' ? (
+            <Button
+              label={t('mob.tournament.register')}
+              onPress={handleRegister}
+              loading={isRegistering}
+              style={styles.button}
+              testID="tournament-register-button"
+            />
+          ) : (
+            <View style={styles.buttonPairRow}>
+              <Button
+                label={t('mob.tournament.register')}
+                onPress={handleRegister}
+                loading={isRegistering}
+                style={styles.pairButton}
+                testID="tournament-register-button"
+              />
+              <Button
+                label={t('mob.respond.decline')}
+                variant="secondary"
+                onPress={handleDecline}
+                loading={isWithdrawing}
+                style={styles.pairButton}
+                testID="tournament-decline-button"
+              />
+            </View>
+          )
+        ) : null
       ) : null}
 
-      {canWithdraw ? (
-        <Button
-          label={t('mob.tournament.withdraw')}
-          variant="secondary"
-          onPress={handleWithdraw}
-          loading={isWithdrawing}
-          style={styles.button}
-        />
-      ) : null}
-
-      {showRegistrationClosedMessage ? (
+      {showRegistrationClosedMessage && !tournament.my_declined ? (
         <Text style={styles.closedNotice}>{t('mob.tournament.registration_closed')}</Text>
       ) : null}
 
@@ -776,5 +895,26 @@ const styles = StyleSheet.create({
     color: colors.error,
     marginBottom: spacing.sm,
     textAlign: 'center',
+  },
+  declinedPill: {
+    backgroundColor: colors.track,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    marginRight: spacing.xs,
+  },
+  declinedPillText: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  buttonPairRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  pairButton: {
+    flex: 1,
+    marginTop: 0,
   },
 });

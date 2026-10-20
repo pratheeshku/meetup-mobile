@@ -11,7 +11,8 @@
  */
 
 import type { OthersVenueInput, VenueSnapshot } from './venue';
-import type { LifecycleStatus } from './event';
+import type { DeclineAck, LifecycleStatus, ResponsePerson, ResponseSection, ResponsesResponse } from './event';
+export type { DeclineAck, ResponsePerson, ResponseSection, ResponsesResponse };
 
 /**
  * Proposed Assumption: not specified anywhere for Tournaments. Reused
@@ -111,6 +112,8 @@ export interface Tournament {
   lifecycle_status?: LifecycleStatus;
   /** DES-MEETUP-ADDENDUM-closure-report AD-1: closure outcome when closed */
   closure_outcome?: string | null;
+  /** DES-MEETUP-ADDENDUM-decline-response AD-4: true when caller has a current decline row */
+  my_declined?: boolean;
 }
 
 export interface TournamentFixture {

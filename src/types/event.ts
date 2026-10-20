@@ -98,6 +98,8 @@ export interface Event {
   lifecycle_status?: LifecycleStatus;
   /** DES-MEETUP-ADDENDUM-closure-report AD-1: closure outcome when closed */
   closure_outcome?: string | null;
+  /** DES-MEETUP-ADDENDUM-decline-response AD-4: true when caller has a current decline row */
+  my_declined?: boolean;
 }
 
 export interface UpdateEventInput {
@@ -238,4 +240,31 @@ export interface EventClosurePut {
   winner_user_id: string | null;
   runner_up_user_id: string | null;
   expected_version: number;
+}
+
+/** DES-MEETUP-ADDENDUM-decline-response AD-5: response person preview */
+export interface ResponsePerson {
+  user_id?: string | null;
+  display_name: string;
+  photo_url?: string | null;
+  email?: string | null;
+  responded_at?: string | null;
+  declined_at?: string | null;
+  via?: 'invitation' | 'public' | 'joined' | string | null;
+  waitlisted?: boolean;
+}
+
+export interface ResponseSection {
+  total: number;
+  items: ResponsePerson[];
+}
+
+export interface ResponsesResponse {
+  accepted: ResponseSection;
+  pending: ResponseSection;
+  declined: ResponseSection;
+}
+
+export interface DeclineAck {
+  my_declined: boolean;
 }

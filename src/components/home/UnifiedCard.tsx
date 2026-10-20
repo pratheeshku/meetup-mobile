@@ -245,14 +245,28 @@ const GAME_BADGE_LABEL_KEY: Record<GameBadge, LabelKey> = {
   Going: 'mob.game_badge.going',
   Waitlisted: 'mob.game_badge.waitlisted',
   Open: 'mob.game_badge.open',
+  Declined: 'mob.respond.declined',
 };
 
 export function GameStatusBadge({ badge }: { badge: GameBadge }): React.JSX.Element {
   const t = useT();
   const isOpen = badge === 'Open';
+  const isDeclined = badge === 'Declined';
   return (
-    <View style={[styles.statusPill, isOpen ? styles.statusOpen : null]}>
-      <Text style={[styles.statusText, isOpen ? styles.statusOpenText : null]}>
+    <View
+      style={[
+        styles.statusPill,
+        isOpen ? styles.statusOpen : null,
+        isDeclined ? styles.statusDeclined : null,
+      ]}
+    >
+      <Text
+        style={[
+          styles.statusText,
+          isOpen ? styles.statusOpenText : null,
+          isDeclined ? styles.statusDeclinedText : null,
+        ]}
+      >
         {t(GAME_BADGE_LABEL_KEY[badge])}
       </Text>
     </View>
@@ -820,5 +834,12 @@ const styles = StyleSheet.create({
   },
   statusOpenText: {
     color: dash.brand,
+  },
+  statusDeclined: {
+    backgroundColor: dash.tabIdleBg,
+    borderColor: dash.cardBorder,
+  },
+  statusDeclinedText: {
+    color: dash.textMuted,
   },
 });

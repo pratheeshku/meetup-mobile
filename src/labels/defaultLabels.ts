@@ -1023,5 +1023,26 @@ export const DEFAULT_LABELS = {
   'mob.closure.view_all': 'All games',
   'mob.closure.view_active_tournaments': 'Active tournaments',
   'mob.closure.view_all_tournaments': 'All tournaments',
+
+  // Decline-response (dr-mobile / DES-MEETUP-ADDENDUM-decline-response AD-9)
+  'mob.respond.accept': 'Accept',
+  'mob.respond.decline': 'Decline',
+  'mob.respond.declined': 'Declined',
+  'mob.respond.join': 'Join',
+  'mob.respond.responses': 'Responses',
+  'mob.respond.section.accepted': 'Accepted',
+  'mob.respond.section.pending': 'Pending',
+  'mob.respond.section.declined': 'Declined',
+  'mob.respond.waitlisted': 'Waitlisted',
+  'mob.respond.empty.accepted': 'No one yet',
+  'mob.respond.empty.pending': 'No one yet',
+  'mob.respond.empty.declined': 'No one has declined',
+  'mob.respond.you_declined': 'You declined',
+  'mob.respond.already_answered': 'Already answered',
+  'mob.respond.unavailable': 'This game is no longer available',
+  'mob.respond.declined_hidden': 'Declined games hidden',
+  'mob.respond.via.invitation': 'Invited',
+  'mob.respond.via.public': 'Public',
+  'mob.respond.via.joined': 'Joined',
 } as const;
 

@@ -22,13 +22,16 @@ import Geolocation from '@react-native-community/geolocation';
 
 import {
   cancelEvent,
+  declineEvent,
   getEvent,
   getEventClosure,
   getEventParticipants,
+  getEventResponses,
   inviteEmailToEvent,
   inviteGroupToEvent,
   inviteUserToEvent,
   putEventClosure,
+  respondToEventInvitation,
   rsvpEvent,
   updateEvent,
   withdrawEvent,
@@ -84,6 +87,7 @@ import {
 } from '../components/icons/SharedIcons';
 import { useT } from '../labels/LabelsContext';
 import LifecycleStatusChip from '../components/LifecycleStatusChip';
+import ResponsesSection from '../components/responses/ResponsesSection';
 import ClosureSummaryCard from '../components/closure/ClosureSummaryCard';
 import ClosureModal, { type CandidateItem } from '../components/closure/ClosureModal';
 import SkillRequirementPicker from '../components/SkillRequirementPicker';
@@ -108,6 +112,7 @@ import type {
   Event,
   EventParticipant,
   EventSkillLevel,
+  ResponsesResponse,
   UpdateEventInput,
 } from '../types/event';
 import type { Group } from '../types/group';
@@ -176,6 +181,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [isClosureSubmitting, setIsClosureSubmitting] = useState(false);
   const [closureError, setClosureError] = useState<string | null>(null);
 
+  // Organizer responses state (dr-mobile / DES-MEETUP-ADDENDUM-decline-response AD-5)
+  const [responses, setResponses] = useState<ResponsesResponse | null>(null);
+
   const closureCandidates: CandidateItem[] = useMemo(() => {
     if (closure?.candidates && closure.candidates.length > 0) {
       return closure.candidates.map(c => ({
@@ -235,11 +243,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         setLoadError(null);
       }
       try {
-        const [data, parts, closureData] = await Promise.all([
+        const [data, parts, closureData, responsesData] = await Promise.all([
           getEvent(eventId),
           getEventParticipants(eventId).catch(() => null),
           typeof getEventClosure === 'function'
             ? getEventClosure(eventId).catch(() => null)
+            : Promise.resolve(null),
+          typeof getEventResponses === 'function'
+            ? getEventResponses(eventId).catch(() => null)
             : Promise.resolve(null),
         ]);
         setEvent(data);
@@ -250,6 +261,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         }
         if (closureData) {
           setClosure(closureData);
+        }
+        if (responsesData && responsesData.accepted) {
+          setResponses(responsesData);
+        } else {
+          setResponses(null);
         }
       } catch (error) {
         // The server answers 404 for a game that is gone or no longer visible to this user
@@ -840,7 +856,60 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       ) {
         setActionError(t('mob.closure.game_ended'));
       } else {
-        setActionError(t('mob.game_detail.leave_error'));
+        const reason = e?.response?.data?.detail || e?.response?.data?.reason;
+        setActionError(reason ?? t('mob.game_detail.leave_error'));
+      }
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleAcceptInvite = async () => {
+    setActionError(null);
+    setIsActionLoading(true);
+    try {
+      await withCorrelationId(async correlationId => {
+        await respondToEventInvitation(eventId, true, { correlationId });
+        await loadEvent(true);
+      });
+    } catch (e: any) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else if (
+        e?.response?.status === 409 &&
+        (e?.response?.data?.code === 'game_ended' ||
+          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
+      ) {
+        setActionError(t('mob.closure.game_ended'));
+      } else {
+        setActionError(getApiErrorMessage(e, t('mob.game_detail.join_error')));
+      }
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDecline = async () => {
+    setActionError(null);
+    setIsActionLoading(true);
+    try {
+      await withCorrelationId(async correlationId => {
+        await declineEvent(eventId, { correlationId });
+        unavailable.markOwnAction();
+        await loadEvent(true);
+      });
+    } catch (e: any) {
+      if (isNotFoundError(e)) {
+        unavailable.onNotFound();
+      } else if (
+        e?.response?.status === 409 &&
+        (e?.response?.data?.code === 'game_ended' ||
+          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
+      ) {
+        setActionError(t('mob.closure.game_ended'));
+      } else {
+        const reason = e?.response?.data?.detail || e?.response?.data?.reason;
+        setActionError(reason ?? t('mob.game_detail.leave_error'));
       }
     } finally {
       setIsActionLoading(false);
@@ -1422,6 +1491,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 <Text style={styles.hostPillText}>{t('mob.game_detail.host_badge')}</Text>
               </View>
             ) : null}
+            {!isOrganiser && event.my_declined ? (
+              <View style={styles.declinedPill} testID="event-declined-badge">
+                <Text style={styles.declinedPillText}>{t('mob.respond.declined')}</Text>
+              </View>
+            ) : null}
             <LifecycleStatusChip
               status={
                 event.lifecycle_status ??
@@ -1723,20 +1797,69 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             <View style={styles.rsvpActionContainer}>
               {event.current_user_rsvp_status === 'going' ? (
                 <Button
-                  label={t('mob.game_detail.leave')}
+                  label={t('mob.respond.decline')}
+                  accessibilityLabel={t('mob.game_detail.leave')}
                   variant="secondary"
                   onPress={handleWithdraw}
                   loading={isActionLoading}
+                  testID="decline-button"
                 />
-              ) : (
+              ) : event.my_declined ? (
                 <Button
-                  label={t('mob.game_detail.join')}
+                  label={
+                    event.visibility === 'invite_only'
+                      ? t('mob.respond.accept')
+                      : t('mob.respond.join')
+                  }
                   variant="cta"
-                  onPress={handleRsvp}
+                  onPress={event.visibility === 'invite_only' ? handleAcceptInvite : handleRsvp}
                   loading={isActionLoading}
+                  testID="recover-join-button"
                 />
+              ) : event.visibility === 'invite_only' ? (
+                <View style={styles.formButtonsRow}>
+                  <Button
+                    label={t('mob.respond.accept')}
+                    variant="cta"
+                    onPress={handleAcceptInvite}
+                    loading={isActionLoading}
+                    style={styles.rowButton}
+                    testID="accept-button"
+                  />
+                  <Button
+                    label={t('mob.respond.decline')}
+                    variant="secondary"
+                    onPress={handleDecline}
+                    loading={isActionLoading}
+                    style={styles.rowButton}
+                    testID="decline-button"
+                  />
+                </View>
+              ) : (
+                <View style={styles.formButtonsRow}>
+                  <Button
+                    label={t('mob.respond.join')}
+                    variant="cta"
+                    onPress={handleRsvp}
+                    loading={isActionLoading}
+                    style={styles.rowButton}
+                    testID="join-button"
+                  />
+                  <Button
+                    label={t('mob.respond.decline')}
+                    variant="secondary"
+                    onPress={handleDecline}
+                    loading={isActionLoading}
+                    style={styles.rowButton}
+                    testID="decline-button"
+                  />
+                </View>
               )}
             </View>
+          ) : null}
+
+          {isOrganiser && responses ? (
+            <ResponsesSection responses={responses} />
           ) : null}
 
           {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
@@ -1919,6 +2042,17 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '700',
     color: colors.ownerChipText,
+  },
+  declinedPill: {
+    backgroundColor: colors.track,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  declinedPillText: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.textSecondary,
   },
   detailContent: {
     padding: spacing.md,

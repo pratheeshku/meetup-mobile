@@ -130,9 +130,23 @@ describe('Accept on an iOS-shaped event_invite', () => {
   });
 });
 
-describe('Ignore on an iOS-shaped event_invite', () => {
+describe('Decline on an iOS-shaped event_invite', () => {
+  it('calls POST /events/{id}/invitations/respond with accept: false and shows You declined', async () => {
+    await handlePushActionEvent(iosPress('decline', iosData('event_invite')));
+
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [url, body, config] = mockPost.mock.calls[0];
+    expect(url).toBe('/events/ent-1/invitations/respond');
+    expect(body).toEqual({ accept: false });
+    expect(config.headers).toEqual({ Authorization: 'Bearer tok-new' });
+    expect(mockDisplay.mock.calls[0][0].id).toBe(APNS_REQUEST_ID);
+    expect(mockDisplay.mock.calls[0][0].title).toBe('You declined');
+  });
+});
+
+describe('Ignore on an iOS-shaped group_invite', () => {
   it('clears the entry and marks the delivery read (POST /notifications/{delivery}/read)', async () => {
-    await handlePushActionEvent(iosPress('ignore', iosData('event_invite')));
+    await handlePushActionEvent(iosPress('ignore', iosData('group_invite')));
 
     expect(mockCancel).toHaveBeenCalledWith(APNS_REQUEST_ID);
     expect(mockPost).toHaveBeenCalledTimes(1);
@@ -141,7 +155,7 @@ describe('Ignore on an iOS-shaped event_invite', () => {
   });
 
   it('with no notification id, cancels by delivery_id and still marks it read', async () => {
-    await handlePushActionEvent(iosPress('ignore', iosData('event_invite'), null));
+    await handlePushActionEvent(iosPress('ignore', iosData('group_invite'), null));
     expect(mockCancel).toHaveBeenCalledWith('del-1');
     expect(mockPost.mock.calls[0][0]).toBe('/notifications/del-1/read');
   });
@@ -149,7 +163,7 @@ describe('Ignore on an iOS-shaped event_invite', () => {
   it('a double press marks read once', async () => {
     let release!: (value: unknown) => void;
     mockPost.mockReturnValue(new Promise(resolve => (release = resolve)));
-    const event = iosPress('ignore', iosData('event_invite'));
+    const event = iosPress('ignore', iosData('group_invite'));
 
     const first = handlePushActionEvent(event);
     const second = handlePushActionEvent(event);

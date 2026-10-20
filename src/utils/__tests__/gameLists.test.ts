@@ -162,6 +162,11 @@ describe('badges (AD-15)', () => {
     expect(getGameBadge(byId('group-open'), ME)).toBe('Open');
   });
 
+  it('gives Declined badge when event.my_declined is true', () => {
+    const declinedGame = makeEvent({ my_declined: true });
+    expect(getGameBadge(declinedGame, ME)).toBe('Declined');
+  });
+
   it('Hosting wins when the user hosts a game they are also going to', () => {
     const both = makeEvent({ organiser_id: ME, current_user_rsvp_status: 'going' });
     expect(getGameBadge(both, ME)).toBe('Hosting');
@@ -170,6 +175,12 @@ describe('badges (AD-15)', () => {
   it('has no badge for a game that is neither mine nor open', () => {
     expect(getGameBadge(byId('invite-only'), ME)).toBeNull();
     expect(getGameBadge(byId('declined'), ME)).toBeNull();
+  });
+
+  it('excludes games with my_declined from open and my games', () => {
+    const declinedOpen = makeEvent({ id: 'dec-open', my_declined: true, starts_at: iso(5) });
+    expect(selectOpenGames([declinedOpen], opts)).toEqual([]);
+    expect(selectMyGames([declinedOpen], opts)).toEqual([]);
   });
 });
 
