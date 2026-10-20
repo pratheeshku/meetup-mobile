@@ -1,10 +1,10 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-LIFECYCLE
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-LIFECYCLE
-**Version:** v1.3 (amends v1.2.2; review rounds 1–9: see §15)
-**Status:** v1.1 APPROVED (owner, 2026-10-14). **v1.2 APPROVED (owner, 2026-10-16). v1.2.1 (`my_invitation_status`) APPROVED (owner, 2026-10-16). v1.2.2 (implementation rulings) APPROVED (owner, 2026-10-16).** **v1.3 (closure report, AD-18) APPROVED (owner, 2026-10-20) together with `DES-MEETUP-ADDENDUM-closure-report.md` v1.0.** Non-blocking open items remain in §14 (OI-5–OI-9, OI-12–OI-14).
+**Version:** v1.4 (amends v1.2.2; merges the two v1.3 amendments; review rounds 1–10: see §15)
+**Status:** v1.1 APPROVED (owner, 2026-10-14). **v1.2 APPROVED (owner, 2026-10-16). v1.2.1 (`my_invitation_status`) APPROVED (owner, 2026-10-16). v1.2.2 (implementation rulings) APPROVED (owner, 2026-10-16).** **v1.3 (creation wizard, +/− controls: AD-19, AD-20, TL-78 to TL-86) APPROVED (owner, 2026-10-19). v1.3 (closure report: AD-18, TL-74 to TL-77) APPROVED (owner, 2026-10-20) together with `DES-MEETUP-ADDENDUM-closure-report.md` v1.0.** **v1.4 (2026-10-20) is an editorial merge of the two v1.3 amendments, which had been written on different bases and used the same ids; the wizard amendment is renumbered (its AD-18 became AD-20, its TL-74 to TL-82 became TL-78 to TL-86). No decision changes.** Non-blocking open items remain in §14 (OI-5–OI-9, OI-12–OI-16).
 **Owner:** Pratheesh
-**Date:** 2026-10-16
+**Date:** 2026-10-19
 **Scale Tier:** T1
 **Baseline:** `DES-MEETUP.md` v1.75 (read from repo). Design-only addendum, same pattern as `DES-MEETUP-ADDENDUM-event-reminder.md`. Does not edit the baseline.
 **Governing files:** `Enterprise_Design_Principles.md` v1.1 (P1–P17), `design-best-practices.md` v1.0 (BP-01–BP-13).
@@ -16,6 +16,8 @@
 3. Part A of §10 (groups and games) is a lightweight design so that work can start before this document is approved.
 4. **v1.2 requirement changes** (owner decisions, 2026-10-16) are restated in §1 as TL-09 to TL-13 (rewritten), TL-38 (amended), TL-40 (amended) and new TL-71 to TL-73. Same departure as note 1; approved with this version.
 5. **Visual source for share and invite.** The canvas boards `TPShareSheet`, `TPInviteGroups`, `TPInviteGroupsCap` and `TPInviteSent` show the v1.1 behaviour (per-tournament link, share sheet). They are superseded by v1.2 and have not been redrawn. Until they are, the visual source is the existing game screens (web `openInviteGroupModal` and the individual-invite search on game detail; the mobile game detail invite and share UI as it was before commit `5f04b95`).
+
+6. **v1.3 requirement changes** (owner decisions, 2026-10-19) are restated in §1 as TL-14 and TL-19 (amended) and new TL-78 to TL-86. Same departure as note 1; approved with this version. The Design canvas boards for the creation wizard are not redrawn until the owner confirms, per his standing instruction; the text of AD-20 and AD-19 governs until then.
 
 ---
 
@@ -46,12 +48,18 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 5. **Existing (v1) tournaments get invitations too**, behind a flag. The one v1 behaviour change: on an `invite` tournament, an invited person who has accepted may register themselves (today only the organizer registers people).
 6. Housekeeping: the §10 inconsistency about when v2 creation is enabled is fixed (Phase 10). New TL-71 to TL-73, config keys, tests 35–42, OI-12, OI-13, deviations D-6 and D-7.
 
-### v1.3 amendment (what changed, approved 2026-10-20)
+### v1.3 amendment A: closure report (what changed, approved 2026-10-20)
 
 1. **A tournament gets a closure report** (owner decision, 2026-10-20): after the end time the organizer or an active committee member records whether it was completed or not held, who took part, the winner and the runner-up (a player or a team). Full design, schema and tests: `DES-MEETUP-ADDENDUM-closure-report.md` (AD-3). Summary in AD-18, requirements TL-74 to TL-77.
 2. **The profile counts Won, Played and Hosted from closure reports.** The fixture-win count behind "Won" and the RSVP counts are retired. Fixtures and results (AD-10) are unchanged and stay the record of matches; they are no longer a stats source.
 3. **Lifecycle status** shown in lists: active, cancelled (`cancelled` or `dissolved`), past (shown as Pending closure) and closed (has a closure report). Computed, no stored status is added, and the status machine of AD-6 is untouched. Stored `completed` (close-out) does not mean closed.
 4. **Lock after the end time**: details, registration, invitations and committee membership are locked from the end time. Result entry, standings publication and close-out stay open (closure addendum D-3, OI-1).
+
+### v1.3 amendment B: creation wizard and +/− controls (what changed, approved 2026-10-19; ids renumbered in v1.4)
+
+1. **Creation wizard (AD-20).** Step 3 captures start and end dates and times, the registration closure date (the soft block) and the hard block date. Step 4 chooses multiple groups. Step 6 adds committee members through the normal player search: the organizer is member 1 and at least one more is required. Step 7 reviews everything and submits once, in one atomic, repeat-safe request.
+2. **"+" and "−" instead of Invite buttons (AD-19).** Every Invite button for a person or group, on web and mobile, across games, groups and tournaments, becomes "+". A staged addition shows "−" until submitted. A sent invitation shows its status. Who may invite, the windows and the caps do not change.
+3. New TL-78 to TL-86, two config keys, one table, one column, tests 43–52, phases C and P, OI-15, OI-16, review round 10.
 
 ---
 
@@ -72,12 +80,12 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 | TL-11 | Group invites follow the game rule: the organizer or committee may invite any group; any other inviter (public tournaments only) must own or administer that group. A group invite creates one invitation per current member (a snapshot, as for games). The tournament-wide cap is 20 distinct groups (config). (v1.2, replaces v1.1 text) |
 | TL-12 | The organizer and active committee members see who invited whom and may revoke a pending invitation. Other inviters cannot list or revoke. (v1.2, replaces v1.1 text) |
 | TL-13 | Share is the app or Play Store link (the single `/public/share` redirect), with system share, WhatsApp and copy link, exactly as for games. It carries no tournament identity and grants no access. Shown to the organizer and active committee members always, and to any viewer of a public tournament while registration is open. (v1.2, replaces v1.1 text) |
-| TL-14 | Dates: registration closes (soft block) ≤ hard block < start − configurable minimum gap. Captured at creation. |
+| TL-14 | Dates: registration closes (soft block) ≤ hard block, and hard block + minimum gap ≤ start. Captured at creation in wizard step 3 (TL-78, TL-79). (v1.3: restated; the rule is AD-5's.) |
 | TL-15 | Before the soft block: self-registration plus committee add. Soft to hard: committee adds individuals only. After hard: no add, change or withdrawal. |
 | TL-16 | Fixtures can be generated only after the hard block. |
 | TL-17 | Team mode: the player creates a tournament team or picks one they belong to. Any active member may register it. Roster frozen at the hard block. On `invite` tournaments every roster member must hold an accepted invitation (AD-4, v1.2). |
 | TL-18 | Template has `team_size` min/max. Registration enforces it and requires every member to have a skill level. |
-| TL-19 | Committee minimum 2. Creator counts as 1. Other members are `invited` and become `active` only by accepting (consent). Enforced on removal; fixture generation requires ≥2 active. |
+| TL-19 | Committee minimum 2. Creator counts as 1. Other members are `invited` and become `active` only by accepting (consent). Enforced on removal; fixture generation requires ≥2 active. At creation the organizer is member 1 and must add at least one more (TL-82). (v1.3) |
 | TL-20 | Maker-checker (two distinct members) applies to: fixture publication, standings publication, disqualification, dissolution, committee changes. |
 | TL-21 | Score entry needs one committee member and is logged (who, when, what). |
 | TL-22 | OTP step-up is removed from tournament committee approvals. Platform admin approval flows are unchanged. |
@@ -115,12 +123,21 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 | TL-75 | The closure report can be edited after submission. Every submission is a numbered, append-only version. (v1.3) |
 | TL-76 | Played, Won and Hosted on the profile come only from closure reports. Each person in a winning team registration gets one Won; the member set is a snapshot taken at submission. Fixture wins no longer count. (v1.3) |
 | TL-77 | Lists show a computed lifecycle status (active, cancelled, past, closed) and an "All tournaments" toggle (default: active only), as for games. Tournaments that ended before release are not backfilled and show as Pending closure. (v1.3) |
+| TL-78 | Wizard step 3 captures start date, end date, start time, end time, registration closure date and time (the soft block) and hard block date and time. Start time and end time are also the daily playing window. (v1.3) |
+| TL-79 | Date rules, checked server-side in this order, each with a reason code: all instants in the future; start before end; daily start time before daily end time; closure ≤ hard block; hard block + minimum gap ≤ start. (v1.3) |
+| TL-80 | Wizard step 4 lets the organizer choose multiple groups (1 to 20, config) from groups the organizer belongs to. (v1.3) |
+| TL-81 | The selected groups scope visibility: a current member of any selected group can view the tournament. Selecting groups creates no invitations. (v1.3) |
+| TL-82 | Wizard step 6 adds committee members through the standard player search, showing suggested and other players. The organizer is committee member 1 by default and cannot be removed. At least one additional member is required. (v1.3) |
+| TL-83 | Wizard step 7 shows a review of everything entered, with a way back to each step, and one submit. Creation is atomic. (v1.3) |
+| TL-84 | Submitting twice creates one tournament. After a successful submit the app shows a completion screen summarising the submitted fields. (v1.3) |
+| TL-85 | Every Invite button for a person or group, on web and mobile, across games, groups and tournaments, becomes "+" (add or invite). A staged addition shows "−" (remove) until submitted. A sent invitation shows its status instead. (v1.3) |
+| TL-86 | The "+" and "−" controls have accessible names from admin-managed labels and a touch target of at least 44 pt. (v1.3) |
 
 ---
 
 ## 2. Scope & Constraints
 
-**In scope:** backend (`~/meetup`): schema additions, services, endpoints, jobs, config, notification types, admin template CRUD. Part A groups/games. **v1.1:** web (`frontend/`) and mobile (`~/Developer/meetup-mobile`) UI for the Release 1 upload flow and the navigation rule (AD-16, AD-17); built from separate build briefs (`docs/briefs/`).
+**In scope:** backend (`~/meetup`): schema additions, services, endpoints, jobs, config, notification types, admin template CRUD. Part A groups/games. **v1.1:** web (`frontend/`) and mobile (`~/Developer/meetup-mobile`) UI for the Release 1 upload flow and the navigation rule (AD-16, AD-17); built from separate build briefs (`docs/briefs/`). **v1.3:** the same for the creation wizard (AD-20) and the "+" and "−" controls (AD-19); the controls also touch the games and groups screens (UI only).
 
 **Out of scope:** replay of drawn matches, multi-venue scheduling (venue is per-match override only), payments/fees, umpire assignment, chat.
 
@@ -162,7 +179,7 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 - **Window.** Every invitation route is accepted only while `invites_open(tournament, db_now)` is true: v2 → `registration_phase = open` (AD-5); v1 → `status = 'registration_open'` and (`registration_closes_at` is NULL or DB `now()` is before it). Otherwise `409 INVITES_CLOSED`. **v1.2.2:** this applies to invite, respond and revoke. `GET …/invitations` (organizer and active committee, TL-12) is a read and stays available after registration closes. After the soft block the committee adds individuals (AD-6).
 - **Group invite = snapshot.** One invitation per current member, `source_group_id` set, the organizer skipped, existing rows skipped (idempotent), a notification per new row. The bulk insert is sorted by `invitee_user_id` ascending so that concurrent inserts take foreign-key locks in one order (v1.2, review round 7). Later joiners are not invited and leavers keep their row, as for games.
 - **Cap.** The number of distinct `source_group_id` over non-revoked invitations of a tournament is at most `meetup.tournament.group_invite_cap` (20). Checked under `pg_advisory_xact_lock(hashtextextended('tinv:'||tournament_id,0))`, held only for the count-and-insert (not a lock on the `tournaments` row: `FOR UPDATE` on the parent conflicts with the `FOR KEY SHARE` taken by every child insert and would stall registrations). A per-user cap, `invite_per_user_cap`, limits how many invitations a user who is not organizer or committee may create per tournament.
-- **View rule (`can_view_tournament`, one rule for v1 and v2).** The existing branches (public, organizer, group member of the linked group, **registered (a registration row for the user or, in team mode, a roster membership; v1.2.2: implemented for v2 so that a player added by the committee can open the tournament, and preserved for v1)**, active committee, admin) plus a user holding an invitation that the **game view rule** treats as granting visibility. Phase 1 reads the game rule, records which statuses it accepts, and mirrors them (BP-01); the working assumption is `pending` and `accepted`. Denial responses are unchanged: v1 keeps its existing 403 messages, v2 keeps 404 hiding. The un-wired Phase 1/2 skeleton in `tournaments/policies.py` (`_member_of_invited_group`, `_active_user_invitation`, `_access_grant`, the `kind`-based `tournament_invitations` stub and `can_view_tournament_v2`) is rewritten in Phase 3 to this rule. The list endpoint applies the same rule in its application query (P15: scoping is never left to the data store).
+- **View rule (`can_view_tournament`, one rule for v1 and v2).** The existing branches (public, organizer, member of any audience group (AD-20, v1.3; for v1 rows, the single `group_id`), **registered (a registration row for the user or, in team mode, a roster membership; v1.2.2: implemented for v2 so that a player added by the committee can open the tournament, and preserved for v1)**, active committee, admin) plus a user holding an invitation that the **game view rule** treats as granting visibility. Phase 1 reads the game rule, records which statuses it accepts, and mirrors them (BP-01); the working assumption is `pending` and `accepted`. Denial responses are unchanged: v1 keeps its existing 403 messages, v2 keeps 404 hiding. The un-wired Phase 1/2 skeleton in `tournaments/policies.py` (`_member_of_invited_group`, `_active_user_invitation`, `_access_grant`, the `kind`-based `tournament_invitations` stub and `can_view_tournament_v2`) is rewritten in Phase 3 to this rule. The list endpoint applies the same rule in its application query (P15: scoping is never left to the data store).
 - **Registration eligibility** (replaces the v1 check in `register_participant`, "Only the organizer can register participants for invite-only tournaments"). `invite` tournaments: the organizer or an active committee member may register participants as today; a user may register themselves only with an `accepted` invitation. Accepting does not register (as for games: eligibility, then a separate action). `group`: group membership as today; an invitation grants visibility only. `public`: open. Team mode (v1.2, review round 7): the registering user and **every roster member** must hold an accepted invitation. Otherwise `409 ROSTER_MEMBER_NOT_INVITED`, naming the first member who lacks one (same pattern as the skill-level check, TL-18). The organizer or an active committee member registering a team is exempt, as for individuals.
 - **Email invitation.** `invited_email` set, `invitee_user_id` NULL. The emailed link is `{origin}/#tournament-detail/{tournament_id}?invite={invitation_id}`. Sign-up and OAuth claim it atomically through the same `invite` field and the same two call sites as `claim_event_invitation` (`auth/router.py`, `auth/local.py`); the same UUID is tried against event then tournament invitations (v4 UUIDs do not collide); an already-claimed or unknown id is a no-op. The email uses the existing `ui_labels` template with `$entity_type = tournament` and `invite_email_allowed` unchanged. If the repository's sibling-import check rejects the new inline call, the agent STOPS and reports (D-4 precedent).
 - **Share is client-side.** The app link is the existing `/public/share` redirect (platform to store URL, admin-editable; DES-MEETUP-FEEDBACK-001 C5). Mobile reuses `useAppShare` and `getShareUrl()`; web uses the same URL its app-download links already use. No backend route, no tournament identity in the link, no access granted. TL-13 says who sees the button.
@@ -175,7 +192,7 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 - Columns: `registration_closes_at` (**is** the soft block for v2; no second column, no alias drift), new `registration_hard_block_at`, existing `starts_at`/`ends_at`.
 - `registration_phase(t, now_db)` is the **only** function that decides `open | committee_only | frozen`. It uses the database `now()` (not app server time, not client time). Boundary: `now < soft` open; `soft ≤ now < hard` committee_only; `now ≥ hard` frozen.
 - No job flips a stored status at the soft or hard block, so there is no dead-man risk on a cut-off. Stored `status` changes only on explicit actions: generate → `schedule_draft`; fixture publication executed → `published`; first result → `in_progress`; close → `completed`; dissolve/cancel.
-- Creation validation: `opens ≤ soft ≤ hard`, `hard + min_gap ≤ starts_at` (config `meetup.tournament.min_gap_hours`), all in the future.
+- Creation validation: `opens ≤ soft ≤ hard`, `hard + min_gap ≤ starts_at` (config `meetup.tournament.min_gap_hours`), all in the future. (v1.3: the full ordered rule list, the reason codes and the daily-window rule are in AD-20.)
 
 **AD-6 — Registration rules are phase-gated server-side (P9, P15).**
 
@@ -194,7 +211,7 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 - **Invites (v1.2).** Invitations are accepted only while registration is open (AD-4 window). On `invite` tournaments, self-registration needs an accepted invitation (AD-4).
 
 **AD-7 — Committee governance: extend, do not rewrite.**
-- New tournaments get committee rows at creation: creator `active`; every other member is `invited` and becomes `active` only when that user accepts (OI-3 closed). The tournament opens for registration immediately. **Gate:** draft generation and any `fixture_publication` submit require ≥2 `active` members (the hard block itself is time-computed and is never blocked). The creator may revoke and re-invite at any time, including after the hard block, so an unresponsive invitee cannot strand the tournament. `invited` members have no committee rights. Removal and resignation are blocked when active count would fall below 2 (min floor 2 enforced in code even if config says less).
+- New tournaments get committee rows at creation: creator `active`; every other member is `invited` and becomes `active` only when that user accepts (OI-3 closed). The tournament opens for registration immediately. (v1.3: the creation wizard requires at least one invited member besides the creator, AD-20.) **Gate:** draft generation and any `fixture_publication` submit require ≥2 `active` members (the hard block itself is time-computed and is never blocked). The creator may revoke and re-invite at any time, including after the hard block, so an unresponsive invitee cannot strand the tournament. `invited` members have no committee rights. Removal and resignation are blocked when active count would fall below 2 (min floor 2 enforced in code even if config says less).
 - **Action catalogue for v2:**
 
 | Action | v1 (unchanged) | v2 |
@@ -283,6 +300,61 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 - **Retired:** the "Won" count from `tournament_fixtures.winner_registration_id` in `users/repository.py::get_profile_summary`. Fixtures, results and standings are unchanged.
 - Rejected: parsing names (ambiguous, PII-fragile); CSV (encoding and injection ambiguity); storing the raw file (unscanned binary at rest, no benefit since the payload is the evidence); inferring advancement from round order (silently wrong for third-place and groups-then-knockout).
 
+
+**AD-20 — Creation wizard contract (v1.3).** Applies to `lifecycle_version = 2` creation (not enabled before Phase 10). One request creates everything. The client holds the wizard state; there are no server-side drafts (BP-12), so leaving the wizard discards it. Steps 1, 2 and 5 are unchanged from the canvas section "Tournament creation wizard". This AD fixes steps 3, 4, 6 and 7. New code lives in `tournaments/` (Phase C fixes the module name).
+
+*Step 3 — dates and times.* All required: start date, end date, start time, end time, registration closure date and time, hard block date and time.
+- Registration closure **is** the soft block (`registration_closes_at`, AD-5). No new column. The hard block is `registration_hard_block_at`. The wizard pre-fills the hard block with the closure value, which means no committee-only window; the organizer may move it later.
+- `starts_at` is start date plus start time; `ends_at` is end date plus end time. Start time and end time are also the **daily playing window** on every day of the tournament: the server derives `daily_start_time` and `daily_end_time` from the local time of `starts_at` and `ends_at` in `HOME_TIMEZONE` (`core/config.py`, Asia/Singapore, the same rule games use; Phase C confirms and records it, BP-01). Overnight windows are out of scope.
+- The API takes ISO-8601 instants with offset. Registration opens at creation (DB `now()`), so `opens ≤ soft` holds by rule 1.
+- **Server rules (P9), evaluated in this order; the first failure is returned as `422 TOURNAMENT_DATES_INVALID` with `field`, `reason` and `step`:**
+
+| # | Rule | `reason` |
+|---|---|---|
+| 1 | closure, hard block, start and end are all after DB `now()` | `DATE_IN_PAST` |
+| 2 | `starts_at < ends_at` | `END_BEFORE_START` |
+| 3 | daily start time < daily end time | `DAILY_WINDOW_INVALID` |
+| 4 | `registration_closes_at ≤ registration_hard_block_at` | `REG_CLOSE_AFTER_HARD` |
+| 5 | `registration_hard_block_at + min_gap_hours ≤ starts_at` | `HARD_BLOCK_TOO_CLOSE` |
+
+The client mirrors the rules for early feedback; the server is the only authority. Dates are never adjusted silently.
+
+*Step 4 — groups.* Visibility stays `public`, `group` or `invite`. When it is `group` the organizer picks one or more groups with the existing group picker (search, recent-activity order).
+- `group_ids` is required (1 to `audience_group_cap`, default 20) when visibility is `group`, and rejected otherwise. The v2 body does not accept the single `group_id`. IDs must be distinct. The caller must be a member of every group (checked in the application through the groups interface AD-4 uses, no sibling import): `403 GROUP_NOT_MEMBER` naming the id; over the cap `422 GROUP_CAP_EXCEEDED`.
+- **Meaning:** selected groups define who can see the tournament (TL-81). Selecting a group sends no invitation and no notification; invitations stay under AD-4 (OI-15). Visibility is by **live** membership of any selected group, as the v1 single-group rule is; invitations remain snapshots (AD-4).
+- **Storage:** `tournament_audience_groups` (§5.1). `tournaments.group_id` is kept and set to the first selected group so existing readers keep working (P14). Readers of v2 tournaments use the additive `groups` field (`[{id, name}]`) on `GET /tournaments/{id}` and the list; reading `group_id` for a v2 tournament is a bug (§5.2).
+- **After creation:** the existing update route also accepts `group_ids` (replace semantics, same rules and cap, organizer only, only while registration is open). Removing a group never revokes invitations or registrations.
+
+*Step 6 — committee.* Same component and endpoint as the app's other player pickers (mobile `UserSearchPicker`, the create-game invite step): one search box, results in **Suggested** and **Other players** sections. The suggested rule is the existing one and is not redefined here (Phase C records it, BP-01).
+- The organizer is listed first, labelled, pinned, and cannot be removed (committee member 1, `active`). "+" on a result adds that player to the selected list; "−" removes. Email addresses and non-users are not offered: a committee member is a user.
+- At least one additional member is required to leave the step.
+- **Server rules:** `committee_user_ids` has 1 to `committee_max − 1` entries, all distinct, none the organizer, each an existing active user. Otherwise `422 COMMITTEE_INVALID` with `reason` (`TOO_FEW`, `TOO_MANY`, `DUPLICATE`, `IS_ORGANIZER`, `USER_UNAVAILABLE`), `user_id` where relevant, and `step`.
+- Each additional member is created as `committee_memberships.status = 'invited'` and receives `tournament_committee_invited` (AD-7, AD-15). They become `active` only by accepting. Until two members are active the committee cannot upload or publish fixtures (AD-7, AD-17); step 7 says so.
+
+*Step 7 — review and submit.* A read-only summary of every value from steps 1 to 6, in the order the dates take effect (registration opens now, closes, hard block, starts, ends), with an edit link per section that returns to that step with the entered state kept.
+- One Submit button, disabled while the request is in flight. `POST /tournaments` carries `client_request_id` (UUID created when the wizard opens). A replay by the same organizer returns the original tournament with `200` and creates nothing more (P5). Stored in `tournaments.client_request_id` under a partial unique index on `(organizer_id, client_request_id)`; a concurrent second submit loses the race on the index and returns the existing tournament.
+- **Atomic:** the tournament, the template snapshot (AD-3), the audience groups, the committee rows and the `tournament_committee_invited` outbox rows (key `tournament_committee_invited:{tournament_id}:{user_id}`) commit in one transaction. Any failure leaves nothing behind.
+- A selection that went stale between step and submit (a group left, a user deactivated) is rejected with `field` and `step`; the wizard jumps there. Nothing is corrected automatically.
+- Success shows the completion screen that summarises the submitted fields, as the other forms do, then the tournament.
+- The create route keeps its existing rate limit (P17). Reading the wizard back never shows another user's data: group and user lookups use the existing scoped endpoints.
+- Rejected: server-side wizard drafts (state is cheap to re-enter, adds a table and a purge job, BP-12); inviting the selected groups on submit (changes notification volume, OI-15); a separate daily-hours field pair in step 3 (duplicates the start and end times for the only case the product has).
+
+**AD-19 — Add and remove controls: "+" and "−" (v1.3).** One shared component per platform (web, mobile). No screen draws its own.
+- **Scope:** every per-person and per-group Invite button, and every entry button that opens an invite picker, on web and mobile, across games, groups and tournaments. The wizard pickers (steps 4 and 6) and the create-game invite step use the same component.
+
+| State | Control | Meaning |
+|---|---|---|
+| Not added | "+" | On a screen with a submit step: add to the staged selection. On a screen without one (group view, game detail): send the invitation now. |
+| Staged, not yet submitted | "−" | Remove from the selection. Nothing was sent. |
+| Invitation sent | status chip (the existing statuses, such as Invited or Accepted) | No "+" or "−". Withdrawing stays the organizer revoke control (TL-12), which this AD does not change. |
+| Entry button that opens a picker | "+" | Opens the picker. The accessible label keeps the word "Invite". |
+
+- **Immediate send:** the status chip appears only after the server confirms. A double tap sends once (existing rows are skipped, AD-4). On failure the row returns to "+" and shows the error from `ui_labels`.
+- **Labels and access (P1):** the controls are icon-only. Accessible names come from admin-managed `ui_labels` (for example "Invite {name}" and "Remove {name}"), never hardcoded. Touch target at least 44 × 44 pt (px on web). State is carried by the glyph, not by colour alone. Colours come from theme tokens only (AD-16 rule).
+- **Nothing else changes:** who may invite, the windows, the caps, notifications and the revoke control stay as AD-4 and the games model define.
+- **Inventory first (BP-01):** Phase P starts by listing every current Invite control in both repos. The list goes into the implementation report. A control found outside it is reported, not converted silently.
+- Rejected: a text "Add" or "Remove" button (the owner chose the glyph pair); optimistic status chips (a failed invite would show as sent).
+
 ---
 
 ## 4. Component / Integration Design
@@ -302,7 +374,7 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 
 **Endpoints (v2, all under `/tournaments`)** — indicative; exact paths fixed in Phase 1 against the router (BP-01).
 - Templates (admin): `GET/POST /admin/tournament-templates`, `POST …/{id}/publish`, `POST …/{id}/retire`.
-- Lifecycle: `POST /tournaments` (v2 body: template_id, overrides, dates, committee_user_ids, visibility), `GET /tournaments/{id}`, `POST …/invite-group`, `POST …/invite-user`, `POST …/invite-email`, `GET …/invitations`, `DELETE …/invitations/{invitation_id}`, `POST …/invitations/respond` (mirrors the game routes; exact paths fixed in Phase 1), `POST …/registrations`, `DELETE …/registrations/{id}`, `POST …/registrations/committee-add`.
+- Lifecycle: `POST /tournaments` (v2 body, AD-20: client_request_id, template_id, overrides, starts_at, ends_at, registration_closes_at, registration_hard_block_at, visibility, group_ids, committee_user_ids), `GET /tournaments/{id}`, `POST …/invite-group`, `POST …/invite-user`, `POST …/invite-email`, `GET …/invitations`, `DELETE …/invitations/{invitation_id}`, `POST …/invitations/respond` (mirrors the game routes; exact paths fixed in Phase 1), `POST …/registrations`, `DELETE …/registrations/{id}`, `POST …/registrations/committee-add`.
 - Fixtures: `POST …/drafts` (generate), `GET …/drafts/{id}`, `POST …/drafts/{id}/comments`, `POST …/comments/{cid}/confirm|reject`, `PATCH …/drafts/{id}/matches/{ref}` (manual edit), `POST …/committee/actions` (existing path, new action type).
 - Play: `POST …/fixtures/{id}/results`, `PATCH …/fixtures/{id}/schedule`, `POST …/fixtures/{id}/walkover`.
 - Close: `POST …/close`, `PATCH …/closeout/visibility`, `GET …/closeout`.
@@ -327,6 +399,8 @@ Existing tournaments keep working as today (a `lifecycle_version` fork, AD-2), e
 | `tournament_format_templates` | id, slug, version, status CHECK(draft,active,retired), definition JSONB, schema_version, created_by, UNIQUE(slug,version) |
 | `tournaments` + | `lifecycle_version SMALLINT NOT NULL DEFAULT 1`, `template_id`, `template_version`, `rules_snapshot JSONB`, `registration_hard_block_at`, `daily_start_time`, `daily_end_time`, `court_count`, `venue_label` (v1.2: no `share_token`; `visibility` CHECK unchanged) |
 | `tournament_invitations` | (v1.2; v1.2.2: the migration also carries `GRANT SELECT, INSERT, UPDATE ON tournament_invitations TO meetup_app;`, no DELETE, as `a91d4e7c2b18` did for its table; owner-approved) (mirrors `event_invitations`) id, tournament_id, invitee_user_id NULL, source_group_id NULL, status CHECK(pending,accepted,declined,revoked,expired), invited_by_user_id, invited_at, responded_at, expires_at NULL, invited_email NULL; UNIQUE(tournament_id, invitee_user_id). Not yet created by any migration. |
+| `tournaments` + (v1.3) | `client_request_id UUID NULL`; partial UNIQUE index on `(organizer_id, client_request_id)` WHERE `client_request_id IS NOT NULL`. `group_id` is kept and, for v2, set to the first selected group (AD-20). |
+| `tournament_audience_groups` (v1.3) | tournament_id FK, group_id FK, position SMALLINT, added_at; PK(tournament_id, group_id). Named apart from `tournament_stage_groups` (pool A, B, …), which is unrelated. The migration carries `GRANT SELECT, INSERT, DELETE ON tournament_audience_groups TO meetup_app;` (DELETE is needed by replace semantics; owner-approved with v1.3, as the v1.2.2 GRANT was). No RLS. |
 | `tournament_registration_members` | registration_id, user_id, role, UNIQUE(registration_id,user_id); written once at registration, mutated only while phase ≠ frozen |
 | `tournament_fixture_drafts` | id, tournament_id, version, payload JSONB, payload_hash, constraints JSONB, rng_seed, source_comment_id, status(draft,superseded,published), created_by; **v1.1:** `source` CHECK(upload,engine) NOT NULL, `source_file_hash` (SHA-256, NULL for engine), `source_filename`, `uploaded_by`. For `source=upload`, `constraints`, `rng_seed` and `source_comment_id` are NULL; the regeneration cap does not apply to uploads |
 | `tournament_fixture_comments` | id, draft_id, author_id, text, proposed_constraints JSONB, status(proposed,confirmed,rejected,failed), model_ref, confirmed_by |
@@ -352,7 +426,9 @@ Identity columns now (checklist): `payload_hash`, `decision_key` (existing), `(f
 | Published fixture set | `tournament_fixtures` rows created by an executed `fixture_publication` | Rows inserted from a draft without an approval |
 | Group qualifiers | `tournament_standings_snapshots` (scope group) | Recomputed standings used for placeholders after publication |
 | Player record | result log via `registration_members` | `users.tournament_participation_history` |
-| Group invite count | distinct `source_group_id` over non-revoked `tournament_invitations` rows | Cached counter |
+| Group invite count | active `tournament_invitations` rows | Cached counter |
+| Groups that scope a tournament (v2) | `tournament_audience_groups` | `tournaments.group_id` (a compatibility mirror of the first group, v1.3) |
+| Committee at creation (v2) | `committee_memberships` rows written by the create transaction | The request body after commit |
 | Committee size | active committee membership rows | Config or a counter |
 
 ### 5.3 Sensitive fields (excluded from logs, metrics, error payloads)
@@ -383,6 +459,7 @@ Identity columns now (checklist): `payload_hash`, `decision_key` (existing), `(f
 | Fixture template download and upload (v1.1) | active committee, ≥2 active, phase ≥ frozen | players, invited-not-active members, admin acting as committee |
 | Publication approve | active committee ≠ maker | maker, non-members, admin acting as committee |
 | Result entry / schedule edit | active committee | players, admin |
+| Create tournament, v2 (v1.3) | any authenticated eligible user; groups the caller belongs to; committee candidates who are active users other than the caller | a group the caller is not a member of (403 `GROUP_NOT_MEMBER`), deactivated users, the organizer as a candidate, a replay by a different organizer |
 | Own record | the user | all others including admin |
 | Closeout feedback | active committee; players only if `show_to_players` | admin, non-registered users |
 
@@ -412,6 +489,8 @@ Identity columns now (checklist): `payload_hash`, `decision_key` (existing), `(f
 |---|---|---|
 | `meetup.tournament.min_gap_hours` | 24 | 1–336 |
 | `meetup.tournament.group_invite_cap` | 20 | 1–100 |
+| `meetup.tournament.audience_group_cap` (v1.3) | 20 | 1–100; most groups selectable in wizard step 4 |
+| `meetup.tournament.committee_max` (v1.3) | 10 | 2–25, floor 2 in code; committee size at creation including the organizer |
 | `meetup.tournament.invitations.enabled` (v1.2) | false | boolean, parsed explicitly; gates all invitation routes and the v1 `invite` registration rule |
 | `meetup.tournament.invite_per_user_cap` (v1.2) | 25 | 1–200; applies to users who are not organizer or committee |
 | `meetup.tournament.committee_min` | 2 | floor 2 in code |
@@ -454,6 +533,10 @@ Identity columns now (checklist): `payload_hash`, `decision_key` (existing), `(f
 | Group stage tie not resolved by tiebreakers | Template must end with a deterministic final tiebreaker (seeded draw using stored `rng_seed`) to avoid ambiguity; recorded in standings payload |
 | Odd entrants / byes | Generator awards byes to top seeds; bye match has `walkover` result type with `auto=true`, excluded from player record as "bye" |
 | Clock skew | All phase decisions use DB `now()` |
+| Wizard submitted twice (double tap, retry after a timeout) | Same `client_request_id` returns the original tournament; one invitation per committee member (v1.3) |
+| A selected group was left, or a selected user deactivated, between the step and submit | 403 or 422 with `field` and `step`; the wizard jumps to that step; nothing is created (v1.3) |
+| Wizard left open until a chosen date has passed | `422 TOURNAMENT_DATES_INVALID`, reason `DATE_IN_PAST`; the wizard jumps to step 3; dates are never shifted silently (v1.3) |
+| Outbox insert fails during create | The whole transaction rolls back: no tournament, no committee rows (v1.3) |
 
 **Lock ordering (v0.2):** a transaction takes at most these in this order: `tinv` → `treg` → row locks (tournament, registration, fixture, by ascending id) → committee advisory/decision-key locks. Result entry takes the fixture row, then its successor row. Any new code path must not invert this. A concurrency test runs registration + invite + withdraw in parallel and asserts no deadlock.
 
@@ -524,6 +607,17 @@ Risk classification (blast × exploitability): committee flow v2 **High**, resul
 43. Closure (v1.3; the full list is closure addendum §9, tests 1 to 6 and 9): non-organizer and non-committee callers get 403 and callers without view access get 404, with no database backstop; closure before the end time or on a cancelled or dissolved tournament returns 409; winner and runner-up must be registered attendees and differ; a stale `expected_version` returns 409; a team win credits each snapshot member once and a later roster change does not alter stats; stored `completed` without a closure row reads as `past`; details, registration, invitations and committee changes return 409 after the end time while result entry and close-out still work.
 42a. `my_invitation_status` is `pending` or `accepted` for the invitee, null for everyone else and for revoked, declined or expired rows; another user's status is never returned. Accept or decline buttons follow it on web and mobile. (v1.2.1)
 
+43. Create dates (v1.3): one case per rule in AD-20 order (past instant, end before start, daily start not before daily end, closure after hard block, hard block closer than `min_gap_hours` to the start) → `422 TOURNAMENT_DATES_INVALID` with the right `reason`, `field` and `step`; exactly at the gap boundary passes (DB time); when two rules fail, the lower-numbered reason is returned; a tournament is never created on failure.
+44. Create groups (v1.3): `group_ids` with visibility other than `group` → 422; empty or missing with `group` → 422; duplicate ids → 422; 21 groups → `422 GROUP_CAP_EXCEEDED`; a group the caller is not a member of (including a guessed id) → `403 GROUP_NOT_MEMBER`; a v2 body with the single `group_id` → 422; `tournaments.group_id` equals the first selected group; the update route replaces the list only while registration is open and only for the organizer.
+45. Multi-group visibility (v1.3): a current member of any selected group, including the second, can view and list the tournament; a user in none cannot (v1 messages for v1, 404 hiding for v2); a user who leaves the only matching group loses visibility; selecting groups creates no invitation and no notification.
+46. Committee at creation (v1.3): no additional member → `COMMITTEE_INVALID/TOO_FEW`; the organizer listed → `IS_ORGANIZER`; duplicate → `DUPLICATE`; deactivated or unknown user → `USER_UNAVAILABLE` naming the id; more than `committee_max − 1` → `TOO_MANY`; success creates the organizer as `active` and each other member as `invited` with exactly one `tournament_committee_invited` notification each; an `invited` member has no committee rights (test 23 stays valid).
+47. Atomic create (v1.3): a forced failure in the audience-group insert, the committee insert or the outbox insert leaves no tournament, no committee rows, no audience groups and no outbox rows.
+48. Idempotent create (v1.3): the same `client_request_id` twice from the same organizer → one tournament and one set of invitations, second call returns the original with `200`; two concurrent first submits → one tournament; the same id from a different organizer → a separate tournament.
+49. Stale selection (v1.3): a group left, or a user deactivated, after the step but before submit → rejected with `field` and `step`; nothing is created; the wizard returns to that step with the other state intact (client test).
+50. Wizard (web and mobile client tests, v1.3): step 3 shows all required fields and mirrors the five date rules; step 4 multi-select enforces the cap and shows only the caller's groups; step 6 uses the standard player search with Suggested and Other sections, the organizer is pinned and cannot be removed, "+" adds and "−" removes, and Next is blocked with no additional member; step 7 shows every value from steps 1 to 6 and each edit link returns to the right step with state kept; Submit is disabled while in flight; success shows the completion screen with the submitted fields.
+51. "+" and "−" (client tests and a static check, v1.3): "+" stages in a screen with a submit step and sends in one without; "−" removes a staged entry and sends nothing; after a confirmed send the row shows the status chip and no "+" or "−"; a double tap on an immediate "+" sends once; a failed send returns the row to "+" with the label from `ui_labels`; accessible names come from `ui_labels` (no hardcoded strings); touch target is at least 44 pt; the glyph changes, not only the colour; a static check finds no remaining per-person or per-group "Invite" text button outside the shared component, with any exception listed in the Phase P report.
+52. Create rate and scope (v1.3): the create route's existing rate limit still applies; a caller cannot read group or user data beyond what the existing scoped lookups return while using the wizard; test 34 now also walks every wizard step and the completion screen.
+
 **Other:** generator determinism (same seed ⇒ identical draft), property tests (no rematch in round 1 of group, byes only top seeds, qualifiers ∈ {2,4,8,16}), template validation table tests, migration up/down tests on a copy, contract tests for AI response schema.
 
 ---
@@ -542,7 +636,7 @@ Acceptance: existing tests green; new tests for cap, replace semantics, ordering
 
 **Part B — Tournament lifecycle**
 
-**Releases (v1.1).** Part B ships in two releases. **Release 1 = build phases 1–5, 7–10 plus 6a (upload).** **Release 2 = 6b (engine, AI interpreter, planner generation).** Release 1 enables `lifecycle_version = 2` creation (phase 10) with `fixture_engine.enabled = false`. Release 2 adds `source=engine` without a schema change (AD-17 sockets).
+**Releases (v1.1).** Part B ships in two releases. **Release 1 = build phases 1–5, 7–10 plus 6a (upload), C (creation wizard, v1.3) and P ("+" and "−" controls, v1.3).** **Release 2 = 6b (engine, AI interpreter, planner generation).** Release 1 enables `lifecycle_version = 2` creation (phase 10) with `fixture_engine.enabled = false`. Release 2 adds `source=engine` without a schema change (AD-17 sockets).
 
 | Phase | Content | Acceptance |
 |---|---|---|
@@ -557,6 +651,8 @@ Acceptance: existing tests green; new tests for cap, replace semantics, ordering
 | 7. Results & standings | Result log, validator, advancement, standings publication, correction guard | Tests 17–19 |
 | 8. Reminders | Table-driven loop, heartbeat, reconcile | Test 21 |
 | 9. Record & close-out | Record endpoint, closeout, visibility toggle | Tests 12–13 |
+| C. Creation wizard (Release 1, v1.3) | Backend create contract (AD-20): date rules, `group_ids` and `tournament_audience_groups`, committee validation and `invited` rows, `client_request_id`, atomic create, `groups` field; visibility rule widened to any audience group; the two new config keys registered in the admin settings dashboard (runtime configuration is managed through the admin interface, never set by hand in the database; owner principle, 2026-10-19); web and mobile wizard steps 3, 4, 6, 7 and the completion screen. Needs phases 2 and 5. Starts by recording the `HOME_TIMEZONE` rule, the player-search suggested rule and the create idempotency approach (BP-01). | Tests 43–50, 52 |
+| P. "+" and "−" controls (Release 1, v1.3) | Inventory of current Invite controls in both repos, one shared component per platform (AD-19), replacement on games, groups and tournaments, label keys in `ui_labels`. UI only; ships independently of the lifecycle phases. | Test 51 |
 | 10. Enable | Flip v2 creation on, soak, measure | §11 gate |
 
 Each phase ends with a short implementation report (as-built schema + deviations) written back to this document (BP-13).
@@ -605,6 +701,7 @@ Migration `a91d4e7c2b18` (revises `e8c1a4b72d09`) is written and was not execute
 - Migrations additive; rollback = leave tables unused (forward-only data), code rollback via redeploy. No column dropped or retyped.
 - v2 creation guarded by config flag `meetup.tournament.v2_enabled` (default false). Disabling it hides creation only; running v2 tournaments continue.
 - Worker deploy order: migration → api → worker. Phase 1 startup validation makes this mandatory: the API and the worker both refuse to start while a required `meetup.tournament.*` key is missing or out of bounds, so deploying either process before `e8c1a4b72d09` is an outage. A bad tournament key stops the whole worker, including push and event reminders (accepted for phase 1; reassess in phase 8, when the worker first consumes the keys). Rollback of this revision is forward-only: leave the columns and rows, redeploy the previous code. Do not drop the columns on a database that has been deployed. Runbook: `docs/runbooks/tournament-lifecycle-phase1-deploy.md`.
+- **v1.3:** the Phase C migration is additive (one table, one nullable column with a partial unique index); rollback leaves them unused. The wizard is reachable only after Phase 10 enables v2 creation. Phase P is UI only; rollback is a client redeploy.
 - **Contract gate (v1 removal):** only when zero non-terminal v1 tournaments exist for 30 consecutive days, verified by query. Separate design/approval.
 - Rollback of the AI interpreter: set endpoint whitelist empty → breaker/failed path, rest unaffected.
 - Rollback of invitations (v1.2): set `meetup.tournament.invitations.enabled = false`. Routes return 404 and the v1 registration rule returns. Rows are kept.
@@ -615,11 +712,11 @@ Migration `a91d4e7c2b18` (revises `e8c1a4b72d09`) is written and was not execute
 
 | Principle | Design element | Status |
 |---|---|---|
-| P1 Config-driven | §7.1, AD-3, AD-14 | Met |
+| P1 Config-driven | §7.1, AD-3, AD-14; v1.3: two new keys in the admin settings dashboard, control labels from `ui_labels` | Met |
 | P2 | Baseline | Unchanged |
 | P3 Shared library | Invitation logic copied from `events/` into `tournaments/` (D-7) | **Deviation** |
 | P4 | Baseline | Unchanged |
-| P5 Idempotency | Result idempotency key, reminder key, decision key | Met |
+| P5 Idempotency | Result idempotency key, reminder key, decision key; v1.3: `client_request_id` on create | Met |
 | P6 Immutable context | `rules_snapshot`, payload hash, standings snapshots, result log | Met |
 | P7 Fault isolation | AI breaker, reminder loop isolated, outbox hand-off | Met |
 | P8 Determinism | Seeded generators | Met (spirit) |
@@ -628,7 +725,7 @@ Migration `a91d4e7c2b18` (revises `e8c1a4b72d09`) is written and was not execute
 | P11 | Baseline | Unchanged |
 | P12 Retention | OI-6 open | **Open** |
 | P13 Negative tests | §9 | Met |
-| P14 Additive evolution | AD-2, §5.1, §11 | Met |
+| P14 Additive evolution | AD-2, §5.1, §11; v1.3: `group_id` kept, `groups` added | Met |
 | P15 Shift-left authz | App-layer policies; no RLS added | Met |
 | P16 Encryption | Baseline | Met |
 | P17 Rate limits | Invite routes (route limit, per-user cap), interpreter calls | Met |
@@ -656,8 +753,8 @@ Migration `a91d4e7c2b18` (revises `e8c1a4b72d09`) is written and was not execute
 |---|---|
 | TL-01–TL-08 | AD-3, AD-8, AD-10, §5.1 |
 | TL-09–TL-13 | AD-4, §6 |
-| TL-14–TL-18 | AD-5, AD-6 |
-| TL-19–TL-22 | AD-7 |
+| TL-14–TL-18 | AD-5, AD-6, AD-20 (TL-14) |
+| TL-19–TL-22 | AD-7, AD-20 (TL-19) |
 | TL-23–TL-27 | AD-8, §6 |
 | TL-28–TL-30 | AD-9 |
 | TL-31 | AD-12 |
@@ -672,6 +769,8 @@ Migration `a91d4e7c2b18` (revises `e8c1a4b72d09`) is written and was not execute
 | TL-74–TL-77 | AD-18; closure addendum AD-1, AD-3, AD-5, AD-10 |
 | TL-70 | AD-16, §10 phase N |
 | TL-71–TL-73 | AD-4, AD-6, §10 phase 3 |
+| TL-78–TL-84 | AD-20, §10 phase C |
+| TL-85–TL-86 | AD-19, §10 phase P |
 
 Deferred (named): multi-venue scheduling, fees, umpires, v1 contract phase, Release 2 engine (TL-23–TL-27 are Release 2; Release 1 replaces them with TL-63–TL-69).
 
@@ -694,8 +793,10 @@ Deferred (named): multi-venue scheduling, fees, umpires, v1 contract phase, Rele
 | OI-15 | (v1.3) Closure report for tournaments: confirm that result entry, standings and close-out stay open after the end time (closure addendum D-3 and OI-1), and name the committee table and registration-member source used for team credit (closure addendum OI-2; depends on OI-5). Owner: architect. | 🟡 MEDIUM | No |
 | OI-14 | (v1.2.2) Group invite by a non-organizer group owner or admin is web-only: the groups list exposes no role field, so mobile offers group invite to `full` access only and web lists only groups the user owns. Closes when the groups API exposes the caller's role (additive). Owner: architect. |
 | OI-13 | Retention of `invited_email` on unclaimed, declined or expired tournament invitations (P12). Same open question as games. Owner to set a period. | 🟡 MEDIUM | No |
+| OI-15 | (v1.3) Wizard step 4 sets visibility scope only: selecting groups sends no invitation and no notification (AD-20). This is an architect assumption, not an owner decision. If selected groups should also be invited on submit, that is an amendment reusing AD-4 group invites (one invitation per member, cap 20). | 🟡 MEDIUM | No |
+| OI-16 | (v1.3) `audience_group_cap` (20) and `committee_max` (10) are architect defaults, editable in the admin settings dashboard; confirm or change after the first tournaments. | 🟢 LOW | No |
 
-Status: v1.0 and v1.1 APPROVED by the owner on 2026-10-14. v1.2 APPROVED by the owner on 2026-10-16. No blocking items. Phase 1 verification of OI-5 and OI-7 is recorded under §10 "Phase 1 as-built"; this paragraph does not change that approval. OI-5 is not closed: v1 still reads live team membership, which AD-2 keeps until a later phase writes `tournament_registration_members`. OI-7's verify step is done; the CHECK widening and the new audience branches are later phases.
+Status: v1.0 and v1.1 APPROVED by the owner on 2026-10-14. v1.2 APPROVED by the owner on 2026-10-16. v1.3 APPROVED by the owner on 2026-10-19. No blocking items. Phase 1 verification of OI-5 and OI-7 is recorded under §10 "Phase 1 as-built"; this paragraph does not change that approval. OI-5 is not closed: v1 still reads live team membership, which AD-2 keeps until a later phase writes `tournament_registration_members`. OI-7's verify step is done; the CHECK widening and the new audience branches are later phases.
 
 ---
 
@@ -770,3 +871,18 @@ Status: v1.0 and v1.1 APPROVED by the owner on 2026-10-14. v1.2 APPROVED by the 
 | M1 Mobile group invite for group owners and admins | Deferral | OI-14. |
 
 **v1.2 approved by the owner, 2026-10-16** (after review round 7); **v1.2.1 approved the same day.**
+
+**Round 10 (2026-10-19, owner decisions in conversation, v1.2.2 → v1.3)**
+
+| Decision or finding | Classification | Outcome |
+|---|---|---|
+| "Registration closure date" in step 3 | Owner decision | It is the existing soft block (`registration_closes_at`); the hard block date is captured as well, as in the design (AD-20, TL-78). |
+| Committee at creation | Owner decision | The organizer is committee member 1 by default; at least one additional member is required (TL-82, AD-20). |
+| "+" and "−" instead of Invite buttons | Owner decision | App-wide: every Invite button on web and mobile across games, groups and tournaments; behaviour as AD-19. |
+| Step 4 multiple groups: `tournaments.group_id` is a single column | New finding (BP-01) | `tournament_audience_groups`; `group_id` mirrored for existing readers (AD-20, §5.1). The table is named apart from `tournament_stage_groups`. |
+| What selecting groups does (visibility only, or also invites) | Architect assumption, flagged | Visibility only (OI-15). |
+| Meaning of start and end time | Architect ruling | They are the daily playing window as well; no overnight windows (AD-20). |
+| A double tap on Submit could create two tournaments | New gap (P5) | `client_request_id` with a partial unique index (AD-20, test 48). |
+| New config keys must be editable in the admin interface | Owner principle, 2026-10-19 | Registered in the admin settings dashboard in Phase C. |
+
+**v1.3 approved by the owner, 2026-10-19.**

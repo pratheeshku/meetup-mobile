@@ -22,6 +22,7 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 
 ## DES-MEETUP-ADDENDUM-tournament-lifecycle.md
 - v1.3 (2026-10-20): approved by the owner. Copy of the backend repo's document. AD-18 (tournament closure report, computed lifecycle status).
+- v1.4 (2026-10-20): editorial merge, no decision changes. Copy of the backend repo's document. Creation-wizard amendment (approved 2026-10-19) merged with the closure amendment; wizard ids renumbered AD-18 to AD-20 (AD-19 unchanged), TL-74 to TL-82 to TL-78 to TL-86. Closure ids unchanged (AD-18, TL-74 to TL-77).
 
 ## DES-MEETUP-ADDENDUM-invitation-response.md
 - v0.1 (2026-10-18): first draft.
@@ -42,3 +43,6 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - v1.3 (2026-10-19): owner approved the board (docs/design/user-menu/ and docs/mockups/user-menu/). OI-6 closed; phases 3 and 4 gated on the backend deploy only. Briefs updated to point at the board.
 - v1.4 (2026-10-19): UM-12 phased after the mobile OI-11 check; avatars only where data exists today (group owner on GroupDetail, tournament registrations); the other person lines wait for a follow-up backend task. Mobile brief updated.
 
+
+## DES-MEETUP-ADDENDUM-push-actions.md
+- v1.0 (2026-10-18): approved by the owner. Copy of the backend repo's document. Action buttons on push for game invite, tournament invite and group addition. Gate: pa-spike (OI-1) before any client build. Task pa-clients-mobile.
