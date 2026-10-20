@@ -231,7 +231,7 @@ Rollback: redeploy the previous version; the tables are additive and stay; hidde
 | OI-3 | Verify whether the existing withdraw path notifies the organizer; if so, suppress for decline | 🟡 MEDIUM | Phase 1 verify |
 | OI-4 | On a joined item, the existing withdraw/leave control takes the Decline label (owner confirmed 2026-10-20); Phase 1 only checks the screens do not already show both | 🟡 MEDIUM | Closed, Phase 1 check remains |
 | OI-5 | P17 rate limit on the new routes | 🟡 MEDIUM | Phase 1 verify |
-| OI-6 | `meetup.tournament.invitations.enabled` must be true in production for tournament Accept/Decline (the respond endpoint answers 404 otherwise) | 🟠 HIGH | Verify before `dr-web`; same as push-actions OI-5 |
+| OI-6 | `meetup.tournament.invitations.enabled` (a `platform_config` key, seeded false, editable in the admin config console) must be true in production for tournament Accept/Decline (the respond endpoint answers 404 otherwise) | 🟠 HIGH | Verify before `dr-web`; same as push-actions OI-5 |
 
 ## 15. Risks and mitigations
 
