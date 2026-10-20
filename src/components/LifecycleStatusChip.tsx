@@ -11,14 +11,14 @@ import { colors, radius, spacing, typography } from '../theme/tokens';
 import type { LifecycleStatus } from '../types/event';
 
 interface Props {
-  status?: LifecycleStatus;
+  status?: LifecycleStatus | 'completed';
   closureOutcome?: string | null;
   outcome?: string | null;
   testID?: string;
 }
 
 export function getLifecycleStatusText(
-  status: LifecycleStatus = 'active',
+  status: LifecycleStatus | 'completed' = 'active',
   closureOutcome?: string | null,
   t: TranslateFn = ((key: string) => key) as unknown as TranslateFn,
 ): string {
@@ -28,11 +28,11 @@ export function getLifecycleStatusText(
   if (status === 'cancelled') {
     return t('mob.closure.status.cancelled');
   }
-  if (status === 'closed') {
+  if (status === 'closed' || status === 'completed') {
     if (closureOutcome === 'not_held') {
       return `${t('mob.closure.status.closed')} · ${t('mob.closure.status.not_held')}`;
     }
-    return t('mob.closure.status.closed');
+    return status === 'completed' ? t('mob.game_status.completed') : t('mob.closure.status.closed');
   }
   return t('mob.closure.status.active');
 }
@@ -52,13 +52,16 @@ export default function LifecycleStatusChip({
     past: { bg: styles.bgPast, text: styles.textPast },
     cancelled: { bg: styles.bgCancelled, text: styles.textCancelled },
     closed: { bg: styles.bgClosed, text: styles.textClosed },
+    completed: { bg: styles.bgClosed, text: styles.textClosed },
   };
 
   const currentStyle = styleMap[status] ?? styleMap.active;
 
+  const statusKey = status === 'closed' ? 'completed' : status;
+
   return (
     <View
-      testID={testID ?? `lifecycle-status-chip-${status}`}
+      testID={testID ?? `game-status-pill-${statusKey}`}
       accessibilityLabel={label}
       style={[styles.chip, currentStyle.bg]}
     >

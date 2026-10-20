@@ -33,7 +33,7 @@ import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
-import type { Event } from '../../types/event';
+import type { Event, LifecycleStatus } from '../../types/event';
 import type { Group, GroupRole } from '../../types/group';
 import type { Tournament, TournamentRegistrationStatus } from '../../types/tournament';
 import { perfImageError, perfImageLoad, perfImageLoadStart } from '../../diagnostics/perfLog';
@@ -304,13 +304,20 @@ export function UnifiedGameCard({
     ) : (
       badge
     );
-  const statusLabel = getLifecycleStatusText(event.lifecycle_status, event.closure_outcome, t);
+  const effectiveStatus: LifecycleStatus | 'completed' =
+    event.lifecycle_status ??
+    (event.status === 'cancelled' || event.display_status === 'cancelled'
+      ? 'cancelled'
+      : event.display_status === 'completed'
+      ? 'completed'
+      : 'active');
+  const statusLabel = getLifecycleStatusText(effectiveStatus, event.closure_outcome, t);
   const badgeWithStatus = showStatus ? (
     <>
       {badgeNode}
       <View style={badgeNode ? styles.statusPillGap : undefined}>
         <LifecycleStatusChip
-          status={event.lifecycle_status}
+          status={effectiveStatus}
           closureOutcome={event.closure_outcome}
         />
       </View>

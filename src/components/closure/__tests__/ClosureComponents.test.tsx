@@ -35,7 +35,7 @@ describe('Closure components', () => {
         />
       );
 
-      expect(texts(root)).toContain('Close game');
+      expect(texts(root)).toContain('Closure report');
       expect(texts(root)).toContain('Was it played?');
       expect(texts(root)).toContain('Alice');
       expect(texts(root)).toContain('Bob');

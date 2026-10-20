@@ -172,7 +172,9 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             getTournament(tournamentId),
             getFixtures(tournamentId),
             getRegistrations(tournamentId),
-            getTournamentClosure(tournamentId).catch(() => null),
+            typeof getTournamentClosure === 'function'
+              ? getTournamentClosure(tournamentId).catch(() => null)
+              : Promise.resolve(null),
           ]);
         setTournament(tournamentData);
         setFixtures(fixturesData);
@@ -432,12 +434,14 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const currentUserRegistrationStatus = myRegistration?.status ?? 'none';
   const isOrganiser = tournament.organiser_id === currentUserId;
 
-  const endInstant = tournament.ends_at
-    ? Date.parse(tournament.ends_at)
-    : tournament.starts_at
-    ? Date.parse(tournament.starts_at)
-    : NaN;
-  const isTournamentEnded = !Number.isNaN(endInstant) && Date.now() >= endInstant;
+  const endInstant = tournament.ends_at ? Date.parse(tournament.ends_at) : NaN;
+  const isTournamentEnded =
+    tournament.lifecycle_status === 'past' ||
+    tournament.lifecycle_status === 'closed' ||
+    (tournament.lifecycle_status !== 'active' &&
+      tournament.status !== 'upcoming' &&
+      !Number.isNaN(endInstant) &&
+      Date.now() >= endInstant);
 
   const canRegister =
     !isTournamentEnded &&

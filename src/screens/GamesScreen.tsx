@@ -50,6 +50,7 @@ import {
   filteredEmptyMessage,
   getGameBadge,
   selectGames,
+  selectMyGamesWithHistory,
 } from '../utils/gameLists';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
@@ -132,7 +133,15 @@ function GamesSegment({
   const [viewFilter, setViewFilter] = useState<'active' | 'all'>('active');
   const withHistory = scope === 'mine' || viewFilter === 'all';
   const events = useResource(
-    options => getEvents({ view: viewFilter, history: withHistory }, options),
+    options =>
+      getEvents(
+        viewFilter === 'all'
+          ? { view: 'all', history: true }
+          : withHistory
+          ? { history: true }
+          : undefined,
+        options,
+      ),
     'getEvents',
   );
   const sports = useResource(options => getSports(options), 'getSports');
@@ -202,7 +211,9 @@ function GamesSegment({
       return undefined;
     }
     const options = { userId, sportKeys: filter.selected, now: Date.now() };
-    return selectGames(feed, scope, options, viewFilter);
+    return scope === 'mine'
+      ? selectMyGamesWithHistory(feed, options)
+      : selectGames(feed, scope, options, viewFilter);
   }, [events.data, scope, userId, filter.selected, viewFilter]);
 
   const emptyCopy =

@@ -145,6 +145,26 @@ function resolveDisplayStatus(raw: string | null | undefined, status: string): G
   return status === 'cancelled' ? 'cancelled' : 'active';
 }
 
+function resolveLifecycleStatus(raw: EventApiItem): LifecycleStatus {
+  if (raw.lifecycle_status) {
+    return raw.lifecycle_status as LifecycleStatus;
+  }
+  if (raw.status === 'cancelled' || raw.display_status === 'cancelled') {
+    return 'cancelled';
+  }
+  if (raw.display_status === 'completed') {
+    return 'closed';
+  }
+  if (raw.status === 'upcoming') {
+    return 'active';
+  }
+  const end = raw.ends_at ? Date.parse(raw.ends_at) : raw.starts_at ? Date.parse(raw.starts_at) : NaN;
+  if (!Number.isNaN(end) && Date.now() >= end) {
+    return 'past';
+  }
+  return 'active';
+}
+
 export function mapEventApiItem(raw: EventApiItem): Event {
   return {
     id: raw.id,
@@ -180,7 +200,7 @@ export function mapEventApiItem(raw: EventApiItem): Event {
     // Older servers send only group_id / group_name: a one-item list.
     group_ids: raw.group_ids ?? (raw.group_id ? [raw.group_id] : []),
     group_names: raw.group_names ?? (raw.group_name ? [raw.group_name] : []),
-    lifecycle_status: (raw.lifecycle_status as LifecycleStatus) ?? 'active',
+    lifecycle_status: resolveLifecycleStatus(raw),
     closure_outcome: raw.closure_outcome ?? null,
   };
 }

@@ -37,7 +37,7 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
-import { rsvpEvent } from '../api/events';
+import { getEvents, rsvpEvent } from '../api/events';
 import { getGroups } from '../api/groups';
 import {
   BUNDLED_FALLBACK_BANNER,
@@ -80,9 +80,11 @@ import type { Group } from '../types/group';
 import { getDisplayName } from '../utils/displayName';
 import { getApiErrorMessage } from '../utils/apiError';
 import {
+  filteredEmptyMessage,
   getGameBadge,
   HOME_SECTION_ROWS,
   isOrganiserOf,
+  selectGames,
 } from '../utils/gameLists';
 import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
 
@@ -102,13 +104,13 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const [menuData, setMenuData] = useState<HomeMenuResponse | null>(null);
   const [persistedBanners, setPersistedBanners] = useState<HomeBannersResponse | null>(null);
 
-  // Live endpoints state with local calculation fallbacks
   const [liveUpcoming, setLiveUpcoming] = useState<{
     items: Event[] | null;
     total: number | null;
     window_days: number;
     status: 'idle' | 'loading' | 'success' | 'error';
-  }>({ items: null, total: null, window_days: 7, status: 'loading' });
+    fromUpcomingEndpoint: boolean;
+  }>({ items: null, total: null, window_days: 7, status: 'loading', fromUpcomingEndpoint: true });
 
   const [liveGroups, setLiveGroups] = useState<{
     items: Group[] | null;
@@ -207,17 +209,52 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       const seq = ++upcomingSeqRef.current;
       setLiveUpcoming(prev =>
         fresh
-          ? { items: null, total: null, window_days: prev.window_days, status: 'loading' }
+          ? {
+              items: null,
+              total: null,
+              window_days: prev.window_days,
+              status: 'loading',
+              fromUpcomingEndpoint: prev.fromUpcomingEndpoint,
+            }
           : { ...prev, status: 'loading' },
       );
       try {
-        const res = await getUpcoming({ correlationId });
+        let res: { items: Event[]; total: number; window_days: number };
+        let fromEndpoint = true;
+        if (typeof getUpcoming === 'function') {
+          try {
+            res = await getUpcoming({ correlationId });
+          } catch {
+            fromEndpoint = false;
+            const eventsRes = await getEvents(
+              { upcoming: true, limit: 100 },
+              { correlationId },
+            );
+            res = {
+              items: eventsRes.items,
+              total: eventsRes.total,
+              window_days: 7,
+            };
+          }
+        } else {
+          fromEndpoint = false;
+          const eventsRes = await getEvents(
+            { upcoming: true, limit: 100 },
+            { correlationId },
+          );
+          res = {
+            items: eventsRes.items,
+            total: eventsRes.total,
+            window_days: 7,
+          };
+        }
         if (seq === upcomingSeqRef.current) {
           setLiveUpcoming({
             items: res.items,
             total: res.total,
             window_days: res.window_days,
             status: 'success',
+            fromUpcomingEndpoint: fromEndpoint,
           });
         }
       } catch {
@@ -276,6 +313,8 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
   // Sport filter
   const filter = useSportFilter(sports, profile.data?.skill_levels, profile.status !== 'loading');
+  const isFiltered = filter.selected.length > 0;
+  const filteredEmpty = isFiltered ? filteredEmptyMessage(filter.selected, filter.options, t) : null;
 
   const selectedSportsRef = useRef(filter.selected);
   selectedSportsRef.current = filter.selected;
@@ -385,15 +424,25 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   // Resolved counts: live summary data preferred, live items length fallback on failure
   // Resolved counts: live upcoming total preferred (AD-8), summary fallback, local items fallback
   // The rows: qualifying upcoming games returned directly from GET /home/upcoming
-  const displayedUpcoming = useMemo(
-    () => (liveUpcoming.items ? liveUpcoming.items.slice(0, HOME_SECTION_ROWS) : null),
-    [liveUpcoming.items],
-  );
+  const displayedUpcoming = useMemo(() => {
+    if (!liveUpcoming.items) {
+      return null;
+    }
+    if (liveUpcoming.fromUpcomingEndpoint) {
+      return liveUpcoming.items.slice(0, HOME_SECTION_ROWS);
+    }
+    return selectGames(liveUpcoming.items, 'all', {
+      userId: user?.id,
+      sportKeys: filter.selected,
+    }).slice(0, HOME_SECTION_ROWS);
+  }, [liveUpcoming.items, liveUpcoming.fromUpcomingEndpoint, user?.id, filter.selected]);
 
-  const upcomingCount =
-    liveUpcoming.total ??
-    summaryData?.upcoming_games_this_week ??
-    (displayedUpcoming ? displayedUpcoming.length : null);
+  const upcomingCount = liveUpcoming.fromUpcomingEndpoint
+    ? liveUpcoming.total ??
+      summaryData?.upcoming_games_this_week ??
+      (displayedUpcoming ? displayedUpcoming.length : null)
+    : summaryData?.upcoming_games_this_week ??
+      (displayedUpcoming ? displayedUpcoming.length : null);
   const groupsCount =
     summaryData?.active_groups ??
     (liveGroups.items ? liveGroups.items.length : null);
@@ -547,7 +596,9 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
               <SkeletonRows count={2} />
             ) : displayedUpcoming.length === 0 ? (
               <EmptyText>
-                {t('mob.closure.upcoming_empty', { days: liveUpcoming.window_days })}
+                {liveUpcoming.fromUpcomingEndpoint
+                  ? t('mob.closure.upcoming_empty', { days: liveUpcoming.window_days })
+                  : filteredEmpty ?? t('mob.home.upcoming_empty')}
               </EmptyText>
             ) : (
               displayedUpcoming.map(event => {

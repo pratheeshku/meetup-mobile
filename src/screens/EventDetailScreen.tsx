@@ -238,7 +238,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         const [data, parts, closureData] = await Promise.all([
           getEvent(eventId),
           getEventParticipants(eventId).catch(() => null),
-          getEventClosure(eventId).catch(() => null),
+          typeof getEventClosure === 'function'
+            ? getEventClosure(eventId).catch(() => null)
+            : Promise.resolve(null),
         ]);
         setEvent(data);
         if (Array.isArray(parts)) {
@@ -1343,7 +1345,13 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     : event.starts_at
     ? Date.parse(event.starts_at)
     : NaN;
-  const isGameEnded = !Number.isNaN(endInstant) && Date.now() >= endInstant;
+  const isGameEnded =
+    event.lifecycle_status === 'past' ||
+    event.lifecycle_status === 'closed' ||
+    (event.lifecycle_status !== 'active' &&
+      event.status !== 'upcoming' &&
+      !Number.isNaN(endInstant) &&
+      Date.now() >= endInstant);
 
   // Cancelled / completed / closed games are read-only: no edit, cancel, Join or Leave.
   const isClosed =
