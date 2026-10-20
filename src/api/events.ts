@@ -16,6 +16,7 @@
  * fallback.
  */
 import { apiClient } from './client';
+import type { UserCardOut } from '../types/userCard';
 import type {
   CreateEventInput,
   Event,
@@ -365,3 +366,38 @@ export async function getEventParticipants(
   return data;
 }
 
+
+/**
+ * `GET /events/{event_id}/players/{user_id}/card`: identity and the actions the caller may take on
+ * this player (user details menu, AD-1). 404 = no access or no relationship to the game.
+ */
+export async function getEventPlayerCard(
+  eventId: string,
+  userId: string,
+  options?: RequestOptions & { timeoutMs?: number },
+): Promise<UserCardOut> {
+  const { data } = await apiClient.get<UserCardOut>(`/events/${eventId}/players/${userId}/card`, {
+    correlationId: options?.correlationId,
+    timeout: options?.timeoutMs,
+  });
+  return data;
+}
+
+/**
+ * Organiser removes a player: `DELETE /events/{event_id}/participants/{user_id}`, optional
+ * `reason` query parameter. Organiser only; 404 = the game is gone or not visible to the caller.
+ */
+export async function removeEventParticipant(
+  eventId: string,
+  userId: string,
+  options?: RequestOptions & { reason?: string },
+): Promise<import('../types/event').EventParticipant> {
+  const { data } = await apiClient.delete<import('../types/event').EventParticipant>(
+    `/events/${eventId}/participants/${userId}`,
+    {
+      correlationId: options?.correlationId,
+      params: options?.reason ? { reason: options.reason } : undefined,
+    },
+  );
+  return data;
+}

@@ -12,7 +12,7 @@ import { colors, groupView, typography } from '../theme/tokens';
 interface PersonNamesProps {
   displayName: string;
   nickname?: string | null;
-  /** Larger text for the long-press member card. */
+  /** Larger text for the View Details sheet. */
   large?: boolean;
   centered?: boolean;
   nameStyle?: StyleProp<TextStyle>;

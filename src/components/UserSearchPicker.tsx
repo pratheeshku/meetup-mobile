@@ -30,6 +30,7 @@ import AddRemoveControl from './AddRemoveControl';
 import PersonNames from './PersonNames';
 import TextField from './TextField';
 import UserAvatar from './UserAvatar';
+import UserPressable from './user/UserPressable';
 import type { LabelKey } from '../labels/fallbackLabels';
 import { useT } from '../labels/LabelsContext';
 
@@ -324,12 +325,22 @@ export default function UserSearchPicker({
         ]}
       >
         <View style={styles.resultLeft} accessible accessibilityLabel={label}>
-          <UserAvatar
-            imageUrl={user.image_url}
-            name={user.display_name}
-            size={isInvite ? INVITE_AVATAR_SIZE : AVATAR_SIZE}
-            fallback={isInvite ? 'initials' : 'letter'}
-          />
+          {/* Selectable row: the control selects; the picture only long-presses (UM-06). */}
+          <UserPressable
+            userId={user.id}
+            displayName={user.display_name}
+            nickname={user.nickname}
+            photoUrl={user.image_url ?? null}
+            context={{ type: 'none' }}
+            tap={false}
+          >
+            <UserAvatar
+              imageUrl={user.image_url}
+              name={user.display_name}
+              size={isInvite ? INVITE_AVATAR_SIZE : AVATAR_SIZE}
+              fallback={isInvite ? 'initials' : 'letter'}
+            />
+          </UserPressable>
           <View style={styles.resultText}>
             <PersonNames displayName={user.display_name} nickname={user.nickname} />
             {chip && !isInvite ? (

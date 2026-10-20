@@ -27,6 +27,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from './client';
+import type { UserCardOut } from '../types/userCard';
 import type {
   CreateGroupInput,
   Group,
@@ -395,6 +396,22 @@ export async function updateMemberRole(
     { role },
     { correlationId: options?.correlationId },
   );
+}
+
+/**
+ * `GET /groups/{group_id}/members/{user_id}/card`: identity and the actions the caller may take on
+ * this member (user details menu, AD-1). 404 = no access or not a member.
+ */
+export async function getGroupMemberCard(
+  groupId: string,
+  userId: string,
+  options?: RequestOptions & { timeoutMs?: number },
+): Promise<UserCardOut> {
+  const { data } = await apiClient.get<UserCardOut>(`/groups/${groupId}/members/${userId}/card`, {
+    correlationId: options?.correlationId,
+    timeout: options?.timeoutMs,
+  });
+  return data;
 }
 
 export async function removeMember(

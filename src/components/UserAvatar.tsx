@@ -10,6 +10,7 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { perfImageError, perfImageLoad, perfImageLoadStart } from '../diagnostics/perfLog';
 import { colors, groupView, typography } from '../theme/tokens';
+import { PersonIcon } from './icons/GroupViewIcons';
 import { toHttpsUrl } from '../utils/httpsUrl';
 
 interface UserAvatarProps {
@@ -24,7 +25,7 @@ interface UserAvatarProps {
    * Fallback style when there is no usable picture: `letter` (default) is one letter on the
    * brand colour; `initials` is up to two initials on a coloured circle picked from the name.
    */
-  fallback?: 'letter' | 'initials';
+  fallback?: 'letter' | 'initials' | 'person';
 }
 
 function getInitials(name: string): string {
@@ -93,6 +94,20 @@ export default function UserAvatar({
     );
   }
   const initial = ((name ?? '').trim().charAt(0) || '?').toUpperCase();
+  if (fallback === 'person') {
+    // A person with no linked account (tournament registration without a user id).
+    return (
+      <View
+        style={[styles.placeholder, dimension, { backgroundColor: colors.border }]}
+        accessible={hasA11y}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole={hasA11y ? 'image' : undefined}
+        testID="user-avatar-placeholder"
+      >
+        <PersonIcon size={Math.round(size * 0.55)} color={colors.textMuted} />
+      </View>
+    );
+  }
   if (fallback === 'initials') {
     return (
       <View

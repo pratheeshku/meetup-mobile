@@ -135,6 +135,7 @@ import AccountDeletionBlockedScreen from '../screens/AccountDeletionBlockedScree
 import TransferGroupOwnershipScreen from '../screens/TransferGroupOwnershipScreen';
 import AccountDeletionCodeScreen from '../screens/AccountDeletionCodeScreen';
 import AccessNoticeToast from '../components/AccessNoticeToast';
+import UserMenuHost from '../components/user/UserMenuHost';
 import NotificationBanner from '../components/NotificationBanner';
 import OnboardingOverlay from './OnboardingOverlay';
 import { useT } from '../labels/LabelsContext';
@@ -543,6 +544,7 @@ export default function RootNavigator(): React.JSX.Element {
       {user ? <OnboardingOverlay userId={user.id} /> : null}
       <NotificationBanner />
       <AccessNoticeToast />
+      {user ? <UserMenuHost /> : null}
     </View>
   );
 }

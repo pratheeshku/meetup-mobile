@@ -1,12 +1,16 @@
 /**
  * Group detail member list (WhatsApp-style): ordering, display name over nickname,
- * photo or initials, and the long-press card with its per-role actions.
+ * photo or initials, and the user menu (design UM-T10): a tap on the picture opens View Details,
+ * a long-press opens the menu whose actions come only from the server's card.
  */
 import React from 'react';
-import { Alert, Image, StyleSheet } from 'react-native';
+import { Image, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { getGroup, updateMemberRole } from '../../api/groups';
+import { getGroup, getGroupMemberCard, updateMemberRole, removeMember, transferGroupOwnership } from '../../api/groups';
+import UserMenuHost from '../../components/user/UserMenuHost';
+import { closeUserMenu } from '../../hooks/useUserMenu';
+import type { UserCardOut } from '../../types/userCard';
 import { searchUsers } from '../../api/users';
 import { act, pressableLabelled, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
@@ -18,6 +22,7 @@ type Props = React.ComponentProps<typeof GroupDetailScreen>;
 jest.mock('../../api/groups', () => ({
   createGroupInvitation: jest.fn(),
   getGroup: jest.fn(),
+  getGroupMemberCard: jest.fn(),
   inviteMember: jest.fn(),
   removeMember: jest.fn(),
   transferGroupOwnership: jest.fn(),
@@ -71,26 +76,48 @@ const mount = (): Promise<Instance> =>
           navigation: { goBack: jest.fn(), navigate: jest.fn() },
         } as unknown as Props)}
       />
+      <UserMenuHost />
     </SafeAreaProvider>,
   );
 
-/** Long-pressable member rows in screen order. */
+/** The member rows' person areas (picture + names) in screen order. */
 const memberRows = (root: Instance): Instance[] =>
   root.findAll(n => typeof n.props.onLongPress === 'function' && typeof n.props.accessibilityLabel === 'string');
 const rowFor = (root: Instance, displayName: string): Instance =>
   memberRows(root).filter(n => texts(n).includes(displayName))[0];
-const longPress = (root: Instance, displayName: string): void => {
-  act(() => rowFor(root, displayName).props.onLongPress());
+/** The whole row (person area plus role chip). */
+const wholeRow = (root: Instance, userId: string): Instance =>
+  root.find(n => n.props.testID === `member-row-${userId}`);
+const longPress = async (root: Instance, displayName: string): Promise<void> => {
+  await act(async () => rowFor(root, displayName).props.onLongPress());
+};
+const tap = async (root: Instance, displayName: string): Promise<void> => {
+  await act(async () => rowFor(root, displayName).props.onPress());
 };
 const hasAction = (root: Instance, label: string): boolean =>
   root.findAll(n => n.props.accessibilityRole === 'button' && n.props.accessibilityLabel === label).length > 0;
-const ACTIONS = ['Make admin', 'Demote', 'Make owner', 'Remove from group'];
+const ACTIONS = ['Make admin', 'Remove admin', 'Make owner', 'Remove from group'];
 const shownActions = (root: Instance): string[] => ACTIONS.filter(label => hasAction(root, label));
 
+const card = (userId: string, keys: string[], extra: Partial<UserCardOut> = {}): UserCardOut => ({
+  user_id: userId,
+  display_name: 'x',
+  nickname: null,
+  photo_url: null,
+  is_self: false,
+  relation: 'member',
+  allowed_actions: keys.map(key => ({ key, requires_approval: false })),
+  ...extra,
+});
+
 beforeEach(() => {
+  act(() => closeUserMenu()); // the menu request store is module-level
   mockUserId = 'user-me';
   (getGroup as jest.Mock).mockReset().mockResolvedValue(GROUP);
   (updateMemberRole as jest.Mock).mockReset().mockResolvedValue(undefined);
+  (removeMember as jest.Mock).mockReset().mockResolvedValue(undefined);
+  (transferGroupOwnership as jest.Mock).mockReset().mockResolvedValue(undefined);
+  (getGroupMemberCard as jest.Mock).mockReset().mockRejectedValue(new Error('no card'));
   (searchUsers as jest.Mock).mockReset().mockResolvedValue([]);
 });
 
@@ -121,10 +148,10 @@ describe('member order', () => {
 
   it('shows an Owner chip and Admin chips only on those rows', async () => {
     const root = await mount();
-    expect(texts(rowFor(root, 'Sam Smith'))).toContain('Owner');
-    expect(texts(rowFor(root, 'Daniel Tan'))).toContain('Admin');
-    expect(texts(rowFor(root, 'Aisha Rahman'))).not.toContain('Admin');
-    expect(texts(rowFor(root, 'Aisha Rahman'))).not.toContain('Owner');
+    expect(texts(wholeRow(root, 'user-me'))).toContain('Owner');
+    expect(texts(wholeRow(root, 'u-dan'))).toContain('Admin');
+    expect(texts(wholeRow(root, 'u-aisha'))).not.toContain('Admin');
+    expect(texts(wholeRow(root, 'u-aisha'))).not.toContain('Owner');
   });
 });
 
@@ -158,80 +185,101 @@ describe('member row', () => {
   });
 });
 
-describe('long-press card', () => {
-  it('owner on a member: Make admin, Make owner, Remove from group', async () => {
+describe('user menu', () => {
+  it('a tap on a member opens View Details with no card request', async () => {
     const root = await mount();
-    longPress(root, 'Aisha Rahman');
-    expect(shownActions(root)).toEqual(['Make admin', 'Make owner', 'Remove from group']);
-  });
-
-  it('owner on an admin: Demote instead of Make admin', async () => {
-    const root = await mount();
-    longPress(root, 'Daniel Tan');
-    expect(shownActions(root)).toEqual(['Demote', 'Make owner', 'Remove from group']);
-  });
-
-  it('the card shows the display name above the nickname', async () => {
-    const root = await mount();
-    longPress(root, 'Aisha Rahman');
+    await tap(root, 'Aisha Rahman');
+    expect(root.findAll(n => n.props.testID === 'user-details' && typeof n.type === 'string')).toHaveLength(1);
+    expect(getGroupMemberCard).not.toHaveBeenCalled();
     const all = texts(root);
-    // list row text comes first in the tree; the card repeats the pair after it
     const last = all.lastIndexOf('Aisha Rahman');
-    expect(all[last + 1]).toBe('aisha_r');
+    expect(all[last + 1]).toBe('aisha_r'); // display name above nickname
   });
 
-  it('admin on a member: Make admin and Remove only (no Make owner)', async () => {
-    mockUserId = 'u-dan';
+  it('a long-press fetches the card for this group and member, then lists View Details first', async () => {
+    (getGroupMemberCard as jest.Mock).mockResolvedValue(card('u-aisha', ['make_admin', 'make_owner', 'remove_from_group']));
     const root = await mount();
-    longPress(root, 'Aisha Rahman');
-    expect(shownActions(root)).toEqual(['Make admin', 'Remove from group']);
+    await longPress(root, 'Aisha Rahman');
+    expect(getGroupMemberCard).toHaveBeenCalledWith('group-1', 'u-aisha', expect.objectContaining({ correlationId: expect.any(String) }));
+    expect(shownActions(root)).toEqual(['Make admin', 'Make owner', 'Remove from group']);
+    const labels = root
+      .findAll(
+        n =>
+          typeof n.type === 'string' &&
+          (n.props.testID === 'user-menu-view-details' || String(n.props.testID ?? '').startsWith('user-menu-action-')),
+      )
+      .map(n => n.props.accessibilityLabel);
+    expect(labels[0]).toBe('View Details');
   });
 
-  it('regular member sees the details card with no actions', async () => {
+  it('shows exactly the actions the server sent (admin target: Remove admin)', async () => {
+    (getGroupMemberCard as jest.Mock).mockResolvedValue(card('u-dan', ['remove_admin', 'make_owner', 'remove_from_group']));
+    const root = await mount();
+    await longPress(root, 'Daniel Tan');
+    expect(shownActions(root)).toEqual(['Remove admin', 'Make owner', 'Remove from group']);
+  });
+
+  it('a regular member gets View Details only when the server sends no actions', async () => {
     mockUserId = 'u-chen';
+    (getGroupMemberCard as jest.Mock).mockResolvedValue(card('u-aisha', []));
     const root = await mount();
-    longPress(root, 'Aisha Rahman');
+    await longPress(root, 'Aisha Rahman');
     expect(shownActions(root)).toEqual([]);
-    expect(texts(root).filter(x => x === 'Aisha Rahman').length).toBeGreaterThan(1); // row + card
+    expect(hasAction(root, 'View Details')).toBe(true);
   });
 
-  it('nobody gets actions on their own row, and nobody on the owner row', async () => {
-    const root = await mount();
-    longPress(root, 'Sam Smith'); // owner on self
+  it('never computes rights on the client: a failed card leaves View Details only, with the message', async () => {
+    const root = await mount(); // owner viewer, card request rejects
+    await longPress(root, 'Aisha Rahman');
     expect(shownActions(root)).toEqual([]);
-
-    mockUserId = 'u-dan';
-    const asAdmin = await mount();
-    longPress(asAdmin, 'Daniel Tan'); // admin on self
-    expect(shownActions(asAdmin)).toEqual([]);
-    longPress(asAdmin, 'Sam Smith'); // admin on owner
-    expect(shownActions(asAdmin)).toEqual([]);
+    expect(hasAction(root, 'View Details')).toBe(true);
+    expect(texts(root)).toContain('Could not load options.');
   });
 
-  it('Remove from group asks for confirmation naming the member by display name', async () => {
-    const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  it('the viewer\'s own row: View Details only, no card request', async () => {
     const root = await mount();
-    longPress(root, 'Aisha Rahman');
-    act(() => pressableLabelled(root, 'Remove from group').props.onPress());
-    expect(spy).toHaveBeenCalled();
-    expect(String(spy.mock.calls[0][1])).toContain('Aisha Rahman');
-    expect(String(spy.mock.calls[0][1])).not.toContain('aisha_r');
-    spy.mockRestore();
+    await longPress(root, 'Sam Smith');
+    expect(getGroupMemberCard).not.toHaveBeenCalled();
+    expect(shownActions(root)).toEqual([]);
+    expect(hasAction(root, 'View Details')).toBe(true);
   });
 
-  it('Make owner asks for the existing transfer confirmation', async () => {
-    const spy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  it('Make admin asks for confirmation naming the member by display name, then calls updateMemberRole', async () => {
+    (getGroupMemberCard as jest.Mock).mockResolvedValue(card('u-aisha', ['make_admin']));
     const root = await mount();
-    longPress(root, 'Aisha Rahman');
-    act(() => pressableLabelled(root, 'Make owner').props.onPress());
-    expect(String(spy.mock.calls[0][0])).toBe('Transfer ownership to Aisha Rahman?');
-    spy.mockRestore();
-  });
-
-  it('Make admin changes the role through updateMemberRole', async () => {
-    const root = await mount();
-    longPress(root, 'Aisha Rahman');
+    await longPress(root, 'Aisha Rahman');
     await act(async () => pressableLabelled(root, 'Make admin').props.onPress());
-    expect(updateMemberRole).toHaveBeenCalledWith('group-1', 'u-aisha', 'admin', expect.anything());
+    expect(texts(root)).toContain('Make Aisha Rahman an admin of this group?');
+    expect(updateMemberRole).not.toHaveBeenCalled();
+    await act(async () => pressableLabelled(root, 'Yes').props.onPress());
+    const cardId = (getGroupMemberCard as jest.Mock).mock.calls[0][2].correlationId;
+    expect(updateMemberRole).toHaveBeenCalledWith('group-1', 'u-aisha', 'admin', { correlationId: cardId });
+    expect(getGroup).toHaveBeenCalledTimes(2); // initial load + refresh after the action
+  });
+
+  it('Remove from group and Make owner confirm, then use removeMember / transferGroupOwnership', async () => {
+    (getGroupMemberCard as jest.Mock).mockResolvedValue(card('u-aisha', ['make_owner', 'remove_from_group']));
+    const root = await mount();
+    await longPress(root, 'Aisha Rahman');
+    await act(async () => pressableLabelled(root, 'Remove from group').props.onPress());
+    expect(texts(root)).toContain('Remove Aisha Rahman from this group?');
+    await act(async () => pressableLabelled(root, 'Yes').props.onPress());
+    expect(removeMember).toHaveBeenCalledWith('group-1', 'u-aisha', expect.anything());
+
+    await longPress(root, 'Aisha Rahman');
+    await act(async () => pressableLabelled(root, 'Make owner').props.onPress());
+    await act(async () => pressableLabelled(root, 'Yes').props.onPress());
+    expect(transferGroupOwnership).toHaveBeenCalledWith('group-1', 'u-aisha', expect.anything());
+  });
+
+  it('a refused action shows the server message and refreshes the group', async () => {
+    (getGroupMemberCard as jest.Mock).mockResolvedValue(card('u-aisha', ['make_admin']));
+    (updateMemberRole as jest.Mock).mockRejectedValue({ response: { status: 403, data: { detail: 'Only an owner can do that' } } });
+    const root = await mount();
+    await longPress(root, 'Aisha Rahman');
+    await act(async () => pressableLabelled(root, 'Make admin').props.onPress());
+    await act(async () => pressableLabelled(root, 'Yes').props.onPress());
+    expect(texts(root)).toContain('Only an owner can do that');
+    expect(getGroup).toHaveBeenCalledTimes(2);
   });
 });

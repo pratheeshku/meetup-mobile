@@ -39,6 +39,7 @@ import ShareActionSheet from '../ShareActionSheet';
 import Toast from '../Toast';
 import PersonNames from '../PersonNames';
 import UserAvatar from '../UserAvatar';
+import UserPressable from '../user/UserPressable';
 import UserSearchPicker from '../UserSearchPicker';
 
 interface Props {
@@ -259,7 +260,14 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
           <Text style={styles.formHint}>{t('mob.tournament.invite_player_hint')}</Text>
           {pickedUser ? (
             <View style={styles.selectedRow}>
-              <View style={styles.selectedNames}>
+              <UserPressable
+                style={styles.selectedNames}
+                userId={pickedUser.id}
+                displayName={pickedUser.display_name}
+                nickname={pickedUser.nickname}
+                photoUrl={pickedUser.image_url ?? null}
+                context={{ type: 'tournament' }}
+              >
                 <UserAvatar
                   imageUrl={pickedUser.image_url}
                   name={pickedUser.display_name}
@@ -269,7 +277,7 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
                 <View style={styles.selectedPerson}>
                   <PersonNames displayName={pickedUser.display_name} nickname={pickedUser.nickname} />
                 </View>
-              </View>
+              </UserPressable>
               <AddRemoveControl
                 mode="staged"
                 staged

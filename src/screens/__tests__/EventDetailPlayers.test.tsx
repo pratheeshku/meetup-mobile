@@ -1,10 +1,12 @@
 /** Game detail Players block: going people only, photos with initials fallback, backend going count, refresh after Join/Leave. */
 import React from 'react';
-import { Image } from 'react-native';
+import { Image, View } from 'react-native';
 
 import { apiClient } from '../../api/client';
 import { act, pressableLabelled, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
+import UserMenuHost from '../../components/user/UserMenuHost';
+import { closeUserMenu } from '../../hooks/useUserMenu';
 import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import EventDetailScreen from '../EventDetailScreen';
 
@@ -30,13 +32,25 @@ async function mount(event: Record<string, unknown>, participants: Record<string
   server.event = event;
   server.participants = participants;
   mockGet.mockImplementation((url: string) =>
-    Promise.resolve({ data: url.includes('/participants') ? server.participants : url === '/config/client' ? {} : server.event }),
+    url.endsWith('/card')
+      ? Promise.resolve({
+          data: {
+            user_id: 'u-1', display_name: 'Alice', nickname: 'alice', photo_url: null, is_self: false,
+            relation: 'player', allowed_actions: [{ key: 'remove_player', requires_approval: false }],
+          },
+        })
+      : Promise.resolve({ data: url.includes('/participants') ? server.participants : url === '/config/client' ? {} : server.event }),
   );
   const props = {
     route: { key: 'k', name: 'EventDetail', params: { eventId: 'evt-1' } },
     navigation: { goBack: jest.fn() },
   } as unknown as React.ComponentProps<typeof EventDetailScreen>;
-  return renderAsync(<EventDetailScreen {...props} />);
+  return renderAsync(
+    <View>
+      <EventDetailScreen {...props} />
+      <UserMenuHost />
+    </View>,
+  );
 }
 const avatars = (root: Instance): Instance[] => root.findAll(n => n.props.testID === 'player-avatar' && typeof n.type === 'string');
 const press = async (root: Instance, label: string): Promise<void> => {
@@ -46,6 +60,7 @@ const press = async (root: Instance, label: string): Promise<void> => {
 };
 
 beforeEach(() => {
+  act(() => closeUserMenu());
   mockGet.mockReset();
   mockPost.mockReset().mockResolvedValue({ data: {} });
   __resetSportDisplayNamesCacheForTests();
@@ -146,5 +161,25 @@ describe('organiser capacity minimum', () => {
     await press(root, 'Next'); // step 2 -> 3 (capacity)
     const next = root.findAll(n => n.props.accessibilityLabel === 'Next' && typeof n.props.onPress === 'function')[0];
     expect(next.props.disabled).toBeFalsy();
+  });
+});
+
+describe('user menu on a player picture (game context)', () => {
+  const people = [person('u-1', 'Alice', 'going'), person('u-2', 'Bob', 'going')];
+  const pressable = (root: Instance, index: number): Instance =>
+    avatars(root)[index].findAll(n => typeof n.props.onPress === 'function' && typeof n.props.onLongPress === 'function')[0];
+
+  it('a tap opens View Details without a card request', async () => {
+    const root = await mount(rawEvent(), people);
+    await act(async () => pressable(root, 0).props.onPress());
+    expect(root.findAll(n => n.props?.testID === 'user-details' && typeof n.type === 'string')).toHaveLength(1);
+    expect(mockGet.mock.calls.some(c => String(c[0]).endsWith('/card'))).toBe(false);
+  });
+
+  it('a long-press fetches this game\'s card for that player and offers the server action', async () => {
+    const root = await mount(rawEvent(), people);
+    await act(async () => pressable(root, 0).props.onLongPress());
+    expect(mockGet.mock.calls.some(c => c[0] === '/events/evt-1/players/u-1/card')).toBe(true);
+    expect(root.findAll(n => n.props?.accessibilityLabel === 'Remove player' && typeof n.type === 'string').length).toBeGreaterThan(0);
   });
 });

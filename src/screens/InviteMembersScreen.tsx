@@ -13,6 +13,7 @@ import UndoAddButton from '../components/groups/UndoAddButton';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import PersonNames from '../components/PersonNames';
 import UserAvatar from '../components/UserAvatar';
+import UserPressable from '../components/user/UserPressable';
 import UserSearchPicker from '../components/UserSearchPicker';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
@@ -158,15 +159,24 @@ export default function InviteMembersScreen({ navigation, route }: Props): React
           {added.map(user => {
             return (
               <View key={user.id} style={styles.addedItem}>
-                <UserAvatar
-                  imageUrl={user.image_url}
-                  name={user.display_name}
-                  size={48}
-                  fallback="initials"
-                />
-                <View style={styles.addedNames}>
-                  <PersonNames displayName={user.display_name} nickname={user.nickname} centered />
-                </View>
+                <UserPressable
+                  style={styles.addedPerson}
+                  userId={user.id}
+                  displayName={user.display_name}
+                  nickname={user.nickname}
+                  photoUrl={user.image_url ?? null}
+                  context={{ type: 'none' }}
+                >
+                  <UserAvatar
+                    imageUrl={user.image_url}
+                    name={user.display_name}
+                    size={48}
+                    fallback="initials"
+                  />
+                  <View style={styles.addedNames}>
+                    <PersonNames displayName={user.display_name} nickname={user.nickname} centered />
+                  </View>
+                </UserPressable>
                 {user.id !== currentUser?.id ? (
                   <UndoAddButton
                     onPress={() => handleUndo(user)}
@@ -282,6 +292,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 84,
   },
+  addedPerson: { alignItems: 'center', alignSelf: 'stretch' },
   addedNames: { marginTop: spacing.xs, alignSelf: 'stretch' },
   avatarCircleLarge: {
     width: 48,

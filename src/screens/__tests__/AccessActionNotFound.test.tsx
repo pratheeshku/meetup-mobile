@@ -5,10 +5,11 @@
  * existing completion flow only: never "no longer available".
  */
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { apiClient } from '../../api/client';
 import {
+  getGroupMemberCard,
   deleteGroup,
   getGroup,
   removeMember,
@@ -24,6 +25,8 @@ import {
   withdrawFromTournament,
 } from '../../api/tournaments';
 import { getSports } from '../../api/sports';
+import UserMenuHost from '../../components/user/UserMenuHost';
+import { closeUserMenu } from '../../hooks/useUserMenu';
 import { clearAccessNotice, isAccessNoticeShowing } from '../../navigation/accessNotice';
 import { showCompletion } from '../../navigation/showCompletion';
 import { createFocusNavigation } from '../../test-utils/focusNavigation';
@@ -37,6 +40,7 @@ import TournamentDetailScreen from '../TournamentDetailScreen';
 
 jest.mock('../../api/client', () => ({ apiClient: { get: jest.fn(), patch: jest.fn(), post: jest.fn() } }));
 jest.mock('../../api/groups', () => ({
+  getGroupMemberCard: jest.fn(),
   getGroup: jest.fn(),
   deleteGroup: jest.fn(),
   removeMember: jest.fn(),
@@ -116,12 +120,15 @@ const mountEvent = (): Promise<Instance> =>
   );
 const mountGroup = (): Promise<Instance> =>
   renderAsync(
-    <GroupDetailScreen
-      {...props<typeof GroupDetailScreen>({
-        navigation: nav.navigation,
-        route: { key: 'k', name: 'GroupDetail', params: { groupId: 'g-1' } },
-      })}
-    />,
+    <View>
+      <GroupDetailScreen
+        {...props<typeof GroupDetailScreen>({
+          navigation: nav.navigation,
+          route: { key: 'k', name: 'GroupDetail', params: { groupId: 'g-1' } },
+        })}
+      />
+      <UserMenuHost />
+    </View>,
   );
 const mountTournament = (): Promise<Instance> =>
   renderAsync(
@@ -176,6 +183,7 @@ const noticeText = 'This is no longer available.';
 
 beforeEach(() => {
   nav = createFocusNavigation();
+  act(() => closeUserMenu());
   clearAccessNotice();
   __resetSportDisplayNamesCacheForTests();
   eventGone = false;
@@ -186,6 +194,10 @@ beforeEach(() => {
   mockGetGroup.mockReset().mockResolvedValue(GROUP_MEMBER);
   (removeMember as jest.Mock).mockReset().mockResolvedValue(undefined);
   (updateMemberRole as jest.Mock).mockReset().mockResolvedValue(undefined);
+  (getGroupMemberCard as jest.Mock).mockReset().mockResolvedValue({
+    user_id: 'u-2', display_name: 'Alex', nickname: 'alex', photo_url: null, is_self: false, relation: 'member',
+    allowed_actions: [{ key: 'make_admin', requires_approval: false }, { key: 'remove_from_group', requires_approval: false }],
+  });
   (deleteGroup as jest.Mock).mockReset().mockResolvedValue(undefined);
   mockGetTournament.mockReset().mockResolvedValue(baseTournament);
   (getFixtures as jest.Mock).mockReset().mockResolvedValue([]);
@@ -280,45 +292,49 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       expect(root).toBeDefined();
     });
 
-    // A 404 here can mean "member not found", not "the group is gone": today's normal error
-    // handling, the screen stays open (ac-m-followup-fix).
-    it('remove member 404: keeps today\'s error, no goBack, no notice', async () => {
+    // A member action 404s (member or group no longer visible): the user menu closes, the neutral
+    // notice shows and the group refetches in place (user details menu AD-5). The screen itself
+    // only closes if that refetch 404s too.
+    it('remove member 404: menu closes, notice shows, group refetched, screen stays', async () => {
       mockGetGroup.mockResolvedValue(GROUP_OWNER);
       const root = await mountGroup();
       (removeMember as jest.Mock).mockRejectedValueOnce(NOT_FOUND);
-      jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
-        buttons?.find(b => b.style === 'destructive')?.onPress?.();
-      });
+      const loads = mockGetGroup.mock.calls.length;
       await openMemberCard(root, 'Alex');
       await press(byLabel(root, 'Remove from group'));
+      await press(byLabel(root, 'Yes'));
       await act(async () => {});
+      expect(goneNow()).toBe(true);
+      expect(mockGetGroup.mock.calls.length).toBeGreaterThan(loads);
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
-      expect(goneNow()).toBe(false);
-      expect(texts(root)).toContain('Could not remove this group member. Please try again.');
       expect(mockShowCompletion).not.toHaveBeenCalled();
     });
 
-    it('change role 404: keeps today\'s error, no goBack, no notice', async () => {
+    it('change role 404: menu closes, notice shows, group refetched, screen stays', async () => {
       mockGetGroup.mockResolvedValue(GROUP_OWNER);
       const root = await mountGroup();
       (updateMemberRole as jest.Mock).mockRejectedValueOnce(NOT_FOUND);
+      const loads = mockGetGroup.mock.calls.length;
       await openMemberCard(root, 'Alex');
       await press(byLabel(root, 'Make admin'));
+      await press(byLabel(root, 'Yes'));
+      await act(async () => {});
+      expect(goneNow()).toBe(true);
+      expect(mockGetGroup.mock.calls.length).toBeGreaterThan(loads);
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
-      expect(goneNow()).toBe(false);
-      expect(texts(root)).toContain('Could not update this group member’s role. Please try again.');
-      expect(mockShowCompletion).not.toHaveBeenCalled();
     });
 
-    it('change role with another error keeps the role error', async () => {
+    it('change role with another error shows the generic message and no notice', async () => {
       mockGetGroup.mockResolvedValue(GROUP_OWNER);
       const root = await mountGroup();
       (updateMemberRole as jest.Mock).mockRejectedValueOnce({ response: { status: 500 } });
       await openMemberCard(root, 'Alex');
       await press(byLabel(root, 'Make admin'));
+      await press(byLabel(root, 'Yes'));
+      await act(async () => {});
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(false);
-      expect(texts(root)).toContain('Could not update this group member’s role. Please try again.');
+      expect(texts(root)).toContain('Could not complete this action. Please try again.');
     });
 
     it('Delete group 404: goes back, shows the message', async () => {

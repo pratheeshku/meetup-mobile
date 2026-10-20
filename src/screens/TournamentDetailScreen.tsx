@@ -56,6 +56,8 @@ import TournamentInvitePanel from '../components/tournament/TournamentInvitePane
 import ErrorView from '../components/ErrorView';
 import GroupNamesRow from '../components/GroupNamesRow';
 import LoadingView from '../components/LoadingView';
+import UserAvatar from '../components/UserAvatar';
+import UserPressable from '../components/user/UserPressable';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
 import type { Tournament, TournamentFixture, TournamentRegistration } from '../types/tournament';
 import { showCompletion } from '../navigation/showCompletion';
@@ -78,6 +80,8 @@ function formatDateTime(isoString: string): string {
     minute: '2-digit',
   });
 }
+
+const REGISTRATION_AVATAR_SIZE = 40;
 
 export default function TournamentDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
@@ -429,13 +433,32 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           <Text style={styles.emptyText}>{t('mob.tournament.no_registrations')}</Text>
         ) : (
           registrations.map(registration => (
-            <View key={registration.id} style={styles.listRow}>
-              <Text style={styles.memberNickname}>{registration.nickname}</Text>
-              <Text style={styles.fixtureMeta}>
-                {t('mob.tournament.registered_at', {
-                  when: formatDateTime(registration.registered_at),
-                })}
-              </Text>
+            <View key={registration.id} style={[styles.listRow, styles.registrationRow]}>
+              {/* View Details only in v1: no card request, no actions (design OI-8). A registration
+                  with no linked user shows the placeholder picture and the nickname. */}
+              <UserPressable
+                style={styles.registrationPerson}
+                userId={registration.user_id}
+                displayName={registration.nickname}
+                nickname={registration.nickname}
+                photoUrl={null}
+                noUser={registration.user_id === null}
+                context={{ type: 'tournament', id: tournamentId }}
+              >
+                <UserAvatar
+                  name={registration.nickname}
+                  size={REGISTRATION_AVATAR_SIZE}
+                  fallback={registration.user_id === null ? 'person' : 'initials'}
+                />
+              </UserPressable>
+              <View style={styles.registrationText}>
+                <Text style={styles.memberNickname}>{registration.nickname}</Text>
+                <Text style={styles.fixtureMeta}>
+                  {t('mob.tournament.registered_at', {
+                    when: formatDateTime(registration.registered_at),
+                  })}
+                </Text>
+              </View>
             </View>
           ))
         )}
@@ -500,6 +523,9 @@ const styles = StyleSheet.create({
   },
   fixtureTeams: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.xs },
   fixtureMeta: { ...typography.caption, color: colors.textSecondary },
+  registrationRow: { flexDirection: 'row', alignItems: 'center' },
+  registrationPerson: { marginRight: spacing.md },
+  registrationText: { flex: 1, minWidth: 0 },
   memberNickname: { ...typography.body, color: colors.textPrimary, marginBottom: spacing.xs },
   cancelSection: {
     marginTop: spacing.lg,

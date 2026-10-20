@@ -94,6 +94,7 @@ import { getApiErrorMessage } from '../utils/apiError';
 import UserSearchPicker from '../components/UserSearchPicker';
 import UserAvatar from '../components/UserAvatar';
 import PersonNames from '../components/PersonNames';
+import UserPressable from '../components/user/UserPressable';
 import { addInviteEmail } from '../utils/inviteEmails';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import {
@@ -1059,15 +1060,24 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               {invitedPlayers.map(person => {
                 return (
                   <View key={`p-${person.id}`} style={styles.inviteeChip}>
-                    <UserAvatar
-                      imageUrl={person.image_url}
-                      name={person.display_name}
-                      size={32}
-                      fallback="initials"
-                    />
-                    <View style={styles.inviteeNames}>
-                      <PersonNames displayName={person.display_name} nickname={person.nickname} />
-                    </View>
+                    <UserPressable
+                      style={styles.inviteePerson}
+                      userId={person.id}
+                      displayName={person.display_name}
+                      nickname={person.nickname}
+                      photoUrl={person.image_url ?? null}
+                      context={{ type: 'none' }}
+                    >
+                      <UserAvatar
+                        imageUrl={person.image_url}
+                        name={person.display_name}
+                        size={32}
+                        fallback="initials"
+                      />
+                      <View style={styles.inviteeNames}>
+                        <PersonNames displayName={person.display_name} nickname={person.nickname} />
+                      </View>
+                    </UserPressable>
                     <AddRemoveControl
                       mode="staged"
                       staged
@@ -1425,6 +1435,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '700',
   },
+  inviteePerson: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
   inviteeNames: { flexShrink: 1, marginHorizontal: spacing.sm },
   inviteeName: {
     ...typography.caption,

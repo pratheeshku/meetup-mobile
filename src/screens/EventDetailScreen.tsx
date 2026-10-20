@@ -50,6 +50,7 @@ import GroupMultiSelect from '../components/GroupMultiSelect';
 import GroupNamesRow from '../components/GroupNamesRow';
 import UserAvatar from '../components/UserAvatar';
 import PersonNames from '../components/PersonNames';
+import UserPressable from '../components/user/UserPressable';
 import LoadingView from '../components/LoadingView';
 import ShareActionSheet from '../components/ShareActionSheet';
 import Toast from '../components/Toast';
@@ -225,6 +226,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     },
     [eventId, t, unavailable],
   );
+
+  // After a user-menu action (or a 404 from the card): refresh the game in place.
+  const refreshEvent = useCallback(() => {
+    loadEvent(true);
+  }, [loadEvent]);
 
   // Fetch on every focus and app foreground, including a push or deep link that opens a game
   // already on the stack (AC-10). The first load shows the loading view; later ones refresh in place.
@@ -1310,7 +1316,16 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 const name = p.user_display_name || p.user_nickname || 'Player';
                 return (
                   <View key={p.id || p.user_id} style={styles.playerAvatarCircle} testID="player-avatar">
-                    <UserAvatar imageUrl={p.user_photo_url} name={name} size={PLAYER_AVATAR_SIZE} />
+                    <UserPressable
+                      userId={p.user_id}
+                      displayName={name}
+                      nickname={p.user_nickname}
+                      photoUrl={p.user_photo_url ?? null}
+                      context={{ type: 'game', id: eventId }}
+                      onChanged={refreshEvent}
+                    >
+                      <UserAvatar imageUrl={p.user_photo_url} name={name} size={PLAYER_AVATAR_SIZE} />
+                    </UserPressable>
                   </View>
                 );
               })}
@@ -1408,7 +1423,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               <Text style={styles.formHint}>{t('mob.game_detail.invite_player_hint')}</Text>
               {selectedInviteUser ? (
                 <View style={styles.selectedInviteRow}>
-                  <View style={styles.selectedInviteNames}>
+                  <UserPressable
+                    style={styles.selectedInviteNames}
+                    userId={selectedInviteUser.id}
+                    displayName={selectedInviteUser.display_name}
+                    nickname={selectedInviteUser.nickname}
+                    photoUrl={selectedInviteUser.image_url ?? null}
+                    context={{ type: 'none' }}
+                  >
                     <UserAvatar
                       imageUrl={selectedInviteUser.image_url}
                       name={selectedInviteUser.display_name}
@@ -1421,7 +1443,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                         nickname={selectedInviteUser.nickname}
                       />
                     </View>
-                  </View>
+                  </UserPressable>
                   <AddRemoveControl
                     mode="staged"
                     staged

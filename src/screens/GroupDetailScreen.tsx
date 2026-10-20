@@ -3,13 +3,11 @@
  * WhatsApp group-info style from docs/mockups/group-view/ (1-group-view,
  * 2-long-press-member, 3-invite-search).
  *
- * Role/permission gating here is UX-only (§3.10, §5.3, R-017/R-082) —
- * every gated action still calls its endpoint normally and the backend
- * remains the sole authority. The gates are unchanged from the previous
- * screen: owner/admin may invite, change roles and remove other members
- * (never themselves, never the owner); only the owner sees "Make owner",
- * which reuses the existing `POST /groups/{id}/transfer-ownership` call.
- * "Last-owner removal rejected server-side" (§4.4) is left to the backend.
+ * Role/permission gating here is UX-only (§3.10, §5.3, R-017/R-082). Member actions (make or
+ * remove admin, make owner, remove from group) are no longer decided or run here: a tap on a
+ * member's picture opens View Details and a long-press opens the user menu (`UserPressable`,
+ * DES-MEETUP-ADDENDUM-user-details-menu), whose actions come from the server's card.
+ * Only owner/admin may invite (UX gate; the backend decides).
  *
  * Member order: owner, then admins, then everyone else, each alphabetical by
  * display name (case-insensitive, user id as the stable tiebreak).
@@ -26,25 +24,19 @@ import {
   getGroup,
   inviteMember,
   removeMember,
-  transferGroupOwnership,
-  updateMemberRole,
 } from '../api/groups';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { isNotFoundError } from '../utils/apiError';
 import { getCachedBanners, type BannerFallback } from '../api/home';
-import { OwnerIcon, TrashIcon } from '../components/icons/ActionIcons';
+import { TrashIcon } from '../components/icons/ActionIcons';
 import {
   CheckMarkIcon,
   ChevronLeftIcon,
   LinkIcon,
   PencilLineIcon,
-  PersonMinusIcon,
-  ShieldMinusIcon,
-  ShieldPlusIcon,
 } from '../components/icons/GroupViewIcons';
 import DeleteGroupSheet from '../components/groups/DeleteGroupSheet';
-import MemberActionCard, { type MemberAction } from '../components/groups/MemberActionCard';
 import { AddEntryButton } from '../components/AddRemoveControl';
 import UndoAddButton from '../components/groups/UndoAddButton';
 import UserAvatar from '../components/UserAvatar';
@@ -56,8 +48,8 @@ import PersonNames from '../components/PersonNames';
 import ShareActionSheet from '../components/ShareActionSheet';
 import Toast from '../components/Toast';
 import UserSearchPicker from '../components/UserSearchPicker';
+import UserPressable from '../components/user/UserPressable';
 import { useAppShare } from '../hooks/useAppShare';
-import { goToDashboard } from '../navigation/goToDashboard';
 import { showCompletion } from '../navigation/showCompletion';
 import { colors, groupView, sizes, spacing, typography } from '../theme/tokens';
 import type { GroupDetail, GroupMember, GroupMemberRole } from '../types/group';
@@ -117,9 +109,6 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
   // Bumped after an undo so the invite list refetches and the person reappears with "+".
   const [searchRefresh, setSearchRefresh] = useState(0);
 
-  const [cardMember, setCardMember] = useState<GroupMember | null>(null);
-  const [memberError, setMemberError] = useState<string | null>(null);
-
   const [isLeaving, setIsLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
@@ -177,6 +166,11 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
       }
     });
   }, []);
+
+  // After a menu action (or a 404 from the card): refresh in place, no loading flash.
+  const refreshGroup = useCallback(() => {
+    loadGroup(true);
+  }, [loadGroup]);
 
   const sortedMembers = useMemo(() => sortMembers(group?.members ?? []), [group?.members]);
 
@@ -256,75 +250,6 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
     }
   };
 
-  const handleChangeRole = async (member: GroupMember): Promise<void> => {
-    const nextRole: GroupMemberRole = member.role === 'admin' ? 'member' : 'admin';
-    setMemberError(null);
-    try {
-      await withCorrelationId(async correlationId => {
-        await updateMemberRole(groupId, member.user_id, nextRole, { correlationId });
-        setGroup(await getGroup(groupId, { correlationId }));
-      });
-      goToDashboard(t('mob.success.group_updated'));
-    } catch {
-      setMemberError(t('mob.group_detail.role_error'));
-    }
-  };
-
-  const handleRemoveMember = async (userId: string): Promise<void> => {
-    setMemberError(null);
-    try {
-      await withCorrelationId(async correlationId => {
-        await removeMember(groupId, userId, { correlationId });
-        setGroup(await getGroup(groupId, { correlationId }));
-      });
-      goToDashboard(t('mob.success.group_updated'));
-    } catch {
-      setMemberError(t('mob.group_detail.remove_error'));
-    }
-  };
-
-  const handleRemoveMemberPress = (member: GroupMember): void => {
-    Alert.alert(
-      t('mob.group_detail.remove_title'),
-      t('mob.group_detail.remove_message', { name: member.display_name }),
-      [
-        { text: t('mob.common.cancel'), style: 'cancel' },
-        {
-          text: t('mob.common.remove'),
-          style: 'destructive',
-          onPress: () => handleRemoveMember(member.user_id),
-        },
-      ],
-    );
-  };
-
-  const handleMakeOwner = async (member: GroupMember): Promise<void> => {
-    setMemberError(null);
-    try {
-      await withCorrelationId(async correlationId => {
-        await transferGroupOwnership(groupId, member.user_id, { correlationId });
-        setGroup(await getGroup(groupId, { correlationId }));
-      });
-      goToDashboard(t('mob.group_transfer.success'));
-    } catch {
-      setMemberError(t('mob.group_transfer.error'));
-    }
-  };
-
-  const handleMakeOwnerPress = (member: GroupMember): void => {
-    Alert.alert(
-      t('mob.group_transfer.confirm_prompt', { name: member.display_name }),
-      t('mob.group_transfer.confirm_message'),
-      [
-        { text: t('mob.common.cancel'), style: 'cancel' },
-        {
-          text: t('mob.group_transfer.confirm_button'),
-          onPress: () => handleMakeOwner(member),
-        },
-      ],
-    );
-  };
-
   const handleLeaveGroup = async (): Promise<void> => {
     if (!currentUserId) {
       return;
@@ -376,9 +301,6 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
   const isOwner = currentUserRole === 'owner' || group.owner_id === currentUserId;
 
   const canInvite = currentUserRole === 'owner' || currentUserRole === 'admin';
-  // §4.4: "Role management — owner/admin only" (unchanged).
-  const canChangeRoles = currentUserRole === 'owner' || currentUserRole === 'admin';
-  const canRemoveMembers = currentUserRole === 'owner' || currentUserRole === 'admin';
   const canLeave = !isOwner && currentUserRole !== 'none';
 
   const memberCount = group.member_count ?? group.members.length;
@@ -393,58 +315,6 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
       { count: group.upcoming_game_count ?? 0 },
     ),
   });
-
-  // Actions offered on the long-press card. Same gates as the old inline controls: never on
-  // yourself, never on the owner; Make owner is owner-only.
-  const buildActions = (member: GroupMember): MemberAction[] => {
-    const actionable = member.user_id !== currentUserId && member.role !== 'owner';
-    if (!actionable) {
-      return [];
-    }
-    const actions: MemberAction[] = [];
-    if (canChangeRoles) {
-      const isAdmin = member.role === 'admin';
-      actions.push({
-        key: 'role',
-        label: t(isAdmin ? 'mob.group_detail.action_demote' : 'mob.group_detail.action_make_admin'),
-        tone: 'default',
-        icon: isAdmin ? (
-          <ShieldMinusIcon size={24} color={groupView.blue} />
-        ) : (
-          <ShieldPlusIcon size={24} color={groupView.blue} />
-        ),
-        onPress: () => {
-          setCardMember(null);
-          handleChangeRole(member);
-        },
-      });
-    }
-    if (isOwner) {
-      actions.push({
-        key: 'owner',
-        label: t('mob.group_detail.action_make_owner'),
-        tone: 'default',
-        icon: <OwnerIcon size={24} color={groupView.blue} />,
-        onPress: () => {
-          setCardMember(null);
-          handleMakeOwnerPress(member);
-        },
-      });
-    }
-    if (canRemoveMembers) {
-      actions.push({
-        key: 'remove',
-        label: t('mob.group_detail.action_remove'),
-        tone: 'destructive',
-        icon: <PersonMinusIcon size={24} color={groupView.destructive} />,
-        onPress: () => {
-          setCardMember(null);
-          handleRemoveMemberPress(member);
-        },
-      });
-    }
-    return actions;
-  };
 
   const headerBackdrop = bannerFallback?.image_url ? (
     <>
@@ -481,15 +351,24 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         </Text>
         {addedUsers.map(invitee => (
           <View key={invitee.id} style={styles.personRow}>
-            <UserAvatar
-              imageUrl={invitee.image_url}
-              name={invitee.display_name}
-              size={MEMBER_AVATAR_SIZE}
-              fallback="initials"
-            />
-            <View style={styles.personNames}>
-              <PersonNames displayName={invitee.display_name} nickname={invitee.nickname} />
-            </View>
+            <UserPressable
+              style={styles.personPressable}
+              userId={invitee.id}
+              displayName={invitee.display_name}
+              nickname={invitee.nickname}
+              photoUrl={invitee.image_url ?? null}
+              context={{ type: 'none' }}
+            >
+              <UserAvatar
+                imageUrl={invitee.image_url}
+                name={invitee.display_name}
+                size={MEMBER_AVATAR_SIZE}
+                fallback="initials"
+              />
+              <View style={styles.personNames}>
+                <PersonNames displayName={invitee.display_name} nickname={invitee.nickname} />
+              </View>
+            </UserPressable>
             <View style={styles.addedChip}>
               <CheckMarkIcon size={16} color={groupView.addedChipText} />
               <Text style={styles.addedChipText}>{t('mob.group_detail.added_chip')}</Text>
@@ -643,33 +522,34 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
             <Text style={styles.membersCount}>{memberCount}</Text>
           </View>
 
-          {memberError ? <Text style={styles.errorText}>{memberError}</Text> : null}
-
           {sortedMembers.map(member => (
-            <Pressable
-              key={member.user_id}
-              style={({ pressed }) => [styles.memberRow, pressed ? styles.memberRowPressed : null]}
-              onLongPress={() => setCardMember(member)}
-              delayLongPress={350}
-              accessibilityRole="button"
-              accessibilityLabel={
-                member.role === 'member'
-                  ? member.display_name
-                  : `${member.display_name}, ${t(
-                      member.role === 'owner' ? 'mob.group_role.owner' : 'mob.group_role.admin',
-                    )}`
-              }
-              accessibilityHint={t('mob.group_detail.member_row_hint')}
-            >
-              <UserAvatar
-                imageUrl={member.photo_url}
-                name={member.display_name}
-                size={MEMBER_AVATAR_SIZE}
-                fallback="initials"
-              />
-              <View style={styles.personNames}>
-                <PersonNames displayName={member.display_name} nickname={member.nickname} />
-              </View>
+            <View key={member.user_id} style={styles.memberRow} testID={`member-row-${member.user_id}`}>
+              <UserPressable
+                style={styles.memberPerson}
+                userId={member.user_id}
+                displayName={member.display_name}
+                nickname={member.nickname}
+                photoUrl={member.photo_url}
+                context={{ type: 'group', id: groupId }}
+                onChanged={refreshGroup}
+                accessibilityLabel={
+                  member.role === 'member'
+                    ? member.display_name
+                    : `${member.display_name}, ${t(
+                        member.role === 'owner' ? 'mob.group_role.owner' : 'mob.group_role.admin',
+                      )}`
+                }
+              >
+                <UserAvatar
+                  imageUrl={member.photo_url}
+                  name={member.display_name}
+                  size={MEMBER_AVATAR_SIZE}
+                  fallback="initials"
+                />
+                <View style={styles.personNames}>
+                  <PersonNames displayName={member.display_name} nickname={member.nickname} />
+                </View>
+              </UserPressable>
               {member.role === 'owner' ? (
                 <View style={[styles.roleChip, styles.ownerChip]}>
                   <Text style={[styles.roleChipText, styles.ownerChipText]}>
@@ -683,7 +563,7 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
                   </Text>
                 </View>
               ) : null}
-            </Pressable>
+            </View>
           ))}
 
           {canLeave ? (
@@ -700,14 +580,6 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
         </>
       )}
 
-      <MemberActionCard
-        visible={cardMember !== null}
-        displayName={cardMember?.display_name ?? ''}
-        nickname={cardMember?.nickname ?? null}
-        photoUrl={cardMember?.photo_url ?? null}
-        actions={cardMember ? buildActions(cardMember) : []}
-        onClose={() => setCardMember(null)}
-      />
       <DeleteGroupSheet
         groupId={group.id}
         groupName={group.name}
@@ -870,7 +742,8 @@ const styles = StyleSheet.create({
     borderBottomColor: groupView.divider,
     backgroundColor: colors.surface,
   },
-  memberRowPressed: { backgroundColor: groupView.sectionBg },
+  memberPerson: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+  personPressable: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   personRow: {
     flexDirection: 'row',
     alignItems: 'center',

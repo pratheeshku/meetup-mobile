@@ -43,7 +43,7 @@ export interface Group {
   owner_display_name?: string;
   owner?: { display_name: string; nickname?: string } | null;
   logo_url?: string | null;
-  members_preview?: Array<{ display_name: string; photo_url: string | null }>;
+  members_preview?: Array<{ user_id?: string | null; display_name: string; photo_url: string | null }>;
   member_count?: number | null;
   upcoming_game_count?: number | null;
   created_at: string;

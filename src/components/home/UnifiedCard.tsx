@@ -30,6 +30,7 @@ import {
 import { getRolePillColor, ROLE_BADGE_LABEL_KEY } from '../GroupCard';
 import GameStatusPill from '../GameStatusPill';
 import UserAvatar from '../UserAvatar';
+import UserPressable from '../user/UserPressable';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
@@ -44,6 +45,8 @@ import { useSportDisplayName } from '../../utils/labels';
 import type { LabelKey } from '../../labels/fallbackLabels';
 
 interface AvatarItem {
+  /** From `AvatarPreview.user_id` (ud-backend); absent on older responses. */
+  user_id?: string | null;
   display_name: string;
   photo_url: string | null;
 }
@@ -102,20 +105,23 @@ export function UnifiedCard({
           {hasAvatars ? (
             <View style={styles.avatarRow}>
               {avatars.slice(0, 4).map((person, idx) => (
-                <View
-                  key={idx}
-                  style={[styles.avatarOverlap, { zIndex: 10 - idx }]}
-                  accessible
-                  accessibilityRole="image"
-                  accessibilityLabel={person.display_name}
-                >
-                  <UserAvatar
-                    imageUrl={person.photo_url}
-                    name={person.display_name}
-                    size={22}
+                <View key={idx} style={[styles.avatarOverlap, { zIndex: 10 - idx }]}>
+                  {/* Tap only: opens View Details, not the card (UM-06). No long-press at 22 px. */}
+                  <UserPressable
+                    userId={person.user_id ?? null}
+                    displayName={person.display_name}
+                    photoUrl={person.photo_url}
+                    context={{ type: 'none' }}
+                    longPress={false}
                     accessibilityLabel={person.display_name}
-                    perfScreen={perfScreen}
-                  />
+                  >
+                    <UserAvatar
+                      imageUrl={person.photo_url}
+                      name={person.display_name}
+                      size={22}
+                      perfScreen={perfScreen}
+                    />
+                  </UserPressable>
                 </View>
               ))}
               {moreCount > 0 ? (

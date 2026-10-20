@@ -95,3 +95,22 @@ export function CheckMarkIcon(props: GroupViewIconProps): React.JSX.Element {
     </Frame>
   );
 }
+
+export function InfoIcon(props: GroupViewIconProps): React.JSX.Element {
+  return (
+    <Frame {...props}>
+      <Circle cx="12" cy="12" r="9" />
+      <Path d="M12 11v5.5" />
+      <Path d="M12 7.6v.1" />
+    </Frame>
+  );
+}
+
+export function PersonIcon(props: GroupViewIconProps): React.JSX.Element {
+  return (
+    <Frame {...props}>
+      <Circle cx="12" cy="8.5" r="3.8" />
+      <Path d="M4.5 20c0-3.9 3.2-6.5 7.5-6.5s7.5 2.6 7.5 6.5" />
+    </Frame>
+  );
+}
