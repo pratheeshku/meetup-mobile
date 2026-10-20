@@ -1798,7 +1798,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               {event.current_user_rsvp_status === 'going' ? (
                 <Button
                   label={t('mob.respond.decline')}
-                  accessibilityLabel={t('mob.game_detail.leave')}
+                  accessibilityLabel={t('mob.respond.decline')}
                   variant="secondary"
                   onPress={handleWithdraw}
                   loading={isActionLoading}

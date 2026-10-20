@@ -91,7 +91,7 @@ describe('EventDetailScreen decline and response states', () => {
 
     expect(content).toContain('Decline');
 
-    const declineBtn = pressableLabelled(root, 'Leave');
+    const declineBtn = pressableLabelled(root, 'Decline');
     await act(async () => {
       declineBtn.props.onPress();
     });
@@ -150,7 +150,7 @@ describe('EventDetailScreen decline and response states', () => {
     });
 
     const root = await mount({ user_rsvp_status: 'going' });
-    const declineBtn = pressableLabelled(root, 'Leave');
+    const declineBtn = pressableLabelled(root, 'Decline');
     await act(async () => {
       declineBtn.props.onPress();
     });

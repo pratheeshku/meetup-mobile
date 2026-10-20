@@ -31,7 +31,7 @@ Completed mobile client implementation for the Accept / Decline, Remembered Decl
 5. **Detail Screens (`EventDetailScreen.tsx`, `TournamentDetailScreen.tsx`)**:
    - **Invited state**: Displays Accept and Decline buttons.
    - **Public open state**: Displays Join and Decline buttons (tournament: Register and Decline).
-   - **Joined state**: Withdraw control displays Decline label and surfaces server reason on refusal while maintaining accessibility.
+   - **Joined state**: Withdraw control displays Decline label and has `accessibilityLabel` set to `mob.respond.decline` ("Decline") matching visible text. Surfaces server reason on refusal while maintaining accessibility.
    - **Declined state**: Displays `Declined` status pill and recovery action button (Accept for invited items; Join/Register for public items).
    - **Organizer responses**: Mounted `ResponsesSection` visible only to the organizer when responses are returned.
    - **Locking**: Mutate actions disabled when ended; surfaces 409 `game_ended`.
@@ -43,9 +43,9 @@ Completed mobile client implementation for the Accept / Decline, Remembered Decl
    - Preserved Leave group and Ignore for `group_invite`.
 
 ## Verification Summary
-- **Baseline vs Branch Diff**: **0 regression suites** (14 failing on origin/main, exact same 14 failing on feat/dr-mobile).
+- **Baseline vs Branch Diff**: **0 regression suites** (14 failing on origin/main, exact same 14 failing on feat/dr-mobile). Total failing tests is 166 (within origin/main baseline of 167).
 - **Touched files lint**: **0 errors, 0 warnings** in all touched files.
 - **TypeScript**: `npx tsc --noEmit` clean (exit code 0).
 - **Labels**: `npm run check:labels` clean (exit code 0).
 - **Test Suites**: 182 total (168 passing, 14 pre-existing failures).
-- **Tests**: 2260 total (2092 passing, 168 pre-existing failures).
+- **Tests**: 2261 total (2095 passing, 166 pre-existing failures).

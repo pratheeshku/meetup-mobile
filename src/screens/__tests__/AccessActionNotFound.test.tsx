@@ -239,7 +239,7 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       event = { ...baseEvent, user_rsvp_status: 'going' };
       const root = await mountEvent();
       mockPost.mockRejectedValueOnce(NOT_FOUND);
-      await press(byLabel(root, 'Leave'));
+      await press(byLabel(root, 'Decline'));
       expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
       expect(goneNow()).toBe(true);
     });
@@ -248,7 +248,7 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       event = { ...baseEvent, user_rsvp_status: 'going' };
       const root = await mountEvent();
       mockPost.mockRejectedValueOnce({ response: { status: 500 } });
-      await press(byLabel(root, 'Leave'));
+      await press(byLabel(root, 'Decline'));
       expect(texts(root).some(x => /leave/i.test(x) && x.length > 5)).toBe(true);
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(false);
@@ -370,7 +370,7 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       (getRegistrations as jest.Mock).mockResolvedValue([MY_REGISTRATION]);
       const root = await mountTournament();
       (withdrawFromTournament as jest.Mock).mockRejectedValueOnce(NOT_FOUND);
-      await press(byLabel(root, 'Withdraw'));
+      await press(byLabel(root, 'Decline'));
       expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
       expect(goneNow()).toBe(true);
     });
@@ -408,7 +408,7 @@ describe('2. the user\'s own successful action never shows "no longer available"
       event = { ...baseEvent, user_rsvp_status: 'going' };
       const root = await mountEvent();
       eventGone = true;
-      await press(byLabel(root, 'Leave'));
+      await press(byLabel(root, 'Decline'));
       expect(mockPost).toHaveBeenCalled();
       expect(goneNow()).toBe(false);
       expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
@@ -461,7 +461,7 @@ describe('2. the user\'s own successful action never shows "no longer available"
       (getRegistrations as jest.Mock).mockResolvedValue([MY_REGISTRATION]);
       const root = await mountTournament();
       mockGetTournament.mockRejectedValue(NOT_FOUND);
-      await press(byLabel(root, 'Withdraw'));
+      await press(byLabel(root, 'Decline'));
       expect(goneNow()).toBe(false);
       expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
       expect(texts(root).join(' ')).not.toMatch(/could not withdraw/i);

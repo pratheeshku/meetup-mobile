@@ -640,7 +640,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         canWithdraw ? (
           <Button
             label={t('mob.respond.decline')}
-            accessibilityLabel={t('mob.tournament.withdraw')}
+            accessibilityLabel={t('mob.respond.decline')}
             variant="secondary"
             onPress={handleWithdraw}
             loading={isWithdrawing}
