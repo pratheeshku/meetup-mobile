@@ -43,6 +43,8 @@ const FLOW_TITLE: Record<CompletionFlow, LabelKey> = {
   account_created: 'mob.done.account_created.title',
   account_deleted: 'mob.done.account_deleted.title',
   onboarding_done: 'mob.done.onboarding_done.title',
+  game_closed: 'mob.closure.success_title',
+  tournament_closed: 'mob.closure.success_title_tournament',
 };
 
 const FLOW_SUBTITLE: Record<CompletionFlow, LabelKey> = {
@@ -61,6 +63,8 @@ const FLOW_SUBTITLE: Record<CompletionFlow, LabelKey> = {
   account_created: 'mob.done.account_created.subtitle',
   account_deleted: 'mob.done.account_deleted.subtitle',
   onboarding_done: 'mob.done.onboarding_done.subtitle',
+  game_closed: 'mob.closure.saved',
+  tournament_closed: 'mob.closure.saved',
 };
 
 const PRIMARY_LABEL: Record<CompletionPrimary, LabelKey> = {

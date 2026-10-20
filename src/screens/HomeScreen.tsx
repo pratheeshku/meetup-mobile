@@ -46,6 +46,7 @@ import {
   getHomeBanners,
   getHomeMenu,
   getHomeSummary,
+  getUpcoming,
   type HomeBannersResponse,
   type HomeMenuResponse,
   type HomeSummaryResponse,
@@ -92,9 +93,6 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<AppTabParamList, 'Home'>
 >;
 
-/** The events API maximum (`limit` 1..100). */
-const UPCOMING_FEED_LIMIT = 100;
-
 export default function HomeScreen({ navigation, route }: Props): React.JSX.Element {
   const { user } = useAuth();
   const t = useT();
@@ -106,11 +104,13 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const [menuData, setMenuData] = useState<HomeMenuResponse | null>(null);
   const [persistedBanners, setPersistedBanners] = useState<HomeBannersResponse | null>(null);
 
-  // Live endpoints state with local calculation fallbacks
   const [liveUpcoming, setLiveUpcoming] = useState<{
     items: Event[] | null;
+    total: number | null;
+    window_days: number;
     status: 'idle' | 'loading' | 'success' | 'error';
-  }>({ items: null, status: 'loading' });
+    fromUpcomingEndpoint: boolean;
+  }>({ items: null, total: null, window_days: 7, status: 'loading', fromUpcomingEndpoint: true });
 
   const [liveGroups, setLiveGroups] = useState<{
     items: Group[] | null;
@@ -197,9 +197,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     }
   }, []);
 
-  // Live upcoming games: GET /events?upcoming=true&limit=100&sports=... The rows are picked
-  // client-side (My games + Open games, earliest first), because open-game filtering happens
-  // client-side; a server-side limit would leave fewer than the rows shown.
+  // Live upcoming games: GET /home/upcoming (AD-8). Total, window_days and capped items.
   // `fresh` (screen focus / app foreground) drops the rows held and shows the loading state
   // until the server answers; a failure shows the error state, never the old rows (AC-10).
   // The request counters keep a slow, older response from overwriting a newer one.
@@ -207,25 +205,62 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   const groupsSeqRef = useRef(0);
 
   const loadLiveUpcoming = useCallback(
-    async (selectedSports: string[], correlationId?: string, fresh: boolean = false) => {
+    async (correlationId?: string, fresh: boolean = false) => {
       const seq = ++upcomingSeqRef.current;
-      setLiveUpcoming(prev => (fresh ? { items: null, status: 'loading' } : { ...prev, status: 'loading' }));
+      setLiveUpcoming(prev =>
+        fresh
+          ? {
+              items: null,
+              total: null,
+              window_days: prev.window_days,
+              status: 'loading',
+              fromUpcomingEndpoint: prev.fromUpcomingEndpoint,
+            }
+          : { ...prev, status: 'loading' },
+      );
       try {
-        const res = await getEvents(
-          {
-            upcoming: true,
-            limit: UPCOMING_FEED_LIMIT,
-            sports: selectedSports.length > 0 ? selectedSports.join(',') : undefined,
-          },
-          { correlationId },
-        );
+        let res: { items: Event[]; total: number; window_days: number };
+        let fromEndpoint = true;
+        if (typeof getUpcoming === 'function') {
+          try {
+            res = await getUpcoming({ correlationId });
+          } catch {
+            fromEndpoint = false;
+            const eventsRes = await getEvents(
+              { upcoming: true, limit: 100 },
+              { correlationId },
+            );
+            res = {
+              items: eventsRes.items,
+              total: eventsRes.total,
+              window_days: 7,
+            };
+          }
+        } else {
+          fromEndpoint = false;
+          const eventsRes = await getEvents(
+            { upcoming: true, limit: 100 },
+            { correlationId },
+          );
+          res = {
+            items: eventsRes.items,
+            total: eventsRes.total,
+            window_days: 7,
+          };
+        }
         if (seq === upcomingSeqRef.current) {
-          setLiveUpcoming({ items: res.items, status: 'success' });
+          setLiveUpcoming({
+            items: res.items,
+            total: res.total,
+            window_days: res.window_days,
+            status: 'success',
+            fromUpcomingEndpoint: fromEndpoint,
+          });
         }
       } catch {
         if (seq === upcomingSeqRef.current) {
           setLiveUpcoming(prev => ({
-            items: prev.items,
+            ...prev,
             status: prev.items !== null ? 'success' : 'error',
           }));
         }
@@ -290,7 +325,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       Promise.all([
         loadBanners(correlationId),
         loadMenu(correlationId),
-        loadLiveUpcoming(selectedSports, correlationId, fresh),
+        loadLiveUpcoming(correlationId, fresh),
         loadLiveGroups(correlationId, fresh),
         loadSummary(selectedSports, correlationId),
         loadStats(correlationId),
@@ -341,7 +376,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   }, [executeHomeLoad]);
   useRefetchOnFocus(navigation, loadOnOpen);
 
-  // Re-fetch live upcoming and summary only when sport filter selection changes
+  // Re-fetch live summary only when sport filter selection changes (upcoming has no sport filter per AD-8)
   const selectedSportsKey = filter.selected.slice().sort().join(',');
   const lastSportsKeyRef = useRef<string | null>(null);
   useEffect(() => {
@@ -354,12 +389,9 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     }
     lastSportsKeyRef.current = selectedSportsKey;
     withCorrelationId(correlationId =>
-      Promise.all([
-        loadLiveUpcoming(filter.selected, correlationId),
-        loadSummary(filter.selected, correlationId),
-      ]),
+      loadSummary(filter.selected, correlationId),
     );
-  }, [selectedSportsKey, filter.selected, loadLiveUpcoming, loadSummary]);
+  }, [selectedSportsKey, filter.selected, loadSummary]);
 
   // Handle route params refreshKey & toast
   const refreshKey = route.params?.refreshKey;
@@ -390,21 +422,27 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
   }, [executeHomeLoad]);
 
   // Resolved counts: live summary data preferred, live items length fallback on failure
-  // The rows: the same union as Games > All (My games + Open games), earliest first.
-  const displayedUpcoming = useMemo(
-    () =>
-      liveUpcoming.items
-        ? selectGames(liveUpcoming.items, 'all', { userId: user?.id, sportKeys: filter.selected }).slice(
-            0,
-            HOME_SECTION_ROWS,
-          )
-        : null,
-    [liveUpcoming.items, user?.id, filter.selected],
-  );
+  // Resolved counts: live upcoming total preferred (AD-8), summary fallback, local items fallback
+  // The rows: qualifying upcoming games returned directly from GET /home/upcoming
+  const displayedUpcoming = useMemo(() => {
+    if (!liveUpcoming.items) {
+      return null;
+    }
+    if (liveUpcoming.fromUpcomingEndpoint) {
+      return liveUpcoming.items.slice(0, HOME_SECTION_ROWS);
+    }
+    return selectGames(liveUpcoming.items, 'all', {
+      userId: user?.id,
+      sportKeys: filter.selected,
+    }).slice(0, HOME_SECTION_ROWS);
+  }, [liveUpcoming.items, liveUpcoming.fromUpcomingEndpoint, user?.id, filter.selected]);
 
-  const upcomingCount =
-    summaryData?.upcoming_games_this_week ??
-    (displayedUpcoming ? displayedUpcoming.length : null);
+  const upcomingCount = liveUpcoming.fromUpcomingEndpoint
+    ? liveUpcoming.total ??
+      summaryData?.upcoming_games_this_week ??
+      (displayedUpcoming ? displayedUpcoming.length : null)
+    : summaryData?.upcoming_games_this_week ??
+      (displayedUpcoming ? displayedUpcoming.length : null);
   const groupsCount =
     summaryData?.active_groups ??
     (liveGroups.items ? liveGroups.items.length : null);
@@ -439,7 +477,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
         await withCorrelationId(async correlationId => {
           await rsvpEvent(eventId, { correlationId });
           await Promise.all([
-            loadLiveUpcoming(selectedSportsRef.current, correlationId),
+            loadLiveUpcoming(correlationId),
             loadSummary(selectedSportsRef.current, correlationId),
           ]);
         });
@@ -454,9 +492,9 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
   const retryUpcoming = useCallback(() => {
     withCorrelationId(correlationId =>
-      loadLiveUpcoming(filter.selected, correlationId),
+      loadLiveUpcoming(correlationId),
     );
-  }, [loadLiveUpcoming, filter.selected]);
+  }, [loadLiveUpcoming]);
 
   const retryGroupsAction = useCallback(() => {
     withCorrelationId(correlationId =>
@@ -557,7 +595,11 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
             ) : isUpcomingLoading || !displayedUpcoming ? (
               <SkeletonRows count={2} />
             ) : displayedUpcoming.length === 0 ? (
-              <EmptyText>{filteredEmpty ?? t('mob.home.upcoming_empty')}</EmptyText>
+              <EmptyText>
+                {liveUpcoming.fromUpcomingEndpoint
+                  ? t('mob.closure.upcoming_empty', { days: liveUpcoming.window_days })
+                  : filteredEmpty ?? t('mob.home.upcoming_empty')}
+              </EmptyText>
             ) : (
               displayedUpcoming.map(event => {
                 const canJoin =
@@ -626,7 +668,14 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
         onClose={() => setIsDrawerOpen(false)}
         user={user}
         avatarUrl={profile.data?.avatar_url}
-        menuData={menuData}
+        menuData={
+          menuData
+            ? {
+                ...menuData,
+                upcoming_games: liveUpcoming.total ?? menuData.upcoming_games,
+              }
+            : null
+        }
         currentScreen="Home"
         onNavigateHome={() => {
           scrollRef.current?.scrollTo({ y: 0, animated: true });

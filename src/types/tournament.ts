@@ -11,6 +11,8 @@
  */
 
 import type { OthersVenueInput, VenueSnapshot } from './venue';
+import type { DeclineAck, LifecycleStatus, ResponsePerson, ResponseSection, ResponsesResponse } from './event';
+export type { DeclineAck, ResponsePerson, ResponseSection, ResponsesResponse };
 
 /**
  * Proposed Assumption: not specified anywhere for Tournaments. Reused
@@ -90,6 +92,7 @@ export interface Tournament {
   participant_count: number | null;
   max_participants: number;
   starts_at: string;
+  ends_at?: string | null;
   registration_closes_at?: string | null;
   created_at: string;
   /** `GET /tournaments` list only (`my_registration_status`). `null` = unknown: hide the text, never show "Not Registered". */
@@ -105,6 +108,12 @@ export interface Tournament {
   venue_label?: string | null;
   venue_id?: string | null;
   venue_snapshot?: VenueSnapshot | null;
+  /** DES-MEETUP-ADDENDUM-closure-report AD-1: computed lifecycle status */
+  lifecycle_status?: LifecycleStatus;
+  /** DES-MEETUP-ADDENDUM-closure-report AD-1: closure outcome when closed */
+  closure_outcome?: string | null;
+  /** DES-MEETUP-ADDENDUM-decline-response AD-4: true when caller has a current decline row */
+  my_declined?: boolean;
 }
 
 export interface TournamentFixture {
@@ -222,4 +231,32 @@ export interface CreateTournamentInput {
   venue_name?: string;
   venue_id?: string;
   others?: OthersVenueInput;
+}
+
+export interface TournamentClosurePerson {
+  user_id?: string | null;
+  display_name: string;
+  photo_url?: string | null;
+  registration_id?: string | null;
+  kind?: string | null;
+}
+
+export interface TournamentClosureResponse {
+  can_close: boolean;
+  outcome?: 'completed' | 'not_held' | null;
+  version: number;
+  winner?: TournamentClosurePerson | null;
+  runner_up?: TournamentClosurePerson | null;
+  closed_at?: string | null;
+  updated_at?: string | null;
+  attendees?: TournamentClosurePerson[] | null;
+  candidates?: TournamentClosurePerson[] | null;
+}
+
+export interface TournamentClosurePut {
+  outcome: 'completed' | 'not_held';
+  attendee_registration_ids: string[];
+  winner_registration_id: string | null;
+  runner_up_registration_id: string | null;
+  expected_version: number;
 }

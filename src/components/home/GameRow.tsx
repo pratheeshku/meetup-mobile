@@ -30,6 +30,7 @@ const BADGE_LABEL_KEY: Record<GameBadge, LabelKey> = {
   Going: 'mob.game_badge.going',
   Waitlisted: 'mob.game_badge.waitlisted',
   Open: 'mob.game_badge.open',
+  Declined: 'mob.respond.declined',
 };
 
 export default function GameRow({ event, onPress, badge }: GameRowProps): React.JSX.Element {
@@ -69,8 +70,20 @@ export default function GameRow({ event, onPress, badge }: GameRowProps): React.
           <Text style={styles.goingText}>{going}</Text>
         </View>
         {badge ? (
-          <View style={[styles.statusPill, badge === 'Open' ? styles.statusOpen : null]}>
-            <Text style={[styles.statusText, badge === 'Open' ? styles.statusOpenText : null]}>
+          <View
+            style={[
+              styles.statusPill,
+              badge === 'Open' ? styles.statusOpen : null,
+              badge === 'Declined' ? styles.statusDeclined : null,
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusText,
+                badge === 'Open' ? styles.statusOpenText : null,
+                badge === 'Declined' ? styles.statusDeclinedText : null,
+              ]}
+            >
               {badgeText}
             </Text>
           </View>
@@ -121,6 +134,8 @@ const styles = StyleSheet.create({
     borderColor: dash.cardBorder,
   },
   statusOpen: { backgroundColor: dash.white, borderColor: dash.brand },
+  statusDeclined: { backgroundColor: dash.tabIdleBg, borderColor: dash.cardBorder },
   statusText: { ...typography.label, color: dash.text },
   statusOpenText: { color: dash.brand },
+  statusDeclinedText: { color: dash.textMuted },
 });

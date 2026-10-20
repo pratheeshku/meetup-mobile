@@ -5,12 +5,13 @@
  * It loads, empties and fails on its own (`getTournaments()`).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
 import { getTournaments } from '../api/tournaments';
 import EmptyState from './EmptyState';
 import ErrorView from './ErrorView';
 import LoadingView from './LoadingView';
+import SegmentedSwitch from './SegmentedSwitch';
 import { useAuth } from '../auth/AuthContext';
 import { UnifiedTournamentCard } from './home/UnifiedCard';
 import { colors, spacing } from '../theme/tokens';
@@ -43,6 +44,7 @@ export default function TournamentsListContent({
   userIdRef.current = user?.id;
   const tRef = useRef(t);
   tRef.current = t;
+  const [viewFilter, setViewFilter] = useState<'active' | 'all'>('active');
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -58,7 +60,10 @@ export default function TournamentsListContent({
     }
     setError(null);
     try {
-      const response = await getTournaments({ currentUserId: userIdRef.current });
+      const response = await getTournaments({
+        currentUserId: userIdRef.current,
+        view: viewFilter,
+      });
       setTournaments(response.items);
     } catch {
       setError(tRef.current('mob.tournament.list_error'));
@@ -66,7 +71,7 @@ export default function TournamentsListContent({
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [viewFilter]);
 
   useEffect(() => {
     loadTournaments(false);
@@ -84,53 +89,64 @@ export default function TournamentsListContent({
     }
   }, [refreshKey, loadTournaments]);
 
-  // Direct create entry point removed (Create Flow Amendment, §4.3/§4.5,
-  // architect-approved 2026-09-22): tournament creation moved into the
-  // Home tab's merged Create Game screen (Tournament toggle) — this
-  // tab's own header no longer has a "+" of its own. This screen still
-  // re-fetches via `refreshKey` when a tournament is created there (see
-  // the effect above).
-
+  let body: React.JSX.Element;
   if (isLoading) {
-    return <LoadingView />;
-  }
-
-  if (error) {
-    return <ErrorView message={error} onRetry={() => loadTournaments(false)} />;
+    body = <LoadingView />;
+  } else if (error) {
+    body = <ErrorView message={error} onRetry={() => loadTournaments(false)} />;
+  } else {
+    body = (
+      <FlatList
+        data={tournaments}
+        keyExtractor={item => item.id}
+        contentContainerStyle={
+          tournaments.length === 0 ? styles.emptyContainer : styles.listContainer
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => loadTournaments(true)}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.surface}
+          />
+        }
+        ListEmptyComponent={
+          <EmptyState
+            title={t('mob.tournament.list_empty_title')}
+            subtitle={t('mob.tournament.list_empty_subtitle')}
+          />
+        }
+        renderItem={({ item }) => (
+          <UnifiedTournamentCard
+            tournament={item}
+            onPress={() => onOpenTournament(item.id)}
+          />
+        )}
+      />
+    );
   }
 
   return (
-    <FlatList
-      data={tournaments}
-      keyExtractor={item => item.id}
-      contentContainerStyle={
-        tournaments.length === 0 ? styles.emptyContainer : styles.listContainer
-      }
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={() => loadTournaments(true)}
-          colors={[colors.primary]}
-          progressBackgroundColor={colors.surface}
+    <View style={styles.root}>
+      <View style={styles.viewToggleWrap}>
+        <SegmentedSwitch
+          options={[
+            { value: 'active', label: t('mob.closure.filter.active_tournaments') },
+            { value: 'all', label: t('mob.closure.filter.all_tournaments') },
+          ]}
+          value={viewFilter}
+          onChange={setViewFilter}
         />
-      }
-      ListEmptyComponent={
-        <EmptyState
-          title={t('mob.tournament.list_empty_title')}
-          subtitle={t('mob.tournament.list_empty_subtitle')}
-        />
-      }
-      renderItem={({ item }) => (
-        <UnifiedTournamentCard
-          tournament={item}
-          onPress={() => onOpenTournament(item.id)}
-        />
-      )}
-    />
+      </View>
+      {body}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
+  viewToggleWrap: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   listContainer: { padding: spacing.md },
   emptyContainer: { flexGrow: 1, justifyContent: 'center' },
 });
+

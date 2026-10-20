@@ -30,6 +30,7 @@ const INPUT_SCREENS = [
   'src/screens/ForgotPasswordScreen.tsx',
   'src/screens/CreateGameScreen.tsx',
   'src/screens/CreateGroupScreen.tsx',
+  'src/screens/EditGroupScreen.tsx',
   'src/screens/EventDetailScreen.tsx',
   'src/screens/GroupDetailScreen.tsx',
   'src/screens/ProfileScreen.tsx',

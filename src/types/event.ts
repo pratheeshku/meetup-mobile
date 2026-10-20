@@ -33,6 +33,12 @@ export type GameDisplayStatus = 'active' | 'cancelled' | 'completed';
 export type RsvpStatus = 'none' | 'going' | 'waitlisted' | 'withdrawn';
 
 /**
+ * Server-computed lifecycle status (DES-MEETUP-ADDENDUM-closure-report AD-1).
+ * Never computed on the client. Rendered from the server field `lifecycle_status`.
+ */
+export type LifecycleStatus = 'active' | 'cancelled' | 'past' | 'closed';
+
+/**
  * `EventCreate.skill_level_requirement` (`events/schemas.py`,
  * `validate_skill`): enforced enum, default `'all_levels'`.
  */
@@ -88,6 +94,12 @@ export interface Event {
   created_at?: string;
   /** Home v2 contract: preview of up to 4 players */
   players_preview?: Array<{ display_name: string; photo_url: string | null; user_id?: string }>;
+  /** DES-MEETUP-ADDENDUM-closure-report AD-1: computed lifecycle status */
+  lifecycle_status?: LifecycleStatus;
+  /** DES-MEETUP-ADDENDUM-closure-report AD-1: closure outcome when closed */
+  closure_outcome?: string | null;
+  /** DES-MEETUP-ADDENDUM-decline-response AD-4: true when caller has a current decline row */
+  my_declined?: boolean;
 }
 
 export interface UpdateEventInput {
@@ -200,4 +212,59 @@ export interface CreateEventInput {
    * BUILD B, before that field was hidden on Edit only).
    */
   estimated_cost_currency?: string | null;
+}
+
+export interface ClosurePerson {
+  user_id: string | null;
+  display_name: string;
+  photo_url: string | null;
+  registration_id?: string | null;
+  kind?: string | null;
+}
+
+export interface ClosureResponse {
+  can_close: boolean;
+  outcome: string | null;
+  version: number;
+  winner: ClosurePerson | null;
+  runner_up: ClosurePerson | null;
+  closed_at: string | null;
+  updated_at: string | null;
+  attendees: ClosurePerson[] | null;
+  candidates: ClosurePerson[] | null;
+}
+
+export interface EventClosurePut {
+  outcome: 'completed' | 'not_held';
+  attendee_user_ids: string[];
+  winner_user_id: string | null;
+  runner_up_user_id: string | null;
+  expected_version: number;
+}
+
+/** DES-MEETUP-ADDENDUM-decline-response AD-5: response person preview */
+export interface ResponsePerson {
+  user_id?: string | null;
+  display_name: string;
+  photo_url?: string | null;
+  email?: string | null;
+  responded_at?: string | null;
+  declined_at?: string | null;
+  via?: 'invitation' | 'public' | 'joined' | string | null;
+  waitlisted?: boolean;
+}
+
+export interface ResponseSection {
+  total: number;
+  items: ResponsePerson[];
+}
+
+export interface ResponsesResponse {
+  accepted: ResponseSection;
+  pending: ResponseSection;
+  declined: ResponseSection;
+}
+
+export interface DeclineAck {
+  my_declined: boolean;
 }

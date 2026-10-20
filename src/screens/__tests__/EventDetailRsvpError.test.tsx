@@ -95,9 +95,9 @@ describe('Join button on cancelled games', () => {
     expect(pressableLabelled(root, 'Join')).toBeDefined();
   });
 
-  it('hides Leave for a cancelled game the user had joined', async () => {
+  it('hides Decline for a cancelled game the user had joined', async () => {
     const root = await mount({ status: 'cancelled', user_rsvp_status: 'going' });
-    expect(() => pressableLabelled(root, 'Leave')).toThrow();
+    expect(() => pressableLabelled(root, 'Decline')).toThrow();
   });
 });
 
@@ -108,34 +108,34 @@ describe('Display status on game detail', () => {
     root.findAll(n => /^game-status-pill-/.test(String(n.props.testID)) && typeof n.type === 'string').map(n => n.props.testID);
   const banner = (root: Instance): boolean => root.findAll(n => n.props.testID === 'cancelled-banner').length > 0;
 
-  it('cancelled: pill, banner, no Join or Leave', async () => {
+  it('cancelled: pill, banner, no Join or Decline', async () => {
     for (const rsvp of [null, 'going']) {
       const root = await mount({ display_status: 'cancelled', status: 'cancelled', user_rsvp_status: rsvp });
       expect(pillIds(root)).toEqual(['game-status-pill-cancelled']);
       expect(banner(root)).toBe(true);
       expect(has(root, 'This game was cancelled')).toBe(true);
       expect(labelled(root, 'Join')).toHaveLength(0);
-      expect(labelled(root, 'Leave')).toHaveLength(0);
+      expect(labelled(root, 'Decline')).toHaveLength(0);
     }
   });
 
-  it('completed: pill, no banner, no Join or Leave', async () => {
+  it('completed: pill, no banner, no Join or Decline', async () => {
     for (const rsvp of [null, 'going']) {
       const root = await mount({ display_status: 'completed', status: 'completed', user_rsvp_status: rsvp });
       expect(pillIds(root)).toEqual(['game-status-pill-completed']);
       expect(banner(root)).toBe(false);
       expect(labelled(root, 'Join')).toHaveLength(0);
-      expect(labelled(root, 'Leave')).toHaveLength(0);
+      expect(labelled(root, 'Decline')).toHaveLength(0);
     }
   });
 
-  it('active: pill, no banner, Join and Leave as before', async () => {
+  it('active: pill, no banner, Join and Decline as before', async () => {
     const root = await mount({ display_status: 'active' });
     expect(pillIds(root)).toEqual(['game-status-pill-active']);
     expect(banner(root)).toBe(false);
     expect(labelled(root, 'Join').length).toBeGreaterThan(0);
     const joined = await mount({ display_status: 'active', user_rsvp_status: 'going' });
-    expect(labelled(joined, 'Leave').length).toBeGreaterThan(0);
+    expect(labelled(joined, 'Decline').length).toBeGreaterThan(0);
   });
 
   it('hides organiser edit and cancel for cancelled and completed games', async () => {

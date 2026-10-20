@@ -55,14 +55,19 @@ export type PushActionType = (typeof PUSH_ACTION_TYPES)[number];
 export const ACCEPT_ACTION_ID = 'accept';
 export const LEAVE_ACTION_ID = 'leave';
 export const IGNORE_ACTION_ID = 'ignore';
+export const DECLINE_ACTION_ID = 'decline';
 const DEFAULT_PRESS_ID = 'default';
 
 type PrimaryActionId = typeof ACCEPT_ACTION_ID | typeof LEAVE_ACTION_ID;
+type SecondaryActionId = typeof DECLINE_ACTION_ID | typeof IGNORE_ACTION_ID;
 
 interface ActionScope {
-  /** The one button that calls an endpoint (Ignore is common to all three). */
+  /** The primary action button (Accept or Leave group). */
   primary: PrimaryActionId;
   primaryLabel: LabelKey;
+  /** Second button: Decline (invitations) or Ignore (group additions). */
+  secondary: SecondaryActionId;
+  secondaryLabel: LabelKey;
   /** `aps.category` the server sends for this type (AD-3). */
   iosCategory: string;
 }
@@ -72,16 +77,22 @@ export const PUSH_ACTION_SCOPE: Record<PushActionType, ActionScope> = {
   event_invite: {
     primary: ACCEPT_ACTION_ID,
     primaryLabel: 'mob.notification_action.accept',
+    secondary: DECLINE_ACTION_ID,
+    secondaryLabel: 'mob.respond.decline',
     iosCategory: 'invite_game',
   },
   tournament_invited: {
     primary: ACCEPT_ACTION_ID,
     primaryLabel: 'mob.notification_action.accept',
+    secondary: DECLINE_ACTION_ID,
+    secondaryLabel: 'mob.respond.decline',
     iosCategory: 'invite_tournament',
   },
   group_invite: {
     primary: LEAVE_ACTION_ID,
     primaryLabel: 'mob.notification_action.leave_group',
+    secondary: IGNORE_ACTION_ID,
+    secondaryLabel: 'mob.notification_action.ignore',
     iosCategory: 'group_added',
   },
 };
@@ -94,6 +105,7 @@ const KNOWN_PRESS_IDS: readonly string[] = [
   ACCEPT_ACTION_ID,
   LEAVE_ACTION_ID,
   IGNORE_ACTION_ID,
+  DECLINE_ACTION_ID,
   DEFAULT_PRESS_ID,
 ];
 const MAX_LOGGED_DATA_KEYS = 20;
@@ -154,7 +166,7 @@ export async function displayPushActionNotification(data: Record<string, string>
       // No launchActivity on the buttons: they must not open the app.
       actions: [
         { title: currentT(scope.primaryLabel), pressAction: { id: scope.primary } },
-        { title: currentT('mob.notification_action.ignore'), pressAction: { id: IGNORE_ACTION_ID } },
+        { title: currentT(scope.secondaryLabel), pressAction: { id: scope.secondary } },
       ],
     },
   });
@@ -182,8 +194,8 @@ export async function registerPushActionCategories(): Promise<void> {
           authenticationRequired: IOS_ACTIONS_REQUIRE_AUTH,
         },
         {
-          id: IGNORE_ACTION_ID,
-          title: currentT('mob.notification_action.ignore'),
+          id: scope.secondary,
+          title: currentT(scope.secondaryLabel),
           foreground: false,
         },
       ],
@@ -307,6 +319,40 @@ async function leaveGroup(groupId: string, ctx: CallContext): Promise<string> {
   }
 }
 
+/** `POST /events/{id}/invitations/respond` `{accept: false}` → result text (DR-08). */
+async function declineGame(eventId: string, ctx: CallContext): Promise<string> {
+  try {
+    await apiClient.post(`/events/${eventId}/invitations/respond`, { accept: false }, ctx);
+    return currentT('mob.respond.you_declined');
+  } catch (error) {
+    const status = statusOf(error);
+    if (status === 404) {
+      return currentT('mob.respond.unavailable');
+    }
+    if (status === 400) {
+      return currentT('mob.respond.already_answered');
+    }
+    return currentT('mob.push_action_result.generic');
+  }
+}
+
+/** `POST /tournaments/{id}/invitations/respond` `{accept: false}` → result text (DR-08). */
+async function declineTournamentInvite(tournamentId: string, ctx: CallContext): Promise<string> {
+  try {
+    await apiClient.post(`/tournaments/${tournamentId}/invitations/respond`, { accept: false }, ctx);
+    return currentT('mob.respond.you_declined');
+  } catch (error) {
+    const status = statusOf(error);
+    if (status === 404) {
+      return currentT('mob.respond.unavailable');
+    }
+    if (status === 400) {
+      return currentT('mob.respond.already_answered');
+    }
+    return currentT('mob.push_action_result.generic');
+  }
+}
+
 // ── Press handling ──────────────────────────────────────────────────────────
 
 function dataOf(notification: Notification | undefined): Record<string, string> {
@@ -333,6 +379,33 @@ async function showResult(
     ...platformNotificationOptions(),
     android: { channelId: PLAN_CHANNEL_ID, pressAction: { id: DEFAULT_PRESS_ID } },
   });
+}
+
+async function runDeclineAction(
+  type: PushActionType,
+  notificationId: string,
+  entityId: string,
+): Promise<void> {
+  const text = await withCorrelationId(async correlationId => {
+    try {
+      const token = await refreshAccessTokenForAction();
+      const ctx: CallContext = { correlationId, headers: { Authorization: `Bearer ${token}` } };
+      if (type === 'event_invite') {
+        return await declineGame(entityId, ctx);
+      }
+      if (type === 'tournament_invited') {
+        return await declineTournamentInvite(entityId, ctx);
+      }
+      return currentT('mob.push_action_result.generic');
+    } catch {
+      return currentT('mob.push_action_result.generic');
+    }
+  });
+  try {
+    await showResult(notificationId, type, entityId, text);
+  } catch {
+    // Nothing useful to do in a headless task if display fails.
+  }
 }
 
 async function runPrimaryAction(
@@ -422,7 +495,7 @@ export async function handlePushActionEvent(event: Event): Promise<void> {
     perfLog('push_action_skip', { reason: 'result_notification' });
     return;
   }
-  if (actionId !== scope.primary && actionId !== IGNORE_ACTION_ID) {
+  if (actionId !== scope.primary && actionId !== scope.secondary) {
     perfLog('push_action_skip', { reason: 'unknown_action' });
     return;
   }
@@ -435,6 +508,8 @@ export async function handlePushActionEvent(event: Event): Promise<void> {
   try {
     if (actionId === IGNORE_ACTION_ID) {
       await runIgnore(notificationId, data.delivery_id ?? '');
+    } else if (actionId === DECLINE_ACTION_ID && data.entity_id) {
+      await runDeclineAction(actionType, notificationId, data.entity_id);
     } else if (data.entity_id) {
       await runPrimaryAction(actionType, notificationId, data.entity_id);
     } else {

@@ -99,7 +99,7 @@ describe('refresh after Leave and Join', () => {
     // The server state after the withdrawal.
     server.event = rawEvent({ going_count: 1, user_rsvp_status: 'withdrawn' });
     server.participants = [person('user-me', 'Sam', 'withdrawn'), person('u-2', 'Bob', 'going')];
-    await press(root, 'Leave');
+    await press(root, 'Decline');
 
     expect(mockPost).toHaveBeenCalledWith('/events/evt-1/rsvp', { action: 'withdrawn' }, expect.anything());
     expect(mockGet.mock.calls.length).toBeGreaterThan(gets);
@@ -109,7 +109,7 @@ describe('refresh after Leave and Join', () => {
     expect(avatars(root)).toHaveLength(1);
     expect(texts(root)).toContain('1 of 12 joined');
     expect(pressableLabelled(root, 'Join')).toBeDefined();
-    expect(root.findAll(n => n.props.accessibilityLabel === 'Leave' && typeof n.props.onPress === 'function')).toHaveLength(0);
+    expect(root.findAll(n => n.props.accessibilityLabel === 'Leave')).toHaveLength(0);
   });
 
   it('Join reloads both too', async () => {
@@ -119,14 +119,14 @@ describe('refresh after Leave and Join', () => {
     await press(root, 'Join');
     expect(avatars(root)).toHaveLength(2);
     expect(texts(root)).toContain('2 of 12 joined');
-    expect(pressableLabelled(root, 'Leave')).toBeDefined();
+    expect(pressableLabelled(root, 'Decline')).toBeDefined();
   });
 
   it('does not flash the loading view while refreshing', async () => {
     const root = await mount(rawEvent({ user_rsvp_status: 'going' }), [person('user-me', 'Sam', 'going')]);
     mockGet.mockImplementation(() => new Promise(() => {})); // refresh never resolves
     await act(async () => {
-      pressableLabelled(root, 'Leave').props.onPress();
+      pressableLabelled(root, 'Decline').props.onPress();
     });
     expect(texts(root)).toContain('Players'); // still on screen
   });

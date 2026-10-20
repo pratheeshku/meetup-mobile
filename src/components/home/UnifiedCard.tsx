@@ -28,17 +28,16 @@ import {
   PeopleGreenIcon,
 } from '../icons/HomeV2Icons';
 import { getRolePillColor, ROLE_BADGE_LABEL_KEY } from '../GroupCard';
-import GameStatusPill from '../GameStatusPill';
+import LifecycleStatusChip, { getLifecycleStatusText } from '../LifecycleStatusChip';
 import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
-import type { Event } from '../../types/event';
+import type { Event, LifecycleStatus } from '../../types/event';
 import type { Group, GroupRole } from '../../types/group';
 import type { Tournament, TournamentRegistrationStatus } from '../../types/tournament';
 import { perfImageError, perfImageLoad, perfImageLoadStart } from '../../diagnostics/perfLog';
 import { formatRowDate } from '../../utils/formatGameTime';
-import { displayStatusOf } from '../../utils/gameLists';
 import type { GameBadge } from '../../utils/gameLists';
 import { useSportDisplayName } from '../../utils/labels';
 import type { LabelKey } from '../../labels/fallbackLabels';
@@ -246,14 +245,28 @@ const GAME_BADGE_LABEL_KEY: Record<GameBadge, LabelKey> = {
   Going: 'mob.game_badge.going',
   Waitlisted: 'mob.game_badge.waitlisted',
   Open: 'mob.game_badge.open',
+  Declined: 'mob.respond.declined',
 };
 
 export function GameStatusBadge({ badge }: { badge: GameBadge }): React.JSX.Element {
   const t = useT();
   const isOpen = badge === 'Open';
+  const isDeclined = badge === 'Declined';
   return (
-    <View style={[styles.statusPill, isOpen ? styles.statusOpen : null]}>
-      <Text style={[styles.statusText, isOpen ? styles.statusOpenText : null]}>
+    <View
+      style={[
+        styles.statusPill,
+        isOpen ? styles.statusOpen : null,
+        isDeclined ? styles.statusDeclined : null,
+      ]}
+    >
+      <Text
+        style={[
+          styles.statusText,
+          isOpen ? styles.statusOpenText : null,
+          isDeclined ? styles.statusDeclinedText : null,
+        ]}
+      >
         {t(GAME_BADGE_LABEL_KEY[badge])}
       </Text>
     </View>
@@ -305,11 +318,22 @@ export function UnifiedGameCard({
     ) : (
       badge
     );
+  const effectiveStatus: LifecycleStatus | 'completed' =
+    event.lifecycle_status ??
+    (event.status === 'cancelled' || event.display_status === 'cancelled'
+      ? 'cancelled'
+      : event.display_status === 'completed'
+      ? 'completed'
+      : 'active');
+  const statusLabel = getLifecycleStatusText(effectiveStatus, event.closure_outcome, t);
   const badgeWithStatus = showStatus ? (
     <>
       {badgeNode}
       <View style={badgeNode ? styles.statusPillGap : undefined}>
-        <GameStatusPill status={displayStatusOf(event)} />
+        <LifecycleStatusChip
+          status={effectiveStatus}
+          closureOutcome={event.closure_outcome}
+        />
       </View>
     </>
   ) : (
@@ -341,7 +365,11 @@ export function UnifiedGameCard({
       countLabel={countLabel}
       actionButtonLabel={t('mob.home.view_game')}
       onPress={onPress}
-      accessibilityLabel={`${event.title}, ${timeLine}, ${venue}, ${countLabel}`}
+      accessibilityLabel={
+        showStatus
+          ? `${event.title}, ${timeLine}, ${venue}, ${statusLabel}, ${countLabel}`
+          : `${event.title}, ${timeLine}, ${venue}, ${countLabel}`
+      }
       badge={badgeWithStatus}
       perfScreen={perfScreen}
       belowCount={
@@ -426,6 +454,21 @@ export function UnifiedTournamentCard({
     tournament.current_user_registration_status != null ? (
       <TournamentRegistrationBadge status={tournament.current_user_registration_status} />
     ) : null;
+  const statusLabel = getLifecycleStatusText(tournament.lifecycle_status, tournament.closure_outcome, t);
+  const statusChip = (
+    <LifecycleStatusChip
+      status={tournament.lifecycle_status}
+      closureOutcome={tournament.closure_outcome}
+    />
+  );
+  const combinedBadge = (
+    <>
+      {badgeNode}
+      <View style={badgeNode ? styles.statusPillGap : undefined}>
+        {statusChip}
+      </View>
+    </>
+  );
 
   return (
     <UnifiedCard
@@ -463,10 +506,10 @@ export function UnifiedTournamentCard({
       countLabel={countLabel}
       actionButtonLabel={t('mob.done.btn_view_tournament')}
       onPress={onPress}
-      accessibilityLabel={[tournament.name, dateFormatted, venue, sportFormat, countLabel]
+      accessibilityLabel={[tournament.name, dateFormatted, venue, sportFormat, statusLabel, countLabel]
         .filter(Boolean)
         .join(', ')}
-      badge={badgeNode}
+      badge={combinedBadge}
     />
   );
 }
@@ -791,5 +834,12 @@ const styles = StyleSheet.create({
   },
   statusOpenText: {
     color: dash.brand,
+  },
+  statusDeclined: {
+    backgroundColor: dash.tabIdleBg,
+    borderColor: dash.cardBorder,
+  },
+  statusDeclinedText: {
+    color: dash.textMuted,
   },
 });

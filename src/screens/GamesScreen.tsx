@@ -130,10 +130,18 @@ function GamesSegment({
   const t = useT();
   const userId = user?.id;
 
-  // My games also lists past (completed / cancelled) games, so it asks for history.
-  const withHistory = scope === 'mine';
+  const [viewFilter, setViewFilter] = useState<'active' | 'all'>('active');
+  const withHistory = scope === 'mine' || viewFilter === 'all';
   const events = useResource(
-    options => getEvents(withHistory ? { history: true } : undefined, options),
+    options =>
+      getEvents(
+        viewFilter === 'all'
+          ? { view: 'all', history: true }
+          : withHistory
+          ? { history: true }
+          : undefined,
+        options,
+      ),
     'getEvents',
   );
   const sports = useResource(options => getSports(options), 'getSports');
@@ -163,7 +171,7 @@ function GamesSegment({
     }
   }, [loadAll, openTick]);
 
-  // Switching to or from My games changes the request; reload (not on first mount).
+  // Switching to or from My games or view filter changes the request; reload (not on first mount).
   const lastWithHistory = useRef(withHistory);
   useEffect(() => {
     if (lastWithHistory.current === withHistory) {
@@ -172,6 +180,15 @@ function GamesSegment({
     lastWithHistory.current = withHistory;
     withCorrelationId(correlationId => loadEvents(correlationId, { fresh: true }));
   }, [withHistory, loadEvents]);
+
+  const lastViewFilter = useRef(viewFilter);
+  useEffect(() => {
+    if (lastViewFilter.current === viewFilter) {
+      return;
+    }
+    lastViewFilter.current = viewFilter;
+    withCorrelationId(correlationId => loadEvents(correlationId, { fresh: true }));
+  }, [viewFilter, loadEvents]);
 
   useEffect(() => {
     onListLoadingChange(events.status === 'loading');
@@ -194,8 +211,10 @@ function GamesSegment({
       return undefined;
     }
     const options = { userId, sportKeys: filter.selected, now: Date.now() };
-    return scope === 'mine' ? selectMyGamesWithHistory(feed, options) : selectGames(feed, scope, options);
-  }, [events.data, scope, userId, filter.selected]);
+    return scope === 'mine'
+      ? selectMyGamesWithHistory(feed, options)
+      : selectGames(feed, scope, options, viewFilter);
+  }, [events.data, scope, userId, filter.selected, viewFilter]);
 
   const emptyCopy =
     filter.selected.length > 0
@@ -240,7 +259,7 @@ function GamesSegment({
             event={item}
             badge={getGameBadge(item, userId)}
             perfScreen="GamesScreen"
-            showStatus={scope === 'mine'}
+            showStatus={true}
             onPress={() => onOpenEvent(item)}
           />
         )}
@@ -251,6 +270,16 @@ function GamesSegment({
   return (
     <View style={styles.flex}>
       <View style={styles.filters}>
+        <View style={styles.viewToggleWrap}>
+          <SegmentedSwitch
+            options={[
+              { value: 'active', label: t('mob.closure.filter.active_games') },
+              { value: 'all', label: t('mob.closure.filter.all_games') },
+            ]}
+            value={viewFilter}
+            onChange={setViewFilter}
+          />
+        </View>
         <ScopeChips value={scope} onChange={onScopeChange} />
         <View style={styles.sportsRow}>
           <SportChipsRow
@@ -397,6 +426,7 @@ const styles = StyleSheet.create({
   hidden: { display: 'none' },
   switchWrap: { padding: spacing.md, paddingBottom: spacing.sm },
   filters: { paddingHorizontal: spacing.md },
+  viewToggleWrap: { marginBottom: spacing.sm },
   sportsRow: { marginTop: spacing.sm, marginBottom: spacing.sm },
   pad: { paddingHorizontal: spacing.md },
   listContent: { padding: spacing.md, paddingTop: spacing.sm },

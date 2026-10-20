@@ -34,7 +34,7 @@ import type { TranslateFn } from '../labels/LabelsContext';
 /** Rows a Home section shows before "View all" (AD-14). */
 export const HOME_SECTION_ROWS = 2;
 
-export type GameBadge = 'Hosting' | 'Going' | 'Waitlisted' | 'Open';
+export type GameBadge = 'Hosting' | 'Going' | 'Waitlisted' | 'Open' | 'Declined';
 export type GamesScope = 'all' | 'mine' | 'open';
 
 /** `is_organiser` is a stub (always false) — also compare ids. */
@@ -86,22 +86,27 @@ export function compareGames(a: Event, b: Event): number {
 
 export function isMyGame(event: Event, userId: string | undefined): boolean {
   return (
-    isOrganiserOf(event, userId) ||
-    event.current_user_rsvp_status === 'going' ||
-    event.current_user_rsvp_status === 'waitlisted'
+    !event.my_declined &&
+    (isOrganiserOf(event, userId) ||
+      event.current_user_rsvp_status === 'going' ||
+      event.current_user_rsvp_status === 'waitlisted')
   );
 }
 
 export function isOpenGame(event: Event, userId: string | undefined): boolean {
   return (
+    !event.my_declined &&
     (event.visibility === 'public' || event.visibility === 'group') &&
     !isOrganiserOf(event, userId) &&
     event.current_user_rsvp_status === 'none'
   );
 }
 
-/** One badge per row: Hosting > Going > Waitlisted > Open; `null` otherwise. */
+/** One badge per row: Declined > Hosting > Going > Waitlisted > Open; `null` otherwise. */
 export function getGameBadge(event: Event, userId: string | undefined): GameBadge | null {
+  if (event.my_declined) {
+    return 'Declined';
+  }
   if (isOrganiserOf(event, userId)) {
     return 'Hosting';
   }
@@ -150,13 +155,29 @@ export function selectOpenGames(events: readonly Event[], options: GameListOptio
   return select(events, event => isOpenGame(event, options.userId), options);
 }
 
-/** The Games screen list: My games ∪ Open games by scope (AD-15). */
+/** The Games screen list: My games ∪ Open games by scope (AD-15, AD-21). */
 export function selectGames(
   events: readonly Event[],
   scope: GamesScope,
   options: GameListOptions,
+  view: 'active' | 'all' = 'active',
 ): Event[] {
-  const { userId } = options;
+  const { userId, sportKeys = [], now = Date.now() } = options;
+  if (view === 'all') {
+    if (scope === 'open') {
+      return selectOpenGames(events, options);
+    }
+    if (scope === 'mine') {
+      return selectMyGamesWithHistory(events, options);
+    }
+    // scope === 'all': my games (with history) + open games (active only per AD-21)
+    const matching = events.filter(event => matchesSports(event, sportKeys));
+    const openActive = matching.filter(event => isOpenGame(event, userId) && isUpcomingActive(event, now));
+    const myGames = matching.filter(event => isMyGame(event, userId));
+    const upcoming = [...myGames.filter(event => isUpcomingActive(event, now)), ...openActive].sort(compareGames);
+    const past = myGames.filter(event => !isUpcomingActive(event, now)).sort((a, b) => compareGames(b, a));
+    return [...upcoming, ...past];
+  }
   return select(
     events,
     event =>

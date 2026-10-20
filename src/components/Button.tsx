@@ -43,6 +43,7 @@ interface ButtonProps {
   /** Layout only (margins, alignment) — colours come from `variant`. */
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
+  testID?: string;
 }
 
 interface VariantStyle {
@@ -95,6 +96,7 @@ export default function Button({
   disabled = false,
   style,
   accessibilityLabel,
+  testID,
 }: ButtonProps): React.JSX.Element {
   const variantStyle = VARIANTS[variant];
   const isInactive = disabled || loading;
@@ -102,6 +104,7 @@ export default function Button({
 
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: isInactive, busy: loading }}

@@ -23,6 +23,10 @@ import { apiClient } from './client';
 import type { VenueSnapshot } from '../types/venue';
 import type {
   CreateTournamentInput,
+  DeclineAck,
+  ResponsesResponse,
+  TournamentClosurePut,
+  TournamentClosureResponse,
   TournamentInvitation,
   TournamentInvitationStatus,
   TournamentInviteAccess,
@@ -68,6 +72,9 @@ interface TournamentApiItem {
   venue_label?: string | null;
   venue_id?: string | null;
   venue_snapshot?: VenueSnapshot | null;
+  lifecycle_status?: string | null;
+  closure_outcome?: string | null;
+  my_declined?: boolean | null;
 }
 
 /** Unknown, null or absent -> `'none'` (never a value that shows buttons). */
@@ -113,13 +120,17 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     venue_label: raw.venue_label ?? null,
     venue_id: raw.venue_id ?? null,
     venue_snapshot: raw.venue_snapshot ?? null,
+    lifecycle_status: (raw.lifecycle_status as any) ?? 'active',
+    closure_outcome: raw.closure_outcome ?? null,
+    my_declined: Boolean(raw.my_declined),
   };
 }
 
 export async function getTournaments(
-  options?: RequestOptions & { currentUserId?: string },
+  options?: RequestOptions & { currentUserId?: string; view?: 'active' | 'all' },
 ): Promise<TournamentsListResponse> {
   const { data } = await apiClient.get<TournamentApiItem[]>('/tournaments', {
+    params: options?.view ? { view: options.view } : undefined,
     correlationId: options?.correlationId,
   });
   const items = data.map(raw => mapTournamentApiItem(raw, options?.currentUserId));
@@ -307,4 +318,57 @@ export async function respondToTournamentInvitation(
     { accept },
     { correlationId: options?.correlationId },
   );
+}
+
+/**
+ * Fetch tournament closure report (DES-MEETUP-ADDENDUM-closure-report AD-3).
+ * Viewers see outcome, winner, runner_up. Organizer/committee also sees attendees, candidates.
+ */
+export async function getTournamentClosure(
+  id: string,
+  options?: RequestOptions,
+): Promise<TournamentClosureResponse> {
+  const { data } = await apiClient.get<TournamentClosureResponse>(`/tournaments/${id}/closure`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
+/**
+ * Submit or update tournament closure report (DES-MEETUP-ADDENDUM-closure-report AD-3).
+ * Organizer or active committee member only.
+ */
+export async function putTournamentClosure(
+  id: string,
+  payload: TournamentClosurePut,
+  options?: RequestOptions,
+): Promise<TournamentClosureResponse> {
+  const { data } = await apiClient.put<TournamentClosureResponse>(`/tournaments/${id}/closure`, payload, {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
+/** `POST /tournaments/{id}/decline` (DES-MEETUP-ADDENDUM-decline-response AD-3). */
+export async function declineTournament(
+  id: string,
+  options?: RequestOptions,
+): Promise<DeclineAck> {
+  const { data } = await apiClient.post<DeclineAck>(
+    `/tournaments/${id}/decline`,
+    {},
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+/** `GET /tournaments/{id}/responses` (DES-MEETUP-ADDENDUM-decline-response AD-5). Organizer or committee only. */
+export async function getTournamentResponses(
+  id: string,
+  options?: RequestOptions,
+): Promise<ResponsesResponse> {
+  const { data } = await apiClient.get<ResponsesResponse>(`/tournaments/${id}/responses`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
 }

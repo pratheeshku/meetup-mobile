@@ -75,8 +75,8 @@ function rawEvent(overrides: Record<string, unknown> = {}): Record<string, unkno
     description: 'Bring a racket',
     visibility: 'public',
     capacity: 12,
-    starts_at: '2026-09-25T18:00:00Z',
-    ends_at: '2026-09-25T20:00:00Z',
+    starts_at: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+    ends_at: new Date(Date.now() + 4 * 3600 * 1000).toISOString(),
     estimated_cost_cents: null,
     estimated_cost_currency: null,
     allow_waitlist: true,
@@ -174,7 +174,7 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     expect(has(root, 'Invite Individual')).toBe(true);
     expect(has(root, 'Share Event')).toBe(true);
     expect(has(root, 'Join')).toBe(false);
-    expect(has(root, 'Leave')).toBe(false);
+    expect(has(root, 'Decline')).toBe(false);
   });
 
   it('renders the Edit Game button in the standing-rule CTA blue (#1D5FA3), not the accent color', async () => {
@@ -192,7 +192,7 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     expect(has(root, 'Edit Game')).toBe(true);
     expect(has(root, 'Invite Group')).toBe(true);
     expect(has(root, 'Invite Individual')).toBe(true);
-    expect(has(root, 'Leave')).toBe(false);
+    expect(has(root, 'Decline')).toBe(false);
     expect(has(root, 'Join')).toBe(false);
   });
 
@@ -228,9 +228,9 @@ describe('non-organiser', () => {
     expect(has(root, 'Share Event')).toBe(false);
   });
 
-  it('sees "Leave" (not Cancel) when already going', async () => {
+  it('sees "Decline" (not Cancel) when already going', async () => {
     const root = await mount(rawEvent({ user_rsvp_status: 'going' }));
-    expect(has(root, 'Leave')).toBe(true);
+    expect(has(root, 'Decline')).toBe(true);
     expect(has(root, 'Cancel Event')).toBe(false);
     expect(has(root, 'Edit Game')).toBe(false);
     expect(has(root, 'Invite Group')).toBe(false);
@@ -242,7 +242,7 @@ describe('non-organiser', () => {
   it.each(['cancelled', 'completed'])('sees no RSVP control on a %s event', async status => {
     const root = await mount(rawEvent({ status }));
     expect(has(root, 'Join')).toBe(false);
-    expect(has(root, 'Leave')).toBe(false);
+    expect(has(root, 'Decline')).toBe(false);
     expect(has(root, 'Cancel Event')).toBe(false);
   });
 
@@ -283,10 +283,10 @@ describe('RSVP / withdraw contract', () => {
     expect(mockPost.mock.calls[0][1]).toEqual({ action: 'going' });
   });
 
-  it('Leave sends POST /events/{id}/rsvp with { action: "withdrawn" }', async () => {
+  it('Decline sends POST /events/{id}/rsvp with { action: "withdrawn" }', async () => {
     const root = await mount(rawEvent({ user_rsvp_status: 'going' }));
     await act(async () => {
-      pressableLabelled(root, 'Leave').props.onPress();
+      pressableLabelled(root, 'Decline').props.onPress();
     });
     expect(mockPost).toHaveBeenCalledTimes(1);
     expect(mockPost.mock.calls[0][0]).toBe('/events/evt-1/rsvp');

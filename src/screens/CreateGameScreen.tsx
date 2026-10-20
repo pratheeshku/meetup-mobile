@@ -385,6 +385,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       return;
     }
     if (step === 3) {
+      if (dateValue.getTime() < Date.now()) {
+        setError(t('mob.closure.start_in_past'));
+        return;
+      }
       if (venueCatalogueEnabled && (!catalogueVenue || !catalogueVenue.name)) {
         setError(t('mob.create_game.venue_label'));
         return;
@@ -573,7 +577,13 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         });
       }
     } catch (e) {
-      setError(getApiErrorMessage(e, t('mob.create_game.err_game_create')));
+      const code = (e as any)?.response?.data?.code;
+      const detail = (e as any)?.response?.data?.detail;
+      if (code === 'start_in_past' || detail === "Start time can't be in the past") {
+        setError(t('mob.closure.start_in_past'));
+      } else {
+        setError(getApiErrorMessage(e, t('mob.create_game.err_game_create')));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -690,6 +700,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     const shortDate = dateValue.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     const compactRow = isCompactDateRow(windowWidth, fontScale);
 
+    const isDateInPast = dateValue.getTime() < Date.now();
+
     return (
       <View style={styles.stepContent}>
         <Text style={styles.stepHeading}>{t('mob.create_game.step_when_where')}</Text>
@@ -697,100 +709,126 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         <View style={styles.cardContainer}>
           {mode === 'game' ? (
             // Games: Date, Start time and Duration in ONE row (flex 1.35 / 1 / 1).
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={styles.dateField}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text
-                  style={styles.fieldLabel}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
+            <View>
+              <View style={styles.row}>
+                <TouchableOpacity
+                  style={styles.dateField}
+                  onPress={() => setShowDatePicker(true)}
                 >
-                  {t('mob.create_game.date_label')}
-                </Text>
-                <View style={[styles.pickerBox, compactRow && styles.pickerBoxCompact]}>
-                  {compactRow ? null : <CalendarIcon size={18} />}
                   <Text
-                    style={styles.pickerBoxText}
+                    style={styles.fieldLabel}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.7}
                   >
-                    {compactRow ? shortDate : formattedDate}
+                    {t('mob.create_game.date_label')}
                   </Text>
-                </View>
-              </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.pickerBox,
+                      compactRow && styles.pickerBoxCompact,
+                      isDateInPast && styles.pickerBoxError,
+                    ]}
+                  >
+                    {compactRow ? null : <CalendarIcon size={18} />}
+                    <Text
+                      style={styles.pickerBoxText}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.7}
+                    >
+                      {compactRow ? shortDate : formattedDate}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.halfField}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Text
-                  style={styles.fieldLabel}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
+                <TouchableOpacity
+                  style={styles.halfField}
+                  onPress={() => setShowTimePicker(true)}
                 >
-                  {t('mob.create_game.start_time_label')}
-                </Text>
-                <View style={[styles.pickerBox, compactRow && styles.pickerBoxCompact]}>
-                  {compactRow ? null : <ClockIcon size={18} />}
                   <Text
-                    style={styles.pickerBoxText}
+                    style={styles.fieldLabel}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.7}
                   >
-                    {formattedTime}
+                    {t('mob.create_game.start_time_label')}
                   </Text>
-                </View>
-              </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.pickerBox,
+                      compactRow && styles.pickerBoxCompact,
+                      isDateInPast && styles.pickerBoxError,
+                    ]}
+                  >
+                    {compactRow ? null : <ClockIcon size={18} />}
+                    <Text
+                      style={styles.pickerBoxText}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.7}
+                    >
+                      {formattedTime}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
 
-              <View style={styles.halfField}>
-                <Text
-                  style={styles.fieldLabel}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                >
-                  {t('mob.create_game.duration_label')}
-                </Text>
-                <DropdownField
-                  options={durationOptions}
-                  value={String(durationHours)}
-                  onChange={value => setDurationHours(Number(value))}
-                  placeholder={t('mob.create_game.duration_label')}
-                  accessibilityLabel={t('mob.create_game.duration_label')}
-                  style={[styles.durationTrigger, compactRow && styles.durationTriggerCompact]}
-                />
+                <View style={styles.halfField}>
+                  <Text
+                    style={styles.fieldLabel}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    {t('mob.create_game.duration_label')}
+                  </Text>
+                  <DropdownField
+                    options={durationOptions}
+                    value={String(durationHours)}
+                    onChange={value => setDurationHours(Number(value))}
+                    placeholder={t('mob.create_game.duration_label')}
+                    accessibilityLabel={t('mob.create_game.duration_label')}
+                    style={[styles.durationTrigger, compactRow && styles.durationTriggerCompact]}
+                  />
+                </View>
               </View>
+              {isDateInPast ? (
+                <Text style={styles.pastDateErrorText} testID="create-game-past-date-error">
+                  {t('mob.closure.start_in_past')}
+                </Text>
+              ) : null}
             </View>
           ) : (
             // Tournaments keep the two-column row, no duration.
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={styles.halfField}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={styles.fieldLabel}>{t('mob.create_game.date_label')}</Text>
-                <View style={styles.pickerBox}>
-                  <CalendarIcon size={18} />
-                  <Text style={styles.pickerBoxText}>{formattedDate}</Text>
-                </View>
-              </TouchableOpacity>
+            <View>
+              <View style={styles.row}>
+                <TouchableOpacity
+                  style={styles.halfField}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Text style={styles.fieldLabel}>{t('mob.create_game.date_label')}</Text>
+                  <View style={[styles.pickerBox, isDateInPast && styles.pickerBoxError]}>
+                    <CalendarIcon size={18} />
+                    <Text style={styles.pickerBoxText}>{formattedDate}</Text>
+                  </View>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.halfField}
-                onPress={() => setShowTimePicker(true)}
-              >
-                <Text style={styles.fieldLabel}>{t('mob.create_game.start_time_label')}</Text>
-                <View style={styles.pickerBox}>
-                  <ClockIcon size={18} />
-                  <Text style={styles.pickerBoxText}>{formattedTime}</Text>
-                </View>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.halfField}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Text style={styles.fieldLabel}>{t('mob.create_game.start_time_label')}</Text>
+                  <View style={[styles.pickerBox, isDateInPast && styles.pickerBoxError]}>
+                    <ClockIcon size={18} />
+                    <Text style={styles.pickerBoxText}>{formattedTime}</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+              {isDateInPast ? (
+                <Text style={styles.pastDateErrorText} testID="create-tournament-past-date-error">
+                  {t('mob.closure.start_in_past')}
+                </Text>
+              ) : null}
             </View>
           )}
 
@@ -798,6 +836,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             <DateTimePicker
               value={dateValue}
               mode="date"
+              minimumDate={new Date()}
               display={Platform.OS === 'ios' ? 'spinner' : 'default'}
               {...iosPickerThemeProps()}
               onChange={handleDateChange}
@@ -1403,6 +1442,16 @@ const styles = StyleSheet.create({
   pickerBoxText: {
     ...typography.bodyBold,
     color: colors.textPrimary,
+  },
+  pickerBoxError: {
+    borderColor: colors.error,
+    borderWidth: borderWidth.medium,
+  },
+  pastDateErrorText: {
+    ...typography.caption,
+    color: colors.error,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
   searchBox: {
     flexDirection: 'row',

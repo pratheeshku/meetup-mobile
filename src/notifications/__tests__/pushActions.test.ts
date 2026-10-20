@@ -104,20 +104,24 @@ describe('scope table (AD-1)', () => {
 
 describe('displayPushActionNotification (Android)', () => {
   it.each([
-    ['event_invite', 'Accept'],
-    ['tournament_invited', 'Accept'],
-    ['group_invite', 'Leave group'],
-  ])('%s: primary button "%s" plus Ignore, neither opens the app', async (type, primaryTitle) => {
-    await displayPushActionNotification(pushData(type));
+    ['event_invite', 'Accept', 'Decline', 'decline'],
+    ['tournament_invited', 'Accept', 'Decline', 'decline'],
+    ['group_invite', 'Leave group', 'Ignore', 'ignore'],
+  ])(
+    '%s: primary button "%s" and secondary button "%s", neither opens the app',
+    async (type, primaryTitle, secondaryTitle, secondaryId) => {
+      await displayPushActionNotification(pushData(type));
 
-    const arg = mockDisplay.mock.calls[0][0];
-    const [primary, ignore] = arg.android.actions;
-    expect(primary.title).toBe(primaryTitle);
-    expect(ignore.title).toBe('Ignore');
-    expect(primary.pressAction).not.toHaveProperty('launchActivity');
-    expect(ignore.pressAction).not.toHaveProperty('launchActivity');
-    expect(arg.android.channelId).toBe(PLAN_CHANNEL_ID);
-  });
+      const arg = mockDisplay.mock.calls[0][0];
+      const [primary, secondary] = arg.android.actions;
+      expect(primary.title).toBe(primaryTitle);
+      expect(secondary.title).toBe(secondaryTitle);
+      expect(secondary.pressAction.id).toBe(secondaryId);
+      expect(primary.pressAction).not.toHaveProperty('launchActivity');
+      expect(secondary.pressAction).not.toHaveProperty('launchActivity');
+      expect(arg.android.channelId).toBe(PLAN_CHANNEL_ID);
+    },
+  );
 
   it('shows the title and body exactly as received (no trim, no recase)', async () => {
     await displayPushActionNotification(pushData('event_invite'));
@@ -153,7 +157,7 @@ describe('displayPushActionNotification (Android)', () => {
   });
 });
 
-describe('iOS categories (AD-5)', () => {
+describe('iOS categories (AD-5, DR-08)', () => {
   it('registers invite_game, invite_tournament and group_added, background actions', async () => {
     jest.replaceProperty(Platform, 'OS', 'ios');
 
@@ -171,24 +175,24 @@ describe('iOS categories (AD-5)', () => {
       }
     }
     const byId = Object.fromEntries(categories.map((c: { id: string }) => [c.id, c]));
-    expect(byId.invite_game.actions.map((a: { title: string }) => a.title)).toEqual(['Accept', 'Ignore']);
-    expect(byId.invite_tournament.actions.map((a: { id: string }) => a.id)).toEqual(['accept', 'ignore']);
+    expect(byId.invite_game.actions.map((a: { title: string }) => a.title)).toEqual(['Accept', 'Decline']);
+    expect(byId.invite_tournament.actions.map((a: { id: string }) => a.id)).toEqual(['accept', 'decline']);
     expect(byId.group_added.actions.map((a: { title: string }) => a.title)).toEqual([
       'Leave group',
       'Ignore',
     ]);
   });
 
-  it('Accept and Leave group require authentication while the constant is true; Ignore never', async () => {
+  it('Accept and Leave group require authentication while the constant is true; secondary never', async () => {
     jest.replaceProperty(Platform, 'OS', 'ios');
     expect(IOS_ACTIONS_REQUIRE_AUTH).toBe(true);
 
     await registerPushActionCategories();
 
     for (const category of mockSetCategories.mock.calls[0][0]) {
-      const [primary, ignore] = category.actions;
+      const [primary, secondary] = category.actions;
       expect(primary.authenticationRequired).toBe(true);
-      expect(ignore.authenticationRequired).toBeUndefined();
+      expect(secondary.authenticationRequired).toBeUndefined();
     }
   });
 
@@ -290,6 +294,77 @@ describe('Accept tournament: AD-7 rows', () => {
   });
 });
 
+describe('Decline game: DR-08', () => {
+  const decline = (): Event => press(EventType.ACTION_PRESS, 'decline', pushData('event_invite'));
+
+  it('calls POST /events/{id}/invitations/respond {accept:false} with in-memory token', async () => {
+    mockPost.mockResolvedValue({ data: {} });
+
+    await handlePushActionEvent(decline());
+
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [url, body, config] = mockPost.mock.calls[0];
+    expect(url).toBe('/events/ent-1/invitations/respond');
+    expect(body).toEqual({ accept: false });
+    expect(config.headers).toEqual({ Authorization: 'Bearer tok-new' });
+    expect(config.correlationId).toEqual(expect.any(String));
+  });
+
+  it('200 → "You declined"', async () => {
+    mockPost.mockResolvedValue({ data: {} });
+    await handlePushActionEvent(decline());
+    expect(lastResultTitle()).toBe('You declined');
+  });
+
+  it('400 already answered → "Already answered"', async () => {
+    mockPost.mockRejectedValue(httpError(400, 'Already answered'));
+    await handlePushActionEvent(decline());
+    expect(lastResultTitle()).toBe('Already answered');
+  });
+
+  it('404 → "This game is no longer available"', async () => {
+    mockPost.mockRejectedValue(httpError(404));
+    await handlePushActionEvent(decline());
+    expect(lastResultTitle()).toBe('This game is no longer available');
+  });
+});
+
+describe('Decline tournament: DR-08', () => {
+  const decline = (): Event => press(EventType.ACTION_PRESS, 'decline', pushData('tournament_invited'));
+
+  it('calls POST /tournaments/{id}/invitations/respond {accept:false} with in-memory token', async () => {
+    mockPost.mockResolvedValue({ data: {} });
+
+    await handlePushActionEvent(decline());
+
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [url, body, config] = mockPost.mock.calls[0];
+    expect(url).toBe('/tournaments/ent-1/invitations/respond');
+    expect(body).toEqual({ accept: false });
+    expect(config.headers).toEqual({ Authorization: 'Bearer tok-new' });
+  });
+
+  it('200 → "You declined"', async () => {
+    mockPost.mockResolvedValue({ data: {} });
+    await handlePushActionEvent(decline());
+    expect(lastResultTitle()).toBe('You declined');
+  });
+
+  it('400 already answered → "Already answered"', async () => {
+    mockPost.mockRejectedValue(httpError(400));
+    await handlePushActionEvent(decline());
+    expect(lastResultTitle()).toBe('Already answered');
+  });
+
+  it('404 → "This game is no longer available"', async () => {
+    mockPost.mockRejectedValue(httpError(404));
+    await handlePushActionEvent(decline());
+    expect(lastResultTitle()).toBe('This game is no longer available');
+  });
+});
+
 describe('Leave group: AD-7 rows', () => {
   const leave = (): Event => press(EventType.ACTION_PRESS, 'leave', pushData('group_invite'));
 
@@ -384,7 +459,7 @@ describe('generic failures (any action)', () => {
 });
 
 describe('Ignore', () => {
-  const ignore = (data = pushData('event_invite')): Event =>
+  const ignore = (data = pushData('group_invite')): Event =>
     press(EventType.ACTION_PRESS, 'ignore', data);
 
   it('cancels the tray entry first, then marks the DELIVERY id read (not notification_id)', async () => {
@@ -400,10 +475,15 @@ describe('Ignore', () => {
     expect(mockDisplay).not.toHaveBeenCalled(); // no result message for Ignore
   });
 
+  it('ignore on event_invite is skipped because Ignore was removed for invitations (D-1)', async () => {
+    await handlePushActionEvent(press(EventType.ACTION_PRESS, 'ignore', pushData('event_invite')));
+    expect(mockCancel).not.toHaveBeenCalled();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
   it('never calls a respond, join or leave endpoint', async () => {
     mockPost.mockResolvedValue({ status: 204 });
     await handlePushActionEvent(ignore());
-    await handlePushActionEvent(ignore(pushData('group_invite')));
     expect(mockDelete).not.toHaveBeenCalled();
     for (const call of mockPost.mock.calls) {
       expect(call[0]).toMatch(/^\/notifications\/.+\/read$/);
@@ -417,7 +497,7 @@ describe('Ignore', () => {
   });
 
   it('without a delivery_id it only clears the entry and does no token work', async () => {
-    await handlePushActionEvent(ignore(pushData('event_invite', { delivery_id: '' })));
+    await handlePushActionEvent(ignore(pushData('group_invite', { delivery_id: '' })));
     expect(mockCancel).toHaveBeenCalledWith('tag-1');
     expect(mockRefresh).not.toHaveBeenCalled();
     expect(mockPost).not.toHaveBeenCalled();
@@ -433,7 +513,7 @@ describe('in-flight guard', () => {
     const first = handlePushActionEvent(event);
     await Promise.resolve();
     await handlePushActionEvent(event); // second press: returns at once
-    await handlePushActionEvent(press(EventType.ACTION_PRESS, 'ignore', pushData('event_invite')));
+    await handlePushActionEvent(press(EventType.ACTION_PRESS, 'decline', pushData('event_invite')));
 
     release({ data: { participation_status: 'going' } });
     await first;
