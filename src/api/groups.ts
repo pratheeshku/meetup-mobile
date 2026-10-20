@@ -27,6 +27,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from './client';
+import type { UserCardOut } from '../types/userMenu';
 import type {
   CreateGroupInput,
   Group,
@@ -395,6 +396,22 @@ export async function updateMemberRole(
     { role },
     { correlationId: options?.correlationId },
   );
+}
+
+/**
+ * `GET /groups/{group_id}/members/{user_id}/card` (user details menu, AD-1). Called on every
+ * open of the menu, never cached. 404 = the viewer cannot see the group or the person has no
+ * current relationship to it.
+ */
+export async function getGroupMemberCard(
+  groupId: string,
+  userId: string,
+  options?: RequestOptions,
+): Promise<UserCardOut> {
+  const { data } = await apiClient.get<UserCardOut>(`/groups/${groupId}/members/${userId}/card`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
 }
 
 export async function removeMember(

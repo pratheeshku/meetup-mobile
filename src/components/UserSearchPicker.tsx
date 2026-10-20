@@ -28,6 +28,9 @@ import type { UserSearchResult } from '../types/user';
 import { SearchIcon } from './icons/ActionIcons';
 import AddRemoveControl from './AddRemoveControl';
 import PersonNames from './PersonNames';
+import UserMenuSheet from './user/UserMenuSheet';
+import UserPressable from './user/UserPressable';
+import { useUserMenu } from '../hooks/useUserMenu';
 import TextField from './TextField';
 import UserAvatar from './UserAvatar';
 import type { LabelKey } from '../labels/fallbackLabels';
@@ -104,6 +107,10 @@ export default function UserSearchPicker({
   onUnstage,
 }: UserSearchPickerProps): React.JSX.Element {
   const t = useT();
+  // Search and suggested-player lists are in no context of the viewer's: long-press on the avatar
+  // or name opens View Details (menu with no actions, no card request). Selecting stays on the
+  // "+" control of the row.
+  const menu = useUserMenu({ context: { type: 'none' } });
   const tRef = useRef(t);
   tRef.current = t;
   const entity = entityLabel ?? t('mob.user_search.entity_group_member');
@@ -323,7 +330,18 @@ export default function UserSearchPicker({
           user.pending ? styles.resultRowDisabled : null,
         ]}
       >
-        <View style={styles.resultLeft} accessible accessibilityLabel={label}>
+        <UserPressable
+          person={{
+            userId: user.id,
+            displayName: user.display_name,
+            nickname: user.nickname ?? null,
+            photoUrl: user.image_url,
+          }}
+          menu={menu}
+          tap="none"
+          style={styles.resultLeft}
+          accessibilityLabel={label}
+        >
           <UserAvatar
             imageUrl={user.image_url}
             name={user.display_name}
@@ -340,7 +358,7 @@ export default function UserSearchPicker({
               </View>
             ) : null}
           </View>
-        </View>
+        </UserPressable>
         {control}
       </View>
     );
@@ -381,6 +399,7 @@ export default function UserSearchPicker({
 
   return (
     <View>
+      <UserMenuSheet menu={menu} />
       {isInvite ? (
         <View style={styles.inviteSearchWrap}>
           <View style={styles.inviteSearchIcon} pointerEvents="none">

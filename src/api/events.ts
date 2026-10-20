@@ -16,6 +16,7 @@
  * fallback.
  */
 import { apiClient } from './client';
+import type { UserCardOut } from '../types/userMenu';
 import type {
   CreateEventInput,
   Event,
@@ -354,6 +355,42 @@ export async function inviteEmailToEvent(
 /**
   * Fetch event participants: calls `GET /events/{id}/participants`.
   */
+/**
+ * `GET /events/{event_id}/players/{user_id}/card` (user details menu, AD-1). Called on every open
+ * of the menu, never cached. 404 = the viewer cannot see the game or the person has no current
+ * relationship to it (a pending invitee is visible only to the organizer and the invitee).
+ */
+export async function getEventPlayerCard(
+  eventId: string,
+  userId: string,
+  options?: RequestOptions,
+): Promise<UserCardOut> {
+  const { data } = await apiClient.get<UserCardOut>(`/events/${eventId}/players/${userId}/card`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
+/**
+ * `DELETE /events/{event_id}/participants/{user_id}` (existing backend endpoint, organizer only,
+ * 100/min). Optional `reason` goes in the query string. Returns the participant row. A 404 means
+ * the game is gone or not visible to the caller.
+ */
+export async function removeEventPlayer(
+  eventId: string,
+  userId: string,
+  options?: RequestOptions & { reason?: string },
+): Promise<import('../types/event').EventParticipant> {
+  const { data } = await apiClient.delete<import('../types/event').EventParticipant>(
+    `/events/${eventId}/participants/${userId}`,
+    {
+      params: options?.reason ? { reason: options.reason } : undefined,
+      correlationId: options?.correlationId,
+    },
+  );
+  return data;
+}
+
 export async function getEventParticipants(
   eventId: string,
   options?: RequestOptions,

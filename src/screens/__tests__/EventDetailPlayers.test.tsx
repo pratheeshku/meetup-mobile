@@ -148,3 +148,37 @@ describe('organiser capacity minimum', () => {
     expect(next.props.disabled).toBeFalsy();
   });
 });
+
+describe('user menu on the going players (UM-06, UM-11)', () => {
+  const people = [person('u-1', 'Alice', 'going'), person('u-2', 'Bob', 'going')];
+  const cardUrls = (): string[] => mockGet.mock.calls.map(c => String(c[0])).filter(u => u.includes('/card'));
+  const pressableFor = (root: Instance, id: string): Instance =>
+    root.find(n => n.props.testID === `player-${id}` && typeof n.props.onLongPress === 'function');
+
+  it('a tap on an avatar opens View Details with no card request', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }), people);
+    await act(async () => pressableFor(root, 'u-1').props.onPress());
+    expect(root.findAll(n => n.props.testID === 'user-menu-details').length).toBeGreaterThan(0);
+    expect(texts(root)).toEqual(expect.arrayContaining(['Details', 'Alice']));
+    expect(cardUrls()).toHaveLength(0);
+  });
+
+  it('a long-press fetches the game card and shows exactly the server actions', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }), people);
+    const base = mockGet.getMockImplementation() as (url: string) => Promise<unknown>;
+    mockGet.mockImplementation((url: string) =>
+      url === '/events/evt-1/players/u-2/card'
+        ? Promise.resolve({
+            data: {
+              user_id: 'u-2', display_name: 'Bob', nickname: 'bob', photo_url: null, is_self: false,
+              relation: 'player', allowed_actions: [{ key: 'remove_player', requires_approval: false }],
+            },
+          })
+        : base(url),
+    );
+    await act(async () => pressableFor(root, 'u-2').props.onLongPress());
+    expect(cardUrls()).toEqual(['/events/evt-1/players/u-2/card']);
+    const actions = root.findAll(n => String(n.props.testID ?? '').startsWith('user-menu-action-') && typeof n.props.onPress === 'function');
+    expect(actions.map(n => n.props.accessibilityLabel)).toEqual(['Remove player']);
+  });
+});
