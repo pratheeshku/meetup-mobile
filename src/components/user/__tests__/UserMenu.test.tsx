@@ -418,6 +418,7 @@ describe('actions', () => {
     const root = render(<Host context={GROUP} onChanged={onChanged} />);
     await longPress(who(root));
     await press(byId(root, 'user-menu-action-make_admin')[0]);
+    await press(byId(root, 'user-menu-confirm-yes')[0]);
     expect(texts(root)).toContain('Only owners can do that');
     expect(onChanged).toHaveBeenCalledTimes(1);
     expect(sheetOpen(root)).toBe(false);
@@ -429,6 +430,7 @@ describe('actions', () => {
     const root = render(<Host context={GROUP} />);
     await longPress(who(root));
     await press(byId(root, 'user-menu-action-make_admin')[0]);
+    await press(byId(root, 'user-menu-confirm-yes')[0]);
     expect(texts(root)).toContain('Could not complete this action. Please try again.');
   });
 
@@ -439,6 +441,7 @@ describe('actions', () => {
     const root = render(<Host context={GROUP} onChanged={onChanged} />);
     await longPress(who(root));
     await press(byId(root, 'user-menu-action-make_admin')[0]);
+    await press(byId(root, 'user-menu-confirm-yes')[0]);
     expect(isAccessNoticeShowing()).toBe(true);
     expect(onChanged).toHaveBeenCalledTimes(1);
   });
