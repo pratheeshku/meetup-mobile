@@ -21,7 +21,7 @@ import { SportIcon, AllSportsIcon } from '../icons/DashboardIcons';
 import { BellGoldIcon } from '../icons/HomeV2Icons';
 import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
-import { dash, dashRadius } from '../../theme/dashboardTheme';
+import { dash, dashRadius, sportTileColors } from '../../theme/dashboardTheme';
 import { colors, spacing, typography } from '../../theme/tokens';
 import type { SportOption } from '../../utils/gameLists';
 
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipIdle: {
-    backgroundColor: 'transparent',
+    backgroundColor: sportTileColors.idle,
   },
   chipSelected: {
     backgroundColor: '#EEF3FF',

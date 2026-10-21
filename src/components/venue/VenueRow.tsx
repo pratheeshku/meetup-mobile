@@ -7,7 +7,7 @@
  * content (address, map pin, photos strip, organizer photo actions, unchanged) plus
  * "Open in Google Maps" and "Copy address". Venue data and photo behaviour are not touched here.
  */
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import {
   Linking,
   Modal,
@@ -17,6 +17,8 @@ import {
   Text,
   View,
 } from 'react-native';
+
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
 import { useT } from '../../labels/LabelsContext';
 import {
@@ -32,7 +34,6 @@ import { buildGoogleMapsUrl } from '../../utils/mapsUrl';
 import { copyTextToClipboard } from '../../utils/shareLink';
 import { CrossIcon, ChevronRightIcon } from '../icons/ActionIcons';
 import { PinIcon } from '../icons/SharedIcons';
-import ScreenContainer from '../ScreenContainer';
 import Toast from '../Toast';
 import VenueDetailCard from './VenueDetailCard';
 
@@ -70,6 +71,7 @@ export default function VenueRow({
   const t = useT();
   const [open, setOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const insets = useContext(SafeAreaInsetsContext);
 
   const name =
     snapshot?.name || venueName || fallbackText || t('mob.gv.venue_title');
@@ -128,68 +130,69 @@ export default function VenueRow({
             accessibilityRole="button"
             accessibilityLabel={t('mob.common.close')}
           />
-          <ScreenContainer edges="bottom" fill={false} style={styles.sheetSafe}>
-            <View style={styles.sheet} testID="venue-sheet">
-              <View style={styles.grabber} />
-              <View style={styles.headerRow}>
-                <Text style={styles.caption} accessibilityRole="header">
-                  {t('mob.gv.venue_title')}
-                </Text>
-                <Pressable
-                  onPress={() => setOpen(false)}
-                  style={styles.closeTarget}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('mob.common.close')}
-                  testID="venue-sheet-close"
-                >
-                  <CrossIcon size={18} color={colors.textSecondary} />
-                </Pressable>
-              </View>
-              <ScrollView
-                style={styles.body}
-                keyboardShouldPersistTaps="handled"
+          <View
+            style={[
+              styles.sheet,
+              { paddingBottom: spacing.md + (insets?.bottom ?? 0) },
+            ]}
+            testID="venue-sheet"
+          >
+            <View style={styles.grabber} />
+            <View style={styles.headerRow}>
+              <Text style={styles.caption} accessibilityRole="header">
+                {t('mob.gv.venue_title')}
+              </Text>
+              <Pressable
+                onPress={() => setOpen(false)}
+                style={styles.closeTarget}
+                accessibilityRole="button"
+                accessibilityLabel={t('mob.common.close')}
+                testID="venue-sheet-close"
               >
-                <VenueDetailCard
-                  variant="sheet"
-                  snapshot={snapshot}
-                  fallbackText={fallbackText}
-                  courtDetails={null}
-                  mapsApiKey={mapsApiKey}
-                  eventId={eventId}
-                  tournamentId={tournamentId}
-                  isOrganiser={isOrganiser}
-                />
-              </ScrollView>
-              <View style={styles.buttons}>
-                <Pressable
-                  onPress={openMaps}
-                  disabled={!mapsUrl}
-                  style={[
-                    styles.primaryButton,
-                    !mapsUrl ? styles.disabled : null,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('mob.gv.open_in_maps')}
-                  testID="venue-open-maps"
-                >
-                  <Text style={styles.primaryText}>
-                    {t('mob.gv.open_in_maps')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={copyAddress}
-                  style={styles.secondaryButton}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('mob.gv.copy_address')}
-                  testID="venue-copy-address"
-                >
-                  <Text style={styles.secondaryText}>
-                    {t('mob.gv.copy_address')}
-                  </Text>
-                </Pressable>
-              </View>
+                <CrossIcon size={18} color={colors.textSecondary} />
+              </Pressable>
             </View>
-          </ScreenContainer>
+            <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+              <VenueDetailCard
+                variant="sheet"
+                snapshot={snapshot}
+                fallbackText={fallbackText}
+                courtDetails={null}
+                mapsApiKey={mapsApiKey}
+                eventId={eventId}
+                tournamentId={tournamentId}
+                isOrganiser={isOrganiser}
+              />
+            </ScrollView>
+            <View style={styles.buttons}>
+              <Pressable
+                onPress={openMaps}
+                disabled={!mapsUrl}
+                style={[
+                  styles.primaryButton,
+                  !mapsUrl ? styles.disabled : null,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={t('mob.gv.open_in_maps')}
+                testID="venue-open-maps"
+              >
+                <Text style={styles.primaryText}>
+                  {t('mob.gv.open_in_maps')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={copyAddress}
+                style={styles.secondaryButton}
+                accessibilityRole="button"
+                accessibilityLabel={t('mob.gv.copy_address')}
+                testID="venue-copy-address"
+              >
+                <Text style={styles.secondaryText}>
+                  {t('mob.gv.copy_address')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
           <Toast message={notice} onDismiss={() => setNotice(null)} />
         </View>
       </Modal>
@@ -225,7 +228,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.scrim,
     justifyContent: 'flex-end',
   },
-  sheetSafe: { backgroundColor: colors.surface },
   sheet: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.lg,
