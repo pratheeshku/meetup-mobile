@@ -1,23 +1,23 @@
 /**
  * Share + invite actions for Tournament Detail (tournament-lifecycle addendum
- * v1.2.2, AD-4). What shows comes only from the server's `my_invite_access`:
- *   full        -> Invite Group, Invite Player (user or email), Share
- *   individuals -> Invite Player (user or email), Share
+ * v1.2.2, AD-4; invite picker per DES-MEETUP-ADDENDUM-game-view-redesign GV-5). What shows comes
+ * only from the server's `my_invite_access`:
+ *   full        -> Invite groups, Invite players (user or email), Share
+ *   individuals -> Invite players (user or email), Share
  *   none/absent -> nothing (this is also the whole feature while the flag is off)
  * Committee membership is never derived on the client; the server enforces
  * every rule. Group invite by a non-committee group owner/admin is out of scope
- * (OI-14). Pickers and flows mirror the game detail (`EventDetailScreen`).
+ * (OI-14). The entries open the shared invite picker, which loops the tournament invite calls per
+ * staged entry (AD-4).
  *
  * Share is client-side only: the app link from `getShareUrl()` through
  * `useAppShare`; no tournament route is called and no tournament identity is
  * in the link. A 404 from an invite route (flag turned off) hides the invite
  * actions silently. Email addresses are never logged.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { withCorrelationId } from '../../api/correlationId';
-import { getMyGroups } from '../../api/groups';
 import {
   inviteEmailToTournament,
   inviteGroupToTournament,
@@ -26,318 +26,134 @@ import {
 import { useAppShare } from '../../hooks/useAppShare';
 import { useT } from '../../labels/LabelsContext';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../../theme/tokens';
-import type { Group } from '../../types/group';
-import type { TournamentInviteAccess } from '../../types/tournament';
-import type { UserSearchResult } from '../../types/user';
+import type { ResponsesResponse, TournamentInviteAccess } from '../../types/tournament';
 import { isInvitesClosed, readTournamentInviteError } from '../../utils/tournamentInviteError';
 import { stripIconGlyphs } from '../../utils/labels';
-import AddRemoveControl, { AddEntryRow, GroupInviteList } from '../AddRemoveControl';
-import Button from '../Button';
-import Card from '../Card';
 import { LinkIcon } from '../icons/SharedIcons';
+import InviteCard from '../invite/InviteCard';
+import InvitePicker, { type InviteSendResult, type InviteTab } from '../invite/InvitePicker';
 import ShareActionSheet from '../ShareActionSheet';
 import Toast from '../Toast';
-import PersonNames from '../PersonNames';
-import UserAvatar from '../UserAvatar';
-import UserSearchPicker from '../UserSearchPicker';
-import UserMenuSheet from '../user/UserMenuSheet';
-import UserPressable from '../user/UserPressable';
-import { useUserMenu } from '../../hooks/useUserMenu';
+import type { AlreadyInPerson } from '../UserSearchPicker';
 
 interface Props {
   tournamentId: string;
   access: TournamentInviteAccess | null | undefined;
+  /** Tournament name, for the picker header. */
+  title?: string;
+  /** The responses listing (organizer/committee), for "already in this tournament". */
+  responses?: ResponsesResponse | null;
+  /** After at least one invite went out: the screen refetches. */
+  onSent?: (result: InviteSendResult) => void;
 }
 
-type OpenForm = 'none' | 'group' | 'user';
-
-export default function TournamentInvitePanel({ tournamentId, access }: Props): React.JSX.Element | null {
+export default function TournamentInvitePanel({
+  tournamentId,
+  access,
+  title = '',
+  responses = null,
+  onSent,
+}: Props): React.JSX.Element | null {
   const t = useT();
   const share = useAppShare();
-  // A picked invitee is in no context of the viewer's yet: View Details only, no card request.
-  const candidateMenu = useUserMenu({ context: { type: 'none' } });
-  const [form, setForm] = useState<OpenForm>('none');
+  const [pickerTab, setPickerTab] = useState<InviteTab | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
 
   const canShare = access === 'full' || access === 'individuals';
   const canInviteGroup = access === 'full' && !unavailable;
   const canInviteUser = canShare && !unavailable;
 
-  // Group form
-  const [myGroups, setMyGroups] = useState<Group[]>([]);
-  const [groupsLoading, setGroupsLoading] = useState(false);
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
-  const [groupSubmitting, setGroupSubmitting] = useState(false);
-  const [groupError, setGroupError] = useState<string | null>(null);
-  const [groupSuccess, setGroupSuccess] = useState<string | null>(null);
-
-  // Individual form (user search or email)
-  const [pickedUser, setPickedUser] = useState<UserSearchResult | null>(null);
-  const [pickedEmail, setPickedEmail] = useState<string | null>(null);
-  const [userSubmitting, setUserSubmitting] = useState(false);
-  const [userError, setUserError] = useState<string | null>(null);
-  const [userSuccess, setUserSuccess] = useState<string | null>(null);
+  const senders = useMemo(
+    () => ({
+      group: (groupId: string, correlationId: string) =>
+        inviteGroupToTournament(tournamentId, groupId, { correlationId }),
+      user: (userId: string, correlationId: string) =>
+        inviteUserToTournament(tournamentId, userId, { correlationId }),
+      email: (email: string, correlationId: string) =>
+        inviteEmailToTournament(tournamentId, email, { correlationId }),
+    }),
+    [tournamentId],
+  );
 
   if (!canShare) {
     return null;
   }
 
   /** Server text for 4xx; 404 means the feature is off: hide the invite actions. */
-  const failureMessage = (e: unknown, fallback: string): string | null => {
+  const failureDetail = (e: unknown): string | null => {
     const info = readTournamentInviteError(e);
     if (info.status === 404) {
       setUnavailable(true);
-      setForm('none');
+      setPickerTab(null);
       return null;
     }
     if (info.message) {
       return info.message;
     }
-    return isInvitesClosed(info) ? t('mob.tournament.invites_closed') : fallback;
+    return isInvitesClosed(info) ? t('mob.tournament.invites_closed') : null;
   };
 
-  const openGroup = async (): Promise<void> => {
-    setGroupError(null);
-    setGroupSuccess(null);
-    setSelectedGroupIds([]);
-    setForm('group');
-    if (myGroups.length === 0) {
-      setGroupsLoading(true);
-      try {
-        const res = await getMyGroups();
-        setMyGroups(res.items);
-      } catch {
-        setMyGroups([]);
-      } finally {
-        setGroupsLoading(false);
-      }
+  const alreadyInPeople: AlreadyInPerson[] = responses
+    ? [
+        ...responses.accepted.items.map(person => ({
+          id: person.user_id ?? person.display_name,
+          displayName: person.display_name,
+          nickname: null,
+          photoUrl: person.photo_url ?? null,
+          statusLabel: t('mob.respond.via.joined'),
+        })),
+        ...responses.pending.items.map(person => ({
+          id: person.user_id ?? person.email ?? person.display_name,
+          displayName: person.display_name || person.email || '',
+          nickname: null,
+          photoUrl: person.photo_url ?? null,
+          statusLabel: t('mob.respond.via.invitation'),
+        })),
+      ]
+    : [];
+
+  const handleSent = (result: InviteSendResult): void => {
+    onSent?.(result);
+    if (result.failedNames.length === 0) {
+      setPickerTab(null);
+      // A send that only touched groups with nobody new keeps the earlier "already invited" notice.
+      setNotice(
+        result.noNewGroups.length > 0 && result.noNewGroups.length === result.sent
+          ? t('mob.tournament.invite_group_none_new')
+          : t('mob.gv.invites_sent', { count: result.sent }),
+      );
     }
   };
-
-  const openUser = (): void => {
-    setUserError(null);
-    setUserSuccess(null);
-    setPickedUser(null);
-    setPickedEmail(null);
-    setForm('user');
-  };
-
-  const closeForm = (): void => setForm('none');
-
-  const toggleGroup = (groupId: string): void => {
-    setSelectedGroupIds(prev =>
-      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId],
-    );
-  };
-
-  const sendGroupInvites = async (): Promise<void> => {
-    if (selectedGroupIds.length === 0) {
-      setGroupError(t('mob.game_detail.invite_group_select'));
-      return;
-    }
-    setGroupError(null);
-    setGroupSuccess(null);
-    setGroupSubmitting(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        let total = 0;
-        for (const groupId of selectedGroupIds) {
-          const invites = await inviteGroupToTournament(tournamentId, groupId, { correlationId });
-          total += Array.isArray(invites) ? invites.length : 0;
-        }
-        setGroupSuccess(
-          total === 0
-            ? t('mob.tournament.invite_group_none_new')
-            : t(
-                total === 1
-                  ? 'mob.game_detail.invite_group_sent_one'
-                  : 'mob.game_detail.invite_group_sent_other',
-                { count: total },
-              ),
-        );
-      });
-      setSelectedGroupIds([]);
-    } catch (e) {
-      setGroupError(failureMessage(e, t('mob.game_detail.invite_group_error')));
-    } finally {
-      setGroupSubmitting(false);
-    }
-  };
-
-  const sendUserInvite = async (): Promise<void> => {
-    if (!pickedUser && !pickedEmail) {
-      setUserError(t('mob.game_detail.invite_choose'));
-      return;
-    }
-    setUserError(null);
-    setUserSuccess(null);
-    setUserSubmitting(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        if (pickedEmail) {
-          await inviteEmailToTournament(tournamentId, pickedEmail, { correlationId });
-          setUserSuccess(t('mob.game_detail.invite_sent', { name: pickedEmail }));
-          setPickedEmail(null);
-        } else if (pickedUser) {
-          await inviteUserToTournament(tournamentId, pickedUser.id, { correlationId });
-          setUserSuccess(t('mob.game_detail.invite_sent', { name: pickedUser.nickname }));
-          setPickedUser(null);
-        }
-      });
-    } catch (e) {
-      setUserError(failureMessage(e, t('mob.game_detail.invite_error')));
-    } finally {
-      setUserSubmitting(false);
-    }
-  };
-
-  const showButtons = form === 'none';
 
   return (
     <View>
-      {showButtons ? (
-        <Card style={styles.card}>
-          {canInviteGroup ? (
-            <AddEntryRow
-              title={t('mob.game_detail.invite_group')}
-              onPress={openGroup}
-              testID="invite-group-entry"
-            />
-          ) : null}
-          {canInviteUser ? (
-            <AddEntryRow
-              title={t('mob.game_detail.invite_player')}
-              onPress={openUser}
-              testID="invite-player-entry"
-            />
-          ) : null}
+      <InviteCard
+        onInviteGroups={canInviteGroup ? () => setPickerTab('groups') : undefined}
+        onInvitePlayers={canInviteUser ? () => setPickerTab('players') : undefined}
+        footer={
           <ActionButton
             label={t('mob.game_detail.share')}
             icon={<LinkIcon size={18} />}
             onPress={share.open}
             last
           />
-        </Card>
-      ) : null}
+        }
+      />
 
-      {form === 'group' ? (
-        <Card style={styles.card}>
-          <Text style={styles.formTitle}>{t('mob.game_detail.invite_group')}</Text>
-          <Text style={styles.formHint}>{t('mob.tournament.invite_group_hint')}</Text>
-          {groupsLoading ? (
-            <Text style={styles.formHint}>{t('mob.game_detail.groups_loading')}</Text>
-          ) : myGroups.length === 0 ? (
-            <Text style={styles.formHint}>{t('mob.create_game.no_groups')}</Text>
-          ) : (
-            <GroupInviteList
-              groups={myGroups}
-              selectedIds={selectedGroupIds}
-              onToggle={toggleGroup}
-              disabled={groupSubmitting}
-            />
-          )}
-          {groupError ? <Text style={styles.errorText}>{groupError}</Text> : null}
-          {groupSuccess ? <Text style={styles.successText}>{groupSuccess}</Text> : null}
-          <View style={styles.formButtonsRow}>
-            <Button
-              label={t('mob.game_detail.send_group_invite')}
-              variant="primary"
-              onPress={sendGroupInvites}
-              loading={groupSubmitting}
-              disabled={selectedGroupIds.length === 0 || groupSubmitting}
-              style={styles.rowButton}
-            />
-            <Button
-              label={t('mob.common.close')}
-              variant="secondary"
-              onPress={closeForm}
-              disabled={groupSubmitting}
-              style={styles.rowButton}
-            />
-          </View>
-        </Card>
-      ) : null}
-
-      {form === 'user' ? (
-        <Card style={styles.card}>
-          <Text style={styles.formTitle}>{t('mob.game_detail.invite_player')}</Text>
-          <Text style={styles.formHint}>{t('mob.tournament.invite_player_hint')}</Text>
-          {pickedUser ? (
-            <View style={styles.selectedRow}>
-              <UserPressable
-                person={{
-                  userId: pickedUser.id,
-                  displayName: pickedUser.display_name,
-                  nickname: pickedUser.nickname ?? null,
-                  photoUrl: pickedUser.image_url,
-                }}
-                menu={candidateMenu}
-                style={styles.selectedNames}
-              >
-                <UserAvatar
-                  imageUrl={pickedUser.image_url}
-                  name={pickedUser.display_name}
-                  size={36}
-                  fallback="initials"
-                />
-                <View style={styles.selectedPerson}>
-                  <PersonNames displayName={pickedUser.display_name} nickname={pickedUser.nickname} />
-                </View>
-              </UserPressable>
-              <AddRemoveControl
-                mode="staged"
-                staged
-                name={pickedUser.display_name}
-                onStage={noop}
-                onUnstage={() => setPickedUser(null)}
-                disabled={userSubmitting}
-              />
-            </View>
-          ) : pickedEmail ? (
-            <View style={styles.selectedRow}>
-              <Text style={styles.selectedText}>
-                {t('mob.group_detail.invite_by_email', { email: pickedEmail })}
-              </Text>
-              <AddRemoveControl
-                mode="staged"
-                staged
-                name={pickedEmail}
-                onStage={noop}
-                onUnstage={() => setPickedEmail(null)}
-                disabled={userSubmitting}
-              />
-            </View>
-          ) : (
-            <UserSearchPicker
-              onSelect={setPickedUser}
-              onSelectEmail={setPickedEmail}
-              entityLabel={t('mob.user_search.entity_player')}
-              disabled={userSubmitting}
-            />
-          )}
-          {userError ? <Text style={styles.errorText}>{userError}</Text> : null}
-          {userSuccess ? <Text style={styles.successText}>{userSuccess}</Text> : null}
-          <View style={styles.formButtonsRow}>
-            <Button
-              label={t('mob.group_detail.send_invite')}
-              variant="primary"
-              onPress={sendUserInvite}
-              loading={userSubmitting}
-              disabled={(!pickedUser && !pickedEmail) || userSubmitting}
-              style={styles.rowButton}
-            />
-            <Button
-              label={t('mob.common.close')}
-              variant="secondary"
-              onPress={closeForm}
-              disabled={userSubmitting}
-              style={styles.rowButton}
-            />
-          </View>
-        </Card>
-      ) : null}
-
-      <UserMenuSheet menu={candidateMenu} />
+      <InvitePicker
+        visible={pickerTab !== null}
+        onClose={() => setPickerTab(null)}
+        title={title}
+        initialTab={pickerTab ?? 'players'}
+        allowGroups={canInviteGroup}
+        senders={senders}
+        alreadyInPeople={alreadyInPeople}
+        alreadyInHeading={t('mob.gv.already_in_tournament')}
+        alreadyInGroupLabel={t('mob.respond.via.invitation')}
+        failureDetail={failureDetail}
+        onSent={handleSent}
+      />
       <ShareActionSheet
         visible={share.sheetVisible}
         title={t('mob.game_detail.share_title')}
@@ -347,6 +163,7 @@ export default function TournamentInvitePanel({ tournamentId, access }: Props): 
         onClose={share.close}
       />
       <Toast message={share.toastMessage} onDismiss={share.clearToast} />
+      <Toast message={notice} onDismiss={() => setNotice(null)} />
     </View>
   );
 }
@@ -384,11 +201,7 @@ function ActionButton({
   );
 }
 
-/** A staged selection is already added: its control only offers "−". */
-const noop = (): void => undefined;
-
 const styles = StyleSheet.create({
-  card: { marginBottom: spacing.md },
   actionBtn: {
     minHeight: sizes.touchTarget,
     borderRadius: radius.md,
@@ -409,35 +222,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionBtnText: { ...typography.bodyBold, color: colors.textPrimary },
-  formTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.xs },
-  formHint: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.md },
-  errorText: {
-    ...typography.body,
-    color: colors.error,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
-  successText: {
-    ...typography.body,
-    color: colors.success,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  formButtonsRow: { flexDirection: 'row', marginTop: spacing.md, gap: spacing.sm },
-  rowButton: { flex: 1, marginBottom: 0 },
-  selectedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: borderWidth.thin,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-  },
-  selectedText: { ...typography.bodyBold, color: colors.textPrimary },
-  selectedNames: { flexDirection: 'row', alignItems: 'center', flexShrink: 1 },
-  selectedPerson: { flexShrink: 1, marginLeft: spacing.sm },
 });

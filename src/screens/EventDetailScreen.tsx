@@ -26,6 +26,7 @@ import {
   getEvent,
   getEventClosure,
   getEventParticipants,
+  getEventInvitations,
   getEventResponses,
   inviteEmailToEvent,
   inviteGroupToEvent,
@@ -50,18 +51,17 @@ import Button from '../components/Button';
 import { iosPickerThemeProps } from '../components/iosPickerTheme';
 import Card from '../components/Card';
 import ErrorView from '../components/ErrorView';
-import AddRemoveControl, { AddEntryRow, GroupInviteList } from '../components/AddRemoveControl';
 import GroupMultiSelect from '../components/GroupMultiSelect';
-import GroupNamesRow from '../components/GroupNamesRow';
 import UserAvatar from '../components/UserAvatar';
-import PersonNames from '../components/PersonNames';
 import LoadingView from '../components/LoadingView';
 import ShareActionSheet from '../components/ShareActionSheet';
 import Toast from '../components/Toast';
-import UserSearchPicker from '../components/UserSearchPicker';
 import { useAppShare } from '../hooks/useAppShare';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
-import VenueDetailCard from '../components/venue/VenueDetailCard';
+import VenueRow from '../components/venue/VenueRow';
+import InviteTypeRow from '../components/invite/InviteTypeRow';
+import InviteCard from '../components/invite/InviteCard';
+import InvitePicker, { type InviteSendResult, type InviteTab } from '../components/invite/InvitePicker';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import NumberField from '../components/NumberField';
 import ScreenContainer from '../components/ScreenContainer';
@@ -81,7 +81,6 @@ import {
   CalendarIcon,
   ClockIcon,
   LinkIcon,
-  PeopleIcon,
   PinIcon,
   TargetIcon,
 } from '../components/icons/SharedIcons';
@@ -110,17 +109,18 @@ import {
 import type {
   ClosureResponse,
   Event,
+  EventInvitation,
   EventParticipant,
   EventSkillLevel,
   ResponsesResponse,
   UpdateEventInput,
 } from '../types/event';
 import type { Group } from '../types/group';
-import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { useUserMenu } from '../hooks/useUserMenu';
+import type { AlreadyInPerson } from '../components/UserSearchPicker';
 import UserMenuSheet from '../components/user/UserMenuSheet';
 import UserPressable from '../components/user/UserPressable';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
@@ -154,22 +154,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Share + invite state (restored; removed in 5f04b95)
+  // Share + invite state
   const share = useAppShare();
-  const [isInviteGroupOpen, setIsInviteGroupOpen] = useState(false);
-  const [myGroups, setMyGroups] = useState<Group[]>([]);
-  const [isGroupsLoading, setIsGroupsLoading] = useState(false);
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
-  const [isInviteGroupSubmitting, setIsInviteGroupSubmitting] = useState(false);
-  const [inviteGroupError, setInviteGroupError] = useState<string | null>(null);
-  const [inviteGroupSuccess, setInviteGroupSuccess] = useState<string | null>(null);
-
-  const [isInviteUserOpen, setIsInviteUserOpen] = useState(false);
-  const [selectedInviteUser, setSelectedInviteUser] = useState<UserSearchResult | null>(null);
-  const [selectedInviteEmail, setSelectedInviteEmail] = useState<string | null>(null);
-  const [isInviteUserSubmitting, setIsInviteUserSubmitting] = useState(false);
-  const [inviteUserError, setInviteUserError] = useState<string | null>(null);
-  const [inviteUserSuccess, setInviteUserSuccess] = useState<string | null>(null);
+  // The invite picker (GV-5): which tab it opens on, `null` = closed.
+  const [pickerTab, setPickerTab] = useState<InviteTab | null>(null);
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
 
   // Delete modal state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -183,6 +172,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   // Organizer responses state (dr-mobile / DES-MEETUP-ADDENDUM-decline-response AD-5)
   const [responses, setResponses] = useState<ResponsesResponse | null>(null);
+  const [invitations, setInvitations] = useState<EventInvitation[] | null>(null);
 
   const closureCandidates: CandidateItem[] = useMemo(() => {
     if (closure?.candidates && closure.candidates.length > 0) {
@@ -243,7 +233,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         setLoadError(null);
       }
       try {
-        const [data, parts, closureData, responsesData] = await Promise.all([
+        const [data, parts, closureData, responsesData, invitationsData] = await Promise.all([
           getEvent(eventId),
           getEventParticipants(eventId).catch(() => null),
           typeof getEventClosure === 'function'
@@ -251,6 +241,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             : Promise.resolve(null),
           typeof getEventResponses === 'function'
             ? getEventResponses(eventId).catch(() => null)
+            : Promise.resolve(null),
+          typeof getEventInvitations === 'function'
+            ? getEventInvitations(eventId).catch(() => null)
             : Promise.resolve(null),
         ]);
         setEvent(data);
@@ -267,6 +260,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         } else {
           setResponses(null);
         }
+        setInvitations(Array.isArray(invitationsData) ? invitationsData : null);
       } catch (error) {
         // The server answers 404 for a game that is gone or no longer visible to this user
         // (AC-11): close the screen with the neutral message, once.
@@ -306,8 +300,6 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     currentUserId: user?.id,
     onChanged: () => loadEvent(true),
   });
-  // A person picked for an invitation is in no context of the viewer's yet: View Details only.
-  const candidateMenu = useUserMenu({ context: { type: 'none' }, currentUserId: user?.id });
 
   useEffect(() => {
     getClientConfig().then(cfg => {
@@ -320,125 +312,35 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const sportRecord = useSportRecord(event?.sport ?? '');
   const isOrganiser = event ? isOrganiserOf(event, user?.id) : false;
 
-  // Organiser action: Invite Group
-  const handleOpenInviteGroup = async (): Promise<void> => {
-    setInviteGroupError(null);
-    setInviteGroupSuccess(null);
-    setSelectedGroupIds([]);
-    setIsInviteUserOpen(false);
-    setIsInviteGroupOpen(true);
-    if (myGroups.length === 0) {
-      setIsGroupsLoading(true);
-      try {
-        const res = await getMyGroups();
-        setMyGroups(res.items);
-      } catch {
-        setMyGroups([]);
-      } finally {
-        setIsGroupsLoading(false);
-      }
-    }
-  };
+  // Organiser action: invite groups / players through the picker (GV-5, AD-4). The picker loops these
+  // existing calls once per staged entry.
+  const inviteSenders = useMemo(
+    () => ({
+      group: (groupId: string, correlationId: string) =>
+        inviteGroupToEvent(eventId, groupId, { correlationId }),
+      user: (userId: string, correlationId: string) =>
+        inviteUserToEvent(eventId, userId, { correlationId }),
+      email: (email: string, correlationId: string) =>
+        inviteEmailToEvent(eventId, email, { correlationId }),
+    }),
+    [eventId],
+  );
 
-  const handleCloseInviteGroup = (): void => {
-    setIsInviteGroupOpen(false);
-    setInviteGroupError(null);
-    setInviteGroupSuccess(null);
-    setSelectedGroupIds([]);
-  };
-
-  const handleToggleGroup = (groupId: string): void => {
-    setSelectedGroupIds(prev =>
-      prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId],
-    );
-  };
-
-  const handleSendGroupInvite = async (): Promise<void> => {
-    if (selectedGroupIds.length === 0) {
-      setInviteGroupError(t('mob.game_detail.invite_group_select'));
-      return;
-    }
-    setInviteGroupError(null);
-    setInviteGroupSuccess(null);
-    setIsInviteGroupSubmitting(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        let totalInvites = 0;
-        for (const groupId of selectedGroupIds) {
-          const invites = await inviteGroupToEvent(eventId, groupId, { correlationId });
-          totalInvites += invites.length;
-        }
-        setInviteGroupSuccess(
-          totalInvites > 0
-            ? t(
-                totalInvites === 1
-                  ? 'mob.game_detail.invite_group_sent_one'
-                  : 'mob.game_detail.invite_group_sent_other',
-                { count: totalInvites },
-              )
-            : t('mob.game_detail.invite_group_done'),
-        );
-      });
-      setSelectedGroupIds([]);
-    } catch (e) {
-      setInviteGroupError(getApiErrorMessage(e, t('mob.game_detail.invite_group_error')));
-    } finally {
-      setIsInviteGroupSubmitting(false);
-    }
-  };
-
-  // Organiser action: Invite Individual (user or email)
-  const handleOpenInviteUser = (): void => {
-    setInviteUserError(null);
-    setInviteUserSuccess(null);
-    setSelectedInviteUser(null);
-    setSelectedInviteEmail(null);
-    setIsInviteGroupOpen(false);
-    setIsInviteUserOpen(true);
-  };
-
-  const handleCloseInviteUser = (): void => {
-    setIsInviteUserOpen(false);
-    setInviteUserError(null);
-    setInviteUserSuccess(null);
-    setSelectedInviteUser(null);
-    setSelectedInviteEmail(null);
-  };
-
-  const handleSendUserInvite = async (): Promise<void> => {
-    if (!selectedInviteUser && !selectedInviteEmail) {
-      setInviteUserError(t('mob.game_detail.invite_choose'));
-      return;
-    }
-    setInviteUserError(null);
-    setInviteUserSuccess(null);
-    setIsInviteUserSubmitting(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        if (selectedInviteEmail) {
-          await inviteEmailToEvent(eventId, selectedInviteEmail, { correlationId });
-          setInviteUserSuccess(t('mob.game_detail.invite_sent', { name: selectedInviteEmail }));
-          setSelectedInviteEmail(null);
-        } else if (selectedInviteUser) {
-          await inviteUserToEvent(eventId, selectedInviteUser.id, { correlationId });
-          setInviteUserSuccess(
-            t('mob.game_detail.invite_sent', { name: selectedInviteUser.nickname }),
-          );
-          setSelectedInviteUser(null);
-        }
-      });
-    } catch (e) {
-      setInviteUserError(getApiErrorMessage(e, t('mob.game_detail.invite_error')));
-    } finally {
-      setIsInviteUserSubmitting(false);
+  const handleInvitesSent = (result: InviteSendResult): void => {
+    loadEvent(true);
+    if (result.failedNames.length === 0) {
+      setPickerTab(null);
+      setInviteNotice(
+        result.noNewGroups.length > 0 && result.noNewGroups.length === result.sent
+          ? t('mob.game_detail.invite_group_done')
+          : t('mob.gv.invites_sent', { count: result.sent }),
+      );
     }
   };
 
   // Start Edit Wizard
   const handleStartEdit = () => {
     if (!event) return;
-    setIsInviteGroupOpen(false);
-    setIsInviteUserOpen(false);
     setEditTitle(event.title);
     const startDate = event.starts_at ? new Date(event.starts_at) : new Date();
     setEditDateValue(startDate);
@@ -1435,6 +1337,40 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const goingParticipants = participants.filter(p => p.status === 'going');
   const emptySpotsCount = Math.max(0, totalCapacity - joinedCount);
 
+  // The groups the game is shared with, for the Invite type row (GV-3).
+  const groupNameList = event.group_names?.length
+    ? event.group_names
+    : event.group_name
+    ? [event.group_name]
+    : [];
+  const inviteGroups = (event.group_ids?.length ? event.group_ids : groupNameList).map((key, index) => ({
+    key,
+    name: groupNameList[index] ?? '',
+  }));
+  const nicknames: Record<string, string | null> = {};
+  participants.forEach(p => {
+    nicknames[p.user_id] = p.user_nickname ?? null;
+  });
+  // People already in the game for the invite picker: joined first, then still-pending invitations.
+  const alreadyInPeople: AlreadyInPerson[] = responses
+    ? [
+        ...responses.accepted.items.map(person => ({
+          id: person.user_id ?? person.display_name,
+          displayName: person.display_name,
+          nickname: person.user_id ? nicknames[person.user_id] ?? null : null,
+          photoUrl: person.photo_url ?? null,
+          statusLabel: t('mob.respond.via.joined'),
+        })),
+        ...responses.pending.items.map(person => ({
+          id: person.user_id ?? person.email ?? person.display_name,
+          displayName: person.display_name || person.email || '',
+          nickname: null,
+          photoUrl: person.photo_url ?? null,
+          statusLabel: t('mob.respond.via.invitation'),
+        })),
+      ]
+    : [];
+
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.detailScroll} keyboardShouldPersistTaps="handled">
@@ -1525,10 +1461,14 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             </View>
 
             {venueCatalogueEnabled ? (
-              <VenueDetailCard
+              <VenueRow
                 snapshot={event.venue_snapshot}
                 fallbackText={venueText}
-                courtDetails={null}
+                venueName={event.venue_name || event.location}
+                venueAddress={event.venue_address}
+                venueLat={event.venue_lat}
+                venueLng={event.venue_lng}
+                venuePlaceId={event.venue_place_id}
                 mapsApiKey={mapsApiKey}
                 eventId={event.id}
                 isOrganiser={isOrganiser}
@@ -1542,21 +1482,20 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               </View>
             )}
 
-            <View style={styles.infoRow}>
-              <View style={[styles.infoIconBox, { backgroundColor: colors.success }]}>
-                <PeopleIcon size={18} />
-              </View>
-              <Text style={styles.infoText}>
-                {event.visibility === 'group' ? t('mob.create_game.group') : t('mob.create_game.public_title')}
-              </Text>
-            </View>
-
-            {event.visibility === 'group' ? (
-              <GroupNamesRow names={event.group_names?.length ? event.group_names : event.group_name ? [event.group_name] : []} />
-            ) : null}
+            <InviteTypeRow
+              isPublic={event.visibility === 'public'}
+              groups={event.visibility === 'group' ? inviteGroups : []}
+              responses={isOrganiser ? responses : null}
+              invitations={isOrganiser ? invitations : null}
+              organizerId={event.organiser_id}
+              menuContext={{ type: 'game', id: eventId }}
+              currentUserId={user?.id}
+              onChanged={() => loadEvent(true)}
+              nicknames={nicknames}
+            />
           </Card>
 
-          {event.lifecycle_status === 'closed' ? (
+          {event.lifecycle_status === 'closed' && !isOrganiser ? (
             <ClosureSummaryCard
               outcome={event.closure_outcome ?? closure?.outcome ?? 'completed'}
               winnerName={closure?.winner?.display_name}
@@ -1566,8 +1505,20 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             />
           ) : null}
 
-          {/* Card 2: Players (hidden from non-organizers when closed) */}
-          {event.lifecycle_status !== 'closed' || isOrganiser ? (
+          {/* Organizer: Responses replaces Players (GV-4, AD-3); a failed responses call keeps Players. */}
+          {isOrganiser && responses ? (
+            <ResponsesSection
+              responses={responses}
+              entity="game"
+              menu={playerMenu}
+              summary={t('mob.gv.joined_of', { joined: joinedCount, capacity: totalCapacity })}
+              organizerId={event.organiser_id}
+              nicknames={nicknames}
+            />
+          ) : null}
+
+          {/* Players (organizer: only when the responses call failed; hidden from non-organizers when closed) */}
+          {(event.lifecycle_status !== 'closed' || isOrganiser) && !(isOrganiser && responses) ? (
             <Card style={styles.infoCard}>
               <View style={styles.playersCardHeader}>
                 <Text style={styles.playersCardTitle}>{t('mob.game_detail.players')}</Text>
@@ -1610,186 +1561,34 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             </Card>
           ) : null}
 
-          {/* Organiser closure notice / action when not closed */}
-          {event.lifecycle_status !== 'closed' && isOrganiser ? (
-            !isGameEnded ? (
-              <View style={styles.closureNoticeBox} testID="closure-opens-notice">
-                <Text style={styles.closureNoticeText}>{t('mob.closure.opens_when_ended')}</Text>
-              </View>
-            ) : (
-              <View style={styles.closureActionContainer}>
-                <Button
-                  label={t('mob.closure.action.close_game')}
-                  variant="primary"
-                  onPress={() => setIsClosureModalOpen(true)}
-                  testID="close-game-button"
-                />
-              </View>
-            )
-          ) : null}
-
-          {/* Organiser actions: Invite Group, Invite Individual, Share (restored) */}
-          {isOrganiserActionsVisible && !isInviteGroupOpen && !isInviteUserOpen ? (
-            <Card style={styles.infoCard}>
-              <AddEntryRow
-                title={t('mob.game_detail.invite_group')}
-                onPress={handleOpenInviteGroup}
-                testID="invite-group-entry"
-              />
-              <AddEntryRow
-                title={t('mob.game_detail.invite_player')}
-                onPress={handleOpenInviteUser}
-                testID="invite-player-entry"
-              />
-
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('mob.game_detail.share')}
-                onPress={share.open}
-                style={[styles.actionBtn, styles.whiteActionBtn, styles.actionBtnLast]}
-              >
-                <View style={styles.actionBtnContent}>
-                  <View
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                    aria-hidden={true}
-                    style={styles.actionBtnIcon}
-                  >
-                    <LinkIcon size={18} />
-                  </View>
-                  <Text style={styles.whiteActionBtnText}>
-                    {stripIconGlyphs(t('mob.game_detail.share'))}
-                  </Text>
-                </View>
-              </Pressable>
-            </Card>
-          ) : null}
-
-          {/* Invite Group form */}
-          {isInviteGroupOpen ? (
-            <Card style={styles.infoCard}>
-              <Text style={styles.formTitle}>{t('mob.game_detail.invite_group')}</Text>
-              <Text style={styles.formHint}>{t('mob.game_detail.invite_group_hint')}</Text>
-              {isGroupsLoading ? (
-                <Text style={styles.formHint}>{t('mob.game_detail.groups_loading')}</Text>
-              ) : myGroups.length === 0 ? (
-                <Text style={styles.formHint}>{t('mob.create_game.no_groups')}</Text>
-              ) : (
-                <GroupInviteList
-                  groups={myGroups}
-                  selectedIds={selectedGroupIds}
-                  onToggle={handleToggleGroup}
-                  disabled={isInviteGroupSubmitting}
-                />
-              )}
-              {inviteGroupError ? <Text style={styles.errorText}>{inviteGroupError}</Text> : null}
-              {inviteGroupSuccess ? (
-                <Text style={styles.successText}>{inviteGroupSuccess}</Text>
-              ) : null}
-              <View style={styles.formButtonsRow}>
-                <Button
-                  label={t('mob.game_detail.send_group_invite')}
-                  variant="primary"
-                  onPress={handleSendGroupInvite}
-                  loading={isInviteGroupSubmitting}
-                  disabled={selectedGroupIds.length === 0 || isInviteGroupSubmitting}
-                  style={styles.rowButton}
-                />
-                <Button
-                  label={t('mob.common.close')}
-                  variant="secondary"
-                  onPress={handleCloseInviteGroup}
-                  disabled={isInviteGroupSubmitting}
-                  style={styles.rowButton}
-                />
-              </View>
-            </Card>
-          ) : null}
-
-          {/* Invite Individual form (user search or email) */}
-          {isInviteUserOpen ? (
-            <Card style={styles.infoCard}>
-              <Text style={styles.formTitle}>{t('mob.game_detail.invite_player')}</Text>
-              <Text style={styles.formHint}>{t('mob.game_detail.invite_player_hint')}</Text>
-              {selectedInviteUser ? (
-                <View style={styles.selectedInviteRow}>
-                  <UserPressable
-                    person={{
-                      userId: selectedInviteUser.id,
-                      displayName: selectedInviteUser.display_name,
-                      nickname: selectedInviteUser.nickname ?? null,
-                      photoUrl: selectedInviteUser.image_url,
-                    }}
-                    menu={candidateMenu}
-                    style={styles.selectedInviteNames}
-                  >
-                    <UserAvatar
-                      imageUrl={selectedInviteUser.image_url}
-                      name={selectedInviteUser.display_name}
-                      size={36}
-                      fallback="initials"
-                    />
-                    <View style={styles.selectedInvitePerson}>
-                      <PersonNames
-                        displayName={selectedInviteUser.display_name}
-                        nickname={selectedInviteUser.nickname}
-                      />
+          {/* Organizer: Invite card with the picker entries (GV-5) */}
+          {isOrganiserActionsVisible ? (
+            <InviteCard
+              onInviteGroups={() => setPickerTab('groups')}
+              onInvitePlayers={() => setPickerTab('players')}
+              footer={
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('mob.game_detail.share')}
+                  onPress={share.open}
+                  style={[styles.actionBtn, styles.whiteActionBtn, styles.actionBtnLast]}
+                >
+                  <View style={styles.actionBtnContent}>
+                    <View
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                      aria-hidden={true}
+                      style={styles.actionBtnIcon}
+                    >
+                      <LinkIcon size={18} />
                     </View>
-                  </UserPressable>
-                  <AddRemoveControl
-                    mode="staged"
-                    staged
-                    name={selectedInviteUser.display_name}
-                    onStage={noop}
-                    onUnstage={() => setSelectedInviteUser(null)}
-                    disabled={isInviteUserSubmitting}
-                  />
-                </View>
-              ) : selectedInviteEmail ? (
-                <View style={styles.selectedInviteRow}>
-                  <Text style={styles.selectedInviteText}>
-                    {t('mob.group_detail.invite_by_email', { email: selectedInviteEmail })}
-                  </Text>
-                  <AddRemoveControl
-                    mode="staged"
-                    staged
-                    name={selectedInviteEmail}
-                    onStage={noop}
-                    onUnstage={() => setSelectedInviteEmail(null)}
-                    disabled={isInviteUserSubmitting}
-                  />
-                </View>
-              ) : (
-                <UserSearchPicker
-                  onSelect={setSelectedInviteUser}
-                  onSelectEmail={setSelectedInviteEmail}
-                  entityLabel={t('mob.user_search.entity_player')}
-                  excludeEventId={eventId}
-                  disabled={isInviteUserSubmitting}
-                />
-              )}
-              {inviteUserError ? <Text style={styles.errorText}>{inviteUserError}</Text> : null}
-              {inviteUserSuccess ? (
-                <Text style={styles.successText}>{inviteUserSuccess}</Text>
-              ) : null}
-              <View style={styles.formButtonsRow}>
-                <Button
-                  label={t('mob.group_detail.send_invite')}
-                  variant="primary"
-                  onPress={handleSendUserInvite}
-                  loading={isInviteUserSubmitting}
-                  disabled={(!selectedInviteUser && !selectedInviteEmail) || isInviteUserSubmitting}
-                  style={styles.rowButton}
-                />
-                <Button
-                  label={t('mob.common.close')}
-                  variant="secondary"
-                  onPress={handleCloseInviteUser}
-                  disabled={isInviteUserSubmitting}
-                  style={styles.rowButton}
-                />
-              </View>
-            </Card>
+                    <Text style={styles.whiteActionBtnText}>
+                      {stripIconGlyphs(t('mob.game_detail.share'))}
+                    </Text>
+                  </View>
+                </Pressable>
+              }
+            />
           ) : null}
 
           {/* Non-organiser RSVP Actions */}
@@ -1858,16 +1657,57 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             </View>
           ) : null}
 
-          {isOrganiser && responses ? (
-            <ResponsesSection responses={responses} />
+          {/* Closure panel / notice and Close action go last (GV-7) */}
+          {event.lifecycle_status === 'closed' && isOrganiser ? (
+            <ClosureSummaryCard
+              outcome={event.closure_outcome ?? closure?.outcome ?? 'completed'}
+              winnerName={closure?.winner?.display_name}
+              runnerUpName={closure?.runner_up?.display_name}
+              canEdit={isOrganiser && (closure?.can_close ?? true)}
+              onEditPress={() => setIsClosureModalOpen(true)}
+            />
           ) : null}
+
+          {/* Organiser closure notice / action when not closed */}
+          {event.lifecycle_status !== 'closed' && isOrganiser ? (
+            !isGameEnded ? (
+              <View style={styles.closureNoticeBox} testID="closure-opens-notice">
+                <Text style={styles.closureNoticeText}>{t('mob.closure.opens_when_ended')}</Text>
+              </View>
+            ) : (
+              <View style={styles.closureActionContainer}>
+                <Button
+                  label={t('mob.closure.action.close_game')}
+                  variant="primary"
+                  onPress={() => setIsClosureModalOpen(true)}
+                  testID="close-game-button"
+                />
+              </View>
+            )
+          ) : null}
+
 
           {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
         </View>
       </ScrollView>
 
       <UserMenuSheet menu={playerMenu} />
-      <UserMenuSheet menu={candidateMenu} />
+      <InvitePicker
+        visible={pickerTab !== null}
+        onClose={() => setPickerTab(null)}
+        title={event.title}
+        initialTab={pickerTab ?? 'players'}
+        allowGroups
+        senders={inviteSenders}
+        excludeEventId={eventId}
+        alreadyInPeople={alreadyInPeople}
+        alreadyInHeading={t('mob.gv.already_in')}
+        alreadyInGroupIds={event.group_ids ?? []}
+        alreadyInGroupLabel={t('mob.respond.via.invitation')}
+        failureDetail={e => getApiErrorMessage(e, '') || null}
+        onSent={handleInvitesSent}
+      />
+      <Toast message={inviteNotice} onDismiss={() => setInviteNotice(null)} />
       <ShareActionSheet
         visible={share.sheetVisible}
         title={t('mob.game_detail.share_title')}
@@ -1954,9 +1794,6 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     </View>
   );
 }
-
-/** A staged selection is already added: its control only offers "−". */
-const noop = (): void => undefined;
 
 const styles = StyleSheet.create({
   screen: {

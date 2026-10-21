@@ -50,7 +50,7 @@ describe('banner per my_invitation_status', () => {
   it('shows regardless of my_invite_access (an invitee has none)', async () => {
     const root = await mountTournament({ my_invitation_status: 'pending', my_invite_access: 'none' });
     expect(hasButton(root, 'Accept')).toBe(true);
-    expect(hasButton(root, 'Invite Player')).toBe(false);
+    expect(hasButton(root, 'Invite players')).toBe(false);
   });
 });
 

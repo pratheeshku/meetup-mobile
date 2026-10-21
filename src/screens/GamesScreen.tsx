@@ -8,7 +8,9 @@
  *   set plus the Open (Recommended) set — earliest first, via the same
  *   `utils/gameLists` module Home uses. Scope chips All / Mine / Open sit
  *   under the switch and combine with the same sport chips as Home (AD-9:
- *   multi-select, skill default on first render, never overwritten).
+ *   multi-select, skill default on first render, never overwritten). Chips
+ *   read Mine | Public | All, Mine by default; the Active | All switch sits in
+ *   the same row, right-aligned (DES-MEETUP-ADDENDUM-game-view-redesign GV-1, AD-8).
  *   Rows reuse Home's `GameRow` and add one status badge.
  *
  * Each segment keeps its own state when you switch (both stay mounted once
@@ -66,9 +68,9 @@ const SEGMENTS: ReadonlyArray<{ value: Segment; labelKey: LabelKey }> = [
 ];
 
 const SCOPES: ReadonlyArray<{ value: GamesScope; labelKey: LabelKey; a11yKey: LabelKey }> = [
-  { value: 'all', labelKey: 'mob.games.scope_all', a11yKey: 'mob.games.scope_all_a11y' },
   { value: 'mine', labelKey: 'mob.games.scope_mine', a11yKey: 'mob.games.scope_mine_a11y' },
   { value: 'open', labelKey: 'mob.games.scope_open', a11yKey: 'mob.games.scope_open_a11y' },
+  { value: 'all', labelKey: 'mob.games.scope_all', a11yKey: 'mob.games.scope_all_a11y' },
 ];
 
 const SCOPE_EMPTY: Record<GamesScope, LabelKey> = {
@@ -80,34 +82,40 @@ const SCOPE_EMPTY: Record<GamesScope, LabelKey> = {
 function ScopeChips({
   value,
   onChange,
+  trailing,
 }: {
   value: GamesScope;
   onChange: (scope: GamesScope) => void;
+  /** Right-aligned control in the same row (the Active | All switch). */
+  trailing?: React.ReactNode;
 }): React.JSX.Element {
   const t = useT();
   return (
     <View style={styles.scopeRow}>
-      {SCOPES.map(scope => {
-        const selected = scope.value === value;
-        return (
-          <Pressable
-            key={scope.value}
-            accessibilityRole="button"
-            accessibilityLabel={t(scope.a11yKey)}
-            accessibilityState={{ selected }}
-            onPress={() => onChange(scope.value)}
-            style={({ pressed }) => [
-              styles.scopeChip,
-              selected ? styles.scopeChipSelected : null,
-              pressed ? styles.pressed : null,
-            ]}
-          >
-            <Text style={[styles.scopeText, selected ? styles.scopeTextSelected : null]}>
-              {t(scope.labelKey)}
-            </Text>
-          </Pressable>
-        );
-      })}
+      <View style={styles.scopeChips}>
+        {SCOPES.map(scope => {
+          const selected = scope.value === value;
+          return (
+            <Pressable
+              key={scope.value}
+              accessibilityRole="button"
+              accessibilityLabel={t(scope.a11yKey)}
+              accessibilityState={{ selected }}
+              onPress={() => onChange(scope.value)}
+              style={({ pressed }) => [
+                styles.scopeChip,
+                selected ? styles.scopeChipSelected : null,
+                pressed ? styles.pressed : null,
+              ]}
+            >
+              <Text style={[styles.scopeText, selected ? styles.scopeTextSelected : null]}>
+                {t(scope.labelKey)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {trailing ? <View style={styles.scopeTrailing}>{trailing}</View> : null}
     </View>
   );
 }
@@ -270,17 +278,29 @@ function GamesSegment({
   return (
     <View style={styles.flex}>
       <View style={styles.filters}>
-        <View style={styles.viewToggleWrap}>
-          <SegmentedSwitch
-            options={[
-              { value: 'active', label: t('mob.closure.filter.active_games') },
-              { value: 'all', label: t('mob.closure.filter.all_games') },
-            ]}
-            value={viewFilter}
-            onChange={setViewFilter}
-          />
-        </View>
-        <ScopeChips value={scope} onChange={onScopeChange} />
+        <ScopeChips
+          value={scope}
+          onChange={onScopeChange}
+          trailing={
+            <SegmentedSwitch
+              compact
+              options={[
+                {
+                  value: 'active',
+                  label: t('mob.closure.filter.active_games'),
+                  shortLabel: t('mob.gv.view_active'),
+                },
+                {
+                  value: 'all',
+                  label: t('mob.closure.filter.all_games'),
+                  shortLabel: t('mob.gv.view_all'),
+                },
+              ]}
+              value={viewFilter}
+              onChange={setViewFilter}
+            />
+          }
+        />
         <View style={styles.sportsRow}>
           <SportChipsRow
             options={filter.options}
@@ -298,7 +318,7 @@ function GamesSegment({
 export default function GamesScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
   const [segment, setSegment] = useState<Segment>('games');
-  const [scope, setScope] = useState<GamesScope>(route.params?.scope ?? 'all');
+  const [scope, setScope] = useState<GamesScope>(route.params?.scope ?? 'mine');
   // Tournaments mounts the first time it is shown, then stays mounted.
   const [tournamentsVisited, setTournamentsVisited] = useState(false);
 
@@ -330,7 +350,7 @@ export default function GamesScreen({ navigation, route }: Props): React.JSX.Ele
   useEffect(() => {
     if (entryKey !== undefined && entryKey !== lastEntryKey.current) {
       lastEntryKey.current = entryKey;
-      setScope(routeScope ?? 'all');
+      setScope(routeScope ?? 'mine');
       if (routeSegment) {
         if (routeSegment === 'tournaments') {
           setTournamentsVisited(true);
@@ -426,11 +446,17 @@ const styles = StyleSheet.create({
   hidden: { display: 'none' },
   switchWrap: { padding: spacing.md, paddingBottom: spacing.sm },
   filters: { paddingHorizontal: spacing.md },
-  viewToggleWrap: { marginBottom: spacing.sm },
   sportsRow: { marginTop: spacing.sm, marginBottom: spacing.sm },
   pad: { paddingHorizontal: spacing.md },
   listContent: { padding: spacing.md, paddingTop: spacing.sm },
-  scopeRow: { flexDirection: 'row', gap: spacing.sm },
+  scopeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  scopeChips: { flexDirection: 'row', gap: spacing.sm, flexShrink: 1 },
+  scopeTrailing: { flexShrink: 0 },
   scopeChip: {
     minHeight: dashSize.touchTarget,
     minWidth: dashSize.touchTarget,

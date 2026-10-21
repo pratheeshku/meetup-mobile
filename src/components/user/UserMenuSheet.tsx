@@ -1,13 +1,13 @@
 /**
- * The user menu and the details view (DES-MEETUP-ADDENDUM-user-details-menu.md AD-4; board
- * docs/mockups/user-menu/ M1-M8). Pure presentation: all state comes from `useUserMenu`.
+ * The combined user pop-up (DES-MEETUP-ADDENDUM-game-view-redesign AD-7, GV-6; boards
+ * docs/design/game-view-redesign/popups). Pure presentation: all state comes from `useUserMenu`.
  *
- * - Menu (M1, M2, M4, M6): bottom sheet, person header, "View Details" first, then only the
- *   actions the server allowed (destructive in the error tone), a loading row while the card loads.
- * - Details (M3, M3b, M7, M8): "Details" title and "Close", 88 px picture, display name, nickname
- *   or the "No nickname" label in muted text.
- * - Confirmation (M5): centred dialog with Cancel and Yes.
- * - Notices (M6): the hook's notice shows as a toast, above the sheet while it is open.
+ * - Sheet: identity on top (picture, display name, nickname or the "No nickname" label, and the
+ *   response/role badge when the host row passes one), then a loading row while the card loads,
+ *   then only the actions the server allowed (destructive in the error tone), then Close. There is
+ *   no separate "View Details" step.
+ * - Confirmation: centred dialog with Cancel and Yes.
+ * - Notices: the hook's notice shows as a toast, above the sheet while it is open.
  */
 import React from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -17,12 +17,10 @@ import { useT } from '../../labels/LabelsContext';
 import { colors, groupView, radius, sizes, spacing, typography } from '../../theme/tokens';
 import { OwnerIcon } from '../icons/ActionIcons';
 import { PersonMinusIcon, ShieldMinusIcon, ShieldPlusIcon } from '../icons/GroupViewIcons';
-import { InfoIcon } from '../icons/HomeV2Icons';
 import ScreenContainer from '../ScreenContainer';
 import Toast from '../Toast';
 import UserAvatar from '../UserAvatar';
 
-const HEADER_AVATAR_SIZE = 40;
 const ICON_BOX = 28;
 const ICON_SIZE = 24;
 const GRABBER_WIDTH = 36;
@@ -39,6 +37,21 @@ function actionIcon(icon: ActionIconKey, color: string): React.JSX.Element {
       return <PersonMinusIcon size={ICON_SIZE} color={color} />;
   }
 }
+
+const BADGE_BG = {
+  accepted: { backgroundColor: colors.successLight },
+  declined: { backgroundColor: colors.errorLight },
+  pending: { backgroundColor: colors.track },
+  organizer: { backgroundColor: colors.ownerChipBg },
+  neutral: { backgroundColor: colors.track },
+} as const;
+const BADGE_TEXT = {
+  accepted: { color: colors.successDark },
+  declined: { color: colors.error },
+  pending: { color: colors.textSecondary },
+  organizer: { color: colors.ownerChipText },
+  neutral: { color: colors.textSecondary },
+} as const;
 
 export default function UserMenuSheet({ menu }: { menu: UserMenuApi }): React.JSX.Element | null {
   const t = useT();
@@ -57,31 +70,35 @@ export default function UserMenuSheet({ menu }: { menu: UserMenuApi }): React.JS
   const photoUrl = card ? card.photo_url : person.photoUrl;
   const nickname = card ? card.nickname : person.nickname;
 
-  const header = (
-    <View style={styles.personHeader}>
-      <UserAvatar imageUrl={photoUrl} name={displayName} size={HEADER_AVATAR_SIZE} fallback="initials" />
-      <Text style={styles.headerName} numberOfLines={1}>
+  const badge = person.badge ?? null;
+
+  const identity = (
+    <View style={styles.identity} testID="user-menu-details">
+      <UserAvatar imageUrl={photoUrl} name={displayName} size={sizes.avatar} fallback="initials" />
+      <Text style={styles.identityName} numberOfLines={2}>
         {displayName}
       </Text>
+      {nickname ? (
+        <Text style={styles.identityNickname} numberOfLines={1}>
+          {nickname}
+        </Text>
+      ) : nickname === null ? (
+        <Text style={[styles.identityNickname, styles.identityNoNickname]} numberOfLines={1}>
+          {t('mob.user_menu.no_nickname')}
+        </Text>
+      ) : null}
+      {badge ? (
+        <View style={[styles.badge, BADGE_BG[badge.tone]]} testID="user-menu-badge">
+          <Text style={[styles.badgeText, BADGE_TEXT[badge.tone]]}>{badge.label}</Text>
+        </View>
+      ) : null}
     </View>
   );
 
-  const menuBody = (
+  const sheetBody = (
     <>
       <View style={styles.grabber} />
-      {header}
-      <Pressable
-        style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
-        onPress={menu.showDetails}
-        accessibilityRole="button"
-        accessibilityLabel={t('mob.user_menu.view_details')}
-        testID="user-menu-view-details"
-      >
-        <View style={styles.iconBox}>
-          <InfoIcon size={ICON_SIZE} color={groupView.textSecondary} />
-        </View>
-        <Text style={styles.rowText}>{t('mob.user_menu.view_details')}</Text>
-      </Pressable>
+      {identity}
       {menu.cardStatus === 'loading' ? (
         <View style={styles.loadingRow} testID="user-menu-loading">
           <ActivityIndicator size="small" color={colors.primary} />
@@ -107,41 +124,16 @@ export default function UserMenuSheet({ menu }: { menu: UserMenuApi }): React.JS
           </Pressable>
         );
       })}
+      <Pressable
+        onPress={menu.close}
+        style={styles.closeButton}
+        accessibilityRole="button"
+        accessibilityLabel={t('mob.user_menu.close')}
+        testID="user-menu-close"
+      >
+        <Text style={styles.closeButtonText}>{t('mob.user_menu.close')}</Text>
+      </Pressable>
     </>
-  );
-
-  const detailsBody = (
-    <View testID="user-menu-details">
-      <View style={styles.detailsHeader}>
-        <Text style={styles.detailsTitle} accessibilityRole="header">
-          {t('mob.user_menu.details_title')}
-        </Text>
-        <Pressable
-          onPress={menu.close}
-          style={styles.closeTarget}
-          accessibilityRole="button"
-          accessibilityLabel={t('mob.user_menu.close')}
-          testID="user-menu-close"
-        >
-          <Text style={styles.closeText}>{t('mob.user_menu.close')}</Text>
-        </Pressable>
-      </View>
-      <View style={styles.detailsIdentity}>
-        <UserAvatar imageUrl={photoUrl} name={displayName} size={sizes.avatar} fallback="initials" />
-        <Text style={styles.detailsName} numberOfLines={2}>
-          {displayName}
-        </Text>
-        {nickname ? (
-          <Text style={styles.detailsNickname} numberOfLines={1}>
-            {nickname}
-          </Text>
-        ) : nickname === null ? (
-          <Text style={[styles.detailsNickname, styles.detailsNoNickname]} numberOfLines={1}>
-            {t('mob.user_menu.no_nickname')}
-          </Text>
-        ) : null}
-      </View>
-    </View>
   );
 
   const confirmBody = (
@@ -202,7 +194,7 @@ export default function UserMenuSheet({ menu }: { menu: UserMenuApi }): React.JS
               accessibilityLabel={t('mob.user_menu.menu_a11y', { name: displayName })}
               testID="user-menu-sheet"
             >
-              {menu.mode === 'details' ? detailsBody : menuBody}
+              {sheetBody}
             </View>
           </ScreenContainer>
         )}
@@ -230,13 +222,6 @@ const styles = StyleSheet.create({
     backgroundColor: groupView.divider,
     marginTop: spacing.sm,
   },
-  personHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  headerName: { ...typography.bodyBold, color: colors.textPrimary, marginLeft: spacing.md, flexShrink: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -257,40 +242,45 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: groupView.divider,
   },
-  detailsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingLeft: spacing.md,
-  },
-  detailsTitle: { ...typography.h3, color: colors.textPrimary },
-  closeTarget: {
-    minWidth: sizes.touchTarget,
-    minHeight: sizes.touchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.md,
-  },
-  closeText: { ...typography.caption, color: groupView.textSecondary },
-  detailsIdentity: {
+  identity: {
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
-  detailsName: {
+  identityName: {
     ...typography.h2,
     color: colors.textPrimary,
     marginTop: spacing.md,
     textAlign: 'center',
   },
-  detailsNickname: {
+  identityNickname: {
     ...typography.body,
     color: groupView.textSecondary,
     marginTop: spacing.xs,
     textAlign: 'center',
   },
-  detailsNoNickname: { fontStyle: 'italic', color: colors.textMuted },
+  identityNoNickname: { fontStyle: 'italic', color: colors.textMuted },
+  badge: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  badgeText: { ...typography.caption, fontWeight: '700' },
+  closeButton: {
+    minHeight: sizes.touchTarget,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeButtonText: { ...typography.bodyBold, color: colors.textPrimary },
   confirmWrap: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg },
   confirmCard: {
     backgroundColor: colors.surface,

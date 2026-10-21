@@ -1,12 +1,14 @@
 /**
- * State and behaviour of the user details menu (DES-MEETUP-ADDENDUM-user-details-menu.md AD-4,
- * AD-5, AD-7). One hook per host screen; `UserPressable` opens it, `UserMenuSheet` renders it.
+ * State and behaviour of the user pop-up (DES-MEETUP-ADDENDUM-user-details-menu.md AD-4,
+ * AD-5, AD-7, as amended by DES-MEETUP-ADDENDUM-game-view-redesign AD-7). One hook per host
+ * screen; `UserPressable` opens it, `UserMenuSheet` renders it.
  *
- * - View Details is available at once from the row identity, with no request.
- * - The card is fetched on EVERY open of the menu (never cached), only for context `group` or
+ * - ONE combined sheet: the person's identity from the row (no request) on top, the server's
+ *   actions below. Tap and long-press both open it; there is no separate details mode.
+ * - The card is fetched on EVERY open (never cached), only for context `group` or
  *   `game`, a person with a user id, and not the viewer. Actions appear only after a successful
  *   fetch and only for keys in the registry below (unknown keys are ignored). A failed or slow
- *   fetch leaves View Details only (fail closed).
+ *   fetch leaves the identity only (fail closed).
  * - The card fetch and the action it leads to share one correlation id.
  * - A 404 from the card or from an action closes the menu, shows the existing "no longer
  *   available" notice and asks the host to refetch. Any other refusal shows the server's message
@@ -38,7 +40,7 @@ import {
 /** A card that has not answered by now counts as failed (fail closed). */
 export const CARD_TIMEOUT_MS = 10000;
 
-export type UserMenuMode = 'closed' | 'menu' | 'details' | 'confirm';
+export type UserMenuMode = 'closed' | 'menu' | 'confirm';
 export type CardStatus = 'none' | 'loading' | 'ready' | 'failed';
 export type ActionIconKey = 'shield_plus' | 'shield_minus' | 'owner' | 'person_minus';
 
@@ -111,7 +113,7 @@ export interface MenuAction {
 
 export interface UseUserMenuOptions {
   context: UserMenuContext;
-  /** The signed-in user; the viewer's own avatar gets View Details only. */
+  /** The signed-in user; the viewer's own avatar gets the identity only. */
   currentUserId?: string | null;
   /** Called after an action ran (done or refused) or after a 404, so the host refetches. */
   onChanged?: () => void;
@@ -129,11 +131,10 @@ export interface UserMenuApi {
   busy: boolean;
   notice: string | null;
   clearNotice: () => void;
-  /** Tap: View Details from the row identity, no request. */
+  /** Kept for existing call sites: opens the same combined sheet as `openMenu`. */
   openDetails: (person: UserIdentity) => void;
-  /** Long-press: the menu (View Details first, then the server's actions). */
+  /** Tap and long-press: the combined sheet (identity, then the server's actions). */
   openMenu: (person: UserIdentity) => void;
-  showDetails: () => void;
   runAction: (key: UserActionKey) => void;
   confirmYes: () => void;
   confirmCancel: () => void;
@@ -182,15 +183,6 @@ export function useUserMenu({
   }, []);
 
   const close = reset;
-
-  const openDetails = useCallback((next: UserIdentity): void => {
-    openSeq.current += 1;
-    setPerson(next);
-    setCard(null);
-    setCardStatus('none');
-    setConfirmKey(null);
-    setMode('details');
-  }, []);
 
   const openMenu = useCallback(
     (next: UserIdentity): void => {
@@ -252,11 +244,6 @@ export function useUserMenu({
     },
     [reset],
   );
-
-  const showDetails = useCallback((): void => {
-    setConfirmKey(null);
-    setMode('details');
-  }, []);
 
   // The server decides which actions exist; the registry only maps keys. Unknown keys, keys that do
   // not belong to this context, and anything that asks for approval (not a v1 action) are dropped.
@@ -342,6 +329,7 @@ export function useUserMenu({
   }, []);
 
   const clearNotice = useCallback((): void => setNotice(null), []);
+  const openDetails = openMenu;
 
   const confirmAction = confirmKey ? actions.find(action => action.key === confirmKey) ?? null : null;
   const name = card?.display_name ?? person?.displayName ?? '';
@@ -361,7 +349,6 @@ export function useUserMenu({
     clearNotice,
     openDetails,
     openMenu,
-    showDetails,
     runAction,
     confirmYes,
     confirmCancel,

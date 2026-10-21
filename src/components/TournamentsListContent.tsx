@@ -130,9 +130,18 @@ export default function TournamentsListContent({
     <View style={styles.root}>
       <View style={styles.viewToggleWrap}>
         <SegmentedSwitch
+          compact
           options={[
-            { value: 'active', label: t('mob.closure.filter.active_tournaments') },
-            { value: 'all', label: t('mob.closure.filter.all_tournaments') },
+            {
+              value: 'active',
+              label: t('mob.closure.filter.active_tournaments'),
+              shortLabel: t('mob.gv.view_active'),
+            },
+            {
+              value: 'all',
+              label: t('mob.closure.filter.all_tournaments'),
+              shortLabel: t('mob.gv.view_all'),
+            },
           ]}
           value={viewFilter}
           onChange={setViewFilter}

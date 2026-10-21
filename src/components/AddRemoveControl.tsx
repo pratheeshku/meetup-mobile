@@ -221,36 +221,83 @@ export function AddEntryRow({
   );
 }
 
-/** Groups to invite: one row per group, "+" stages it, "−" removes it (screen has a submit step). */
+/**
+ * Groups to invite: one row per group, "+" stages it, "−" removes it (screen has a submit step).
+ *
+ * With `sectionLabels` (game-view-redesign GV-5, invite picker board) the rows are grouped
+ * Selected / Available / Already in this game (GV-P1): a staged group moves up to Selected with
+ * "−", a group in `alreadyIds` shows `alreadyLabel` instead of a glyph. Without it the flat list is
+ * unchanged.
+ */
 export function GroupInviteList({
   groups,
   selectedIds,
   onToggle,
   disabled = false,
+  alreadyIds = [],
+  alreadyLabel,
+  sectionLabels,
 }: {
   groups: readonly { id: string; name: string }[];
   selectedIds: readonly string[];
   onToggle: (groupId: string) => void;
   disabled?: boolean;
+  alreadyIds?: readonly string[];
+  /** Status chip text of a group already in the game. */
+  alreadyLabel?: string;
+  sectionLabels?: { selected: string; available: string; alreadyIn: string };
 }): React.JSX.Element {
+  const renderRow = (group: { id: string; name: string }, already: boolean): React.JSX.Element => (
+    <View key={group.id} style={styles.entryRow}>
+      <Text style={styles.entryTitle} numberOfLines={1}>
+        {group.name}
+      </Text>
+      <AddRemoveControl
+        mode="staged"
+        name={group.name}
+        staged={selectedIds.includes(group.id)}
+        onStage={() => onToggle(group.id)}
+        onUnstage={() => onToggle(group.id)}
+        disabled={disabled}
+        sentStatus={already ? alreadyLabel ?? null : null}
+        testID={`group-invite-${group.id}`}
+      />
+    </View>
+  );
+
+  if (!sectionLabels) {
+    return <View testID="group-invite-list">{groups.map(group => renderRow(group, false))}</View>;
+  }
+
+  const already = groups.filter(group => alreadyIds.includes(group.id));
+  const open = groups.filter(group => !alreadyIds.includes(group.id));
+  const selected = open.filter(group => selectedIds.includes(group.id));
+  const available = open.filter(group => !selectedIds.includes(group.id));
+  const heading = (text: string, testID: string): React.JSX.Element => (
+    <Text style={styles.sectionHeading} accessibilityRole="header" testID={testID}>
+      {text}
+    </Text>
+  );
   return (
     <View testID="group-invite-list">
-      {groups.map(group => (
-        <View key={group.id} style={styles.entryRow}>
-          <Text style={styles.entryTitle} numberOfLines={1}>
-            {group.name}
-          </Text>
-          <AddRemoveControl
-            mode="staged"
-            name={group.name}
-            staged={selectedIds.includes(group.id)}
-            onStage={() => onToggle(group.id)}
-            onUnstage={() => onToggle(group.id)}
-            disabled={disabled}
-            testID={`group-invite-${group.id}`}
-          />
-        </View>
-      ))}
+      {selected.length > 0 ? (
+        <>
+          {heading(sectionLabels.selected, 'group-invite-heading-selected')}
+          {selected.map(group => renderRow(group, false))}
+        </>
+      ) : null}
+      {available.length > 0 ? (
+        <>
+          {heading(sectionLabels.available, 'group-invite-heading-available')}
+          {available.map(group => renderRow(group, false))}
+        </>
+      ) : null}
+      {already.length > 0 ? (
+        <>
+          {heading(sectionLabels.alreadyIn, 'group-invite-heading-already')}
+          {already.map(group => renderRow(group, true))}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -263,6 +310,14 @@ const styles = StyleSheet.create({
     minHeight: sizes.touchTarget,
   },
   entryTitle: { ...typography.bodyBold, color: colors.textPrimary, flexShrink: 1 },
+  sectionHeading: {
+    ...typography.label,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: groupView.textSecondary,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
   wrap: { alignItems: 'flex-end' },
   target: {
     minWidth: sizes.touchTarget,

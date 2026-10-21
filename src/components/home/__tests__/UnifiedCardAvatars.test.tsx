@@ -1,5 +1,5 @@
 /**
- * The 22 px home-card avatars (design UM-06, board M7): a tap opens View Details from the card's
+ * The 22 px home-card avatars (design UM-06, board M7): a tap opens the combined user pop-up from the card's
  * own data (no card request, no long-press) and does not trigger the card's own action.
  */
 import React from 'react';
@@ -43,11 +43,12 @@ it('each avatar is its own tap target, with tap only (no long-press)', () => {
   nodes.forEach(node => expect(node.props.onLongPress).toBeUndefined());
 });
 
-it('a tap opens View Details with that person, makes no card request and does not trigger the card', async () => {
+it('a tap opens the pop-up with that person, makes no card request (no context) and does not trigger the card', async () => {
   const { root, onPress } = mount();
   await act(async () => avatarPressables(root)[1].props.onPress());
   expect(root.findAll(n => n.props.testID === 'user-menu-details').length).toBeGreaterThan(0);
-  expect(texts(root)).toEqual(expect.arrayContaining(['Details', 'Arjun S']));
+  expect(texts(root)).toEqual(expect.arrayContaining(['Arjun S']));
+  expect(texts(root)).not.toContain('View Details');
   expect(onPress).not.toHaveBeenCalled();
   const { getGroupMemberCard } = jest.requireMock('../../../api/groups');
   const { getEventPlayerCard } = jest.requireMock('../../../api/events');

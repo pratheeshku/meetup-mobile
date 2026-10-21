@@ -1,8 +1,11 @@
-/** Game and tournament detail show a Group row (icon + name) for group visibility only. */
+/**
+ * Game and tournament detail: the Invite type row (game-view-redesign GV-3) replaces the old Group row.
+ * It counts the groups for group visibility only; the Invited sheet names them.
+ */
 import React from 'react';
 
 import { apiClient } from '../../api/client';
-import { renderAsync, texts } from '../../test-utils/render';
+import { act, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import { mountTournament } from '../../test-utils/tournamentDetailHarness';
 import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
@@ -28,7 +31,9 @@ async function mountGame(overrides: Record<string, unknown>): Promise<Instance> 
   return renderAsync(<EventDetailScreen {...props} />);
 }
 
-const groupRows = (root: Instance): Instance[] => root.findAll(n => n.props.testID === 'group-name-item' && typeof n.type === 'string');
+const typeRow = (root: Instance): Instance[] => root.findAll(n => n.props.testID === 'invite-type-row' && typeof n.type === 'string');
+const openRow = async (root: Instance): Promise<void> =>
+  act(async () => root.find(n => n.props.testID === 'invite-type-row' && typeof n.props.onPress === 'function').props.onPress());
 
 beforeEach(() => {
   mockGet.mockReset();
@@ -36,38 +41,48 @@ beforeEach(() => {
 });
 
 describe('Game detail', () => {
-  it('group game: a Group row with the group name', async () => {
+  it('group game: the Invite type row counts the group and the Invited sheet names it', async () => {
     const root = await mountGame({ visibility: 'group', group_name: 'Sunday Footballers' });
-    expect(groupRows(root)).toHaveLength(1);
-    expect(texts(groupRows(root)[0])).toEqual(['Sunday Footballers']);
+    expect(texts(root)).toContain('Groups (1)');
+    expect(texts(root)).not.toContain('Sunday Footballers');
+    await openRow(root);
+    expect(texts(root)).toContain('Sunday Footballers');
   });
 
-  it.each([['public'], ['invite_only']])('%s game: no Group row, even if a name came back', async visibility => {
+  it.each([['public'], ['invite_only']])('%s game: no group count, even if a name came back', async visibility => {
     const root = await mountGame({ visibility, group_name: 'Sunday Footballers' });
-    expect(groupRows(root)).toHaveLength(0);
+    expect(texts(root)).not.toContain('Groups (1)');
     expect(texts(root)).not.toContain('Sunday Footballers');
+  });
+
+  it('a public game reads "Public" and the row is not tappable', async () => {
+    const root = await mountGame({ visibility: 'public' });
+    expect(texts(root)).toEqual(expect.arrayContaining(['Invite type', 'Public']));
+    expect(root.findAll(n => n.props.testID === 'invite-type-row' && typeof n.props.onPress === 'function')).toHaveLength(0);
   });
 
   it('group game without a name renders no empty row', async () => {
     const root = await mountGame({ visibility: 'group', group_name: null });
-    expect(groupRows(root)).toHaveLength(0);
+    expect(typeRow(root)).toHaveLength(0);
   });
 });
 
 describe('Tournament detail', () => {
-  it('group tournament: a Group row with the group name', async () => {
+  it('group tournament: the Invite type row counts the group and the Invited sheet names it', async () => {
     const root = await mountTournament({ visibility: 'group', group_name: 'Sunday Footballers' });
-    expect(groupRows(root)).toHaveLength(1);
-    expect(texts(groupRows(root)[0])).toEqual(['Sunday Footballers']);
+    expect(texts(root)).toContain('Groups (1)');
+    await openRow(root);
+    expect(texts(root)).toContain('Sunday Footballers');
   });
 
-  it.each([['public'], ['invite']])('%s tournament: no Group row', async visibility => {
+  it.each([['public'], ['invite']])('%s tournament: no group count', async visibility => {
     const root = await mountTournament({ visibility, group_name: 'Sunday Footballers' });
-    expect(groupRows(root)).toHaveLength(0);
+    expect(texts(root)).not.toContain('Groups (1)');
+    expect(texts(root)).not.toContain('Sunday Footballers');
   });
 
   it('group tournament without a name renders no empty row', async () => {
     const root = await mountTournament({ visibility: 'group', group_name: null });
-    expect(groupRows(root)).toHaveLength(0);
+    expect(typeRow(root)).toHaveLength(0);
   });
 });

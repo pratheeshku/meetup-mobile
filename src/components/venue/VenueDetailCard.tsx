@@ -37,7 +37,7 @@ import { PinIcon } from '../icons/SharedIcons';
 import { VenuePinBadgeIcon, VenuePlusIcon } from './VenueIcons';
 import { logMapFailureOnce } from './logMapFailure';
 import { useT } from '../../labels/LabelsContext';
-import { colors } from '../../theme/tokens';
+import { colors, spacing, typography } from '../../theme/tokens';
 import {
   VENUE_ORGANIZER_PHOTOS_ENABLED,
   type VenueImage,
@@ -55,6 +55,11 @@ interface VenueDetailCardProps {
   tournamentId?: string;
   venueId?: string | null;
   isOrganiser?: boolean;
+  /**
+   * `sheet` (game-view-redesign GV-2): the card is hosted in the venue bottom sheet, so the name
+   * and address are the sheet's heading instead of a boxed row. Data and photo behaviour are the same.
+   */
+  variant?: 'card' | 'sheet';
 }
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -68,6 +73,7 @@ export default function VenueDetailCard({
   tournamentId,
   venueId,
   isOrganiser = false,
+  variant = 'card',
 }: VenueDetailCardProps): React.JSX.Element {
   const t = useT();
   const [photos, setPhotos] = useState<VenueImage[]>([]);
@@ -200,14 +206,16 @@ export default function VenueDetailCard({
   return (
     <View style={styles.cardContainer}>
       {/* Venue Info Row (matching GameDetail board) */}
-      <View style={styles.venueRow}>
-        <View style={styles.pinIconBox}>
-          <PinIcon size={16} />
-        </View>
+      <View style={variant === 'sheet' ? styles.sheetInfoRow : styles.venueRow}>
+        {variant === 'sheet' ? null : (
+          <View style={styles.pinIconBox}>
+            <PinIcon size={16} />
+          </View>
+        )}
         <View style={styles.venueInfo}>
-          <Text style={styles.venueTitle}>{fullDisplayName}</Text>
+          <Text style={variant === 'sheet' ? styles.sheetTitle : styles.venueTitle}>{fullDisplayName}</Text>
           {venueAddress ? (
-            <Text style={styles.venueAddress}>{venueAddress}</Text>
+            <Text style={variant === 'sheet' ? styles.sheetAddress : styles.venueAddress}>{venueAddress}</Text>
           ) : null}
           {snapshot?.operating_hours ? (
             <Text style={styles.listedHoursText}>
@@ -488,6 +496,19 @@ const styles = StyleSheet.create({
   },
   venueInfo: {
     flex: 1,
+  },
+  sheetInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sheetTitle: {
+    ...typography.h2,
+    color: colors.textPrimary,
+  },
+  sheetAddress: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   venueTitle: {
     fontSize: 14.5,

@@ -18,7 +18,14 @@ export interface UserCardOut {
   allowed_actions: AllowedAction[];
 }
 
-/** What a row already knows about a person: enough for View Details with no request. */
+/** Response or role badge a host row passes to the combined user pop-up (game-view-redesign AD-7). */
+export interface UserBadge {
+  /** Label-system text, already resolved by the host. */
+  label: string;
+  tone: 'accepted' | 'declined' | 'pending' | 'organizer' | 'neutral';
+}
+
+/** What a row already knows about a person: enough to show the pop-up identity with no request. */
 export interface UserIdentity {
   /** `null` for a person with no linked user (tournament registration without a user id). */
   userId: string | null;
@@ -30,6 +37,8 @@ export interface UserIdentity {
    */
   nickname?: string | null;
   photoUrl?: string | null;
+  /** Response/role badge where the host list knows it (Accepted, Declined, Pending, Organizer). */
+  badge?: UserBadge | null;
 }
 
 export type UserMenuContextType = 'group' | 'game' | 'tournament' | 'none';
