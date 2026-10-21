@@ -119,3 +119,29 @@ Not provided: **screenshots next to the boards.** No Android/iOS runtime exists 
 ## 8. Git evidence
 
 See the PR; branch `claude/cool-pascal-84tbeh` off `origin/main` a887344. No `android/key.properties`, `google-services.json` or `.env` in the diff. No `versionCode` / `versionName` change.
+
+---
+
+## Follow-up entry (2026-10-21): gv-mobile-invite-source (resolves B-1)
+
+**Why.** B-1 in the entry above said the GV-3 source tags and the Players count were blocked because no client read `GET …/invitations`. That premise was wrong: the endpoint exists, has the same organizer/committee gate as Responses, and its rows carry `source_group_id` and `invited_email`. No backend change, no label change (the `mob.gv.players_count` / `via_group` / `via_individual` / `via_email` keys already existed).
+
+**What changed**
+- Types: `source_group_id?: string | null` on `EventInvitation` and `TournamentInvitation`.
+- API: `getEventInvitations(eventId, options?)` and `getTournamentInvitations(id, options?)` (plain GETs, correlation id passed through).
+- `EventDetailScreen` / `TournamentDetailScreen`: invitations fetched in parallel with responses (`.catch(() => null)`, so a refused call gives null), new `invitations` state, passed to `InviteTypeRow` under the same gate as `responses` (`isOrganiser` on games, `canReadResponses` on tournaments). Non-readers stay at null, unchanged.
+- `InviteTypeRow`: Players count = invitations with no `source_group_id`. New combined value `Groups (n) · Players (m)` only when invitations are present, there are groups, and m > 0. Public, groups-only and fallback branches unchanged. Invitations passed to `InvitedSheet`.
+- `InvitedSheet`: after the existing email and declined-`via` tags (untouched, still first), a person with a matching invitation gets `via <group>` (`source_group_id` set), else `email` (`invited_email` set), else `individual`. No matching invitation (for example a direct join) gets no tag.
+- Tests added in `InviteTypeRow.test.tsx`: count with groups, the three tags, declined tag precedence, unresolved group, no-match.
+
+**Known limit, not new.** The group name for `via <group>` is looked up only among the groups the Invite type row already has. On games that is `group_ids`/`group_names`; on tournaments it is the single `group_name`. A source group not in that list shows `via ` with a blank name. This is best-effort and matches the limitation shipped in the web build (PR #73); nothing extra is fetched to close it, and I am not introducing a new gap. The `(m)` count is unaffected by it.
+
+**Checks (one run each)**
+```
+npx tsc --noEmit        -> exit 0
+npm run check:labels    -> check-labels: OK - 245 files scanned, 1138 default labels checked.
+npx eslint <the 8 listed files + InviteTypeRow.test.tsx> -> exit 0
+npx jest --ci (full)    -> Test Suites: 14 failed, 174 passed, 188 total
+                           Tests: 162 failed, 2168 passed, 2330 total
+```
+Failing suites (all legacy, none touched here): `CreateGameScreen`, `EventDetailScreen`, `HomeScreen`, `ProfileScreen`, `ProfileScreenLinks`, `ProfileScreenReportRow`, `ProfileScreenTerms`, `keyboardInventory` (the same 8 as before), plus six that the earlier scoped run never included because it was scoped: `AppForceUpdate` and `ForceUpdateGate` ("Shuttlr" vs "GameOn SG" text), `appConfig`, `headerIcon` (missing `shuttlr-icon-header.png`), `homeComponents` (same branding), `shareLink`. These are all older branding/asset mismatches. `DetailGroupRow`, which failed in the first entry, now passes. The root-suite gap from the first entry is closed by this full run. Nothing new from this change.

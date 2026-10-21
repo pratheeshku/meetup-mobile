@@ -40,6 +40,8 @@ export interface TournamentInvitation {
   status: string;
   invitee_user_id?: string | null;
   invited_email?: string | null;
+  /** Group the invitation came from; null/absent = an individual invite. */
+  source_group_id?: string | null;
 }
 
 /** Brief's literal enum. */

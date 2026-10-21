@@ -362,6 +362,17 @@ export async function declineTournament(
   return data;
 }
 
+/** `GET /tournaments/{id}/invitations`. Organizer or committee only. */
+export async function getTournamentInvitations(
+  id: string,
+  options?: RequestOptions,
+): Promise<TournamentInvitation[]> {
+  const { data } = await apiClient.get<TournamentInvitation[]>(`/tournaments/${id}/invitations`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
 /** `GET /tournaments/{id}/responses` (DES-MEETUP-ADDENDUM-decline-response AD-5). Organizer or committee only. */
 export async function getTournamentResponses(
   id: string,

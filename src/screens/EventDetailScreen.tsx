@@ -26,6 +26,7 @@ import {
   getEvent,
   getEventClosure,
   getEventParticipants,
+  getEventInvitations,
   getEventResponses,
   inviteEmailToEvent,
   inviteGroupToEvent,
@@ -108,6 +109,7 @@ import {
 import type {
   ClosureResponse,
   Event,
+  EventInvitation,
   EventParticipant,
   EventSkillLevel,
   ResponsesResponse,
@@ -170,6 +172,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   // Organizer responses state (dr-mobile / DES-MEETUP-ADDENDUM-decline-response AD-5)
   const [responses, setResponses] = useState<ResponsesResponse | null>(null);
+  const [invitations, setInvitations] = useState<EventInvitation[] | null>(null);
 
   const closureCandidates: CandidateItem[] = useMemo(() => {
     if (closure?.candidates && closure.candidates.length > 0) {
@@ -230,7 +233,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         setLoadError(null);
       }
       try {
-        const [data, parts, closureData, responsesData] = await Promise.all([
+        const [data, parts, closureData, responsesData, invitationsData] = await Promise.all([
           getEvent(eventId),
           getEventParticipants(eventId).catch(() => null),
           typeof getEventClosure === 'function'
@@ -238,6 +241,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             : Promise.resolve(null),
           typeof getEventResponses === 'function'
             ? getEventResponses(eventId).catch(() => null)
+            : Promise.resolve(null),
+          typeof getEventInvitations === 'function'
+            ? getEventInvitations(eventId).catch(() => null)
             : Promise.resolve(null),
         ]);
         setEvent(data);
@@ -254,6 +260,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         } else {
           setResponses(null);
         }
+        setInvitations(Array.isArray(invitationsData) ? invitationsData : null);
       } catch (error) {
         // The server answers 404 for a game that is gone or no longer visible to this user
         // (AC-11): close the screen with the neutral message, once.
@@ -1479,6 +1486,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               isPublic={event.visibility === 'public'}
               groups={event.visibility === 'group' ? inviteGroups : []}
               responses={isOrganiser ? responses : null}
+              invitations={isOrganiser ? invitations : null}
               organizerId={event.organiser_id}
               menuContext={{ type: 'game', id: eventId }}
               currentUserId={user?.id}

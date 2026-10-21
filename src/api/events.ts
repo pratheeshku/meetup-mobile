@@ -491,6 +491,17 @@ export async function declineEvent(
   return data;
 }
 
+/** `GET /events/{id}/invitations`. Organizer only. */
+export async function getEventInvitations(
+  eventId: string,
+  options?: RequestOptions,
+): Promise<EventInvitation[]> {
+  const { data } = await apiClient.get<EventInvitation[]>(`/events/${eventId}/invitations`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
 /** `GET /events/{id}/responses` (DES-MEETUP-ADDENDUM-decline-response AD-5). Organizer only. */
 export async function getEventResponses(
   id: string,

@@ -20,11 +20,20 @@ import { ChevronRightIcon } from '../icons/ActionIcons';
 import { PeopleIcon } from '../icons/SharedIcons';
 import InvitedSheet, { type InvitedGroup } from './InvitedSheet';
 
+/** The invitation fields the row reads (`GET …/invitations`, organizer/committee only). */
+export type InviteSourceRow = {
+  invitee_user_id?: string | null;
+  source_group_id?: string | null;
+  invited_email?: string | null;
+};
+
 interface InviteTypeRowProps {
   isPublic: boolean;
   groups: readonly InvitedGroup[];
   /** The organizer-only responses listing; null when the viewer cannot read it. */
   responses: ResponsesResponse | null;
+  /** Invitations the viewer may read; null for anyone else. */
+  invitations?: InviteSourceRow[] | null;
   organizerId?: string | null;
   menuContext: UserMenuContext;
   currentUserId?: string | null;
@@ -38,6 +47,7 @@ export default function InviteTypeRow({
   isPublic,
   groups,
   responses,
+  invitations = null,
   organizerId,
   menuContext,
   currentUserId,
@@ -50,9 +60,15 @@ export default function InviteTypeRow({
   const people = responses ? invitedPeople(responses, organizerId) : null;
   const hasPeople = Boolean(people);
 
+  const playersCount = invitations?.filter(i => !i.source_group_id).length ?? 0;
+
   let value: string | null = null;
   if (isPublic) {
     value = t('mob.gv.invite_type_public');
+  } else if (groups.length > 0 && invitations && playersCount > 0) {
+    value = `${t('mob.gv.groups_count', { count: groups.length })} · ${t('mob.gv.players_count', {
+      count: playersCount,
+    })}`;
   } else if (groups.length > 0) {
     value = t('mob.gv.groups_count', { count: groups.length });
   } else if (hasPeople) {
@@ -104,6 +120,7 @@ export default function InviteTypeRow({
         onClose={() => setOpen(false)}
         groups={groups}
         people={people}
+        invitations={invitations}
         menuContext={menuContext}
         currentUserId={currentUserId}
         onChanged={onChanged}

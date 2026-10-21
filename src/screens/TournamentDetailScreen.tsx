@@ -45,6 +45,7 @@ import {
   getRegistrations,
   getTournament,
   getTournamentClosure,
+  getTournamentInvitations,
   getTournamentResponses,
   putTournamentClosure,
   registerForTournament,
@@ -75,6 +76,7 @@ import type {
   TournamentClosurePerson,
   TournamentClosureResponse,
   TournamentFixture,
+  TournamentInvitation,
   TournamentRegistration,
 } from '../types/tournament';
 import { showCompletion, type CompletionRow } from '../navigation/showCompletion';
@@ -138,6 +140,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
 
   // Organizer responses state (dr-mobile / DES-MEETUP-ADDENDUM-decline-response AD-5)
   const [responses, setResponses] = useState<ResponsesResponse | null>(null);
+  const [invitations, setInvitations] = useState<TournamentInvitation[] | null>(null);
 
   const closureCandidates: CandidateItem[] = useMemo(() => {
     if (closure?.candidates && closure.candidates.length > 0) {
@@ -174,7 +177,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         setLoadError(null);
       }
       try {
-        const [tournamentData, fixturesData, registrationsData, closureData, responsesData] =
+        const [tournamentData, fixturesData, registrationsData, closureData, responsesData, invitationsData] =
           await Promise.all([
             getTournament(tournamentId),
             getFixtures(tournamentId),
@@ -184,6 +187,9 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
               : Promise.resolve(null),
             typeof getTournamentResponses === 'function'
               ? getTournamentResponses(tournamentId).catch(() => null)
+              : Promise.resolve(null),
+            typeof getTournamentInvitations === 'function'
+              ? getTournamentInvitations(tournamentId).catch(() => null)
               : Promise.resolve(null),
           ]);
         setTournament(tournamentData);
@@ -197,6 +203,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         } else {
           setResponses(null);
         }
+        setInvitations(Array.isArray(invitationsData) ? invitationsData : null);
       } catch (error) {
         // 404 = gone or no longer visible to this user (AC-11, AC-07: a registered player who
         // lost access sees nothing): close with the neutral message, once.
@@ -592,6 +599,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
               : []
           }
           responses={canReadResponses ? responses : null}
+          invitations={canReadResponses ? invitations : null}
           organizerId={tournament.organiser_id}
           menuContext={{ type: 'tournament', id: tournamentId }}
           onChanged={() => loadAll(true)}

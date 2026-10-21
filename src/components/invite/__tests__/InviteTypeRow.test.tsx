@@ -115,3 +115,49 @@ describe('T3 invite type row', () => {
     expect(texts(byId(root, 'user-menu-badge')[0])).toEqual(['Pending']);
   });
 });
+
+describe('invitation sources (GV-3 tags and Players count)', () => {
+  const INVITATIONS = [
+    { invitee_user_id: 'u-1', source_group_id: 'g-1' },
+    { invitee_user_id: 'u-2', source_group_id: null },
+    { invitee_user_id: 'u-4', source_group_id: null, invited_email: 'sam@example.com' },
+    { invitee_user_id: 'u-3', source_group_id: 'g-2' },
+  ];
+
+  it('shows Groups (n) · Players (m) with m = invitations that have no source group', () => {
+    const root = mount({ invitations: INVITATIONS });
+    expect(texts(root)).toContain('Groups (2) · Players (2)');
+  });
+
+  it('keeps Groups (n) alone without invitations or without individual ones', () => {
+    expect(texts(mount({ invitations: null }))).toContain('Groups (2)');
+    expect(texts(mount({ invitations: [{ invitee_user_id: 'u-1', source_group_id: 'g-1' }] }))).toContain('Groups (2)');
+  });
+
+  it('tags people: via group, individual, email; declined via tags keep precedence', async () => {
+    const root = mount({
+      invitations: [...INVITATIONS, { invitee_user_id: 'u-3', source_group_id: 'g-2' }],
+    });
+    await open(root);
+    const sheet = texts(byId(root, 'invited-sheet')[0]);
+    // u-1 (Priya) via g-1 -> "via Tampines Badminton Crew"; u-2 (Arun) individual; u-4 (Sam) invited by email.
+    expect(sheet).toEqual(
+      expect.arrayContaining(['via Tampines Badminton Crew', 'individual', 'email']),
+    );
+    // Ravi (u-3) is declined via invitation: the existing tag wins over "via <group>".
+    const ravi = byId(root, 'invited-declined-row-0')[0];
+    expect(texts(ravi)).toContain('Invited');
+    expect(texts(ravi).some(x => x.startsWith('via '))).toBe(false);
+  });
+
+  it('a group that is not in the payload leaves the name blank; no match means no tag', async () => {
+    const root = mount({
+      invitations: [{ invitee_user_id: 'u-1', source_group_id: 'g-unknown' }],
+    });
+    await open(root);
+    const sheet = texts(byId(root, 'invited-sheet')[0]);
+    expect(sheet).toContain('via ');
+    expect(sheet).not.toContain('individual');
+  });
+});
+

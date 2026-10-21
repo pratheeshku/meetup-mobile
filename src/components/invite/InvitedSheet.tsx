@@ -45,6 +45,12 @@ interface InvitedSheetProps {
   onClose: () => void;
   groups: readonly InvitedGroup[];
   people: InvitedPeople | null;
+  /** Source of each invitation (organizer/committee); null = no source tags. */
+  invitations?: Array<{
+    invitee_user_id?: string | null;
+    source_group_id?: string | null;
+    invited_email?: string | null;
+  }> | null;
   menuContext: UserMenuContext;
   currentUserId?: string | null;
   /** Called after a pop-up action ran, so the host refetches. */
@@ -70,6 +76,7 @@ export default function InvitedSheet({
   onClose,
   groups,
   people,
+  invitations = null,
   menuContext,
   currentUserId,
   onChanged,
@@ -77,6 +84,13 @@ export default function InvitedSheet({
 }: InvitedSheetProps): React.JSX.Element {
   const t = useT();
   const menu = useUserMenu({ context: menuContext, currentUserId, onChanged });
+
+  const bySourceUser = new Map<string, NonNullable<typeof invitations>[number]>();
+  invitations?.forEach(i => {
+    if (i.invitee_user_id) {
+      bySourceUser.set(i.invitee_user_id, i);
+    }
+  });
 
   const sections: Array<{
     key: 'accepted' | 'declined' | 'pending';
@@ -106,6 +120,20 @@ export default function InvitedSheet({
       ]
     : [];
 
+  /** GV-3 source tag from the invitation row; null when none matched (for example a direct join). */
+  const sourceTag = (person: ResponsePerson): string | null => {
+    const inv = person.user_id ? bySourceUser.get(person.user_id) : undefined;
+    if (!inv) {
+      return null;
+    }
+    if (inv.source_group_id) {
+      // Best effort: only groups the payload names are resolved, otherwise the name stays blank.
+      const group = groups.find(g => g.key === inv.source_group_id)?.name ?? '';
+      return t('mob.gv.via_group', { group });
+    }
+    return inv.invited_email ? t('mob.gv.via_email') : t('mob.gv.via_individual');
+  };
+
   const renderPerson = (
     section: (typeof sections)[number],
     person: ResponsePerson,
@@ -125,7 +153,7 @@ export default function InvitedSheet({
       ? t('mob.respond.via.public')
       : section.key === 'declined' && person.via === 'joined'
       ? t('mob.respond.via.joined')
-      : null;
+      : sourceTag(person);
     const body = (
       <>
         <UserAvatar
