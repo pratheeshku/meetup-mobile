@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Games list</title>
+</head>
+<body>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1B1918}
+button{font-family:inherit}
+</style>
+<div style="width:390px;height:700px;box-sizing:border-box;background:#FAF6F1;display:flex;flex-direction:column">
+
+  <div style="background:#0D47A1;color:#fff;padding:20px 16px 14px;font-size:20px;font-weight:700">Games</div>
+
+  <div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+    <!-- Games | Tournaments (unchanged) -->
+    <div style="display:flex;background:#EFECE6;border-radius:12px;padding:3px">
+      <div style="flex:1;text-align:center;background:#fff;border-radius:10px;padding:9px 0;font-size:14px;font-weight:700;color:#1565C0;box-shadow:0 1px 2px rgba(0,0,0,.08)">Games</div>
+      <div style="flex:1;text-align:center;padding:9px 0;font-size:14px;font-weight:600;color:#52514F">Tournaments</div>
+    </div>
+
+    <!-- ONE LINE: scope chips left, Active | All toggle right -->
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;gap:6px">
+        <span style="background:#1565C0;color:#fff;border-radius:999px;padding:7px 12px;font-size:13px;font-weight:700">Mine</span>
+        <span style="background:#fff;border:1px solid #E8E4DF;color:#52514F;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600">Public</span>
+        <span style="background:#fff;border:1px solid #E8E4DF;color:#52514F;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600">All</span>
+      </div>
+      <div style="flex:1"></div>
+      <!-- real two-segment switch with a sliding thumb -->
+      <div style="display:flex;position:relative;background:#EFECE6;border-radius:999px;padding:3px;border:1px solid #E8E4DF">
+        <span style="background:#fff;color:#0D47A1;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;box-shadow:0 1px 2px rgba(0,0,0,.15)">Active</span>
+        <span style="color:#52514F;padding:5px 10px;font-size:12px;font-weight:600">All</span>
+      </div>
+    </div>
+
+    <!-- sport chips (unchanged) -->
+    <div style="display:flex;gap:8px;overflow:hidden">
+      <span style="width:40px;height:40px;border-radius:50%;background:#1565C0;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">BAD</span>
+      <span style="width:40px;height:40px;border-radius:50%;background:#E6EAF0;color:#52514F;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">TEN</span>
+      <span style="width:40px;height:40px;border-radius:50%;background:#E6EAF0;color:#52514F;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">PKL</span>
+    </div>
+
+    <!-- cards -->
+    <div style="background:#fff;border:1px solid #E8E4DF;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:16px;font-weight:700">Sunday Smash Doubles</span><span style="background:#E8F5E9;color:#166534;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700">Active</span></div>
+      <div style="font-size:13px;color:#52514F">Sat 24 Oct · 7:00 PM · Our Tampines Hub</div>
+      <div style="font-size:12px;color:#6E6D6B">Mine · 5 of 8 joined</div>
+    </div>
+    <div style="background:#fff;border:1px solid #E8E4DF;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:16px;font-weight:700">Tuesday Doubles</span><span style="background:#E8F5E9;color:#166534;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700">Active</span></div>
+      <div style="font-size:13px;color:#52514F">Tue 27 Oct · 8:00 PM · Heartbeat@Bedok</div>
+      <div style="font-size:12px;color:#6E6D6B">Mine · invited, accepted · 3 of 6 joined</div>
+    </div>
+
+    <div style="margin-top:6px;border:1px dashed #C2481F;background:#FBECE6;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.45;color:#1B1918">
+      <b>Scope chips answer “whose?”</b>: Mine (default), Public, All = Mine + Public.<br>
+      <b>Toggle answers “when?”</b>: Active = upcoming, not cancelled. All = adds past, cancelled and closed games.<br>
+      Same toggle on the Tournaments segment.
+    </div>
+  </div>
+</div>
+</body>
+</html>
