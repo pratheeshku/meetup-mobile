@@ -86,9 +86,9 @@ export default function ResponsesSection({
     !responses.pending ||
     typeof responses.pending.total !== 'number' ||
     !Array.isArray(responses.pending.items) ||
-    !responses.declined ||
-    typeof responses.declined.total !== 'number' ||
-    !Array.isArray(responses.declined.items)
+    // `declined` may be absent (viewer not allowed to see it); when present it must be well formed.
+    (responses.declined != null &&
+      (typeof responses.declined.total !== 'number' || !Array.isArray(responses.declined.items)))
   ) {
     return null;
   }
@@ -113,14 +113,18 @@ export default function ResponsesSection({
         emptyText: t('mob.respond.empty.accepted'),
         tone: 'accepted',
       },
-      {
-        key: 'declined',
-        title: t('mob.respond.section.declined'),
-        total: responses.declined.total,
-        items: groups.declined,
-        emptyText: t('mob.respond.empty.declined'),
-        tone: 'declined',
-      },
+      ...(responses.declined
+        ? [
+            {
+              key: 'declined' as const,
+              title: t('mob.respond.section.declined'),
+              total: responses.declined.total,
+              items: groups.declined,
+              emptyText: t('mob.respond.empty.declined'),
+              tone: 'declined' as const,
+            },
+          ]
+        : []),
       {
         key: 'pending',
         title: t('mob.respond.section.pending'),
@@ -141,14 +145,18 @@ export default function ResponsesSection({
         emptyText: t('mob.respond.empty.accepted'),
         tone: 'accepted',
       },
-      {
-        key: 'declined',
-        title: t('mob.respond.section.declined'),
-        total: responses.declined.total,
-        items: groups.declined,
-        emptyText: t('mob.respond.empty.declined'),
-        tone: 'declined',
-      },
+      ...(responses.declined
+        ? [
+            {
+              key: 'declined' as const,
+              title: t('mob.respond.section.declined'),
+              total: responses.declined.total,
+              items: groups.declined,
+              emptyText: t('mob.respond.empty.declined'),
+              tone: 'declined' as const,
+            },
+          ]
+        : []),
       {
         key: 'pending',
         title: t('mob.respond.section.pending'),

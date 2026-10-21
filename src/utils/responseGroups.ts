@@ -37,7 +37,7 @@ export function groupGameResponses(
   }
   return {
     accepted,
-    declined: responses.declined.items,
+    declined: responses.declined?.items ?? [],
     pending: responses.pending.items,
   };
 }
@@ -71,7 +71,7 @@ export function groupTournamentResponses(
   return {
     registered,
     acceptedNotRegistered,
-    declined: responses.declined.items,
+    declined: responses.declined?.items ?? [],
     pending: responses.pending.items,
   };
 }
@@ -91,7 +91,7 @@ export function invitedPeople(
     !excludeUserId || person.user_id !== excludeUserId;
   return {
     accepted: responses.accepted.items.filter(keep),
-    declined: responses.declined.items.filter(keep),
+    declined: (responses.declined?.items ?? []).filter(keep),
     pending: responses.pending.items.filter(keep),
   };
 }

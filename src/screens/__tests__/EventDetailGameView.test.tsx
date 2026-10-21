@@ -56,6 +56,9 @@ const RESPONSES = {
   pending: { total: 1, items: [{ user_id: 'u-8', display_name: 'Priya', photo_url: null }] },
 };
 
+/** What a non-organizer gets: no `declined` key at all (backend response_model_exclude_none). */
+const PLAYER_RESPONSES = { accepted: RESPONSES.accepted, pending: RESPONSES.pending };
+
 interface Setup {
   event?: Record<string, unknown>;
   responses?: unknown | 'refused';
@@ -169,23 +172,34 @@ describe('organizer view (GV-2..GV-7)', () => {
   });
 });
 
-describe('non-organizer view (T7, AD-3)', () => {
-  it('T7: keeps the Players block exactly: avatars row and "x of y joined", no Responses, no Invite card', async () => {
+describe('non-organizer view (T7/T8, AD-3 v1.1)', () => {
+  it('T7: a non-organizer sees Responses with Accepted and Pending, no Declined (absent, no crash), no Invite card, no old Players list', async () => {
+    const root = await mount({ responses: PLAYER_RESPONSES });
+    expect(byId(root, 'organizer-responses-section')).toHaveLength(1);
+    const sections = root
+      .findAll(n => typeof n.type === 'string' && String(n.props.testID ?? '').startsWith('responses-section-'))
+      .map(n => String(n.props.testID).replace('responses-section-', ''));
+    expect(sections).toEqual(['accepted', 'pending']);
+    expect(texts(root)).not.toContain('Declined');
+    expect(byId(root, 'invite-card')).toHaveLength(0);
+    expect(byId(root, 'player-avatar')).toHaveLength(0);
+  });
+
+  it('T8: the Declined group follows the payload, not the viewer: present means shown', async () => {
+    const root = await mount({ responses: RESPONSES });
+    expect(byId(root, 'responses-section-declined')).toHaveLength(1);
+    expect(byId(root, 'invite-card')).toHaveLength(0);
+  });
+
+  it('if the responses call fails for a non-organizer the Players block is kept', async () => {
     const root = await mount({ responses: 'refused' });
     expect(byId(root, 'organizer-responses-section')).toHaveLength(0);
-    expect(byId(root, 'invite-card')).toHaveLength(0);
     expect(texts(root)).toEqual(expect.arrayContaining(['Players', '2 of 8 joined']));
     expect(byId(root, 'player-avatar')).toHaveLength(2);
   });
 
-  it('T7: even if the responses endpoint answered, a non-organizer never sees the Responses block', async () => {
-    const root = await mount();
-    expect(byId(root, 'organizer-responses-section')).toHaveLength(0);
-    expect(byId(root, 'player-avatar')).toHaveLength(2);
-  });
-
   it('keeps the Join / Decline actions below the Players block', async () => {
-    const root = await mount({ responses: 'refused' });
+    const root = await mount({ responses: PLAYER_RESPONSES });
     expect(pressableLabelled(root, 'Join')).toBeDefined();
     expect(pressableLabelled(root, 'Decline')).toBeDefined();
   });

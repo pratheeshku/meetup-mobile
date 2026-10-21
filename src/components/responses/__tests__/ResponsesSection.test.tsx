@@ -172,5 +172,11 @@ describe('ResponsesSection (game-view-redesign GV-4, GV-P1)', () => {
     // A pending email invite has no user to open.
     expect(root.findAll(n => String(n.props.testID ?? '').startsWith('response-person-friend'))).toHaveLength(0);
   });
-});
 
+  it('T8: an absent `declined` renders Accepted and Pending only, with no empty Declined group and no crash', () => {
+    const withoutDeclined = { accepted: game.accepted, pending: game.pending };
+    const root = render(<ResponsesSection responses={withoutDeclined as ResponsesResponse} organizerId="u-org" />);
+    expect(sectionOrder(root)).toEqual(['accepted', 'pending']);
+    expect(texts(root)).not.toContain('Declined');
+  });
+});
