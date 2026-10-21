@@ -16,12 +16,11 @@
  * that; the underlying design gap is flagged in the Implementation
  * Report for a future task if a real Standings view is ever requested.
  *
- * The Fixtures/Registrations "tabs" are two toggle buttons over one
- * screen, not a tab-navigator component — no tab library
- * (`@react-navigation/material-top-tabs` + `react-native-pager-view`)
- * is installed, and this task didn't ask for one. Same pattern as the
- * profile module's segmented-button skill-level picker (no native
- * picker library installed there either).
+ * Game-view redesign (DES-MEETUP-ADDENDUM-game-view-redesign GV-2..GV-5, GV-7, AD-1, AD-9, AD-10):
+ * the Fixtures | Registrations toggle is gone. Order: Details (venue row, invite-type row),
+ * Responses (Registered / Accepted, not yet registered / Declined / Pending; organizer and
+ * committee), Invite, Fixtures, then the closure panel last. A viewer who cannot read the
+ * responses keeps a plain Registrations list, so no registration data disappears for them.
  *
  * Role/permission gating here is UX-only (§3.10, §5.3) — every gated
  * action still calls its endpoint normally and the backend remains the
@@ -34,7 +33,7 @@
  * actions.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -63,13 +62,13 @@ import LifecycleStatusChip from '../components/LifecycleStatusChip';
 import ResponsesSection from '../components/responses/ResponsesSection';
 import ClosureSummaryCard from '../components/closure/ClosureSummaryCard';
 import ClosureModal, { type CandidateItem } from '../components/closure/ClosureModal';
-import VenueDetailCard from '../components/venue/VenueDetailCard';
+import VenueRow from '../components/venue/VenueRow';
+import InviteTypeRow from '../components/invite/InviteTypeRow';
 import TournamentInvitationBanner from '../components/tournament/TournamentInvitationBanner';
 import TournamentInvitePanel from '../components/tournament/TournamentInvitePanel';
 import ErrorView from '../components/ErrorView';
-import GroupNamesRow from '../components/GroupNamesRow';
 import LoadingView from '../components/LoadingView';
-import { borderWidth, colors, radius, sizes, spacing, typography } from '../theme/tokens';
+import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type {
   ResponsesResponse,
   Tournament,
@@ -82,6 +81,7 @@ import { showCompletion, type CompletionRow } from '../navigation/showCompletion
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
+import { isActiveRegistration } from '../utils/responseGroups';
 import { useSportDisplayName } from '../utils/labels';
 import { formatEventDate } from '../utils/formatEventDateTime';
 import type { TournamentsStackParamList } from '../navigation/types';
@@ -109,7 +109,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const tRef = useRef(t);
   tRef.current = t;
 
-  // Tournament people: View Details from the row, no card request, no actions in v1.
+  // Tournament people open the combined user pop-up from the row: identity only, no card request, no actions in v1.
   const personMenu = useUserMenu({ context: { type: 'tournament', id: tournamentId } });
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -117,7 +117,6 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const [registrations, setRegistrations] = useState<TournamentRegistration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'fixtures' | 'registrations'>('fixtures');
   // Called before the loading/error early returns below (Rules of Hooks) —
   // `tournament` is still possibly `null` here.
   const sportLabel = useSportDisplayName(tournament?.sport ?? '');
@@ -504,6 +503,11 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const myRegistration = registrations.find(r => r.user_id === currentUserId);
   const currentUserRegistrationStatus = myRegistration?.status ?? 'none';
   const isOrganiser = tournament.organiser_id === currentUserId;
+  // Organizer or committee (the server's `my_invite_access`); the responses endpoint stays the authority.
+  const canReadResponses =
+    isOrganiser ||
+    tournament.my_invite_access === 'full' ||
+    tournament.my_invite_access === 'individuals';
 
   const endInstant = tournament.ends_at ? Date.parse(tournament.ends_at) : NaN;
   const isTournamentEnded =
@@ -570,12 +574,32 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           })}
         </Text>
         <Text style={styles.description}>{tournament.description}</Text>
-        {tournament.visibility === 'group' ? (
-          <GroupNamesRow names={tournament.group_name ? [tournament.group_name] : []} />
+        {venueCatalogueEnabled ? (
+          <VenueRow
+            snapshot={tournament.venue_snapshot}
+            fallbackText={tournament.venue_label || tournament.name}
+            venueName={tournament.venue_name}
+            mapsApiKey={null}
+            tournamentId={tournament.id}
+            isOrganiser={isOrganiser}
+          />
         ) : null}
+        <InviteTypeRow
+          isPublic={tournament.visibility === 'public'}
+          groups={
+            tournament.visibility === 'group' && tournament.group_name
+              ? [{ key: 'group', name: tournament.group_name }]
+              : []
+          }
+          responses={canReadResponses ? responses : null}
+          organizerId={tournament.organiser_id}
+          menuContext={{ type: 'tournament', id: tournamentId }}
+          onChanged={() => loadAll(true)}
+        />
       </Card>
 
-      {tournament.lifecycle_status === 'closed' ? (
+
+      {tournament.lifecycle_status === 'closed' && !isOrganiser ? (
         <ClosureSummaryCard
           outcome={tournament.closure_outcome ?? closure?.outcome ?? 'completed'}
           winnerName={closure?.winner?.display_name}
@@ -584,25 +608,6 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           onEditPress={() => setIsClosureModalOpen(true)}
           entityType="tournament"
         />
-      ) : null}
-
-      {tournament.lifecycle_status !== 'closed' && isOrganiser ? (
-        !isTournamentEnded ? (
-          <View style={styles.closureNoticeBox} testID="tournament-closure-opens-notice">
-            <Text style={styles.closureNoticeText}>
-              {t('mob.closure.opens_when_ended_tournament')}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.closureActionContainer}>
-            <Button
-              label={t('mob.closure.action.close_tournament')}
-              variant="primary"
-              onPress={() => setIsClosureModalOpen(true)}
-              testID="close-tournament-button"
-            />
-          </View>
-        )
       ) : null}
 
       <TournamentInvitationBanner
@@ -618,20 +623,32 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         onNotFound={unavailable.onNotFound}
       />
 
-      <TournamentInvitePanel tournamentId={tournament.id} access={tournament.my_invite_access} />
+      {/* Organizer / committee: Responses (GV-4, AD-1, AD-3); a refused or failed call keeps today's content. */}
+      {canReadResponses && responses ? (
+        <View style={styles.block}>
+          <ResponsesSection
+            responses={responses}
+            entity="tournament"
+            menu={personMenu}
+            summary={t('mob.gv.registered_of', {
+              registered: registrations.filter(isActiveRegistration).length,
+              capacity: tournament.max_participants,
+            })}
+            organizerId={tournament.organiser_id}
+            registrations={registrations}
+          />
+        </View>
+      ) : null}
 
-      {venueCatalogueEnabled ? (
-        <VenueDetailCard
-          snapshot={tournament.venue_snapshot}
-          fallbackText={tournament.venue_label || tournament.name}
+      <View style={styles.block}>
+        <TournamentInvitePanel
           tournamentId={tournament.id}
-          isOrganiser={isOrganiser}
+          access={tournament.my_invite_access}
+          title={tournament.name}
+          responses={canReadResponses ? responses : null}
+          onSent={() => loadAll(true)}
         />
-      ) : null}
-
-      {isOrganiser && responses ? (
-        <ResponsesSection responses={responses} />
-      ) : null}
+      </View>
 
       {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
       {withdrawError ? <Text style={styles.errorText}>{withdrawError}</Text> : null}
@@ -698,39 +715,54 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         <Text style={styles.closedNotice}>{t('mob.tournament.registration_closed')}</Text>
       ) : null}
 
-      <View style={styles.tabRow}>
-        <Pressable
-          style={[styles.tabButton, activeTab === 'fixtures' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('fixtures')}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'fixtures' }}
-        >
-          <Text
-            style={[styles.tabButtonText, activeTab === 'fixtures' && styles.tabButtonTextActive]}
-          >
-            {t('mob.tournament.tab_matches')}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tabButton, activeTab === 'registrations' && styles.tabButtonActive]}
-          onPress={() => setActiveTab('registrations')}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'registrations' }}
-        >
-          <Text
-            style={[
-              styles.tabButtonText,
-              activeTab === 'registrations' && styles.tabButtonTextActive,
-            ]}
-          >
+      {/* Viewers without the Responses block keep the registrations list (no data disappears for them). */}
+      {!(canReadResponses && responses) ? (
+        <Card style={styles.block}>
+          <Text style={styles.sectionTitle} accessibilityRole="header">
             {t('mob.tournament.tab_registrations')}
           </Text>
-        </Pressable>
-      </View>
+          {registrations.length === 0 ? (
+            <Text style={styles.emptyText}>{t('mob.tournament.no_registrations')}</Text>
+          ) : (
+            registrations.map(registration => (
+              <View key={registration.id} style={styles.listRow}>
+                {/* Tournament people open the pop-up from the row only: identity, no card request, no
+                    actions (design OI-8). A registration with no user id shows a placeholder avatar. */}
+                <UserPressable
+                  person={{
+                    userId: registration.user_id,
+                    displayName: registration.nickname,
+                    photoUrl: null,
+                  }}
+                  menu={personMenu}
+                  style={styles.registrationPerson}
+                  testID={`registration-${registration.id}`}
+                >
+                  <UserAvatar
+                    name={registration.user_id ? registration.nickname : null}
+                    size={REGISTRATION_AVATAR_SIZE}
+                    fallback="initials"
+                  />
+                  <View style={styles.registrationText}>
+                    <Text style={styles.memberNickname}>{registration.nickname}</Text>
+                    <Text style={styles.fixtureMeta}>
+                      {t('mob.tournament.registered_at', {
+                        when: formatDateTime(registration.registered_at),
+                      })}
+                    </Text>
+                  </View>
+                </UserPressable>
+              </View>
+          ))
+          )}
+        </Card>
+      ) : null}
 
-      <Card>
-        {activeTab === 'fixtures' ? (
-          fixtures.length === 0 ? (
+      <Card style={styles.block} testID="tournament-fixtures-section">
+        <Text style={styles.sectionTitle} accessibilityRole="header">
+          {t('mob.gv.fixtures')}
+        </Text>
+        {fixtures.length === 0 ? (
             <Text style={styles.emptyText}>{t('mob.tournament.no_matches')}</Text>
           ) : (
             fixtures.map(fixture => (
@@ -745,41 +777,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
                 </Text>
               </View>
             ))
-          )
-        ) : registrations.length === 0 ? (
-          <Text style={styles.emptyText}>{t('mob.tournament.no_registrations')}</Text>
-        ) : (
-          registrations.map(registration => (
-            <View key={registration.id} style={styles.listRow}>
-              {/* Tournament people open View Details from the row only: no card request, no actions
-                  (design OI-8). A registration with no user id shows a placeholder avatar. */}
-              <UserPressable
-                person={{
-                  userId: registration.user_id,
-                  displayName: registration.nickname,
-                  photoUrl: null,
-                }}
-                menu={personMenu}
-                style={styles.registrationPerson}
-                testID={`registration-${registration.id}`}
-              >
-                <UserAvatar
-                  name={registration.user_id ? registration.nickname : null}
-                  size={REGISTRATION_AVATAR_SIZE}
-                  fallback="initials"
-                />
-                <View style={styles.registrationText}>
-                  <Text style={styles.memberNickname}>{registration.nickname}</Text>
-                  <Text style={styles.fixtureMeta}>
-                    {t('mob.tournament.registered_at', {
-                      when: formatDateTime(registration.registered_at),
-                    })}
-                  </Text>
-                </View>
-              </UserPressable>
-            </View>
-          ))
-        )}
+          )}
       </Card>
 
       {canCancel ? (
@@ -792,6 +790,37 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             loading={isCancelling}
           />
         </View>
+      ) : null}
+
+      {/* Closure panel / notice and Close action go last (GV-7) */}
+      {tournament.lifecycle_status === 'closed' && isOrganiser ? (
+        <ClosureSummaryCard
+          outcome={tournament.closure_outcome ?? closure?.outcome ?? 'completed'}
+          winnerName={closure?.winner?.display_name}
+          runnerUpName={closure?.runner_up?.display_name}
+          canEdit={isOrganiser && (closure?.can_close ?? true)}
+          onEditPress={() => setIsClosureModalOpen(true)}
+          entityType="tournament"
+        />
+      ) : null}
+
+      {tournament.lifecycle_status !== 'closed' && isOrganiser ? (
+        !isTournamentEnded ? (
+          <View style={styles.closureNoticeBox} testID="tournament-closure-opens-notice">
+            <Text style={styles.closureNoticeText}>
+              {t('mob.closure.opens_when_ended_tournament')}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.closureActionContainer}>
+            <Button
+              label={t('mob.closure.action.close_tournament')}
+              variant="primary"
+              onPress={() => setIsClosureModalOpen(true)}
+              testID="close-tournament-button"
+            />
+          </View>
+        )
       ) : null}
 
       <ClosureModal
@@ -820,6 +849,8 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
 const styles = StyleSheet.create({
   container: { padding: spacing.md },
   infoCard: { marginBottom: spacing.md },
+  block: { marginBottom: spacing.md },
+  sectionTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.sm },
   title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.sm },
   statusChipRow: {
     marginVertical: spacing.xs,
@@ -852,18 +883,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   button: { marginBottom: spacing.sm },
-  tabRow: { flexDirection: 'row', marginTop: spacing.sm, marginBottom: spacing.md },
-  tabButton: {
-    flex: 1,
-    minHeight: sizes.touchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: borderWidth.thick,
-    borderBottomColor: colors.border,
-  },
-  tabButtonActive: { borderBottomColor: colors.primary },
-  tabButtonText: { ...typography.bodyBold, color: colors.textSecondary },
-  tabButtonTextActive: { color: colors.primary },
   emptyText: {
     ...typography.body,
     color: colors.textSecondary,

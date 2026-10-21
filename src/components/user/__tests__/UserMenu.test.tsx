@@ -119,17 +119,54 @@ beforeEach(() => {
 });
 
 describe('tap and long-press (UM-06)', () => {
-  it('avatar tap opens View Details, makes no card request and does not trigger the row action', async () => {
+  it('T5: tap opens the one combined sheet (identity and the server actions), fetches the card and does not trigger the row action', async () => {
+    (getGroupMemberCard as jest.Mock).mockResolvedValue(card({ allowed_actions: allow('make_owner') }));
     const onRowPress = jest.fn();
     const root = render(<Host context={GROUP} onRowPress={onRowPress} />);
     await press(who(root));
+    expect(sheetOpen(root)).toBe(true);
     expect(byId(root, 'user-menu-details').length).toBeGreaterThan(0);
-    expect(texts(root)).toEqual(expect.arrayContaining(['Details', 'Ravi Kumar', 'Ravi the Smash', 'Close']));
-    expect(getGroupMemberCard).not.toHaveBeenCalled();
+    expect(texts(root)).toEqual(expect.arrayContaining(['Ravi Kumar', 'Ravi the Smash', 'Make owner', 'Close']));
+    expect(texts(root)).not.toContain('View Details');
+    expect(actionKeys(root)).toEqual(['make_owner']);
+    expect(getGroupMemberCard).toHaveBeenCalledTimes(1);
     expect(onRowPress).not.toHaveBeenCalled();
   });
 
-  it('long-press opens the menu with View Details first, then only the server actions', async () => {
+  it('T5: tap and long-press open the same sheet', async () => {
+    (getGroupMemberCard as jest.Mock).mockResolvedValue(card({ allowed_actions: allow('make_owner') }));
+    const tapped = render(<Host context={GROUP} />);
+    await press(who(tapped));
+    const held = render(<Host context={GROUP} />);
+    await longPress(who(held));
+    expect(texts(tapped)).toEqual(texts(held));
+  });
+
+  it('shows the response/role badge the host row passes, under the identity', async () => {
+    const badged: UserIdentity = { ...RAVI, badge: { label: 'Declined', tone: 'declined' } };
+    const root = render(<Host context={{ type: 'none' }} people={[badged]} />);
+    await press(who(root));
+    expect(byId(root, 'user-menu-badge').length).toBeGreaterThan(0);
+    expect(texts(root)).toContain('Declined');
+  });
+
+  it('openDetails still works and shows the same combined sheet', async () => {
+    function DetailsHost(): React.JSX.Element {
+      const menu = useUserMenu({ context: { type: 'none' }, currentUserId: 'me' });
+      return (
+        <View>
+          <Pressable testID="open-details" onPress={() => menu.openDetails(RAVI)} />
+          <UserMenuSheet menu={menu} />
+        </View>
+      );
+    }
+    const root = render(<DetailsHost />);
+    await press(root.find(n => n.props.testID === 'open-details'));
+    expect(byId(root, 'user-menu-details').length).toBeGreaterThan(0);
+    expect(texts(root)).toEqual(expect.arrayContaining(['Ravi Kumar', 'Ravi the Smash']));
+  });
+
+  it('long-press opens the sheet with the identity on top, then only the server actions', async () => {
     (getGroupMemberCard as jest.Mock).mockResolvedValue(
       card({ allowed_actions: allow('remove_admin', 'make_owner', 'remove_from_group') }),
     );
@@ -144,17 +181,12 @@ describe('tap and long-press (UM-06)', () => {
           typeof n.props.onPress === 'function',
       )
       .map(n => n.props.testID as string);
-    expect(ids[0]).toBe('user-menu-view-details');
-    expect(actionKeys(root)).toEqual(['remove_admin', 'make_owner', 'remove_from_group']);
-    expect(texts(root)).toEqual(expect.arrayContaining(['View Details', 'Remove admin', 'Make owner', 'Remove from group']));
-    expect(getGroupMemberCard).toHaveBeenCalledWith('g-1', 'u-ravi', expect.objectContaining({ correlationId: expect.any(String) }));
-  });
-
-  it('View Details item switches the sheet to the details view', async () => {
-    const root = render(<Host context={GROUP} />);
-    await longPress(who(root));
-    await press(byId(root, 'user-menu-view-details')[0]);
+    expect(ids).not.toContain('user-menu-view-details');
     expect(byId(root, 'user-menu-details').length).toBeGreaterThan(0);
+    expect(actionKeys(root)).toEqual(['remove_admin', 'make_owner', 'remove_from_group']);
+    expect(texts(root)).toEqual(expect.arrayContaining(['Remove admin', 'Make owner', 'Remove from group']));
+    expect(texts(root)).not.toContain('View Details');
+    expect(getGroupMemberCard).toHaveBeenCalledWith('g-1', 'u-ravi', expect.objectContaining({ correlationId: expect.any(String) }));
   });
 
   it('selectable rows: the avatar gets long-press only, so a tap stays with the row', () => {
@@ -178,12 +210,12 @@ describe('tap and long-press (UM-06)', () => {
 });
 
 describe('fail closed (AD-5)', () => {
-  it('shows View Details at once, with a loading state, before the card arrives', async () => {
+  it('shows the identity at once, with a loading state, before the card arrives', async () => {
     let resolve!: (c: UserCardOut) => void;
     (getGroupMemberCard as jest.Mock).mockReturnValue(new Promise<UserCardOut>(r => (resolve = r)));
     const root = render(<Host context={GROUP} />);
     await longPress(who(root));
-    expect(byId(root, 'user-menu-view-details').length).toBeGreaterThan(0);
+    expect(byId(root, 'user-menu-details').length).toBeGreaterThan(0);
     expect(byId(root, 'user-menu-loading').length).toBeGreaterThan(0);
     expect(actionKeys(root)).toEqual([]);
     await act(async () => {
@@ -192,12 +224,12 @@ describe('fail closed (AD-5)', () => {
     expect(actionKeys(root)).toEqual(['make_owner']);
   });
 
-  it('a card failure leaves View Details only and shows "Could not load options."', async () => {
+  it('a card failure leaves the identity only and shows "Could not load options."', async () => {
     (getGroupMemberCard as jest.Mock).mockRejectedValue(new Error('boom'));
     const root = render(<Host context={GROUP} />);
     await longPress(who(root));
     expect(actionKeys(root)).toEqual([]);
-    expect(byId(root, 'user-menu-view-details').length).toBeGreaterThan(0);
+    expect(byId(root, 'user-menu-details').length).toBeGreaterThan(0);
     expect(texts(root)).toContain('Could not load options.');
   });
 
@@ -256,11 +288,11 @@ describe('fail closed (AD-5)', () => {
     expect(actionKeys(root)).toEqual(['make_admin']);
   });
 
-  it('own avatar: View Details only, no card request', async () => {
+  it('own avatar: identity only, no card request', async () => {
     const root = render(<Host context={GROUP} people={[SELF]} />);
     await longPress(who(root, 'Sam Lee'));
     expect(getGroupMemberCard).not.toHaveBeenCalled();
-    expect(byId(root, 'user-menu-view-details').length).toBeGreaterThan(0);
+    expect(byId(root, 'user-menu-details').length).toBeGreaterThan(0);
     expect(actionKeys(root)).toEqual([]);
   });
 
@@ -272,13 +304,13 @@ describe('fail closed (AD-5)', () => {
   });
 
   it.each([['tournament' as const], ['none' as const]])(
-    'context %s: View Details from the row, no card request, no actions',
+    'context %s: identity from the row, no card request, no actions',
     async type => {
       const root = render(<Host context={{ type, id: 't-1' }} />);
       await longPress(who(root));
       expect(getGroupMemberCard).not.toHaveBeenCalled();
       expect(getEventPlayerCard).not.toHaveBeenCalled();
-      expect(byId(root, 'user-menu-view-details').length).toBeGreaterThan(0);
+      expect(byId(root, 'user-menu-details').length).toBeGreaterThan(0);
       expect(actionKeys(root)).toEqual([]);
     },
   );
@@ -293,14 +325,13 @@ describe('fail closed (AD-5)', () => {
   it('fetches the card on every open (no cache)', async () => {
     const root = render(<Host context={GROUP} />);
     await longPress(who(root));
-    await press(byId(root, 'user-menu-view-details')[0]);
     await press(byId(root, 'user-menu-close')[0]);
     await longPress(who(root));
     expect(getGroupMemberCard).toHaveBeenCalledTimes(2);
   });
 });
 
-describe('details view', () => {
+describe('identity block', () => {
   it('shows the "No nickname" label when there is no nickname', async () => {
     const root = render(<Host context={{ type: 'none' }} people={[NO_NICK]} />);
     await press(who(root, 'No Nick'));

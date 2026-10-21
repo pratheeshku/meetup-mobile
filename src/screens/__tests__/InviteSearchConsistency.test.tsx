@@ -63,7 +63,7 @@ describe.each([
 ])('%s invite player', (_name, mount) => {
   it('has one search field and no separate email input', async () => {
     const root = await mount();
-    await act(async () => pressableLabelled(root, 'Invite Player').props.onPress());
+    await act(async () => pressableLabelled(root, 'Invite players').props.onPress());
     expect(field(root)).toHaveLength(1);
     expect(root.findAll(n => n.props.accessibilityLabel === 'Invite by email')).toHaveLength(0);
     expect(root.findAll(n => n.props.keyboardType === 'email-address')).toHaveLength(0);
@@ -71,7 +71,7 @@ describe.each([
 
   it('a valid email that matches nobody shows the Invite button; a non-email shows none', async () => {
     const root = await mount();
-    await act(async () => pressableLabelled(root, 'Invite Player').props.onPress());
+    await act(async () => pressableLabelled(root, 'Invite players').props.onPress());
     await type(root, 'who@example.com');
     expect(emailBtn(root, 'who@example.com')).toBeDefined();
     await type(root, 'just words');
@@ -80,9 +80,10 @@ describe.each([
 
   it('tapping the email button selects that email for the invite (same flow as a person)', async () => {
     const root = await mount();
-    await act(async () => pressableLabelled(root, 'Invite Player').props.onPress());
+    await act(async () => pressableLabelled(root, 'Invite players').props.onPress());
     await type(root, 'who@example.com');
     await act(async () => emailBtn(root, 'who@example.com')!.props.onPress());
-    expect(texts(root)).toContain('Invite by email: who@example.com');
+    // The email joins the staged "Selected" list of the invite picker.
+    expect(texts(root)).toContain('who@example.com');
   });
 });

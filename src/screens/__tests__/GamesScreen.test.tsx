@@ -94,6 +94,8 @@ function element(params?: Params): React.ReactElement {
   );
 }
 const mount = (params?: Params): Promise<Instance> => renderAsync(element(params));
+/** The Games tab opened from Home on the All scope (the default is Mine since game-view-redesign GV-1). */
+const mountAll = (): Promise<Instance> => mount({ scope: 'all', entryKey: 1 });
 const tap = (root: Instance, label: string) => act(async () => pressableLabelled(root, label).props.onPress());
 /** The segmented switch's buttons carry the `tab` role. */
 const segment = (root: Instance, label: string): Instance => {
@@ -167,7 +169,7 @@ describe('switch', () => {
   });
 
   it('keeps each segment\'s own state when switching (scope, sport chips; only entering My games refetches, for history)', async () => {
-    const root = await mount();
+    const root = await mountAll();
     await tap(root, 'Mine games');
     await tap(root, 'Tennis');
     expect(selected(root, 'Mine games')).toBe(true);
@@ -208,7 +210,7 @@ describe('switch', () => {
 
 describe('Games list (AD-15)', () => {
   it('is the union of My games and Open games, future and non-cancelled only, earliest first', async () => {
-    expect(listTitles(await mount())).toEqual([
+    expect(listTitles(await mountAll())).toEqual([
       'Open tennis', // +5h
       'Going badminton', // +10h
       'Open badminton', // +15h
@@ -218,7 +220,7 @@ describe('Games list (AD-15)', () => {
   });
 
   it('shows one badge per row: Hosting, Going, Waitlisted or Open, and the going count', async () => {
-    const root = await mount();
+    const root = await mountAll();
     const row = (title: string): string[] =>
       texts(root.findAll(node => node.props.accessibilityRole === 'button' && texts(node).includes(title))[0]);
     expect(row('Hosted football')).toContain('Hosting');
@@ -232,16 +234,58 @@ describe('Games list (AD-15)', () => {
     }
   });
 
-  it('scope chips All (default), Mine and Open filter the list', async () => {
+  it('T1: opens on Mine without a route scope; chips read Mine | Public | All; Open and All still filter', async () => {
     const root = await mount();
-    expect(selected(root, 'All games')).toBe(true);
-    await tap(root, 'Mine games');
+    expect(selected(root, 'Mine games')).toBe(true);
+    expect(selected(root, 'Open games')).toBe(false);
+    expect(selected(root, 'All games')).toBe(false);
+    const chipOrder = root
+      .findAll(
+        node =>
+          node.props.accessibilityRole === 'button' &&
+          ['Mine games', 'Open games', 'All games'].includes(node.props.accessibilityLabel) &&
+          typeof node.props.onPress === 'function',
+      )
+      .map(node => node.props.accessibilityLabel);
+    expect(chipOrder).toEqual(['Mine games', 'Open games', 'All games']);
+    expect(texts(root).filter(text => ['Mine', 'Public', 'All'].includes(text)).slice(0, 3)).toEqual([
+      'Mine',
+      'Public',
+      'All',
+    ]);
     // My games also lists past games (after the upcoming ones).
     expect(listTitles(root)).toEqual(['Going badminton', 'Waitlisted tennis', 'Hosted football', 'Past going']);
     await tap(root, 'Open games');
     expect(listTitles(root)).toEqual(['Open tennis', 'Open badminton']);
     await tap(root, 'All games');
     expect(listTitles(root)).toHaveLength(5);
+  });
+
+  it('T1: a route scope from Home is still honoured over the Mine default', async () => {
+    const root = await mountAll();
+    expect(selected(root, 'All games')).toBe(true);
+    expect(selected(root, 'Mine games')).toBe(false);
+  });
+
+  it('GV-1: the Active | All switch sits in the scope-chip row with its semantics unchanged', async () => {
+    const root = await mount();
+    const chip = root.findAll(node => typeof node.type === 'string' && node.props.accessibilityLabel === 'Mine games')[0];
+    const hasSwitch = (node: Instance): boolean =>
+      node.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityLabel === 'Active games').length > 0;
+    let row = chip.parent;
+    while (row && !hasSwitch(row)) {
+      row = row.parent;
+    }
+    // The nearest ancestor holding both is the scope-chip row, not the list or the sport chips.
+    expect(row).not.toBeNull();
+    expect(row!.findAll(n => n.props.testID === 'games-list')).toHaveLength(0);
+    expect(row!.findAll(n => n.props.accessibilityLabel === 'Tennis')).toHaveLength(0);
+    expect(segment(root, 'Active games').props.accessibilityState).toEqual({ selected: true });
+    expect(texts(root)).toEqual(expect.arrayContaining(['Active', 'All']));
+    mockGetEvents.mockClear();
+    await tapSegment(root, 'All games');
+    expect(segment(root, 'All games').props.accessibilityState).toEqual({ selected: true });
+    expect(mockGetEvents).toHaveBeenLastCalledWith({ view: 'all', history: true }, expect.anything());
   });
 
   it('scope chips combine with the sport chips (multi-select, All exclusive)', async () => {
@@ -259,12 +303,12 @@ describe('Games list (AD-15)', () => {
 
   it('uses the same sport defaults as Home: the user\'s skill sports, otherwise All', async () => {
     mockGetProfile.mockResolvedValue(profileOf([{ sport: 'tennis', skill_level: 'expert' }]));
-    const root = await mount();
+    const root = await mountAll();
     expect(selected(root, 'Tennis')).toBe(true);
     expect(selected(root, 'All')).toBe(false);
     expect(listTitles(root)).toEqual(['Open tennis', 'Waitlisted tennis']);
     mockGetProfile.mockResolvedValue(profileOf([]));
-    const none = await mount();
+    const none = await mountAll();
     expect(selected(none, 'All')).toBe(true);
     expect(listTitles(none)).toHaveLength(5);
   });
@@ -282,7 +326,7 @@ describe('Games list (AD-15)', () => {
   });
 
   it('opens game detail from a row', async () => {
-    const root = await mount();
+    const root = await mountAll();
     const row = root.findAll(
       node => node.props.accessibilityRole === 'button' && texts(node).includes('Open tennis'),
     )[0];

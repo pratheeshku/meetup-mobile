@@ -170,8 +170,8 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
     expect(has(root, 'Cancel Event')).toBe(true);
     expect(has(root, 'Edit Game')).toBe(true);
-    expect(has(root, 'Invite Group')).toBe(true);
-    expect(has(root, 'Invite Individual')).toBe(true);
+    expect(has(root, 'Invite groups')).toBe(true);
+    expect(has(root, 'Invite players')).toBe(true);
     expect(has(root, 'Share Event')).toBe(true);
     expect(has(root, 'Join')).toBe(false);
     expect(has(root, 'Decline')).toBe(false);
@@ -190,8 +190,8 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', user_rsvp_status: 'going' }));
     expect(has(root, 'Cancel Event')).toBe(true);
     expect(has(root, 'Edit Game')).toBe(true);
-    expect(has(root, 'Invite Group')).toBe(true);
-    expect(has(root, 'Invite Individual')).toBe(true);
+    expect(has(root, 'Invite groups')).toBe(true);
+    expect(has(root, 'Invite players')).toBe(true);
     expect(has(root, 'Decline')).toBe(false);
     expect(has(root, 'Join')).toBe(false);
   });
@@ -200,8 +200,8 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', status: 'active' }));
     expect(has(root, 'Cancel Event')).toBe(true);
     expect(has(root, 'Edit Game')).toBe(true);
-    expect(has(root, 'Invite Group')).toBe(true);
-    expect(has(root, 'Invite Individual')).toBe(true);
+    expect(has(root, 'Invite groups')).toBe(true);
+    expect(has(root, 'Invite players')).toBe(true);
   });
 
   it.each(['cancelled', 'completed'])(
@@ -651,46 +651,53 @@ describe('BUILD 2: Event Edit Flow', () => {
   });
 });
 
-describe('BUILD 3: Group Invite Flow', () => {
-  it('opens invite group form, loads user groups, and sends POST /events/{id}/invite-group', async () => {
+/** The two groups the signed-in organiser can invite (GET /settings/groups-owned + groups-member). */
+function mockInviteGroups(): void {
+  mockGet.mockImplementation((url: string) => {
+    if (url === '/settings/groups-owned') {
+      return Promise.resolve({
+        data: [
+          { id: 'grp-1', name: 'Badminton Club', description: '', owner_id: 'user-me', created_at: '2026-01-01' },
+        ],
+      });
+    }
+    if (url === '/settings/groups-member') {
+      return Promise.resolve({
+        data: [
+          { id: 'grp-2', name: 'Weekend Runners', description: '', owner_id: 'other', created_at: '2026-01-01' },
+        ],
+      });
+    }
+    return Promise.resolve({ data: rawEvent({ organizer_id: 'user-me' }) });
+  });
+}
+const joined = (root: Instance): string => texts(root).join(' | ');
+
+describe('BUILD 3: Group Invite Flow (invite picker, GV-5)', () => {
+  it('opens the picker on Groups, loads user groups, and sends POST /events/{id}/invite-group per staged group', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-
-    mockGet.mockImplementation((url: string) => {
-      if (url === '/settings/groups-owned') {
-        return Promise.resolve({
-          data: [
-            { id: 'grp-1', name: 'Badminton Club', description: '', owner_id: 'user-me', created_at: '2026-01-01' },
-          ],
-        });
-      }
-      if (url === '/settings/groups-member') {
-        return Promise.resolve({
-          data: [
-            { id: 'grp-2', name: 'Weekend Runners', description: '', owner_id: 'other', created_at: '2026-01-01' },
-          ],
-        });
-      }
-      return Promise.resolve({ data: rawEvent({ organizer_id: 'user-me' }) });
-    });
-
+    mockInviteGroups();
     mockPost.mockResolvedValueOnce({
       data: [{ id: 'inv-1', event_id: 'evt-1', invitee_user_id: 'u-1', status: 'pending' }],
     });
 
     await act(async () => {
-      pressableLabelled(root, 'Invite Group').props.onPress();
+      pressableLabelled(root, 'Invite groups').props.onPress();
     });
 
     expect(has(root, 'Badminton Club')).toBe(true);
     expect(has(root, 'Weekend Runners')).toBe(true);
+    expect(has(root, 'Available')).toBe(true);
 
-    // Select Badminton Club
+    // Stage Badminton Club: it moves to Selected and shows "−".
     await act(async () => {
       pressableLabelled(root, 'Invite Badminton Club').props.onPress();
     });
+    expect(has(root, 'Selected')).toBe(true);
+    expect(pressableLabelled(root, 'Remove Badminton Club')).toBeDefined();
 
     await act(async () => {
-      pressableLabelled(root, 'Send Group Invite').props.onPress();
+      pressableLabelled(root, 'Send 1 invites').props.onPress();
     });
 
     expect(mockPost).toHaveBeenCalledWith(
@@ -698,26 +705,12 @@ describe('BUILD 3: Group Invite Flow', () => {
       { group_id: 'grp-1' },
       expect.any(Object),
     );
-    expect(has(root, 'Sent 1 group invitation!')).toBe(true);
+    expect(has(root, 'Sent 1 invites')).toBe(true);
   });
 
-  it('surfaces error when group invite request fails', async () => {
+  it('surfaces the failed group by name with the server message', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-
-    mockGet.mockImplementation((url: string) => {
-      if (url === '/settings/groups-owned') {
-        return Promise.resolve({
-          data: [
-            { id: 'grp-1', name: 'Badminton Club', description: '', owner_id: 'user-me', created_at: '2026-01-01' },
-          ],
-        });
-      }
-      if (url === '/settings/groups-member') {
-        return Promise.resolve({ data: [] });
-      }
-      return Promise.resolve({ data: rawEvent({ organizer_id: 'user-me' }) });
-    });
-
+    mockInviteGroups();
     mockPost.mockRejectedValueOnce({
       response: {
         status: 403,
@@ -726,59 +719,37 @@ describe('BUILD 3: Group Invite Flow', () => {
     });
 
     await act(async () => {
-      pressableLabelled(root, 'Invite Group').props.onPress();
+      pressableLabelled(root, 'Invite groups').props.onPress();
     });
-
     await act(async () => {
       pressableLabelled(root, 'Invite Badminton Club').props.onPress();
     });
-
     await act(async () => {
-      pressableLabelled(root, 'Send Group Invite').props.onPress();
+      pressableLabelled(root, 'Send 1 invites').props.onPress();
     });
 
-    expect(has(root, 'Only group admins can invite members')).toBe(true);
+    expect(joined(root)).toContain('Could not invite: Badminton Club');
+    expect(joined(root)).toContain('Only group admins can invite members');
   });
 
-  it('supports selecting multiple groups and posts an invite for each group', async () => {
+  it('supports staging multiple groups and posts an invite for each group with one Send', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-
-    mockGet.mockImplementation((url: string) => {
-      if (url === '/settings/groups-owned') {
-        return Promise.resolve({
-          data: [
-            { id: 'grp-1', name: 'Badminton Club', description: '', owner_id: 'user-me', created_at: '2026-01-01' },
-          ],
-        });
-      }
-      if (url === '/settings/groups-member') {
-        return Promise.resolve({
-          data: [
-            { id: 'grp-2', name: 'Weekend Runners', description: '', owner_id: 'other', created_at: '2026-01-01' },
-          ],
-        });
-      }
-      return Promise.resolve({ data: rawEvent({ organizer_id: 'user-me' }) });
-    });
-
+    mockInviteGroups();
     mockPost.mockResolvedValue({
       data: [{ id: 'inv-1', event_id: 'evt-1', invitee_user_id: 'u-1', status: 'pending' }],
     });
 
     await act(async () => {
-      pressableLabelled(root, 'Invite Group').props.onPress();
+      pressableLabelled(root, 'Invite groups').props.onPress();
     });
-
-    // Select both groups
     await act(async () => {
       pressableLabelled(root, 'Invite Badminton Club').props.onPress();
     });
     await act(async () => {
       pressableLabelled(root, 'Invite Weekend Runners').props.onPress();
     });
-
     await act(async () => {
-      pressableLabelled(root, 'Send Group Invite').props.onPress();
+      pressableLabelled(root, 'Send 2 invites').props.onPress();
     });
 
     expect(mockPost).toHaveBeenCalledWith(
@@ -791,12 +762,22 @@ describe('BUILD 3: Group Invite Flow', () => {
       { group_id: 'grp-2' },
       expect.any(Object),
     );
-    expect(has(root, 'Sent 2 group invitations!')).toBe(true);
+    expect(has(root, 'Sent 2 invites')).toBe(true);
+  });
+
+  it('a group already shared with the game is listed under "Already in this game" with no "+"', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me', visibility: 'group', group_ids: ['grp-1'], group_names: ['Badminton Club'] }));
+    mockInviteGroups();
+    await act(async () => {
+      pressableLabelled(root, 'Invite groups').props.onPress();
+    });
+    expect(has(root, 'Already in this game')).toBe(true);
+    expect(root.findAll(n => n.props.accessibilityLabel === 'Invite Badminton Club')).toHaveLength(0);
   });
 });
 
-describe('BUILD C: Individual Invite Flow', () => {
-  it('opens invite user form and sends POST /events/{id}/invite-user with user_id', async () => {
+describe('BUILD C: Individual Invite Flow (invite picker, GV-5, AD-4)', () => {
+  it('opens the picker on Players and sends POST /events/{id}/invite-user with user_id', async () => {
     mockPost.mockResolvedValueOnce({
       data: { id: 'inv-u1', event_id: 'evt-1', invitee_user_id: 'u-user-1', status: 'pending' },
     });
@@ -804,23 +785,19 @@ describe('BUILD C: Individual Invite Flow', () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
 
     await act(async () => {
-      pressableLabelled(root, 'Invite Individual').props.onPress();
+      pressableLabelled(root, 'Invite players').props.onPress();
     });
 
     expect(has(root, 'Pick Alex')).toBe(true);
 
-    // Pick Alex
+    // Stage Alex
     await act(async () => {
       pressableLabelled(root, 'Pick Alex').props.onPress();
     });
 
-    expect(has(root, 'alex (Alex C)')).toBe(true);
-    // The staged person shows the shared "−" (remove), not a Change link.
-    expect(pressableLabelled(root, 'Remove Alex C')).toBeDefined();
-
-    // Send Invite
+    // One Send for everything staged.
     await act(async () => {
-      pressableLabelled(root, 'Send Invite').props.onPress();
+      pressableLabelled(root, 'Send 1 invites').props.onPress();
     });
 
     expect(mockPost).toHaveBeenCalledWith(
@@ -828,7 +805,7 @@ describe('BUILD C: Individual Invite Flow', () => {
       { user_id: 'u-user-1' },
       expect.any(Object),
     );
-    expect(has(root, 'Invitation sent to alex!')).toBe(true);
+    expect(has(root, 'Sent 1 invites')).toBe(true);
   });
 
   it('surfaces error when individual invite fails', async () => {
@@ -842,7 +819,7 @@ describe('BUILD C: Individual Invite Flow', () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
 
     await act(async () => {
-      pressableLabelled(root, 'Invite Individual').props.onPress();
+      pressableLabelled(root, 'Invite players').props.onPress();
     });
 
     await act(async () => {
@@ -850,39 +827,31 @@ describe('BUILD C: Individual Invite Flow', () => {
     });
 
     await act(async () => {
-      pressableLabelled(root, 'Send Invite').props.onPress();
+      pressableLabelled(root, 'Send 1 invites').props.onPress();
     });
 
-    expect(has(root, 'User is already invited')).toBe(true);
+    expect(joined(root)).toContain('Could not invite: Alex C');
+    expect(joined(root)).toContain('User is already invited');
   });
 
-  it('allows changing selection and closes form on Close press', async () => {
+  it('Back closes the picker without sending', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
 
     await act(async () => {
-      pressableLabelled(root, 'Invite Individual').props.onPress();
+      pressableLabelled(root, 'Invite players').props.onPress();
     });
-
     await act(async () => {
       pressableLabelled(root, 'Pick Alex').props.onPress();
     });
-    expect(has(root, 'alex (Alex C)')).toBe(true);
 
-    // Click Change
     await act(async () => {
-      pressableLabelled(root, 'Change').props.onPress();
-    });
-    expect(has(root, 'alex (Alex C)')).toBe(false);
-    expect(has(root, 'Pick Alex')).toBe(true);
-
-    // Click Close
-    await act(async () => {
-      pressableLabelled(root, 'Close').props.onPress();
+      root.find(n => n.props.testID === 'invite-picker-back' && typeof n.props.onPress === 'function').props.onPress();
     });
     expect(has(root, 'Pick Alex')).toBe(false);
+    expect(mockPost).not.toHaveBeenCalled();
   });
 
-  it('opens invite user form and sends POST /events/{id}/invite-email when email is selected (Decision 25)', async () => {
+  it('sends POST /events/{id}/invite-email when an email is staged (Decision 25)', async () => {
     mockPost.mockResolvedValueOnce({
       data: {
         id: 'inv-eml-1',
@@ -895,23 +864,17 @@ describe('BUILD C: Individual Invite Flow', () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
 
     await act(async () => {
-      pressableLabelled(root, 'Invite Individual').props.onPress();
+      pressableLabelled(root, 'Invite players').props.onPress();
     });
 
     expect(has(root, 'Pick Email')).toBe(true);
 
-    // Pick Email
     await act(async () => {
       pressableLabelled(root, 'Pick Email').props.onPress();
     });
 
-    expect(has(root, 'Invite by email: newcomer@example.com')).toBe(true);
-    // The staged person shows the shared "−" (remove), not a Change link.
-    expect(pressableLabelled(root, 'Remove Alex C')).toBeDefined();
-
-    // Send Invite
     await act(async () => {
-      pressableLabelled(root, 'Send Invite').props.onPress();
+      pressableLabelled(root, 'Send 1 invites').props.onPress();
     });
 
     expect(mockPost).toHaveBeenCalledWith(
@@ -919,7 +882,7 @@ describe('BUILD C: Individual Invite Flow', () => {
       { email: 'newcomer@example.com' },
       expect.any(Object),
     );
-    expect(has(root, 'Invitation sent to newcomer@example.com!')).toBe(true);
+    expect(has(root, 'Sent 1 invites')).toBe(true);
   });
 });
 

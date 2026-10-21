@@ -50,8 +50,6 @@ const option = (root: Instance, id: string): Instance | undefined =>
   root.findAll(n => n.props.testID === `group-option-${id}` && typeof n.props.onPress === 'function')[0];
 const checkedIds = (root: Instance): string[] =>
   ['g-1', 'g-2', 'g-3', 'g-9'].filter(id => option(root, id)?.props.accessibilityState.checked);
-const groupRows = (root: Instance): number =>
-  root.findAll(n => n.props.testID === 'group-name-item' && typeof n.type === 'string').length;
 
 async function openEdit(root: Instance): Promise<void> {
   await press(labelled(root, 'Edit Game'));
@@ -64,23 +62,35 @@ beforeEach(() => {
   __resetSportDisplayNamesCacheForTests();
 });
 
-describe('game detail group rows', () => {
-  it('shows every group the game is shared with (up to three rows)', async () => {
+describe('game detail invite-type row (GV-3: replaces the group line)', () => {
+  const invitedGroupKeys = (root: Instance): string[] =>
+    root
+      .findAll(n => String(n.props.testID ?? '').startsWith('invited-group-') && typeof n.type === 'string')
+      .map(n => String(n.props.testID).replace('invited-group-', ''));
+  const openInvited = async (root: Instance, value: string): Promise<void> =>
+    press(labelled(root, `Invite type: ${value}`));
+
+  it('shows "Invite type" with the group count; the Invited sheet lists every group the game is shared with', async () => {
     const root = await mount();
-    expect(groupRows(root)).toBe(2);
+    expect(texts(root)).toEqual(expect.arrayContaining(['Invite type', 'Groups (2)']));
+    expect(invitedGroupKeys(root)).toEqual([]);
+    await openInvited(root, 'Groups (2)');
+    expect(invitedGroupKeys(root)).toEqual(['g-1', 'g-2']);
     expect(texts(root)).toEqual(expect.arrayContaining(['Group 1', 'Group 2']));
   });
 
-  it('shows three rows and "+n more" for a game shared with many groups', async () => {
+  it('a game shared with many groups lists them all in the sheet', async () => {
     const ids = Array.from({ length: 25 }, (_, i) => `g-${i + 1}`);
     const root = await mount({ group_ids: ids, group_names: ids.map((_, i) => `Group ${i + 1}`) });
-    expect(groupRows(root)).toBe(3);
-    expect(texts(root)).toContain('+22 more');
+    expect(texts(root)).toContain('Groups (25)');
+    await openInvited(root, 'Groups (25)');
+    expect(invitedGroupKeys(root)).toHaveLength(25);
   });
 
   it('old server: one group from group_id / group_name', async () => {
     const root = await mount({ group_ids: undefined, group_names: undefined, group_id: 'g-1', group_name: 'Group 1' });
-    expect(groupRows(root)).toBe(1);
+    expect(texts(root)).toContain('Groups (1)');
+    await openInvited(root, 'Groups (1)');
     expect(texts(root)).toContain('Group 1');
   });
 });

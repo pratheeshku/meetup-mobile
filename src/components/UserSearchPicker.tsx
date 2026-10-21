@@ -52,6 +52,16 @@ export type UserSearchVariant = 'classic' | 'invite';
 
 export type SuggestionContext = 'players' | 'group_members' | 'team_players';
 
+/** A person already in the game (invite picker, GV-5): shown last with a status chip, no "+". */
+export interface AlreadyInPerson {
+  id: string;
+  displayName: string;
+  nickname?: string | null;
+  photoUrl?: string | null;
+  /** Chip text, for example "Joined" or "Invited". */
+  statusLabel: string;
+}
+
 const HEADING_KEYS: Record<SuggestionContext, LabelKey> = {
   players: 'mob.user_search.heading_players',
   group_members: 'mob.user_search.heading_group_members',
@@ -86,6 +96,10 @@ interface UserSearchPickerProps {
   selectionMode?: 'staged' | 'immediate';
   stagedUserIds?: string[];
   onUnstage?: (user: UserSearchResult) => void;
+  /** Invite picker (GV-5): people already in the game, listed under `heading` (filtered by the typed text). */
+  alreadyIn?: { heading: string; people: readonly AlreadyInPerson[] };
+  /** Invite variant: one flat "Available" heading above all result rows instead of the group sections. */
+  availableHeading?: string;
 }
 
 export default function UserSearchPicker({
@@ -105,6 +119,8 @@ export default function UserSearchPicker({
   selectionMode = 'staged',
   stagedUserIds,
   onUnstage,
+  alreadyIn,
+  availableHeading,
 }: UserSearchPickerProps): React.JSX.Element {
   const t = useT();
   // Search and suggested-player lists are in no context of the viewer's: long-press on the avatar
@@ -396,6 +412,13 @@ export default function UserSearchPicker({
   );
 
   const suggestedHeading = t(HEADING_KEYS[suggestionContext]);
+  const needle = trimmed.toLowerCase();
+  const alreadyInRows = (alreadyIn?.people ?? []).filter(
+    person =>
+      !needle ||
+      person.displayName.toLowerCase().includes(needle) ||
+      (person.nickname ?? '').toLowerCase().includes(needle),
+  );
 
   return (
     <View>
@@ -456,7 +479,13 @@ export default function UserSearchPicker({
           {suggestedHeading}
         </Text>
       ) : null}
-      {!isSearching && visibleResults.length > 0 ? (
+      {!isSearching && visibleResults.length > 0 && isInvite && availableHeading ? (
+        <View testID="user-search-available">
+          {renderHeading(availableHeading, true)}
+          {visibleResults.map(user => renderRow(user, Boolean(user.in_my_groups)))}
+        </View>
+      ) : null}
+      {!isSearching && visibleResults.length > 0 && !(isInvite && availableHeading) ? (
         <View style={isInvite ? undefined : styles.resultsList}>
           {groupRows.length > 0 ? (
             <>
@@ -477,6 +506,39 @@ export default function UserSearchPicker({
               {otherRows.map(user => renderRow(user, false))}
             </>
           ) : null}
+        </View>
+      ) : null}
+      {alreadyIn && alreadyInRows.length > 0 ? (
+        <View testID="user-search-already-in">
+          {renderHeading(alreadyIn.heading, false)}
+          {alreadyInRows.map(person => (
+            <View
+              key={person.id}
+              style={[styles.resultRow, styles.resultRowInvite]}
+              testID="user-search-already-in-row"
+            >
+              <View style={styles.resultLeft}>
+                <UserAvatar
+                  imageUrl={person.photoUrl}
+                  name={person.displayName}
+                  size={INVITE_AVATAR_SIZE}
+                  fallback="initials"
+                />
+                <View style={styles.resultText}>
+                  <PersonNames displayName={person.displayName} nickname={person.nickname} />
+                </View>
+              </View>
+              <AddRemoveControl
+                mode="staged"
+                name={person.displayName}
+                staged={false}
+                onStage={() => undefined}
+                onUnstage={() => undefined}
+                sentStatus={person.statusLabel}
+                testID="user-search-already-in-status"
+              />
+            </View>
+          ))}
         </View>
       ) : null}
     </View>

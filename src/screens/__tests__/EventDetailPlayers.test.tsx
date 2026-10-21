@@ -155,12 +155,13 @@ describe('user menu on the going players (UM-06, UM-11)', () => {
   const pressableFor = (root: Instance, id: string): Instance =>
     root.find(n => n.props.testID === `player-${id}` && typeof n.props.onLongPress === 'function');
 
-  it('a tap on an avatar opens View Details with no card request', async () => {
+  it('a tap on an avatar opens the one combined pop-up (identity, then the server actions); no View Details step', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }), people);
     await act(async () => pressableFor(root, 'u-1').props.onPress());
     expect(root.findAll(n => n.props.testID === 'user-menu-details').length).toBeGreaterThan(0);
-    expect(texts(root)).toEqual(expect.arrayContaining(['Details', 'Alice']));
-    expect(cardUrls()).toHaveLength(0);
+    expect(texts(root)).toContain('Alice');
+    expect(texts(root)).not.toContain('View Details');
+    expect(cardUrls()).toEqual(['/events/evt-1/players/u-1/card']);
   });
 
   it('a long-press fetches the game card and shows exactly the server actions', async () => {

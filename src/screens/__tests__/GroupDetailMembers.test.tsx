@@ -185,14 +185,15 @@ describe('member row', () => {
 });
 
 describe('user menu on member rows', () => {
-  it('long-press: View Details first, then exactly the actions the server returned (owner on a member)', async () => {
+  it('long-press: the combined pop-up (identity on top), then exactly the actions the server returned (owner on a member)', async () => {
     (getGroupMemberCard as jest.Mock).mockResolvedValue(
       card('u-aisha', 'Aisha Rahman', 'member', ['make_admin', 'make_owner', 'remove_from_group']),
     );
     const root = await mount();
     await longPress(root, 'Aisha Rahman');
     expect(getGroupMemberCard).toHaveBeenCalledWith('group-1', 'u-aisha', expect.objectContaining({ correlationId: expect.any(String) }));
-    expect(byTestId(root, 'user-menu-view-details').length).toBeGreaterThan(0);
+    expect(byTestId(root, 'user-menu-details').length).toBeGreaterThan(0);
+    expect(byTestId(root, 'user-menu-view-details')).toHaveLength(0);
     expect(shownActions(root)).toEqual(['Make admin', 'Make owner', 'Remove from group']);
   });
 
@@ -213,35 +214,36 @@ describe('user menu on member rows', () => {
     expect(shownActions(root)).toEqual(['Remove from group']);
   });
 
-  it('a plain member gets View Details only when the server returns no actions', async () => {
+  it('a plain member gets the identity only when the server returns no actions', async () => {
     mockUserId = 'u-chen';
     const root = await mount();
     await longPress(root, 'Aisha Rahman');
     expect(shownActions(root)).toEqual([]);
-    expect(byTestId(root, 'user-menu-view-details').length).toBeGreaterThan(0);
+    expect(byTestId(root, 'user-menu-details').length).toBeGreaterThan(0);
   });
 
-  it('own row: View Details only and no card request', async () => {
+  it('own row: identity only and no card request', async () => {
     const root = await mount();
     await longPress(root, 'Sam Smith');
     expect(getGroupMemberCard).not.toHaveBeenCalled();
     expect(shownActions(root)).toEqual([]);
   });
 
-  it('a card failure leaves View Details only', async () => {
+  it('a card failure leaves the identity only', async () => {
     (getGroupMemberCard as jest.Mock).mockRejectedValue(new Error('boom'));
     const root = await mount();
     await longPress(root, 'Aisha Rahman');
     expect(shownActions(root)).toEqual([]);
-    expect(byTestId(root, 'user-menu-view-details').length).toBeGreaterThan(0);
+    expect(byTestId(root, 'user-menu-details').length).toBeGreaterThan(0);
   });
 
-  it('a tap on the avatar opens View Details (no card request)', async () => {
+  it('a tap on the avatar opens the same combined pop-up as a long-press (card requested)', async () => {
     const root = await mount();
     await tap(root, 'Aisha Rahman');
     expect(byTestId(root, 'user-menu-details').length).toBeGreaterThan(0);
-    expect(texts(root)).toEqual(expect.arrayContaining(['Details', 'Aisha Rahman', 'aisha_r']));
-    expect(getGroupMemberCard).not.toHaveBeenCalled();
+    expect(texts(root)).toEqual(expect.arrayContaining(['Aisha Rahman', 'aisha_r']));
+    expect(texts(root)).not.toContain('View Details');
+    expect(getGroupMemberCard).toHaveBeenCalledTimes(1);
   });
 
   it('Remove from group asks first, names the member by display name, then removes and refetches the group', async () => {

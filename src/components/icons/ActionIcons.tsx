@@ -260,3 +260,23 @@ export function MarkUnreadIcon({ size = 20, color = colors.white }: ActionIconPr
   );
 }
 
+
+export function ChevronRightIcon({
+  size = 18,
+  color = colors.textMuted,
+}: ActionIconProps): React.JSX.Element {
+  return (
+    <Svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <Path d="m9 6 6 6-6 6" />
+    </Svg>
+  );
+}
