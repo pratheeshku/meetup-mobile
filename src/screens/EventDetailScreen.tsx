@@ -1505,8 +1505,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             />
           ) : null}
 
-          {/* Organizer: Responses replaces Players (GV-4, AD-3); a failed responses call keeps Players. */}
-          {isOrganiser && responses ? (
+          {/* Responses for every viewer who got the payload (GV-4, AD-3 v1.1); a failed call keeps Players. */}
+          {responses ? (
             <ResponsesSection
               responses={responses}
               entity="game"
@@ -1518,7 +1518,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           ) : null}
 
           {/* Players (organizer: only when the responses call failed; hidden from non-organizers when closed) */}
-          {(event.lifecycle_status !== 'closed' || isOrganiser) && !(isOrganiser && responses) ? (
+          {(event.lifecycle_status !== 'closed' || isOrganiser) && !responses ? (
             <Card style={styles.infoCard}>
               <View style={styles.playersCardHeader}>
                 <Text style={styles.playersCardTitle}>{t('mob.game_detail.players')}</Text>

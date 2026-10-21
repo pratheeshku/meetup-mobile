@@ -264,7 +264,8 @@ export interface ResponseSection {
 export interface ResponsesResponse {
   accepted: ResponseSection;
   pending: ResponseSection;
-  declined: ResponseSection;
+  /** Absent for a viewer who may not see who declined (not an error, not loading). */
+  declined?: ResponseSection;
 }
 
 export interface DeclineAck {

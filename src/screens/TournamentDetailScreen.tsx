@@ -632,7 +632,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       />
 
       {/* Organizer / committee: Responses (GV-4, AD-1, AD-3); a refused or failed call keeps today's content. */}
-      {canReadResponses && responses ? (
+      {responses ? (
         <View style={styles.block}>
           <ResponsesSection
             responses={responses}
@@ -724,7 +724,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       ) : null}
 
       {/* Viewers without the Responses block keep the registrations list (no data disappears for them). */}
-      {!(canReadResponses && responses) ? (
+      {!responses ? (
         <Card style={styles.block}>
           <Text style={styles.sectionTitle} accessibilityRole="header">
             {t('mob.tournament.tab_registrations')}

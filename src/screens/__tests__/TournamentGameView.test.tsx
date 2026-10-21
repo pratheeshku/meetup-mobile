@@ -142,7 +142,7 @@ describe('organizer view', () => {
   });
 });
 
-describe('viewers who cannot read the responses', () => {
+describe('viewers without the full payload', () => {
   it('a plain participant keeps the registrations list and sees no Responses block (nothing disappears)', async () => {
     const root = await mount({ responses: 'refused' });
     expect(byId(root, 'organizer-responses-section')).toHaveLength(0);
@@ -158,8 +158,14 @@ describe('viewers who cannot read the responses', () => {
     expect(byId(root, 'invite-card')).toHaveLength(1);
   });
 
-  it('a non-reader never sees the Responses block even if the endpoint answered', async () => {
-    const root = await mount();
-    expect(byId(root, 'organizer-responses-section')).toHaveLength(0);
+  it('a plain viewer whose payload has no `declined` sees Registered, Accepted not yet registered and Pending, no Declined, no Invite card', async () => {
+    const playerView = { accepted: RESPONSES.accepted, pending: RESPONSES.pending };
+    const root = await mount({ responses: playerView });
+    const sections = root
+      .findAll(n => typeof n.type === 'string' && String(n.props.testID ?? '').startsWith('responses-section-'))
+      .map(n => String(n.props.testID).replace('responses-section-', ''));
+    expect(sections).toEqual(['registered', 'accepted_not_registered', 'pending']);
+    expect(byId(root, 'invite-card')).toHaveLength(0);
+    expect(byId(root, 'registration-r-1')).toHaveLength(0);
   });
 });
