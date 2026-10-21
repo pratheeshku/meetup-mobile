@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Invite picker</title>
+</head>
+<body>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1B1918}
+button{font-family:inherit}
+</style>
+<div style="width:390px;height:800px;box-sizing:border-box;background:#FAF6F1;display:flex;flex-direction:column">
+
+  <div style="background:#0D47A1;color:#fff;padding:20px 16px 14px;display:flex;align-items:center;gap:10px">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    <div style="font-size:20px;font-weight:700">Invite to Sunday Smash</div>
+  </div>
+
+  <div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;flex:1">
+    <!-- Groups | Players: same component, same behaviour -->
+    <div style="display:flex;background:#EFECE6;border-radius:12px;padding:3px">
+      <div style="flex:1;text-align:center;padding:9px 0;font-size:14px;font-weight:600;color:#52514F">Groups</div>
+      <div style="flex:1;text-align:center;background:#fff;border-radius:10px;padding:9px 0;font-size:14px;font-weight:700;color:#1565C0;box-shadow:0 1px 2px rgba(0,0,0,.08)">Players</div>
+    </div>
+
+    <!-- search -->
+    <div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E8E4DF;border-radius:12px;padding:0 12px;min-height:46px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6E6D6B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <span style="font-size:15px;color:#6E6D6B">Search name or nickname</span>
+    </div>
+
+    <!-- results: + stages, − unstages (multi-select, no per-row Send) -->
+    <div style="background:#fff;border:1px solid #E8E4DF;border-radius:14px;padding:2px 12px">
+      <div style="padding:10px 0 4px;font-size:12px;font-weight:700;letter-spacing:.04em;color:#52514F;text-transform:uppercase">Selected</div>
+      <div style="display:flex;align-items:center;gap:10px;min-height:56px;border-bottom:1px solid #EFECE6"><span style="width:34px;height:34px;border-radius:50%;background:#D1FAE5;color:#065F46;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center">SJ</span><span style="flex:1"><span style="font-size:15px;font-weight:600">Sam J</span><br><span style="font-size:12px;color:#6E6D6B">@Sam</span></span><button aria-label="Remove Sam J" style="width:44px;height:44px;border:0;background:none;padding:0"><span style="display:block;margin:auto;width:30px;height:30px;border-radius:50%;background:#1565C0;color:#fff;font-size:20px;line-height:29px;text-align:center">−</span></button></div>
+      <div style="display:flex;align-items:center;gap:10px;min-height:56px;border-bottom:1px solid #EFECE6"><span style="width:34px;height:34px;border-radius:50%;background:#FCE7F3;color:#9D174D;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center">PM</span><span style="flex:1"><span style="font-size:15px;font-weight:600">Priya M</span><br><span style="font-size:12px;color:#6E6D6B">@Priya</span></span><button aria-label="Remove Priya M" style="width:44px;height:44px;border:0;background:none;padding:0"><span style="display:block;margin:auto;width:30px;height:30px;border-radius:50%;background:#1565C0;color:#fff;font-size:20px;line-height:29px;text-align:center">−</span></button></div>
+      <div style="display:flex;align-items:center;gap:10px;min-height:56px;border-bottom:1px solid #EFECE6"><span style="width:34px;height:34px;border-radius:50%;background:#DBEAFE;color:#1E40AF;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center">DW</span><span style="flex:1"><span style="font-size:15px;font-weight:600">Daniel W</span><br><span style="font-size:12px;color:#6E6D6B">@Dan</span></span><button aria-label="Remove Daniel W" style="width:44px;height:44px;border:0;background:none;padding:0"><span style="display:block;margin:auto;width:30px;height:30px;border-radius:50%;background:#1565C0;color:#fff;font-size:20px;line-height:29px;text-align:center">−</span></button></div>
+      <div style="padding:10px 0 4px;font-size:12px;font-weight:700;letter-spacing:.04em;color:#52514F;text-transform:uppercase">Available</div>
+      <div style="display:flex;align-items:center;gap:10px;min-height:56px;border-bottom:1px solid #EFECE6"><span style="width:34px;height:34px;border-radius:50%;background:#FEF3C7;color:#92400E;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center">NA</span><span style="flex:1"><span style="font-size:15px;font-weight:600">Nadia A</span><br><span style="font-size:12px;color:#6E6D6B">@Nadia</span></span><button aria-label="Add Nadia A" style="width:44px;height:44px;border:0;background:none;padding:0"><span style="display:block;margin:auto;width:30px;height:30px;border-radius:50%;background:#E3F2FD;color:#1565C0;font-size:20px;line-height:29px;text-align:center;border:1px solid #1565C0;box-sizing:border-box">+</span></button></div>
+      <div style="padding:10px 0 4px;font-size:12px;font-weight:700;letter-spacing:.04em;color:#52514F;text-transform:uppercase">Already in this game</div>
+      <div style="display:flex;align-items:center;gap:10px;min-height:56px"><span style="width:34px;height:34px;border-radius:50%;background:#EDE9FE;color:#5B21B6;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center">MS</span><span style="flex:1"><span style="font-size:15px;font-weight:600">Mohan S</span><br><span style="font-size:12px;color:#6E6D6B">@Mo</span></span><span style="font-size:12px;color:#6E6D6B;background:#EFECE6;border-radius:999px;padding:3px 9px">Joined</span></div>
+    </div>
+
+    <div style="font-size:12.5px;color:#52514F;line-height:1.4">Typed email addresses join the same list as a staged “+” row. Groups tab behaves identically: each group row is + / −, one Send.</div>
+    <div style="flex:1"></div>
+    <button style="min-height:52px;border:0;border-radius:14px;background:#1D5FA3;color:#fff;font-size:16px;font-weight:700">Send 3 invites</button>
+  </div>
+</div>
+</body>
+</html>

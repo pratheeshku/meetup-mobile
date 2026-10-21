@@ -46,3 +46,6 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 
 ## DES-MEETUP-ADDENDUM-push-actions.md
 - v1.0 (2026-10-18): approved by the owner. Copy of the backend repo's document. Action buttons on push for game invite, tournament invite and group addition. Gate: pa-spike (OI-1) before any client build. Task pa-clients-mobile.
+
+## DES-MEETUP-ADDENDUM-game-view-redesign.md
+- v1.0 (2026-10-21): first version, approved by the owner (boards of 2026-10-21). GV-1..GV-7, AD-1..AD-10, D-1 (supersedes user-details-menu v1.4 UM-06 two-step pop-up), D-2 (decline-response AD-5 display order: Declined above Pending), D-3 (dashboard AD-21 toggle placement), D-4 (tournament Registrations tab folded into Responses). Additive-only rule in §1/§4. Mobile task gv-mobile.
