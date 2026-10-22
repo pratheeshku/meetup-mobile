@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-MATCH-SCORING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-MATCH-SCORING
-**Version:** v1.1
+**Version:** v1.2
 **Status:** **v1.1 amends the APPROVED v1.0 (owner, 2026-10-22).** v1.1 is the architect's correction after the ms-s0 Blocked Report (same day): lifecycle phases 6a and 7 were never built, so this release now **builds the results and advancement substrate itself** to the lifecycle AD-10 specification (tasks S2a/S3a, §10), plus the as-built corrections in §13. No requirement (MS-01..MS-28) changed.
 **Owner:** Pratheesh
 **Date:** 2026-10-22
@@ -278,7 +278,7 @@ Risk: results upload and derivation **High**; flip/override/clear approvals **Hi
 | Phase | Content | Acceptance |
 |---|---|---|
 | S0 | BP-01 verification: live CHECKs (result kinds, action types, notification types), fixture columns, label sections; record in report | **Done 2026-10-22** (`docs/reports/ms-s0-verification-and-blocked-report.md`); the human re-verifies the two CHECK constraint names against the live catalog before running those migrations |
-| ms-p4 / ms-p5 | Lifecycle phases 4 and 5 per the lifecycle addendum (AD-6, AD-7; tests 5–11) | lifecycle tests 5–11 written |
+| ms-p4 / ms-p5 | Lifecycle phases 4 and 5 per the lifecycle addendum (AD-6, AD-7; tests 5–11) | **Done 2026-10-22** (merged `39bf522`; report `docs/reports/ms-p45-report.md`; rulings ratified at v1.2; migrations pending the human) |
 | S1 | `fixture_core` v1.4 in Sadhana (pairing revision 2, `suggest_group_count`, min sizes) — separate dispatch per its own doc; release tag cut, wheel re-vendored | FT-20, FT-21 |
 | S2a (v1.1) | Draft + publication substrate: `tournament_fixture_drafts` (engine source only), `fixture_publication` flow binding `{draft_id, payload_hash}`, materialisation into `tournament_fixtures` including the new advancement columns | drafts never leak into `tournament_fixtures` without an executed approval; test 10 of lifecycle §9 |
 | S2 | Points round-trip + generation adapter + publication wiring (backend/web) | S-T1–S-T4, S-T15 |
@@ -342,3 +342,5 @@ Standing rules apply: migrations human-run one at a time; briefs split per repo 
 | C2 | As-built corrections from ms-s0: the notification-type list is `chk_notification_preferences_type` on `notification_preferences` (not a `notifications` CHECK); `ui_labels` grouping is key-prefix based in the admin editor; the fixture-core pin is a rebuilt vendored wheel, with tag name + tag-object SHA + commit SHA recorded in `vendor/fixture_core.SOURCE.txt`. | AD-S3, AD-S8, §5.1 |
 | C3 | Reminder-row updates on result posting are gated on lifecycle phase 8 existing (not built, out of scope); posting must not depend on it. | AD-S4 |
 | C4 | §10 task table restated: ms-p4/ms-p5, S2a, S3a added; S0 marked done; OI-S5 revised (residual blocker = the fixture-core v1.4 release tag, dispatch D). | §10, §12 |
+
+**v1.2 (2026-10-22), architect ratification after the ms-p45 build (merged to main at `39bf522`; architect review of the branch passed: maker-checker enforcement, migration self-verification, grants and the OI-5 boundary spot-checked).** The ms-p45 report's nine Proposed Assumptions (R1–R9: member-row shape with surrogate id and `role` default `player`; DELETE grant for roster replacement; the roster-change route, actors and AD-4 invite rule on added members; NULL cut-off v2 rows refused with 409; `fixture_publication` decision target = tournament_id; `otp_hash` NULL in v2; S2a publication ports with 409 until registered; v1 side effects kept on v2 registration; DB-clock boundary testing) and deviations D-1 to D-4 are **ratified as normative**; the report text (`docs/reports/ms-p45-report.md`) is the authoritative wording. New rulings for S2a: register the fixture-publication ports and call `require_min_active_committee` on draft generation (report gap 6), and add a clean 400 guard rejecting step-up challenge requests for v2-only action types (report gap 4). ms-p4/ms-p5 are **done** in §10. Two migrations await the human (`1748c8917ab3`, then `83db8f5d1092`, one at a time; the second self-verifies the live CHECK name). No requirement changed.
