@@ -74,6 +74,8 @@ export type GroupsStackParamList = {
 export type TournamentsStackParamList = {
   TournamentsList: { refreshKey?: number; scope?: GamesScope; entryKey?: number; segment?: 'games' | 'tournaments' } | undefined;
   TournamentDetail: { tournamentId: string };
+  /** Standings, results and bracket (match-scoring v1.2 read views). */
+  TournamentScoring: { tournamentId: string };
 };
 
 /**

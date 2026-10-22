@@ -21,6 +21,8 @@
  */
 import { apiClient } from './client';
 import type { VenueSnapshot } from '../types/venue';
+import type { TournamentStandingsView } from '../types/tournamentScoring';
+import { normaliseStandings } from '../utils/tournamentScoring';
 import type {
   CreateTournamentInput,
   DeclineAck,
@@ -382,4 +384,26 @@ export async function getTournamentResponses(
     correlationId: options?.correlationId,
   });
   return data;
+}
+
+/**
+ * `GET /tournaments/{id}/standings` (match-scoring v1.2, ms-s4 Appendix A1). Any viewer of the
+ * tournament. Returns `null` when there is no scoring data to show: the v1 list shape, an
+ * unpublished fixture, or a 404 (scoring switched off). Other errors propagate.
+ */
+export async function getTournamentStandings(
+  id: string,
+  options?: RequestOptions,
+): Promise<TournamentStandingsView | null> {
+  try {
+    const { data } = await apiClient.get<unknown>(`/tournaments/${id}/standings`, {
+      correlationId: options?.correlationId,
+    });
+    return normaliseStandings(data);
+  } catch (error) {
+    if ((error as { response?: { status?: number } } | null)?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
 }

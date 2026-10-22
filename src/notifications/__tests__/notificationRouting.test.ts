@@ -24,13 +24,15 @@ const ADDED_TYPES = [
   'group_deleted',
   'group_ownership_transferred',
   'tournament_invited',
+  'tournament_advanced',
+  'tournament_result_corrected',
 ] as const;
 
 describe('type list', () => {
-  it('contains the added types alongside the original 12 (19 total, no duplicates)', () => {
+  it('contains the added types alongside the original 12 (21 total, no duplicates)', () => {
     expect(NOTIFICATION_TYPES).toEqual(expect.arrayContaining([...ADDED_TYPES]));
-    expect(NOTIFICATION_TYPES).toHaveLength(19);
-    expect(new Set(NOTIFICATION_TYPES).size).toBe(19);
+    expect(NOTIFICATION_TYPES).toHaveLength(21);
+    expect(new Set(NOTIFICATION_TYPES).size).toBe(21);
   });
 
   it('resolves every listed type without throwing (list and switch cannot drift)', () => {
@@ -39,6 +41,19 @@ describe('type list', () => {
     });
   });
 });
+
+describe.each(['tournament_advanced', 'tournament_result_corrected', 'tournament_result_posted'] as const)(
+  'resolveNotificationTarget(%s) (match scoring)',
+  type => {
+    it('deep-links to the tournament view with entity_id as the tournament id', () => {
+      expect(resolveNotificationTarget(type, 'tour-7')).toEqual({
+        tab: 'Tournaments',
+        screen: 'TournamentDetail',
+        params: { tournamentId: 'tour-7' },
+      });
+    });
+  },
+);
 
 describe.each(PARTICIPANT_TYPES)('resolveNotificationTarget(%s)', type => {
   it('opens Event Detail for the entity id', () => {

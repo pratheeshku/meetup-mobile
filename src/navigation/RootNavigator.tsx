@@ -124,6 +124,7 @@ import InviteMembersScreen from '../screens/InviteMembersScreen';
 import TournamentTeamsScreen from '../screens/TournamentTeamsScreen';
 import GamesScreen from '../screens/GamesScreen';
 import TournamentDetailScreen from '../screens/TournamentDetailScreen';
+import TournamentScoringScreen from '../screens/TournamentScoringScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import EditSkillLevelsScreen from '../screens/EditSkillLevelsScreen';
@@ -290,6 +291,11 @@ function TournamentsStack(): React.JSX.Element {
         name="TournamentDetail"
         component={TournamentDetailScreen}
         options={{ title: t('mob.nav.title_tournament') }}
+      />
+      <TournamentsStackNav.Screen
+        name="TournamentScoring"
+        component={TournamentScoringScreen}
+        options={{ title: t('mob.scoring.title_groups') }}
       />
     </TournamentsStackNav.Navigator>
   );

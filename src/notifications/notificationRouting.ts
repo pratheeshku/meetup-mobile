@@ -122,6 +122,8 @@ export function resolveNotificationTarget(
     case 'tournament_cancelled':
     case 'tournament_schedule_published':
     case 'tournament_standings_published':
+    case 'tournament_advanced': // match scoring (v1.2 AD-S8): entity_id = the tournament id
+    case 'tournament_result_corrected':
       return {
         tab: 'Tournaments',
         screen: 'TournamentDetail',
