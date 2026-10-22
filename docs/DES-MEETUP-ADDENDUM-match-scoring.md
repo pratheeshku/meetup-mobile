@@ -1,8 +1,8 @@
 # DES-MEETUP-ADDENDUM-MATCH-SCORING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-MATCH-SCORING
-**Version:** v1.0
-**Status:** **v1.0 APPROVED (owner, 2026-10-22).** The owner instructed drafting with approved status after elicitation completed in conversation (2026-10-22); any later review finding amends by version.
+**Version:** v1.1
+**Status:** **v1.1 amends the APPROVED v1.0 (owner, 2026-10-22).** v1.1 is the architect's correction after the ms-s0 Blocked Report (same day): lifecycle phases 6a and 7 were never built, so this release now **builds the results and advancement substrate itself** to the lifecycle AD-10 specification (tasks S2a/S3a, §10), plus the as-built corrections in §13. No requirement (MS-01..MS-28) changed.
 **Owner:** Pratheesh
 **Date:** 2026-10-22
 **Scale Tier:** T1
@@ -16,6 +16,7 @@
 2. This document reconciles three conflicts found in a full history sweep (owner-requested, 2026-10-22); each is an explicit Architecture Decision: AD-S10 (Won semantics, closure-report ruling of 2026-10-20 wins), AD-S7 (live standings supersede the group `standings_publication` maker-checker), AD-S5 (walkover carries no score credit, superseding the canvas board's default 21–0 note).
 3. Sequencing is the owner's: build **after the current app release** (2026-10-20 decision on release sizing). Prerequisites in §10.
 4. Table and column names must be verified against the live schema in phase S0 (BP-01); §5.1 names follow the lifecycle addendum's as-built reports.
+5. **(v1.1)** The ms-s0 verification (`docs/reports/ms-s0-verification-and-blocked-report.md`, 2026-10-22) found that lifecycle phases 6a and 7 were never built: no `tournament_match_results`, no `result_service`, no advancement columns on `tournament_fixtures`, no tournament draft table. v1.0's "existing, extended" wording for those items was drift. v1.1 folds their build into this release (S2a/S3a) rather than building lifecycle 6a's Excel fixture-import first, which §2 already supersedes for groups+knockout. Lifecycle AD-10 and lifecycle §5.1 remain the authoritative specification for what S2a/S3a build.
 
 ---
 
@@ -103,7 +104,7 @@ A player's Played count updates as soon as their match result is uploaded. Won s
 - Registration IDs are the join key across points, fixture and scoring workbooks — never names (AD-17 precedent). This closes the mapping gap OI-W2 recorded.
 
 **AD-S3 — Generation from the tournament view through `fixture_core` (MS-15, MS-16, MS-19).**
-- New host adapter `tournaments/fixture_core_adapter.py`: builds the library roster from frozen registrations + the uploaded points (team points = member average, by the library's rule), computes the group count with the library's `suggest_group_count` helper (thresholds from the format spec; the organizer may pick a smaller allowed count, never larger), calls `generate` with format `group_knockout` (algorithm revision 2: pre-final same-group separation), seed = stored `rng_seed`, and maps the returned `Fixture` to a `DraftPayload` with `source='engine'` — the shape AD-17's socket already admits. A round-trip test asserts the mapping (workspace §2 requirement).
+- New host adapter `tournaments/fixture_core_adapter.py`: builds the library roster from frozen registrations + the uploaded points (team points = member average, by the library's rule), computes the group count with the library's `suggest_group_count` helper (thresholds from the format spec; the organizer may pick a smaller allowed count, never larger), calls `generate` with format `group_knockout` (algorithm revision 2: pre-final same-group separation), seed = stored `rng_seed`, and maps the returned `Fixture` to a `DraftPayload` with `source='engine'` — the shape AD-17's socket already admits. A round-trip test asserts the mapping (workspace §2 requirement). **(v1.1)** The pin is the **vendored wheel** pattern already in use: build the wheel from the sadhana release tag carrying library v1.4, replace `vendor/fixture_core-*.whl`, and record tag name, tag-object SHA **and commit SHA** in `vendor/fixture_core.SOURCE.txt` (the current file records the tag-object SHA as "Commit"; fix that drift).
 - Draft → publication is unchanged lifecycle machinery: `fixture_publication` maker-checker (TL-20) binds `{draft_id, payload_hash}`; materialisation writes `tournament_fixtures` with the advancement links. The schedule planner (AD-9, in the library) proposes times and courts inside the tournament window; the organizer edits in the workbook before results or per match after publication.
 - `meetup.tournament.fixture_engine.enabled` gates the routes (existing key, default false until this release ships).
 - Requires ≥2 active committee members (AD-7 gate) and a stored points set.
@@ -112,7 +113,7 @@ A player's Played count updates as soon as their match result is uploaded. Won s
 **AD-S4 — Scoring workbook round-trip (MS-04, MS-05, MS-21, MS-22).**
 - `GET …/fixtures/workbook` (active committee, after publication): server-generated `.xlsx`. One sheet per group plus a Knockout sheet. Columns per match row: `Match ID` (locked), `Stage/Round` (locked), `Side A` / `Side B` (locked: registration IDs + display names; placeholders like "Winner of M3" or "A1" until resolved), `Date`, `Start`, `Court`, `Venue` (editable **before publication only**; afterwards shown read-only with a note pointing to the per-match edit), `Result type` (dropdown: Normal, WO, RET), `Set1 A`, `Set1 B`, `Set2 A`, `Set2 B`, `Set3 A`, `Set3 B`, `Advancing side` (A/B; **required for WO and RET, ignored otherwise**). There is **no winner column**: the system derives it. Locked header: tournament id, fixture `payload_hash`, workbook schema version. All user-controlled cells neutralised on write (AD-17).
 - `POST …/fixtures/results-upload` (one active committee member, logged — TL-21): AD-17 file rules; header hash must match the published fixture (stale workbook → `409 WORKBOOK_STALE`, re-download). Validation, all-or-nothing with row reasons (`422`): known match IDs only; both sides resolved; sets are non-negative integers; within a set the scores differ (no tied set, MS-03); Normal rows have ≥1 completed set and a derivable winner (more sets won than the other side among entered sets); WO rows have no set scores and an advancing side; RET rows keep entered sets and name the advancing side; a row for a match that already has a result is accepted only if the derived winner, result type and advancing side are **unchanged** (a score-only correction, posted as a new result version with reason `workbook_correction`) — any row that would flip a winner or change WO/RET is rejected with `CORRECTION_NEEDS_APPROVAL`, pointing at the correction flow (AD-S6). Unfilled rows are simply not yet played.
-- On success, per new row in one transaction set: append `tournament_match_results` (kind `sets`, `walkover` or `retired`; payload holds sets, result type, advancing side), write the projection, advance the winner one hop (AD-10), update reminder rows, enqueue notifications (AD-S8). Partial fixtures are normal; upload as often as wanted.
+- On success, per new row in one transaction set: append `tournament_match_results` (kind `sets`, `walkover` or `retired`; payload holds sets, result type, advancing side), write the projection, advance the winner one hop (AD-10), enqueue notifications (AD-S8), and update reminder rows **only once lifecycle phase 8 exists** — the reminder dispatch table is not built and phase 8 is out of this release's scope, so result posting must not depend on it (v1.1). Partial fixtures are normal; upload as often as wanted.
 - Rejected: partial (row-level) acceptance (ordering ambiguity on failures; AD-17 is all-or-nothing); schedule edits via re-upload after publication (bypasses AD-9's bounds and `fixture_reschedule`).
 
 **AD-S5 — Result types and counting (MS-07, MS-08).**
@@ -129,7 +130,7 @@ A player's Played count updates as soon as their match result is uploaded. Won s
 
 **AD-S7 — Live standings (MS-11, MS-12).** Group standings are a pure function over current result rows + the snapshot tiebreak list: matches won → head-to-head when exactly two tied (guard: applied only when the tied players met the same number of times — automatic in a single round robin, asserted) → for three or more, set difference then point difference over all group matches, reapplying head-to-head whenever a step leaves exactly two → organizer override. Standings are computed on read (T1 volumes; a group is ≤ a few dozen matches) and shown to every tournament viewer; nothing is snapshotted until close-out. When a group completes with no unresolved tie, the qualifying registrations resolve the knockout `group_place` slots automatically in the same transaction as the final group result; an unresolved tie leaves the slots open and flags the group for override. Supersedes `standings_publication` scope `group` (§2). Rejected: keeping the two-person publish step (contradicts MS-12 and adds a human gate to arithmetic; committee control is preserved where judgment enters — overrides, flips, clears).
 
-**AD-S8 — Notifications (MS-14, MS-27).** New types (additive CHECK + fanout audience + builders + label seeds): `tournament_result_posted` (exists; audience = the fixture's two sides via `tournament_registration_members`), `tournament_advanced` (a side placed into a next match or qualified from a group; names the opponent once both sides are known, else "to be decided"), `tournament_result_corrected` (approved flip, WO/RET change, override or clear; audience = every registration whose slot or result changed). All titles and bodies from `ui_labels`, grouped under a "Tournament scoring" section in admin label management (owner's 2026-10-21 grouping rule). One notification per event per recipient, deduplicated; no notification for a score-only correction.
+**AD-S8 — Notifications (MS-14, MS-27).** New types (additive CHECK + fanout audience + builders + label seeds): `tournament_result_posted` (exists; audience = the fixture's two sides via `tournament_registration_members`), `tournament_advanced` (a side placed into a next match or qualified from a group; names the opponent once both sides are known, else "to be decided"), `tournament_result_corrected` (approved flip, WO/RET change, override or clear; audience = every registration whose slot or result changed). All titles and bodies from `ui_labels`, grouped under a "Tournament scoring" section in admin label management (owner's 2026-10-21 grouping rule) — **(v1.1)** grouping in the admin label editor is by key prefix, so this is a new prefix (for example `tournament_scoring.*`) mapped to the section name in the editor, not a schema change. One notification per event per recipient, deduplicated; no notification for a score-only correction.
 
 **AD-S9 — Stats recompute (MS-13).** Played for tournament matches = count of current result versions where the player's side actually contested (Normal both sides; RET both sides; WO advancing side only — MS-08), read through `tournament_registration_members`, recomputed from rows on read or on a cheap materialised refresh per upload — never incremented counters, so flips, clears and corrections self-correct. Played for **games** stays closure-driven (closure addendum CR-06, unchanged). The dashboard stats strip (Played/Won/Hosted/Groups) picks this up through its existing source. **Won is unchanged:** one per tournament won, from closure player rows with role `winner` (AD-S10); the removed per-fixture win query does not return.
 
@@ -146,7 +147,8 @@ A player's Played count updates as soon as their match result is uploaded. Won s
 | `points_io.py` | Points template export, upload parse/validate, stored points set | AD-17 file guards |
 | `fixture_core_adapter.py` | Roster build, `suggest_group_count`, `generate`, Fixture→DraftPayload mapping, round-trip test | `fixture_core` (pinned release) |
 | `scoring_io.py` | Scoring workbook export, results upload parse/validate, diff against stored results | `result_service` |
-| `result_service.py` (existing, extended) | Append results incl. `retired`, projection, one-hop advancement, clear-result voiding | `fixture_engine`/library validator |
+| `result_service.py` + `result_validator.py` (**new in this release, v1.1**: built to lifecycle AD-10's specification, then extended per AD-S4..AD-S6) | Append-only result log, projection writer (sole writer of `winner_registration_id`/`score_summary`), one-hop advancement over the new links, clear-result voiding | library structural validator |
+| Draft + publication path (**new in this release, v1.1**: lifecycle AD-8/AD-17 socket, engine source only — the Excel fixture-import parser of AD-17 is not built) | `tournament_fixture_drafts` rows, `fixture_publication` binding `{draft_id, payload_hash}`, materialisation into `tournament_fixtures` | `committee_flow_v2` |
 | `standings.py` | Pure standings function (MS-11), qualification resolution, override application | result rows |
 | `committee_flow_v2.py` (existing, extended) | `result_winner_change`, `qualification_override` action types | `committee_engine` |
 | `notifications/fanout` (existing, extended) | AD-S8 audiences | `tournament_registration_members` |
@@ -178,11 +180,12 @@ Publication, per-match schedule edit and reminders are the existing lifecycle en
 | Table / change | Columns and constraints |
 |---|---|
 | `tournament_points_sets` (new) | tournament_id PK/FK, payload JSONB (registration_id → points or null), file_sha256, filename, uploaded_by, uploaded_at, locked_at NULL (set at generation). GRANT SELECT, INSERT, UPDATE to `meetup_app`; no RLS. |
-| `tournament_match_results` | `kind` CHECK adds `retired`; payload for sets/walkover/retired carries `{sets:[{a,b}], result_type, advancing_side}`; a voiding version has kind `voided` (additive) with `correction_of_version` and reason |
-| `tournament_fixtures` | unchanged (advancement links from AD-10 suffice) |
-| `tournament_approval_requests` | `action_type` CHECK adds `result_winner_change`, `qualification_override` |
+| `tournament_match_results` (**new table, v1.1** — lifecycle phase 7 never ran) | Built to lifecycle AD-10 / lifecycle §5.1: id, fixture_id, version, kind, payload JSONB, winner_registration_id, entered_by, entered_at, correction_of_version, reason; UNIQUE(fixture_id, version); no UPDATE/DELETE path in code. `kind` CHECK = lifecycle's (`sets`, `score`, `draw`, `walkover`) **plus `retired` and `voided`**; this release uses `sets`, `walkover`, `retired`, `voided` only. Payload for sets/walkover/retired carries `{sets:[{a,b}], result_type, advancing_side}` |
+| `tournament_fixture_drafts` (**new table, v1.1** — lifecycle phase 6a never ran) | Built to lifecycle §5.1 (id, tournament_id, version, payload, payload_hash, constraints, rng_seed, source_comment_id, status, created_by, source CHECK(upload, engine), source_file_hash, source_filename, uploaded_by). This release writes `source='engine'` only; the upload columns stay NULL and the AD-17 parser is not built |
+| `tournament_fixtures` (**columns added, v1.1** — v1.0 wrongly said "unchanged") | Adds lifecycle AD-10's columns: `next_fixture_id`, `next_slot`, `loser_next_fixture_id`, `loser_next_slot`, `source_a` JSONB, `source_b` JSONB, `court_label`, `duration_minutes`; `stage` CHECK gains `third_place` (as-built today: main, group, quarterfinal, semifinal, final) |
+| `tournament_approval_requests` | `action_type` CHECK adds `result_winner_change`, `qualification_override` (ms-p5 adds `fixture_publication` first; as-built CHECK today holds the six v1 values only) |
 | `tournament_standings_overrides` (new) | id, tournament_id, group_key, payload JSONB (placements), reason, requested_by, approval_request_id, created_at (immutable; latest per group wins) |
-| `notifications` | `notification_type` CHECK adds `tournament_advanced`, `tournament_result_corrected` (verify live CHECK first, OI-7 pattern) |
+| `notification_preferences` (**v1.1**: the type list lives on `chk_notification_preferences_type`, not a `notifications` CHECK) | CHECK adds `tournament_advanced`, `tournament_result_corrected` (verify the live catalog first, OI-7 pattern) |
 | `rules_snapshot` (data, not DDL) | format spec v2 fields for `group_knockout`: `allowed_group_counts [2,4,8]`, `min_group_size 3`, `qualify_per_group_options [1,2]`, `knockout_min 4`, `pairing "cross_group_v2"`, `allocation "snake_by_points"`, `tiebreakers ["matches_won","head_to_head","set_difference","point_difference","override"]` (TemplateDefinition schema_version bump, additive) |
 
 ### 5.2 Data lineage (one source per field)
@@ -270,13 +273,16 @@ Risk: results upload and derivation **High**; flip/override/clear approvals **Hi
 
 ## 10. Implementation Phases
 
-**Sequencing (owner):** build starts **after the current app release**. **Prerequisites:** lifecycle Release 1 phases 4 (registration freeze — `tournament_registration_members`) and 5 (committee v2 — `fixture_publication`, action machinery) are not yet built (Release 1 on hold after p3); they must land first. `fixture_core` v1.4 (companion) precedes S2.
+**Sequencing (owner):** build starts **after the current app release**. **Prerequisites and in-scope substrate (v1.1):** lifecycle Release 1 phases 4 (registration freeze — `tournament_registration_members`) and 5 (committee v2 — `fixture_publication`, action machinery) are built as tasks of this release (ms-p4, ms-p5; no fixture-core dependency). The lifecycle 6a/7 substrate this design relies on is built here too (S2a, S3a), to lifecycle AD-10 / §5.1 as the specification. Lifecycle phase 8 (reminders) stays out of scope. `fixture_core` v1.4, consumed as a rebuilt vendored wheel from a sadhana release tag, precedes S2.
 
 | Phase | Content | Acceptance |
 |---|---|---|
-| S0 | BP-01 verification: live CHECKs (result kinds, action types, notification types), fixture columns, label sections; record in report | report |
-| S1 | `fixture_core` v1.4 in Sadhana (pairing revision 2, `suggest_group_count`, min sizes) — separate dispatch per its own doc | FT-20, FT-21 |
+| S0 | BP-01 verification: live CHECKs (result kinds, action types, notification types), fixture columns, label sections; record in report | **Done 2026-10-22** (`docs/reports/ms-s0-verification-and-blocked-report.md`); the human re-verifies the two CHECK constraint names against the live catalog before running those migrations |
+| ms-p4 / ms-p5 | Lifecycle phases 4 and 5 per the lifecycle addendum (AD-6, AD-7; tests 5–11) | lifecycle tests 5–11 written |
+| S1 | `fixture_core` v1.4 in Sadhana (pairing revision 2, `suggest_group_count`, min sizes) — separate dispatch per its own doc; release tag cut, wheel re-vendored | FT-20, FT-21 |
+| S2a (v1.1) | Draft + publication substrate: `tournament_fixture_drafts` (engine source only), `fixture_publication` flow binding `{draft_id, payload_hash}`, materialisation into `tournament_fixtures` including the new advancement columns | drafts never leak into `tournament_fixtures` without an executed approval; test 10 of lifecycle §9 |
 | S2 | Points round-trip + generation adapter + publication wiring (backend/web) | S-T1–S-T4, S-T15 |
+| S3a (v1.1) | Results substrate to lifecycle AD-10: `tournament_match_results`, `result_service`/`result_validator` (structural parts: append-only log, projection, one-hop advancement over the links, `DOWNSTREAM_PLAYED`) | lifecycle tests 17–19 structural parts |
 | S3 | Scoring workbook, results upload, derivation, corrections/flips/overrides/clears, standings, qualification | S-T5–S-T10, S-T13, S-T14 |
 | S4 | Notifications, stats recompute, closure pre-fill, mobile read views (scores, standings, bracket), flip `fixture_engine.enabled` | S-T11, S-T12; owner walkthrough |
 
@@ -319,7 +325,7 @@ Standing rules apply: migrations human-run one at a time; briefs split per repo 
 | OI-S2 | Deferred: in-app result entry screens (canvas end state). Gate: owner request, or two organizer complaints about the Excel flow within 60 days of first use. | 🟢 LOW | No |
 | OI-S3 | Deferred: standalone knockout and round robin for tournaments. Gate: one real tournament request per format. | 🟢 LOW | No |
 | OI-S4 | Deferred: badminton rule validation and per-tournament scoring parameters (D-S1 gate). | 🟢 LOW | No |
-| OI-S5 | Lifecycle phases 4–5 must be scheduled before S2 (Release 1 restart is the owner's call). | 🟠 HIGH | Blocks S2, not approval |
+| OI-S5 | **Revised at v1.1:** phases 4–5 and the 6a/7 substrate are now in-scope tasks of this release (ms-p4/ms-p5, S2a/S3a), so nothing waits on a Release 1 restart. Residual: `fixture_core` v1.4 release tag (dispatch D, Sadhana) must exist before S2. | 🟠 HIGH | Blocks S2, not approval |
 | OI-S6 | Canvas boards for the workbook flow and corrected walkover note: redraw only on the owner's explicit confirmation (standing instruction). | 🟢 LOW | No |
 
 ---
@@ -327,3 +333,12 @@ Standing rules apply: migrations human-run one at a time; briefs split per repo 
 ## 13. Approval Record
 
 **v1.0 APPROVED by the owner, 2026-10-22.** Approval was given in conversation ahead of drafting ("Generate the design with status as approved"), after the elicitation of 2026-10-22 closed every open question; the full-history sweep and its three reconciliations (process note 2) are part of this version. Companion `DES-FIXTURE-CORE-001` v1.4 approved the same day.
+
+**v1.1 (2026-10-22), architect amendment after the ms-s0 Blocked Report; amends the approved v1.0, no requirement changed.** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| C1 | Valid HIGH finding accepted: lifecycle phases 6a and 7 were never built; v1.0's "existing/unchanged" wording for `result_service`, `tournament_match_results` and the `tournament_fixtures` advancement columns was drift. This release builds that substrate itself, to lifecycle AD-10 / §5.1 as the specification (tasks S2a, S3a); lifecycle 6a's Excel fixture-import parser is explicitly **not** built (already superseded for groups+knockout, §2). | notes, §4, §5.1, §10 |
+| C2 | As-built corrections from ms-s0: the notification-type list is `chk_notification_preferences_type` on `notification_preferences` (not a `notifications` CHECK); `ui_labels` grouping is key-prefix based in the admin editor; the fixture-core pin is a rebuilt vendored wheel, with tag name + tag-object SHA + commit SHA recorded in `vendor/fixture_core.SOURCE.txt`. | AD-S3, AD-S8, §5.1 |
+| C3 | Reminder-row updates on result posting are gated on lifecycle phase 8 existing (not built, out of scope); posting must not depend on it. | AD-S4 |
+| C4 | §10 task table restated: ms-p4/ms-p5, S2a, S3a added; S0 marked done; OI-S5 revised (residual blocker = the fixture-core v1.4 release tag, dispatch D). | §10, §12 |
