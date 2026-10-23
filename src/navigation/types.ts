@@ -2,6 +2,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 
 import type { OwnedGroupInfo } from '../api/profile';
 import type { GamesScope } from '../utils/gameLists';
+import type { WizardTemplatesResponse } from '../types/tournamentWizard';
 
 export type { GamesScope };
 
@@ -34,6 +35,11 @@ export type HomeStackParamList = {
   EventsList: { refreshKey?: number; successMessage?: string } | undefined;
   EventDetail: { eventId: string };
   CreateGame: undefined;
+  /**
+   * Tournament creation wizard (AD-20). Opened by the Create tournament entry when
+   * `GET /tournaments/v2/templates` lists a format; `templates` is that response.
+   */
+  TournamentWizard: { templates: WizardTemplatesResponse };
   NotificationHistory: undefined;
 };
 

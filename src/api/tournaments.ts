@@ -39,6 +39,11 @@ import type {
   TournamentsListResponse,
   TournamentStatus,
 } from '../types/tournament';
+import type {
+  WizardCreateBody,
+  WizardCreateResult,
+  WizardTemplatesResponse,
+} from '../types/tournamentWizard';
 
 interface RequestOptions {
   correlationId?: string;
@@ -427,4 +432,29 @@ export async function getTournamentScoringState(
     }
     throw error;
   }
+}
+
+/**
+ * Creation wizard (AD-20). `GET /tournaments/v2/templates`: published templates plus the limits the wizard
+ * mirrors; `{ templates: [] }` while the v2 flag is off. Not cached: the list is read when the wizard opens.
+ */
+export async function getWizardTemplates(options?: RequestOptions): Promise<WizardTemplatesResponse> {
+  const { data } = await apiClient.get<WizardTemplatesResponse>('/tournaments/v2/templates', {
+    correlationId: options?.correlationId,
+  });
+  return { ...data, templates: Array.isArray(data?.templates) ? data.templates : [] };
+}
+
+/**
+ * `POST /tournaments/v2/create`. 201 (created) and 200 (replay of the same `client_request_id`) are both success;
+ * `replayed` tells them apart. Rejections reject with the axios error (`response.data` = `WizardRejection`).
+ */
+export async function createWizardTournament(
+  body: WizardCreateBody,
+  options?: RequestOptions,
+): Promise<{ result: WizardCreateResult; replayed: boolean }> {
+  const response = await apiClient.post<WizardCreateResult>('/tournaments/v2/create', body, {
+    correlationId: options?.correlationId,
+  });
+  return { result: response.data, replayed: response.status === 200 };
 }

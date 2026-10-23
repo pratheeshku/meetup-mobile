@@ -22,6 +22,7 @@ const EXCEPTIONS: Record<string, string> = {
   'src/screens/GroupDetailScreen.tsx':
     'OPEN QUESTION: "+" square that closes the invite panel (plusSquare); AddEntryButton opens it',
   'src/components/NumberField.tsx': 'numeric stepper, not an invite control',
+  'src/components/tournament/wizard/parts.tsx': 'numeric count stepper of the wizard boards (players, teams), not an invite control',
   'src/components/HeaderAddButton.tsx': 'screen header "create" action, not an invite control',
   'src/components/home/CreateGameCard.tsx': 'create-game card, not an invite control',
   'src/navigation/CreateTabButton.tsx': 'create tab button, not an invite control',

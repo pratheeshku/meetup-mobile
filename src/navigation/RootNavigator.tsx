@@ -116,6 +116,7 @@ import VerifyScreen from '../screens/VerifyScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CreateGameScreen from '../screens/CreateGameScreen';
+import TournamentWizardScreen from '../screens/TournamentWizardScreen';
 import EventDetailScreen from '../screens/EventDetailScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
@@ -234,6 +235,11 @@ function HomeStack(): React.JSX.Element {
         name="CreateGame"
         component={CreateGameScreen}
         options={{ title: t('mob.nav.title_create_game') }}
+      />
+      <HomeStackNav.Screen
+        name="TournamentWizard"
+        component={TournamentWizardScreen}
+        options={{ headerShown: false, statusBarStyle: 'light' }}
       />
       <HomeStackNav.Screen
         name="NotificationHistory"
