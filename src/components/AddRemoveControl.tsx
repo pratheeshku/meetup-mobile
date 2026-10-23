@@ -237,6 +237,7 @@ export function GroupInviteList({
   alreadyIds = [],
   alreadyLabel,
   sectionLabels,
+  disabledIds = [],
 }: {
   groups: readonly { id: string; name: string }[];
   selectedIds: readonly string[];
@@ -246,6 +247,8 @@ export function GroupInviteList({
   /** Status chip text of a group already in the game. */
   alreadyLabel?: string;
   sectionLabels?: { selected: string; available: string; alreadyIn: string };
+  /** Rows whose "+" is off (for example at a cap); a staged row keeps its "−". */
+  disabledIds?: readonly string[];
 }): React.JSX.Element {
   const renderRow = (group: { id: string; name: string }, already: boolean): React.JSX.Element => (
     <View key={group.id} style={styles.entryRow}>
@@ -258,7 +261,7 @@ export function GroupInviteList({
         staged={selectedIds.includes(group.id)}
         onStage={() => onToggle(group.id)}
         onUnstage={() => onToggle(group.id)}
-        disabled={disabled}
+        disabled={disabled || (disabledIds.includes(group.id) && !selectedIds.includes(group.id))}
         sentStatus={already ? alreadyLabel ?? null : null}
         testID={`group-invite-${group.id}`}
       />

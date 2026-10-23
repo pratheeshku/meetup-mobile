@@ -2,7 +2,7 @@
  * Create Game Wizard (DES-MEETUP-MOBILE.md §4.3 Create Flow Amendment;
  * design-ref-p23/Game1Type.png .. Game6InviteOnly.png, Game5Error.png).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Image,
   PermissionsAndroid,
@@ -31,7 +31,8 @@ import {
   type PlacePrediction,
 } from '../api/places';
 import { getSports } from '../api/sports';
-import { createTournament } from '../api/tournaments';
+import { createTournament, getWizardTemplates } from '../api/tournaments';
+import { listableTemplates } from '../utils/tournamentWizard';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import Button from '../components/Button';
 import { iosPickerThemeProps } from '../components/iosPickerTheme';
@@ -370,6 +371,30 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     }
   };
 
+  /**
+   * Create tournament entry (AD-20): the wizard opens when `GET /tournaments/v2/templates` lists a groups and
+   * knockout format. An empty list, a failed call or a flag that is off leaves the v1 form exactly as it was.
+   */
+  const entryBusy = useRef(false);
+  const openTournamentEntry = async (): Promise<void> => {
+    if (entryBusy.current) {
+      return;
+    }
+    entryBusy.current = true;
+    try {
+      const response = await getWizardTemplates();
+      if (listableTemplates(response).length > 0) {
+        navigation.navigate('TournamentWizard', { templates: response });
+        return;
+      }
+    } catch {
+      // Fall through to the v1 form.
+    } finally {
+      entryBusy.current = false;
+    }
+    setMode('tournament');
+  };
+
   const handleNext = () => {
     setError(null);
     if (step === 1) {
@@ -608,7 +633,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 
       <SelectableCard
         selected={mode === 'tournament'}
-        onPress={() => setMode('tournament')}
+        onPress={openTournamentEntry}
         title={t('mob.create_game.step_type_tournament_title')}
         subtitle={t('mob.create_game.step_type_tournament_desc')}
         leading={
