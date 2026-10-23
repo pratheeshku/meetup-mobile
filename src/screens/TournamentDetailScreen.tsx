@@ -41,6 +41,7 @@ import { withCorrelationId } from '../api/correlationId';
 import {
   cancelTournament,
   declineTournament,
+  getCommitteeInvitation,
   getFixtures,
   getRegistrations,
   getTournament,
@@ -65,6 +66,7 @@ import ClosureSummaryCard from '../components/closure/ClosureSummaryCard';
 import ClosureModal, { type CandidateItem } from '../components/closure/ClosureModal';
 import VenueRow from '../components/venue/VenueRow';
 import InviteTypeRow from '../components/invite/InviteTypeRow';
+import CommitteeInvitationCard from '../components/tournament/CommitteeInvitationCard';
 import TournamentInvitationBanner from '../components/tournament/TournamentInvitationBanner';
 import TournamentInvitePanel from '../components/tournament/TournamentInvitePanel';
 import TournamentScoringEntry from '../components/scoring/TournamentScoringEntry';
@@ -72,6 +74,7 @@ import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type {
+  CommitteeInvitationSummary,
   ResponsesResponse,
   Tournament,
   TournamentClosurePerson,
@@ -81,9 +84,12 @@ import type {
   TournamentRegistration,
 } from '../types/tournament';
 import { showCompletion, type CompletionRow } from '../navigation/showCompletion';
+import { useCommitteeInvitationResponse } from '../hooks/useCommitteeInvitationResponse';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
+import { committeeAnswerOutcome, type CommitteeAnswerState } from '../utils/committeeInvitation';
+import type { LabelKey } from '../labels/fallbackLabels';
 import { isActiveRegistration } from '../utils/responseGroups';
 import { useSportDisplayName } from '../utils/labels';
 import { formatEventDate } from '../utils/formatEventDateTime';
@@ -158,6 +164,17 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     }));
   }, [closure?.candidates, registrations]);
 
+  // Committee invitation card (tl-c-mobile-3). The card stays up after a refusal so its label can be read; only a
+  // successful answer closes it.
+  const [committeeCardOpen, setCommitteeCardOpen] = useState(false);
+  const [committeeSummary, setCommitteeSummary] = useState<CommitteeInvitationSummary | null>(null);
+  const [committeeNote, setCommitteeNote] = useState<{ state: CommitteeAnswerState; labelKey: LabelKey } | null>(null);
+  const committeeLoadTried = useRef(false);
+  const committeeAnswered = useRef(false);
+  const committeeAnswering = useRef(false);
+  const committeeAnswerGone = useRef(false);
+  const lastCommitteeAnswer = useRef<boolean | null>(null);
+
   const [venueCatalogueEnabled, setVenueCatalogueEnabled] = useState(false);
 
   useEffect(() => {
@@ -168,11 +185,47 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       .catch(() => setVenueCatalogueEnabled(false));
   }, []);
 
+  const committeeSummaryRef = useRef<CommitteeInvitationSummary | null>(null);
+  /**
+   * Reads the invitation card once per visit. A refusal becomes the card's inline state; with `cardOnly` (the tournament
+   * itself could not be read) a refusal shows nothing and the caller closes the screen as before.
+   */
+  const loadCommitteeSummary = useCallback(
+    async (cardOnly: boolean = false): Promise<boolean> => {
+      if (committeeSummaryRef.current) {
+        return true;
+      }
+      if (committeeLoadTried.current && !cardOnly) {
+        return false;
+      }
+      committeeLoadTried.current = true;
+      try {
+        const summary = await getCommitteeInvitation(tournamentId);
+        committeeSummaryRef.current = summary;
+        setCommitteeSummary(summary);
+        setCommitteeNote(null);
+        setCommitteeCardOpen(true);
+        return true;
+      } catch (error) {
+        if (!cardOnly) {
+          const outcome = committeeAnswerOutcome(error);
+          setCommitteeNote({
+            state: outcome.state,
+            labelKey: outcome.labelKey ?? 'mob.committee_invite.failed',
+          });
+        }
+        return false;
+      }
+    },
+    [tournamentId],
+  );
+
   // `silent` refreshes in place (focus / foreground after the first load) instead of flashing
   // the loading view.
   const unavailable = useUnavailableScreen(navigation);
   const loadAll = useCallback(
-    async (silent: boolean = false) => {
+    async (silent: boolean = false, correlationId?: string) => {
+      const options = correlationId ? { correlationId } : undefined;
       if (!silent) {
         setIsLoading(true);
         setLoadError(null);
@@ -180,17 +233,17 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       try {
         const [tournamentData, fixturesData, registrationsData, closureData, responsesData, invitationsData] =
           await Promise.all([
-            getTournament(tournamentId),
-            getFixtures(tournamentId),
-            getRegistrations(tournamentId),
+            getTournament(tournamentId, options),
+            getFixtures(tournamentId, options),
+            getRegistrations(tournamentId, options),
             typeof getTournamentClosure === 'function'
-              ? getTournamentClosure(tournamentId).catch(() => null)
+              ? getTournamentClosure(tournamentId, options).catch(() => null)
               : Promise.resolve(null),
             typeof getTournamentResponses === 'function'
-              ? getTournamentResponses(tournamentId).catch(() => null)
+              ? getTournamentResponses(tournamentId, options).catch(() => null)
               : Promise.resolve(null),
             typeof getTournamentInvitations === 'function'
-              ? getTournamentInvitations(tournamentId).catch(() => null)
+              ? getTournamentInvitations(tournamentId, options).catch(() => null)
               : Promise.resolve(null),
           ]);
         setTournament(tournamentData);
@@ -205,11 +258,22 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           setResponses(null);
         }
         setInvitations(Array.isArray(invitationsData) ? invitationsData : null);
+        if (tournamentData.my_committee_invitation === 'pending' && !committeeAnswered.current) {
+          setCommitteeCardOpen(true);
+          await loadCommitteeSummary();
+        }
       } catch (error) {
         // 404 = gone or no longer visible to this user (AC-11, AC-07: a registered player who
-        // lost access sees nothing): close with the neutral message, once.
+        // lost access sees nothing): close with the neutral message, once. An invited committee person may not be
+        // able to view the tournament yet; the card read is theirs alone, so the card shows by itself (as on web).
         if (isNotFoundError(error)) {
-          unavailable.onNotFound();
+          if (committeeAnswering.current) {
+            committeeAnswerGone.current = true;
+          } else if (!committeeAnswered.current && (await loadCommitteeSummary(true))) {
+            setTournament(null);
+          } else {
+            unavailable.onNotFound();
+          }
         } else if (!silent) {
           setLoadError(tRef.current('mob.tournament.load_error'));
         }
@@ -219,7 +283,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         }
       }
     },
-    [tournamentId, unavailable],
+    [tournamentId, unavailable, loadCommitteeSummary],
   );
 
   // Fetch on every focus and app foreground (AC-10), including a push that opens a tournament
@@ -231,6 +295,12 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       const silent = loadedTournamentIdRef.current === tournamentId;
       if (!silent) {
         unavailable.reset();
+        committeeLoadTried.current = false;
+        committeeAnswered.current = false;
+        committeeSummaryRef.current = null;
+        setCommitteeCardOpen(false);
+        setCommitteeSummary(null);
+        setCommitteeNote(null);
       }
       loadedTournamentIdRef.current = tournamentId;
       loadAll(silent);
@@ -252,6 +322,66 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       throw error;
     }
   }, [tournamentId, unavailable]);
+
+  // One user action = one correlation id: the hook sends it with the answer and hands it to this re-read.
+  const refreshAfterCommitteeAnswer = useCallback(
+    (correlationId: string): Promise<void> => loadAll(true, correlationId),
+    [loadAll],
+  );
+  const committeeResponse = useCommitteeInvitationResponse(tournamentId, refreshAfterCommitteeAnswer);
+
+  const answerCommitteeInvitation = async (accept: boolean): Promise<void> => {
+    if (committeeAnswering.current) {
+      return;
+    }
+    lastCommitteeAnswer.current = accept;
+    committeeAnswering.current = true;
+    committeeAnswerGone.current = false;
+    setCommitteeNote(null);
+    try {
+      const outcome = await committeeResponse.respond(accept);
+      if (!outcome) {
+        return;
+      }
+      if (outcome.state === 'done') {
+        committeeAnswered.current = true;
+        setCommitteeCardOpen(false);
+        if (committeeAnswerGone.current) {
+          // The re-read says the tournament is out of sight (a decline from someone outside its audience).
+          if (!accept) {
+            unavailable.markOwnAction();
+          }
+          unavailable.onNotFound();
+        }
+      } else if (outcome.labelKey) {
+        setCommitteeNote({ state: outcome.state, labelKey: outcome.labelKey });
+      }
+    } finally {
+      committeeAnswering.current = false;
+    }
+  };
+
+  const retryCommitteeInvitation = async (): Promise<void> => {
+    if (!committeeSummary) {
+      committeeLoadTried.current = false;
+      setCommitteeNote(null);
+      await loadCommitteeSummary();
+    } else if (lastCommitteeAnswer.current !== null) {
+      await answerCommitteeInvitation(lastCommitteeAnswer.current);
+    }
+  };
+
+  const committeeCard = committeeCardOpen ? (
+    <CommitteeInvitationCard
+      summary={committeeSummary}
+      state={committeeNote?.state ?? null}
+      messageKey={committeeNote?.labelKey ?? null}
+      busy={committeeResponse.busy}
+      onAccept={() => answerCommitteeInvitation(true)}
+      onDecline={() => answerCommitteeInvitation(false)}
+      onRetry={retryCommitteeInvitation}
+    />
+  ) : null;
 
   const handleRegister = async (): Promise<void> => {
     setRegisterError(null);
@@ -495,6 +625,11 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     return <LoadingView />;
   }
 
+  // The tournament cannot be read but the invitation card can (an invited person outside its audience): the card alone.
+  if (!tournament && committeeCard && !loadError) {
+    return <ScrollView contentContainerStyle={styles.container}>{committeeCard}</ScrollView>;
+  }
+
   if (loadError || !tournament) {
     return <ErrorView message={loadError ?? t('mob.tournament.not_found')} onRetry={() => loadAll(false)} />;
   }
@@ -546,6 +681,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {committeeCard}
       <Card style={styles.infoCard}>
         <Text style={styles.title}>{tournament.name}</Text>
         <Text style={styles.meta}>

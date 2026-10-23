@@ -1,4 +1,4 @@
-import { committeeAnswerOutcome, committeeNames } from '../committeeInvitation';
+import { committeeAnswerOutcome, committeeDateRange, committeeNames } from '../committeeInvitation';
 import type { CommitteeMember } from '../../types/tournament';
 
 const reject = (status: number, code?: string) => ({ response: { status, data: code ? { code, detail: 'x' } : {} } });
@@ -48,5 +48,22 @@ describe('committeeNames: people by name, never by id', () => {
     const out = committeeNames([member({ display_name: null, user_id: 'abc-123' }), member({ display_name: '  ', user_id: 'def-456' })], 'A committee person');
     expect(out).toEqual(['A committee person', 'A committee person']);
     expect(JSON.stringify(out)).not.toMatch(/abc-123|def-456/);
+  });
+});
+
+describe('committeeDateRange: the card\'s Dates value', () => {
+  const local = (month: number, day: number): string => new Date(2026, month, day, 10).toISOString();
+  const monthName = (month: number): string => new Date(2026, month, 1).toLocaleDateString(undefined, { month: 'short' });
+
+  it('one day, a range inside a month, and a range across months', () => {
+    expect(committeeDateRange(local(10, 14), local(10, 14))).toBe(`14 ${monthName(10)}`);
+    expect(committeeDateRange(local(10, 14), null)).toBe(`14 ${monthName(10)}`);
+    expect(committeeDateRange(local(10, 14), local(10, 15))).toBe(`14 – 15 ${monthName(10)}`);
+    expect(committeeDateRange(local(10, 30), local(11, 2))).toBe(`30 ${monthName(10)} – 2 ${monthName(11)}`);
+  });
+
+  it('a missing or invalid start gives an empty value (the row is left out)', () => {
+    expect(committeeDateRange(null, null)).toBe('');
+    expect(committeeDateRange('not a date', local(10, 15))).toBe('');
   });
 });

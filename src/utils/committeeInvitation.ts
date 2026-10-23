@@ -63,3 +63,28 @@ export function committeeNames(
     .filter(member => member.status === 'active' || (options.includeInvited === true && member.status === 'invited'))
     .map(member => (member.display_name && member.display_name.trim() ? member.display_name.trim() : unknownName));
 }
+
+/**
+ * The card's "Dates" value, as the web card shows it: "14 Nov" for a one-day tournament, "14 – 15 Nov" inside one month,
+ * "30 Nov – 2 Dec" across months. Device local time (the web card uses Asia/Singapore); empty when `startsAt` is missing
+ * or not a date, so the row is left out rather than showing "Invalid Date".
+ */
+export function committeeDateRange(startsAt: string | null | undefined, endsAt: string | null | undefined): string {
+  const start = startsAt ? new Date(startsAt) : null;
+  if (!start || Number.isNaN(start.getTime())) {
+    return '';
+  }
+  // Day first, as the web card writes it; only the month name follows the device's language.
+  const dayMonth = (date: Date): string =>
+    `${date.getDate()} ${date.toLocaleDateString(undefined, { month: 'short' })}`;
+  const end = endsAt ? new Date(endsAt) : null;
+  if (!end || Number.isNaN(end.getTime())) {
+    return dayMonth(start);
+  }
+  const sameDay = start.toDateString() === end.toDateString();
+  if (sameDay) {
+    return dayMonth(start);
+  }
+  const sameMonth = start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth();
+  return sameMonth ? `${start.getDate()} – ${dayMonth(end)}` : `${dayMonth(start)} – ${dayMonth(end)}`;
+}
