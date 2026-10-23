@@ -185,3 +185,31 @@ Still unseeded from earlier work (found while auditing PR 3; `grep mob.add_remov
 
 ## Git evidence
 (see the end of this file)
+
+```
+$ git log --oneline -3 (PR 1 branch)
+ce680c5 tl-c-mobile: report and status (PR 1 delivered, PR 2 blocked, PR 3 audit)
+d9499a2 Scoring contract check: backend-shaped fixtures and contract test; tournament venue picker shows the address line after selection
+5a68f64 Merge pull request #49 from pratheeshku/claude/charming-faraday-ppxgkm
+
+$ git log --oneline -3 claude/tl-c-mobile-pr3-add-remove
+bfdef76 tl-c-mobile: report and status (PR 1 delivered, PR 2 blocked, PR 3 audit)
+d8d2b4e AD-19 static check: no screen draws its own + or - glyph outside the shared control, exceptions listed
+5a68f64 Merge pull request #49 from pratheeshku/claude/charming-faraday-ppxgkm
+
+$ git show --stat d9499a2
+d9499a2 Claude Scoring contract check: backend-shaped fixtures and contract test; tournament venue picker shows the address line after selection
+
+ src/components/venue/VenuePicker.tsx               |  14 ++
+ .../venue/__tests__/VenuePicker.test.tsx           |  37 +++++
+ src/test-utils/scoringBackendFixture.ts            | 120 ++++++++++++++++
+ .../__tests__/tournamentScoringContract.test.ts    | 152 +++++++++++++++++++++
+ 4 files changed, 323 insertions(+)
+
+$ git show --stat d8d2b4e
+d8d2b4e Claude AD-19 static check: no screen draws its own + or - glyph outside the shared control, exceptions listed
+
+ .../__tests__/addRemoveGlyphStatic.test.ts         | 79 ++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
+```
+The report/status commit on each branch is the top commit shown; its own hash is not self-cited. Cited code hashes d9499a2 and d8d2b4e are reachable from their branch heads as shown.
