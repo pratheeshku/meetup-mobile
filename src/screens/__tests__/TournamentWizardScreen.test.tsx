@@ -341,14 +341,19 @@ describe('submit', () => {
     expect(childText(root, 'tw-group-count')).toContain('1 of 20');
   });
 
-  it('a retired format returns to Format with the board message and refetches the list', async () => {
+  it('a retired format shows the board message on Review; the next Create goes to Format with the list re-read', async () => {
     (createWizardTournament as jest.Mock).mockRejectedValueOnce({ response: { status: 409, data: { code: 'TEMPLATE_NOT_ACTIVE', step: 5 } } });
     const root = await mount();
     await toStep(root, 8);
     await press(byLabel(root, 'Create tournament'));
-    expect(has(root, 'Choose a format')).toBe(true);
+    expect(has(root, 'Review')).toBe(true);
     expect(has(root, 'The "Badminton groups knockout v4" format was retired while you were editing.')).toBe(true);
     expect(getWizardTemplates).toHaveBeenCalledTimes(1);
+    await press(byLabel(root, 'Create tournament'));
+    expect(createWizardTournament).toHaveBeenCalledTimes(1);
+    expect(has(root, 'Choose a format')).toBe(true);
+    await press(byTestId(root, `tw-format-${GROUP_TEMPLATE.id}`));
+    expect(has(root, 'The "Badminton groups knockout v4" format was retired')).toBe(false);
   });
 
   it('Edit on the review returns to that step with the entered state kept', async () => {

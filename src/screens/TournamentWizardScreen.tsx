@@ -335,11 +335,11 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
         }
         setStep(outcome.step);
       } else if (outcome.kind === 'format_retired') {
+        // Board TournReviewErr: the banner sits on Review; the format is cleared so the next Create sends the
+        // organizer to the Format step (see `submit`), where the list is re-read.
         setRetired(template ? { name: template.display_name, version: template.version } : null);
-        setServerIssue(outcome.issue);
         setState(current => ({ ...current, templateId: null }));
         loadTemplates();
-        setStep(outcome.step);
       } else {
         setSubmitIssue(outcome.issue);
       }
@@ -399,10 +399,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   const errors = errorsFor(step);
   const windowError = errors.starts_at && errors.starts_at === errors.ends_at ? errors.starts_at : null;
   const venueLabel = catalogueEnabled ? state.venue?.name ?? '' : state.venueName.trim();
-  const retiredMessage =
-    retired && serverIssue?.key === 'mob.tw.err_format_retired'
-      ? t('mob.tw.err_format_retired', { name: retired.name, version: retired.version })
-      : null;
+  const retiredMessage = retired ? t('mob.tw.err_format_retired', { name: retired.name, version: retired.version }) : null;
 
   const renderStep = (): React.JSX.Element => {
     switch (step) {
@@ -503,7 +500,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
             state={state}
             template={template}
             venueLabel={venueLabel}
-            retiredMessage={null}
+            retiredMessage={retiredMessage}
             onEdit={target => {
               setServerIssue(null);
               setStep(target);
