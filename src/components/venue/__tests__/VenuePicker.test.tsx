@@ -284,4 +284,41 @@ describe('VenuePicker', () => {
     expect(mockGetVenues).not.toHaveBeenCalled();
     expect(texts(root)).toContain('Choose a sport first to see venues.');
   });
+  describe.each(['standard', 'tournament'] as const)('after selection (%s variant)', variant => {
+    it('shows the chosen venue name and its address line', async () => {
+      const Host = () => {
+        const [chosen, setChosen] = useState<SelectedVenueState | null>(null);
+        return (
+          <VenuePicker
+            sportId={BADMINTON_ID}
+            sportDisplayName="Badminton"
+            variant={variant}
+            selectedVenue={chosen}
+            onSelectVenue={v =>
+              setChosen({
+                venueId: v.id,
+                name: v.name,
+                address: [v.block, v.street].filter(Boolean).join(' '),
+                lat: v.lat,
+                lng: v.lng,
+                source: v.source,
+                isOthers: false,
+              })
+            }
+          />
+        );
+      };
+      const root = await renderAsync(<Host />);
+
+      await act(async () => {
+        pressableLabelled(root, 'Hougang Sport Centre').props.onPress();
+      });
+
+      const shown = texts(root);
+      expect(shown).toContain('Hougang Sport Centre');
+      expect(shown).toContain('93 Hougang Avenue 4');
+      // The list has closed: the other venue is no longer offered.
+      expect(shown).not.toContain('Pasir Ris Sport Centre');
+    });
+  });
 });
