@@ -24,6 +24,9 @@ import type { VenueSnapshot } from '../types/venue';
 import type { TournamentScoringState, TournamentStandingsView } from '../types/tournamentScoring';
 import { normaliseScoringState, normaliseStandings } from '../utils/tournamentScoring';
 import type {
+  CommitteeInvitationAck,
+  CommitteeInvitationSummary,
+  CommitteeMember,
   CreateTournamentInput,
   DeclineAck,
   ResponsesResponse,
@@ -75,6 +78,7 @@ interface TournamentApiItem {
   group_name?: string | null;
   visibility?: string | null;
   my_invitation_status?: string | null;
+  my_committee_invitation?: string | null;
   venue_name?: string | null;
   venue_label?: string | null;
   venue_id?: string | null;
@@ -123,6 +127,7 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
         : undefined,
     my_invite_access: normaliseInviteAccess(raw.my_invite_access),
     my_invitation_status: normaliseInvitationStatus(raw.my_invitation_status),
+    my_committee_invitation: raw.my_committee_invitation === 'pending' ? 'pending' : null,
     venue_name: raw.venue_name ?? null,
     venue_label: raw.venue_label ?? null,
     venue_id: raw.venue_id ?? null,
@@ -432,6 +437,44 @@ export async function getTournamentScoringState(
     }
     throw error;
   }
+}
+
+/**
+ * Committee invitation (tl-c-accept). Accept and decline take no body and no request id: the server changes the
+ * caller's own row only while it is `invited` (a conditional update), so a second answer is refused with a coded
+ * 409 rather than applied twice. The caller threads one correlation id through the answer and the refresh.
+ * Coded errors: 404 `committee_not_invited`, 409 `committee_already_active`, `committee_invitation_closed`,
+ * `tournament_cancelled`, `tournament_ended`, `v2_disabled`.
+ */
+export async function getCommitteeInvitation(
+  id: string,
+  options?: RequestOptions,
+): Promise<CommitteeInvitationSummary> {
+  const { data } = await apiClient.get<CommitteeInvitationSummary>(`/tournaments/${id}/committee/invitation`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
+}
+
+export async function respondToCommitteeInvitation(
+  id: string,
+  accept: boolean,
+  options?: RequestOptions,
+): Promise<CommitteeInvitationAck> {
+  const { data } = await apiClient.post<CommitteeInvitationAck>(
+    `/tournaments/${id}/committee/invitation/${accept ? 'accept' : 'decline'}`,
+    undefined,
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
+
+/** `GET /tournaments/{id}/committee/members`: names to show; `[]` unless the caller is an active committee member. */
+export async function getCommitteeMembers(id: string, options?: RequestOptions): Promise<CommitteeMember[]> {
+  const { data } = await apiClient.get<CommitteeMember[]>(`/tournaments/${id}/committee/members`, {
+    correlationId: options?.correlationId,
+  });
+  return Array.isArray(data) ? data : [];
 }
 
 /**
