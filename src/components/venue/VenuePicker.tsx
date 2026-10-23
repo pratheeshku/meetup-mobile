@@ -219,6 +219,15 @@ export default function VenuePicker({
               </View>
               <VenueChevronDownIcon size={16} color={colors.venueOthersIcon} />
             </Pressable>
+            {selectedVenue.address ? (
+              <Text
+                style={styles.tournamentSelectedAddress}
+                numberOfLines={1}
+                testID="venue-selected-address"
+              >
+                {selectedVenue.address}
+              </Text>
+            ) : null}
             {helperText ? (
               <Text style={styles.helperText}>{helperText}</Text>
             ) : null}
@@ -455,6 +464,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     color: colors.textPrimary,
+  },
+  tournamentSelectedAddress: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   helperText: {
     fontSize: 12,
