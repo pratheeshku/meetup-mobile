@@ -106,6 +106,11 @@ export interface Tournament {
   visibility?: TournamentVisibility;
   my_invite_access?: TournamentInviteAccess;
   my_invitation_status?: TournamentInvitationStatus | null;
+  /**
+   * `GET /tournaments/{id}` `my_committee_invitation` (tl-c-accept): `'pending'` while the caller's own committee row
+   * is `invited` (they can accept or decline), else null. Describes only the caller.
+   */
+  my_committee_invitation?: 'pending' | null;
   venue_name?: string | null;
   venue_label?: string | null;
   venue_id?: string | null;
@@ -261,4 +266,33 @@ export interface TournamentClosurePut {
   winner_registration_id: string | null;
   runner_up_registration_id: string | null;
   expected_version: number;
+}
+
+/** `GET /tournaments/{id}/committee/invitation`: what an accept card can show. Readable only by the invited user. */
+export interface CommitteeInvitationSummary {
+  tournament_id: string;
+  status: string;
+  title: string;
+  sport: string;
+  starts_at: string;
+  ends_at: string | null;
+  /** The organizer's display name (never an id). */
+  organizer_name: string;
+}
+
+/** Answer of accept and decline: the caller's committee status afterwards (`active` or `removed`). */
+export interface CommitteeInvitationAck {
+  tournament_id: string;
+  status: 'active' | 'removed' | string;
+}
+
+/**
+ * One row of `GET /tournaments/{id}/committee/members`. `display_name` is the name to show; ids are never shown.
+ * The route lists only to active committee members: everyone else (an invited person included) gets `[]`.
+ */
+export interface CommitteeMember {
+  user_id: string;
+  display_name: string | null;
+  status: 'active' | 'invited' | 'removed' | string;
+  is_organizer: boolean;
 }
