@@ -1,19 +1,18 @@
 import React from 'react';
 
-import { getTournamentStandings } from '../../../api/tournaments';
+import { getTournamentScoringState } from '../../../api/tournaments';
 import { act, renderAsync } from '../../../test-utils/render';
-import { normaliseStandings } from '../../../utils/tournamentScoring';
-import { STANDINGS_RAW } from '../../../test-utils/scoringFixtures';
 import TournamentScoringEntry from '../TournamentScoringEntry';
 
-jest.mock('../../../api/tournaments', () => ({ getTournamentStandings: jest.fn() }));
-const mockStandings = getTournamentStandings as jest.MockedFunction<typeof getTournamentStandings>;
+jest.mock('../../../api/tournaments', () => ({ getTournamentScoringState: jest.fn() }));
+const mockState = getTournamentScoringState as jest.MockedFunction<typeof getTournamentScoringState>;
 
 describe('TournamentScoringEntry', () => {
-  it('shows the entry only when scoring data exists, and opens the screen', async () => {
-    mockStandings.mockResolvedValue(normaliseStandings(STANDINGS_RAW));
+  it('shows the entry only when scoring is enabled and applicable, and opens the screen', async () => {
+    mockState.mockResolvedValue({ enabled: true, applicable: true });
     const onOpen = jest.fn();
     const root = await renderAsync(<TournamentScoringEntry tournamentId="t-1" onOpen={onOpen} />);
+    expect(mockState).toHaveBeenCalledWith('t-1');
     const card = root.findByProps({ testID: 'tournament-scoring-entry' });
     await act(async () => {
       card.props.onPress();
@@ -22,8 +21,10 @@ describe('TournamentScoringEntry', () => {
   });
 
   it.each([
-    ['no scoring data (v1, unpublished, 404)', () => mockStandings.mockResolvedValue(null)],
-    ['a failed request', () => mockStandings.mockRejectedValue(new Error('down'))],
+    ['scoring switched off', () => mockState.mockResolvedValue({ enabled: false, applicable: true })],
+    ['a tournament it does not apply to', () => mockState.mockResolvedValue({ enabled: true, applicable: false })],
+    ['no state (404)', () => mockState.mockResolvedValue(null)],
+    ['a failed request', () => mockState.mockRejectedValue(new Error('down'))],
   ])('renders nothing for %s', async (_name, arrange) => {
     arrange();
     const root = await renderAsync(<TournamentScoringEntry tournamentId="t-1" onOpen={jest.fn()} />);

@@ -4,10 +4,10 @@
  */
 import React from 'react';
 
-import { getRegistrations, getTournamentStandings } from '../../api/tournaments';
+import { getTournamentScoringState, getTournamentStandings } from '../../api/tournaments';
 import { act, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
-import { STANDINGS_RAW } from '../../test-utils/scoringFixtures';
+import { STANDINGS_RAW, withMine } from '../../test-utils/scoringFixtures';
 import { normaliseStandings } from '../../utils/tournamentScoring';
 import TournamentScoringScreen from '../TournamentScoringScreen';
 
@@ -15,12 +15,11 @@ type Props = React.ComponentProps<typeof TournamentScoringScreen>;
 
 jest.mock('../../api/tournaments', () => ({
   getTournamentStandings: jest.fn(),
-  getRegistrations: jest.fn(),
+  getTournamentScoringState: jest.fn(),
 }));
-jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-me' } }) }));
 
 const mockStandings = getTournamentStandings as jest.MockedFunction<typeof getTournamentStandings>;
-const mockRegistrations = getRegistrations as jest.MockedFunction<typeof getRegistrations>;
+const mockState = getTournamentScoringState as jest.MockedFunction<typeof getTournamentScoringState>;
 
 const setOptions = jest.fn();
 
@@ -48,6 +47,8 @@ const press = async (node: Instance): Promise<void> => {
     node.props.onPress();
   });
 };
+const flat = (n: Instance): Record<string, unknown> =>
+  Object.assign({}, ...[n.props.style].flat(Infinity).filter(Boolean));
 const hasTab = (root: Instance, label: string): boolean =>
   root.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityLabel === label).length > 0;
 const matchIds = (root: Instance): string[] =>
@@ -58,7 +59,7 @@ const matchIds = (root: Instance): string[] =>
 beforeEach(() => {
   setOptions.mockReset();
   mockStandings.mockReset().mockResolvedValue(normaliseStandings(STANDINGS_RAW));
-  mockRegistrations.mockReset().mockResolvedValue([]);
+  mockState.mockReset().mockResolvedValue({ enabled: true, applicable: true });
 });
 
 describe('groups tab', () => {
@@ -74,25 +75,29 @@ describe('groups tab', () => {
     expect(setOptions).toHaveBeenLastCalledWith({ title: 'Group stage' });
   });
 
-  it('highlights qualifiers only once the backend resolved them, and marks tied rows', async () => {
+  it('highlights the rows the backend marks qualifies: true, and no others', async () => {
     const root = await mount();
-    const flat = (n: Instance): Record<string, unknown> => Object.assign({}, ...[n.props.style].flat(Infinity).filter(Boolean));
     expect(flat(root.findByProps({ testID: 'scoring-row-r1' })).backgroundColor).toBeDefined();
-    expect(flat(root.findByProps({ testID: 'scoring-row-r3' })).backgroundColor).toBeUndefined();
-    expect(texts(root.findByProps({ testID: 'scoring-row-r3' }))[0]).toBe('=3');
+    expect(flat(root.findByProps({ testID: 'scoring-row-r2' })).backgroundColor).toBeDefined();
+    expect(flat(root.findByProps({ testID: 'scoring-row-r3' })).backgroundColor).toBeUndefined(); // qualifies: false
     expect(root.findByProps({ testID: 'scoring-row-r1' }).props.accessibilityLabel).toContain('Qualified');
-    expect(root.findByProps({ testID: 'scoring-row-r3' }).props.accessibilityLabel).toContain('Tied');
+    expect(root.findByProps({ testID: 'scoring-row-r3' }).props.accessibilityLabel).not.toContain('Qualified');
     expect(texts(root)).toContain('Highlighted players have qualified for the knockout.');
   });
 
-  it('marks an incomplete group Provisional with no qualifier highlight', async () => {
+  it('shows no marker where qualifies is null: a provisional group and an unresolved tie', async () => {
     const root = await mount();
     await press(tab(root, 'B'));
     expect(root.findAllByProps({ testID: 'scoring-provisional' }).length).toBeGreaterThan(0);
     expect(texts(root)).toContain('Provisional');
     expect(texts(root)).toContain('This group has matches still to play, so the table may change.');
-    const flat = (n: Instance): Record<string, unknown> => Object.assign({}, ...[n.props.style].flat(Infinity).filter(Boolean));
     expect(flat(root.findByProps({ testID: 'scoring-row-r5' })).backgroundColor).toBeUndefined();
+    await press(tab(root, 'C'));
+    expect(texts(root.findByProps({ testID: 'scoring-row-r7' }))[0]).toBe('=1');
+    expect(root.findByProps({ testID: 'scoring-row-r7' }).props.accessibilityLabel).toContain('Tied');
+    expect([ 'r7', 'r8', 'r9' ].every(id => flat(root.findByProps({ testID: `scoring-row-${id}` })).backgroundColor === undefined)).toBe(true);
+    expect(texts(root)).toContain('Tied players share a place until the committee settles it.');
+    expect(root.findAllByProps({ testID: 'scoring-provisional' })).toHaveLength(0);
   });
 
   it('shows result lines for the group matches including a walkover and a retirement', async () => {
@@ -118,15 +123,28 @@ describe('knockout tab', () => {
     expect(matchIds(root)).toEqual(['k3']);
   });
 
-  it('hides All | My matches without a registration of the user, and filters with one', async () => {
+  it('draws placeholders from the server detail: C1, Winner of QF1, Loser of SF1, generic when unknown', async () => {
+    const root = await mount();
+    await press(tab(root, 'Knockout'));
+    const qf = texts(root);
+    expect(qf).toEqual(expect.arrayContaining(['C1', 'D2']));
+    await press(tab(root, 'SF'));
+    expect(texts(root)).toEqual(expect.arrayContaining(['Winner of QF1', 'Winner of QF2']));
+    await press(tab(root, 'Final'));
+    expect(texts(root)).toContain('Winner of SF1');
+    expect(texts(root)).toContain('Winner of an earlier match'); // match_id not in the response
+    await press(tab(root, '3rd'));
+    expect(texts(root)).toContain('Loser of SF1');
+    expect(texts(root)).toContain('Loser of an earlier match'); // match_id null
+  });
+
+  it('hides All | My matches when no side is mine, and filters by the server is_mine when one is', async () => {
     let root = await mount();
     await press(tab(root, 'Knockout'));
     expect(hasTab(root, 'My matches')).toBe(false);
 
-    mockRegistrations.mockResolvedValue([
-      { id: 'r1', user_id: 'user-me', nickname: 'Ravi K.', registered_at: '', status: 'registered' },
-      { id: 'r9', user_id: 'someone', nickname: 'X', registered_at: '', status: 'registered' },
-    ]);
+    // Works for a team member too: only the server flag matters, no registration lookup is made.
+    mockStandings.mockResolvedValue(normaliseStandings(withMine(STANDINGS_RAW, ['r1'])));
     root = await mount();
     await press(tab(root, 'Knockout'));
     await press(tab(root, 'My matches'));
@@ -144,25 +162,39 @@ describe('knockout tab', () => {
   });
 });
 
-describe('no scoring data and failures', () => {
-  it('says standings are not available when the backend has no scoring data (v1, unpublished, 404)', async () => {
+describe('gating by the scoring state, no scoring data and failures', () => {
+  it('asks the state first and loads the standings only when scoring is enabled and applicable', async () => {
+    await mount();
+    expect(mockState).toHaveBeenCalledWith('t-1', expect.any(Object));
+    expect(mockStandings).toHaveBeenCalledWith('t-1', expect.any(Object));
+  });
+
+  it.each([
+    ['switched off', { enabled: false, applicable: true }],
+    ['not applicable', { enabled: true, applicable: false }],
+    ['no state (404)', null],
+  ])('shows "not available" and never calls the standings when scoring is %s', async (_name, state) => {
+    mockState.mockResolvedValue(state);
+    const root = await mount();
+    expect(texts(root)).toContain('Standings are not available for this tournament.');
+    expect(mockStandings).not.toHaveBeenCalled();
+  });
+
+  it('says standings are not available when the standings have no scoring data (v1 shape, unpublished)', async () => {
     mockStandings.mockResolvedValue(null);
     const root = await mount();
     expect(texts(root)).toContain('Standings are not available for this tournament.');
   });
 
-  it('shows the error with Retry and recovers', async () => {
-    mockStandings.mockRejectedValueOnce(new Error('down'));
+  it.each([
+    ['the state call', () => mockState.mockRejectedValueOnce(new Error('down'))],
+    ['the standings call', () => mockStandings.mockRejectedValueOnce(new Error('down'))],
+  ])('shows the error with Retry when %s fails, and recovers', async (_name, arrange) => {
+    arrange();
     const root = await mount();
     expect(texts(root)).toContain('Could not load the standings. Please try again.');
     const retry = root.findAll(n => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function')[0];
     await press(retry);
     expect(root.findAllByProps({ testID: 'tournament-scoring-screen' }).length).toBeGreaterThan(0);
-  });
-
-  it('still shows the standings when the registrations cannot be read', async () => {
-    mockRegistrations.mockRejectedValue(new Error('403'));
-    const root = await mount();
-    expect(root.findAllByProps({ testID: 'scoring-table-A' }).length).toBeGreaterThan(0);
   });
 });

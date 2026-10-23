@@ -21,8 +21,8 @@
  */
 import { apiClient } from './client';
 import type { VenueSnapshot } from '../types/venue';
-import type { TournamentStandingsView } from '../types/tournamentScoring';
-import { normaliseStandings } from '../utils/tournamentScoring';
+import type { TournamentScoringState, TournamentStandingsView } from '../types/tournamentScoring';
+import { normaliseScoringState, normaliseStandings } from '../utils/tournamentScoring';
 import type {
   CreateTournamentInput,
   DeclineAck,
@@ -400,6 +400,27 @@ export async function getTournamentStandings(
       correlationId: options?.correlationId,
     });
     return normaliseStandings(data);
+  } catch (error) {
+    if ((error as { response?: { status?: number } } | null)?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * `GET /tournaments/{id}/scoring/state` (match-scoring ms-s5). Any viewer; answers 200 whether or not the
+ * engine is on. Returns `null` for a 404 or an unreadable body. Other errors propagate.
+ */
+export async function getTournamentScoringState(
+  id: string,
+  options?: RequestOptions,
+): Promise<TournamentScoringState | null> {
+  try {
+    const { data } = await apiClient.get<unknown>(`/tournaments/${id}/scoring/state`, {
+      correlationId: options?.correlationId,
+    });
+    return normaliseScoringState(data);
   } catch (error) {
     if ((error as { response?: { status?: number } } | null)?.response?.status === 404) {
       return null;

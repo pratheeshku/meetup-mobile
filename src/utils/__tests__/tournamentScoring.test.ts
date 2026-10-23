@@ -1,8 +1,10 @@
-import { STANDINGS_RAW } from '../../test-utils/scoringFixtures';
+import { STANDINGS_RAW, withMine } from '../../test-utils/scoringFixtures';
 import {
   groupKnockoutRounds,
+  isMyMatch,
+  mainRoundSize,
+  normaliseScoringState,
   normaliseStandings,
-  seatedKnockoutIds,
   signed,
   sortKnockout,
 } from '../tournamentScoring';
@@ -10,12 +12,20 @@ import {
 describe('normaliseStandings', () => {
   it('reads the documented shape without changing the backend values', () => {
     const view = normaliseStandings(STANDINGS_RAW)!;
-    expect(view.groups.map(g => g.group_key)).toEqual(['A', 'B']);
-    expect(view.groups[0].table.map(r => [r.rank, r.tied])).toEqual([
-      [1, false],
-      [2, false],
-      [3, true],
-      [3, true],
+    expect(view.groups.map(g => g.group_key)).toEqual(['A', 'B', 'C']);
+    expect(view.groups[0].table.map(r => [r.rank, r.tied, r.qualifies])).toEqual([
+      [1, false, true],
+      [2, false, true],
+      [3, false, false],
+      [4, false, false],
+    ]);
+    expect(view.groups.map(g => g.advance_per_group)).toEqual([2, 2, 2]);
+    // Provisional group and unresolved tie: the server sends null, which stays null (no marker).
+    expect(view.groups[1].table.every(r => r.qualifies === null)).toBe(true);
+    expect(view.groups[2].table.map(r => [r.rank, r.tied, r.qualifies])).toEqual([
+      [1, true, null],
+      [1, true, null],
+      [1, true, null],
     ]);
     expect(view.groups[1].provisional).toBe(true);
     expect(view.groups[0].matches[0].result).toEqual({
@@ -53,9 +63,61 @@ describe('normaliseStandings', () => {
     expect(view.groups[0].table).toHaveLength(1);
     expect(view.groups[0].table[0]).toMatchObject({ rank: 0, tied: false, played: 0, set_diff: 0 });
     const m = view.groups[0].matches[0];
-    expect(m.side_a).toEqual({ registration_id: null, name: null, placeholder: null });
+    expect(m.side_a).toEqual({ registration_id: null, name: null, placeholder: null, placeholder_detail: null, is_mine: false });
     expect(m.result).toMatchObject({ result_type: 'normal', sets: [{ a: 0, b: 0 }], advancing_side: null });
     expect(view.groups[0].matches).toHaveLength(1);
+  });
+});
+
+describe('ms-s5 fields', () => {
+  const view = normaliseStandings(withMine(STANDINGS_RAW, ['r1']))!;
+  const knockout = view.knockout;
+  const byId = (id: string) => knockout.find(m => m.fixture_id === id)!;
+
+  it('reads placeholder_detail as the server sent it', () => {
+    expect(byId('kq2').side_a.placeholder_detail).toEqual({ type: 'group_place', group: 'C', place: 1 });
+    expect(byId('ks1').side_a.placeholder_detail).toEqual({ type: 'winner', match_id: 'kq1' });
+    expect(byId('k3').side_a.placeholder_detail).toEqual({ type: 'loser', match_id: 'ks1' });
+    expect(byId('k3').side_b.placeholder_detail).toEqual({ type: 'loser', match_id: null });
+    expect(byId('kq1').side_a.placeholder_detail).toBeNull();
+  });
+
+  it('reads is_mine per side and never infers it', () => {
+    expect(byId('kq1').side_a.is_mine).toBe(true);
+    expect(byId('kq1').side_b.is_mine).toBe(false);
+    expect(isMyMatch(byId('kq1'))).toBe(true);
+    expect(isMyMatch(byId('kq2'))).toBe(false);
+    const none = normaliseStandings(STANDINGS_RAW)!;
+    expect(none.knockout.some(isMyMatch)).toBe(false);
+  });
+
+  it('defaults missing or malformed ms-s5 fields safely (an older answer)', () => {
+    const old = normaliseStandings({
+      published: true,
+      groups: [{ group_key: 'A', table: [{ registration_id: 'r1', name: 'X', qualifies: 'yes' }], matches: [
+        { fixture_id: 'f', side_a: { registration_id: 'r1', placeholder_detail: { type: 'nope' }, is_mine: 'true' } },
+      ] }],
+      knockout: [],
+    })!;
+    expect(old.groups[0].advance_per_group).toBe(0);
+    expect(old.groups[0].table[0].qualifies).toBeNull();
+    expect(old.groups[0].matches[0].side_a).toMatchObject({ placeholder_detail: null, is_mine: false });
+  });
+
+  it('sizes a main round from its matches only', () => {
+    const main = [1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ ...byId('kq1'), fixture_id: `m${i}`, stage: 'main', round_number: 4 }));
+    expect(mainRoundSize(main[0], [...main, byId('kf')])).toBe(16);
+    expect(mainRoundSize(byId('kq1'), knockout)).toBeUndefined();
+  });
+});
+
+describe('normaliseScoringState', () => {
+  it('reads enabled and applicable as booleans and nothing else', () => {
+    expect(normaliseScoringState({ enabled: true, applicable: true, committee: null, is_committee: false })).toEqual({ enabled: true, applicable: true });
+    expect(normaliseScoringState({ enabled: true })).toEqual({ enabled: true, applicable: false });
+    expect(normaliseScoringState({ enabled: 'true', applicable: 1 })).toEqual({ enabled: false, applicable: false });
+    expect(normaliseScoringState(null)).toBeNull();
+    expect(normaliseScoringState([])).toBeNull();
   });
 });
 
@@ -80,10 +142,6 @@ describe('knockout helpers', () => {
       ['m1', 'm2', 'm3'].map((id, i) => ({ ...ko[0], fixture_id: id, stage: 'main', round_number: i < 2 ? 4 : 5 })),
     );
     expect(rounds.map(r => r.key)).toEqual(['main:4', 'main:5']);
-  });
-
-  it('lists only registrations already seated in a slot', () => {
-    expect([...seatedKnockoutIds(ko)].sort()).toEqual(['r1', 'r2']);
   });
 });
 

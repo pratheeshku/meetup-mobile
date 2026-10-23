@@ -4,22 +4,22 @@
  * are web-only.
  *
  * Everything shown is what `GET /tournaments/{id}/standings` returned (tables, ranks, results,
- * winners, qualification). Nothing is recomputed here. A group's qualifier highlight is drawn only
- * once the backend says that group's qualifiers are resolved, and marks the players the backend has
- * already seated in the knockout. An unpublished fixture, the v1 shape or a 404 shows no scoring.
+ * winners, qualification, placeholders, "mine"). Nothing is recomputed here. Qualifier markers are the
+ * backend's `qualifies` (null shows none). The screen first asks `GET /tournaments/{id}/scoring/state`:
+ * scoring shows only when it is enabled and applies to this tournament; the standings call (which keeps
+ * handling the v1 shape and an unpublished fixture) is made only then.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
-import { getRegistrations, getTournamentStandings } from '../api/tournaments';
-import { useAuth } from '../auth/AuthContext';
+import { getTournamentScoringState, getTournamentStandings } from '../api/tournaments';
 import EmptyState from '../components/EmptyState';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import GroupTable from '../components/scoring/GroupTable';
-import ScoringMatchCard from '../components/scoring/ScoringMatchCard';
+import ScoringMatchCard, { stageRef } from '../components/scoring/ScoringMatchCard';
 import SegmentedSwitch from '../components/SegmentedSwitch';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useT } from '../labels/LabelsContext';
@@ -28,7 +28,8 @@ import { colors, spacing, typography } from '../theme/tokens';
 import type { TournamentStandingsView } from '../types/tournamentScoring';
 import {
   groupKnockoutRounds,
-  seatedKnockoutIds,
+  isMyMatch,
+  mainRoundSize,
   sortKnockout,
 } from '../utils/tournamentScoring';
 
@@ -47,11 +48,8 @@ const STAGE_PILL_KEYS = {
 export default function TournamentScoringScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
   const { tournamentId } = route.params;
-  const { user } = useAuth();
-  const currentUserId = user?.id;
 
   const [view, setView] = useState<TournamentStandingsView | null>(null);
-  const [mineIds, setMineIds] = useState<ReadonlySet<string>>(new Set());
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [tab, setTab] = useState<Tab>('groups');
   const [groupKey, setGroupKey] = useState<string | null>(null);
@@ -61,31 +59,32 @@ export default function TournamentScoringScreen({ navigation, route }: Props): R
   const load = useCallback(async (): Promise<void> => {
     try {
       await withCorrelationId(async correlationId => {
-        const [standings, registrations] = await Promise.all([
-          getTournamentStandings(tournamentId, { correlationId }),
-          // "My matches" is a convenience: if the registrations are unreadable the switch is simply hidden.
-          getRegistrations(tournamentId, { correlationId }).catch(() => []),
-        ]);
+        const state = await getTournamentScoringState(tournamentId, { correlationId });
+        // Scoring off or not applicable (or no such state): no standings call, no scoring UI.
+        const standings =
+          state && state.enabled && state.applicable
+            ? await getTournamentStandings(tournamentId, { correlationId })
+            : null;
         setView(standings);
-        setMineIds(
-          new Set(
-            registrations
-              .filter(r => currentUserId && r.user_id === currentUserId && r.status !== 'withdrawn')
-              .map(r => r.id),
-          ),
-        );
         setStatus('ready');
       });
     } catch {
       setStatus(prev => (prev === 'ready' ? prev : 'error'));
     }
-  }, [tournamentId, currentUserId]);
+  }, [tournamentId]);
 
   useRefetchOnFocus(navigation, load, tournamentId);
 
   const knockout = useMemo(() => sortKnockout(view?.knockout ?? []), [view]);
   const rounds = useMemo(() => groupKnockoutRounds(knockout), [knockout]);
-  const qualifiedIds = useMemo(() => seatedKnockoutIds(knockout), [knockout]);
+  const refLabel = useCallback(
+    (matchId: string): string | null => {
+      const all = [...(view?.groups.flatMap(g => g.matches) ?? []), ...knockout];
+      const found = all.find(m => m.match_id === matchId);
+      return found ? stageRef(found, t, mainRoundSize(found, knockout)) : null;
+    },
+    [view, knockout, t],
+  );
   const hasGroups = (view?.groups.length ?? 0) > 0;
   const hasKnockout = knockout.length > 0;
 
@@ -141,14 +140,9 @@ export default function TournamentScoringScreen({ navigation, route }: Props): R
         .filter(Boolean)
         .join(' ')
     : '';
-  const canFilter = mineIds.size > 0;
-  const mineMatches = knockout.filter(
-    m =>
-      (m.side_a.registration_id && mineIds.has(m.side_a.registration_id)) ||
-      (m.side_b.registration_id && mineIds.has(m.side_b.registration_id)),
-  );
-  const roundSize = (stage: string, count: number): number | undefined =>
-    stage === 'main' ? count * 2 : undefined;
+  const canFilter =
+    view.groups.some(g => g.matches.some(isMyMatch)) || knockout.some(isMyMatch);
+  const mineMatches = knockout.filter(isMyMatch);
 
   return (
     <ScrollView
@@ -181,7 +175,7 @@ export default function TournamentScoringScreen({ navigation, route }: Props): R
               }))}
             />
           </View>
-          <GroupTable group={group} qualifiedIds={qualifiedIds} />
+          <GroupTable group={group} />
           {group.provisional ? (
             <Text style={styles.provisional} testID="scoring-provisional">
               {t('mob.scoring.provisional')}
@@ -192,7 +186,7 @@ export default function TournamentScoringScreen({ navigation, route }: Props): R
             <Text style={styles.note}>{t('mob.scoring.matches_empty')}</Text>
           ) : (
             group.matches.map(match => (
-              <ScoringMatchCard key={match.fixture_id} match={match} mineIds={mineIds} />
+              <ScoringMatchCard key={match.fixture_id} match={match} refLabel={refLabel} />
             ))
           )}
         </>
@@ -221,13 +215,8 @@ export default function TournamentScoringScreen({ navigation, route }: Props): R
                   <ScoringMatchCard
                     key={match.fixture_id}
                     match={match}
-                    mineIds={mineIds}
-                    mainRoundSize={roundSize(
-                      match.stage,
-                      knockout.filter(
-                        k => k.stage === match.stage && k.round_number === match.round_number,
-                      ).length,
-                    )}
+                    mainRoundSize={mainRoundSize(match, knockout)}
+                    refLabel={refLabel}
                   />
                 ))
               )
@@ -254,8 +243,8 @@ export default function TournamentScoringScreen({ navigation, route }: Props): R
                   <ScoringMatchCard
                     key={match.fixture_id}
                     match={match}
-                    mineIds={mineIds}
-                    mainRoundSize={roundSize(match.stage, round.matches.length)}
+                    mainRoundSize={mainRoundSize(match, knockout)}
+                    refLabel={refLabel}
                   />
                 ))}
               </>

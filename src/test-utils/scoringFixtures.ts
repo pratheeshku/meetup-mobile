@@ -1,14 +1,23 @@
 /** Fixtures shaped like ms-s4 Appendix A1 (`GET /tournaments/{id}/standings`). Test-only. */
 import type {
   ScoringMatch,
+  ScoringPlaceholderDetail,
   ScoringSide,
   ScoringTableRow,
 } from '../types/tournamentScoring';
 
-export const side = (id: string | null, name: string | null, placeholder: ScoringSide['placeholder'] = null): ScoringSide => ({
+export const side = (
+  id: string | null,
+  name: string | null,
+  placeholder: ScoringSide['placeholder'] = null,
+  placeholder_detail: ScoringPlaceholderDetail | null = null,
+  is_mine = false,
+): ScoringSide => ({
   registration_id: id,
   name,
   placeholder,
+  placeholder_detail,
+  is_mine,
 });
 
 export const row = (rank: number, id: string, name: string, over: Partial<ScoringTableRow> = {}): ScoringTableRow => ({
@@ -25,6 +34,7 @@ export const row = (rank: number, id: string, name: string, over: Partial<Scorin
   points_for: 84,
   points_against: 40,
   point_diff: 44,
+  qualifies: null,
   ...over,
 });
 
@@ -61,7 +71,13 @@ export const STANDINGS_RAW = {
       qualifiers_resolved: true,
       matches_total: 3,
       matches_played: 3,
-      table: [row(1, 'r1', 'Ravi K.'), row(2, 'r2', 'Wei C.'), row(3, 'r3', 'Mei Tan', { tied: true }), row(3, 'r4', 'Jon Ong', { tied: true })],
+      advance_per_group: 2,
+      table: [
+        row(1, 'r1', 'Ravi K.', { qualifies: true }),
+        row(2, 'r2', 'Wei C.', { qualifies: true }),
+        row(3, 'r3', 'Mei Tan', { qualifies: false }),
+        row(4, 'r4', 'Jon Ong', { qualifies: false }),
+      ],
       matches: [
         match({
           fixture_id: 'ga1',
@@ -89,6 +105,7 @@ export const STANDINGS_RAW = {
       qualifiers_resolved: false,
       matches_total: 3,
       matches_played: 1,
+      advance_per_group: 2,
       table: [row(1, 'r5', 'Daniel S.'), row(2, 'r6', 'Alicia L.')],
       matches: [
         match({
@@ -101,12 +118,44 @@ export const STANDINGS_RAW = {
         }),
       ],
     },
+    {
+      // Complete but tied: the backend leaves the qualifiers open, so no row carries a marker.
+      group_key: 'C',
+      complete: true,
+      provisional: false,
+      unresolved_tie: true,
+      needs_override: true,
+      adjusted_by_committee: false,
+      qualifiers_resolved: false,
+      matches_total: 3,
+      matches_played: 3,
+      advance_per_group: 2,
+      table: [
+        row(1, 'r7', 'Mei Tan', { tied: true }),
+        row(1, 'r8', 'Jon Ong', { tied: true }),
+        row(1, 'r9', 'Sam Lee', { tied: true }),
+      ],
+      matches: [],
+    },
   ],
   knockout: [
-    match({ fixture_id: 'kf', stage: 'final', round_number: 6, fixture_order: 1, side_a: side(null, null, 'winner'), side_b: side(null, null, 'winner') }),
-    match({ fixture_id: 'k3', stage: 'third_place', round_number: 5, fixture_order: 2, side_a: side(null, null, 'loser'), side_b: side(null, null, 'loser') }),
-    match({ fixture_id: 'ks1', stage: 'semifinal', round_number: 5, fixture_order: 1, side_a: side(null, null, 'winner'), side_b: side(null, null, 'winner') }),
-    match({ fixture_id: 'kq2', stage: 'quarterfinal', round_number: 4, fixture_order: 2, side_a: side(null, null, 'group_place'), side_b: side(null, null, 'group_place') }),
+    match({ fixture_id: 'kf', stage: 'final', round_number: 6, fixture_order: 1, side_a: side(null, null, 'winner', { type: 'winner', match_id: 'ks1' }), side_b: side(null, null, 'winner', { type: 'winner', match_id: 'not-in-response' }) }),
+    match({ fixture_id: 'k3', stage: 'third_place', round_number: 5, fixture_order: 2, side_a: side(null, null, 'loser', { type: 'loser', match_id: 'ks1' }), side_b: side(null, null, 'loser', { type: 'loser', match_id: null }) }),
+    match({ fixture_id: 'ks1', stage: 'semifinal', round_number: 5, fixture_order: 1, side_a: side(null, null, 'winner', { type: 'winner', match_id: 'kq1' }), side_b: side(null, null, 'winner', { type: 'winner', match_id: 'kq2' }) }),
+    match({ fixture_id: 'kq2', stage: 'quarterfinal', round_number: 4, fixture_order: 2, side_a: side(null, null, 'group_place', { type: 'group_place', group: 'C', place: 1 }), side_b: side(null, null, 'group_place', { type: 'group_place', group: 'D', place: 2 }) }),
     match({ fixture_id: 'kq1', stage: 'quarterfinal', round_number: 4, fixture_order: 1, side_a: side('r1', 'Ravi K.'), side_b: side('r2', 'Wei C.') }),
   ],
 };
+
+/** A copy of the answer as another caller would get it: every side of these registrations is `is_mine`. */
+export function withMine(raw: typeof STANDINGS_RAW, ids: string[]): typeof STANDINGS_RAW {
+  const copy = JSON.parse(JSON.stringify(raw)) as typeof STANDINGS_RAW;
+  const mark = (m: ScoringMatch): void => {
+    [m.side_a, m.side_b].forEach(sd => {
+      sd.is_mine = sd.registration_id !== null && ids.includes(sd.registration_id);
+    });
+  };
+  copy.groups.forEach(g => g.matches.forEach(mark));
+  copy.knockout.forEach(mark);
+  return copy;
+}

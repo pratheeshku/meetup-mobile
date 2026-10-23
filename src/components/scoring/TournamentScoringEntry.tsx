@@ -1,13 +1,13 @@
 /**
  * Entry row on the tournament view to the standings, results and bracket screen. It appears only
- * when the backend returns scoring data for this tournament (published v2 groups + knockout with
- * the engine on). Any other answer (v1 list, 404, error) renders nothing, so v1 tournaments and
+ * when `GET /tournaments/{id}/scoring/state` says scoring is enabled and applies to this tournament.
+ * Any other answer (off, not applicable, 404, error) renders nothing, so v1 tournaments and
  * tournaments without scoring look exactly as before.
  */
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
-import { getTournamentStandings } from '../../api/tournaments';
+import { getTournamentScoringState } from '../../api/tournaments';
 import { useT } from '../../labels/LabelsContext';
 import { colors, spacing, typography } from '../../theme/tokens';
 import Card from '../Card';
@@ -28,9 +28,9 @@ export default function TournamentScoringEntry({
     let active = true;
     (async () => {
       try {
-        const view = await getTournamentStandings(tournamentId);
+        const state = await getTournamentScoringState(tournamentId);
         if (active) {
-          setAvailable(view !== null && view !== undefined);
+          setAvailable(Boolean(state && state.enabled && state.applicable));
         }
       } catch {
         if (active) {

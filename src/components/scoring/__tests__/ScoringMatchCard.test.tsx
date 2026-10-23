@@ -71,27 +71,66 @@ describe('ScoringMatchCard', () => {
     expect(texts(ret.findByProps({ testID: 'scoring-match-r-a' }))).toEqual(['Ravi K.', '21', '3']);
   });
 
-  it('shows placeholders, "To be decided", the court, and You for the signed-in player', () => {
+  it('shows You for the user\'s own side (the server\'s is_mine), the court, and a plain name otherwise', () => {
     const root = render(
       <ScoringMatchCard
         match={match({
           fixture_id: 'p',
           stage: 'final',
           court: '1',
-          side_a: side('me', 'Pratheesh K.'),
-          side_b: side(null, null, 'winner'),
+          side_a: side('me', 'Pratheesh K.', null, null, true),
+          side_b: side('other', 'Wei C.'),
         })}
-        mineIds={new Set(['me'])}
       />,
     );
     const all = texts(root);
     expect(all[0]).toBe('Final · Court 1');
     expect(all).toContain('You');
-    expect(all).toContain('Winner of an earlier match');
+    expect(all).toContain('Wei C.');
     expect(all).not.toContain('Pratheesh K.');
+  });
 
-    const tbd = render(<ScoringMatchCard match={match({ fixture_id: 'q', side_b: side(null, null) })} />);
-    expect(texts(tbd)).toContain('To be decided');
+  it('draws placeholders as the boards do: A1, Winner of QF1, Loser of SF2', () => {
+    const labels: Record<string, string> = { m1: 'QF1', m2: 'SF2' };
+    const refLabel = (id: string): string | null => labels[id] ?? null;
+    const root = render(
+      <>
+        <ScoringMatchCard
+          refLabel={refLabel}
+          match={match({
+            fixture_id: 'a',
+            side_a: side(null, null, 'group_place', { type: 'group_place', group: 'A', place: 1 }),
+            side_b: side(null, null, 'winner', { type: 'winner', match_id: 'm1' }),
+          })}
+        />
+        <ScoringMatchCard
+          refLabel={refLabel}
+          match={match({ fixture_id: 'b', side_a: side(null, null, 'loser', { type: 'loser', match_id: 'm2' }), side_b: side('r2', 'Wei C.') })}
+        />
+      </>,
+    );
+    const all = texts(root);
+    expect(all).toEqual(expect.arrayContaining(['A1', 'Winner of QF1', 'Loser of SF2']));
+  });
+
+  it('falls back to the generic wording when the referenced match is not in the response', () => {
+    const root = render(
+      <>
+        <ScoringMatchCard
+          refLabel={() => null}
+          match={match({
+            fixture_id: 'c',
+            side_a: side(null, null, 'winner', { type: 'winner', match_id: 'gone' }),
+            side_b: side(null, null, 'loser', { type: 'loser', match_id: null }),
+          })}
+        />
+        <ScoringMatchCard match={match({ fixture_id: 'd', side_a: side(null, null, 'winner', null), side_b: side(null, null) })} />
+      </>,
+    );
+    const all = texts(root);
+    expect(all.filter(t => t === 'Winner of an earlier match')).toHaveLength(2);
+    expect(all).toContain('Loser of an earlier match');
+    expect(all).toContain('To be decided');
   });
 
   it('names the round size for a main round', () => {

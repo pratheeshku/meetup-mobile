@@ -23,10 +23,28 @@ export type ScoringResultType = 'normal' | 'walkover' | 'retired';
 /** `group_place`, `winner` or `loser` when the slot has no registration yet. */
 export type ScoringPlaceholder = 'group_place' | 'winner' | 'loser';
 
+/**
+ * Where an unresolved slot comes from (ms-s5): a group place, or the winner / loser of a feeder match.
+ * `match_id` is null only when the backend could not find the feeder.
+ */
+export type ScoringPlaceholderDetail =
+  | { type: 'group_place'; group: string; place: number }
+  | { type: 'winner' | 'loser'; match_id: string | null };
+
 export interface ScoringSide {
   registration_id: string | null;
   name: string | null;
   placeholder: ScoringPlaceholder | null;
+  /** Null when the slot is resolved (or an older backend did not send it). */
+  placeholder_detail: ScoringPlaceholderDetail | null;
+  /** True when the signed-in user is the registrant or a roster member of this side (server-computed). */
+  is_mine: boolean;
+}
+
+/** `GET /tournaments/{id}/scoring/state` (ms-s5): only the fields the app reads. */
+export interface TournamentScoringState {
+  enabled: boolean;
+  applicable: boolean;
 }
 
 export interface ScoringSet {
@@ -72,6 +90,11 @@ export interface ScoringTableRow {
   points_for: number;
   points_against: number;
   point_diff: number;
+  /**
+   * Server-derived (ms-s5): true or false once the group's qualifiers are resolved, null while the group is
+   * provisional or has an unresolved tie (show no marker).
+   */
+  qualifies: boolean | null;
 }
 
 export interface ScoringGroup {
@@ -84,6 +107,8 @@ export interface ScoringGroup {
   qualifiers_resolved: boolean;
   matches_total: number;
   matches_played: number;
+  /** Number of qualifiers per group, from the tournament's format. */
+  advance_per_group: number;
   table: ScoringTableRow[];
   matches: ScoringMatch[];
 }

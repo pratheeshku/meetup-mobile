@@ -1,7 +1,7 @@
 /**
  * One group's table (board BRGroups): player, P, W, L, set difference and point difference, exactly as
- * the backend returned them in the backend's order. Qualified rows are highlighted; tied rows share a
- * place and say so. Fixed column widths keep every row aligned (AGENTS.md).
+ * the backend returned them in the backend's order. Rows the backend marks `qualifies: true` are highlighted;
+ * tied rows share a place and say so. Fixed column widths keep every row aligned (AGENTS.md).
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -17,13 +17,10 @@ const DIFF_WIDTH = 60;
 
 interface Props {
   group: ScoringGroup;
-  /** Registration ids the backend has seated in the knockout. Only used once the group's qualifiers are resolved. */
-  qualifiedIds: ReadonlySet<string>;
 }
 
-export default function GroupTable({ group, qualifiedIds }: Props): React.JSX.Element {
+export default function GroupTable({ group }: Props): React.JSX.Element {
   const t = useT();
-  const showQualified = group.qualifiers_resolved;
 
   return (
     <View style={styles.card} testID={`scoring-table-${group.group_key}`}>
@@ -40,7 +37,8 @@ export default function GroupTable({ group, qualifiedIds }: Props): React.JSX.El
         <Text style={styles.empty}>{t('mob.scoring.group_empty')}</Text>
       ) : (
         group.table.map(row => {
-          const qualified = showQualified && qualifiedIds.has(row.registration_id);
+          // The backend's `qualifies`: true or false once resolved, null (no marker) while provisional or tied.
+          const qualified = row.qualifies === true;
           return (
             <View
               key={row.registration_id}

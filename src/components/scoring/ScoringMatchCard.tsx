@@ -63,35 +63,52 @@ function formatWhen(iso: string): string {
   });
 }
 
-function sideName(side: ScoringSide, mineIds: ReadonlySet<string>, t: TranslateFn): string {
-  if (side.registration_id && mineIds.has(side.registration_id)) {
+/**
+ * The name of one side, in this order: "You" for the signed-in user's own side (the backend's `is_mine`), the
+ * player or team name, the placeholder as the boards draw it ("A1", "Winner of QF1"), then the generic wording
+ * when the backend gave no detail (older answer, or a feeder match that is not in the response).
+ */
+function sideName(
+  side: ScoringSide,
+  t: TranslateFn,
+  refLabel?: (matchId: string) => string | null,
+): string {
+  if (side.is_mine) {
     return t('mob.scoring.you');
   }
   if (side.name) {
     return side.name;
+  }
+  const detail = side.placeholder_detail;
+  if (detail?.type === 'group_place') {
+    return t('mob.scoring.ph_group_place', { group: detail.group, place: detail.place });
+  }
+  if (detail && detail.match_id) {
+    const label = refLabel?.(detail.match_id);
+    if (label) {
+      return t(detail.type === 'winner' ? 'mob.scoring.ph_winner' : 'mob.scoring.ph_loser', { match: label });
+    }
   }
   return side.placeholder ? t(PLACEHOLDER_KEYS[side.placeholder]) : t('mob.scoring.to_be_decided');
 }
 
 interface Props {
   match: ScoringMatch;
-  /** Registration ids that belong to the signed-in user (shown as "You"). */
-  mineIds?: ReadonlySet<string>;
   /** Number of entrants of a `main` round (16 for R16), shown in the stage reference. */
   mainRoundSize?: number;
+  /** Short label (QF1, SF2) of the match with this `match_id`, built from the same response; null when unknown. */
+  refLabel?: (matchId: string) => string | null;
 }
-
-const NO_IDS: ReadonlySet<string> = new Set();
 
 export default function ScoringMatchCard({
   match,
-  mineIds = NO_IDS,
   mainRoundSize,
+  refLabel,
 }: Props): React.JSX.Element {
   const t = useT();
   const { result } = match;
-  const nameA = sideName(match.side_a, mineIds, t);
-  const nameB = sideName(match.side_b, mineIds, t);
+  const nameA = sideName(match.side_a, t, refLabel);
+  const nameB = sideName(match.side_b, t, refLabel);
 
   const metaParts = [stageRef(match, t, mainRoundSize)];
   if (match.scheduled_at) {

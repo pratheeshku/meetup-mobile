@@ -3,17 +3,20 @@
  * (`GET /tournaments/{id}/standings`, ms-s4 Appendix A1).
  *
  * Only presentation grouping lives here (ordering the knockout list as the
- * design asks, listing which rounds exist, reading which slots are seated).
- * No rank, winner, qualifier or total is ever computed (AGENTS.md).
+ * design asks, listing which rounds exist). No rank, winner, qualifier or
+ * total is ever computed (AGENTS.md); qualification, placeholders and
+ * "mine" are the backend's fields.
  */
 import type {
   ScoringGroup,
   ScoringMatch,
   ScoringPlaceholder,
+  ScoringPlaceholderDetail,
   ScoringResult,
   ScoringSet,
   ScoringSide,
   ScoringTableRow,
+  TournamentScoringState,
   TournamentStandingsView,
 } from '../types/tournamentScoring';
 
@@ -27,6 +30,19 @@ const num = (value: unknown, fallback = 0): number =>
 const bool = (value: unknown): boolean => value === true;
 const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
+function normaliseDetail(raw: unknown): ScoringPlaceholderDetail | null {
+  if (!isObject(raw)) {
+    return null;
+  }
+  if (raw.type === 'group_place' && typeof raw.group === 'string' && typeof raw.place === 'number') {
+    return { type: 'group_place', group: raw.group, place: raw.place };
+  }
+  if (raw.type === 'winner' || raw.type === 'loser') {
+    return { type: raw.type, match_id: str(raw.match_id) };
+  }
+  return null;
+}
+
 function normaliseSide(raw: unknown): ScoringSide {
   const side = isObject(raw) ? raw : {};
   const placeholder = side.placeholder;
@@ -37,6 +53,8 @@ function normaliseSide(raw: unknown): ScoringSide {
       placeholder === 'group_place' || placeholder === 'winner' || placeholder === 'loser'
         ? (placeholder as ScoringPlaceholder)
         : null,
+    placeholder_detail: normaliseDetail(side.placeholder_detail),
+    is_mine: bool(side.is_mine),
   };
 }
 
@@ -103,6 +121,7 @@ function normaliseRow(raw: unknown): ScoringTableRow | null {
     points_for: num(raw.points_for),
     points_against: num(raw.points_against),
     point_diff: num(raw.point_diff),
+    qualifies: typeof raw.qualifies === 'boolean' ? raw.qualifies : null,
   };
 }
 
@@ -125,6 +144,7 @@ function normaliseGroup(raw: unknown): ScoringGroup | null {
     qualifiers_resolved: bool(raw.qualifiers_resolved),
     matches_total: num(raw.matches_total, matches.length),
     matches_played: num(raw.matches_played),
+    advance_per_group: num(raw.advance_per_group),
     table: list(raw.table).map(normaliseRow).filter((r): r is ScoringTableRow => r !== null),
     matches,
   };
@@ -190,17 +210,28 @@ export function groupKnockoutRounds(matches: ScoringMatch[]): KnockoutRound[] {
   return rounds;
 }
 
-/** Registration ids the backend has already seated in a knockout slot (the group's qualifiers). */
-export function seatedKnockoutIds(knockout: ScoringMatch[]): Set<string> {
-  const ids = new Set<string>();
-  knockout.forEach(match => {
-    [match.side_a.registration_id, match.side_b.registration_id].forEach(id => {
-      if (id) {
-        ids.add(id);
-      }
-    });
-  });
-  return ids;
+/** Number of entrants of a `main` round (16 for R16): twice its matches. Other stages carry their own label. */
+export function mainRoundSize(match: ScoringMatch, all: ScoringMatch[]): number | undefined {
+  if (match.stage !== 'main') {
+    return undefined;
+  }
+  return all.filter(m => m.stage === 'main' && m.round_number === match.round_number).length * 2;
+}
+
+/** True when the signed-in user plays in either side (server-computed `is_mine`). */
+export function isMyMatch(match: ScoringMatch): boolean {
+  return match.side_a.is_mine || match.side_b.is_mine;
+}
+
+/**
+ * `GET /tournaments/{id}/scoring/state`: scoring UI is shown only when the backend says it is on
+ * (`enabled`) and applies to this tournament (`applicable`). Anything else reads as not available.
+ */
+export function normaliseScoringState(raw: unknown): TournamentScoringState | null {
+  if (!isObject(raw)) {
+    return null;
+  }
+  return { enabled: raw.enabled === true, applicable: raw.applicable === true };
 }
 
 /** The score line of one side: its games in each set, as returned. */
