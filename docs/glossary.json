@@ -12,11 +12,12 @@
     {"concept": "Competing unit in a tournament", "term": "Tournament team", "avoid": ["Team (bare)"]},
     {"concept": "Person in a group", "term": "Group member", "avoid": ["Member (bare)"]},
     {"concept": "Person joined to a standalone game", "term": "Player", "avoid": ["Participant"]},
-    {"concept": "Person on a tournament team", "term": "Team player", "avoid": ["Player (in a match context)"]}
+    {"concept": "Person on a tournament team", "term": "Team player", "avoid": ["Player (in a match context)"]},
+    {"concept": "Person on a tournament's organizing committee", "term": "Committee member", "avoid": ["Member (bare)"]}
   ],
   "banned": [
     {"term": "event", "pattern": "\\bevents?\\b", "use": "game (standalone play session) or tournament"},
     {"term": "bare team", "pattern": "(?<!tournament )\\bteams?\\b(?! player)", "use": "tournament team / team player"},
-    {"term": "bare member", "pattern": "(?<!group )\\bmembers?\\b", "use": "group member (or team player on a tournament team)"}
+    {"term": "bare member", "pattern": "(?<!group )(?<!committee )\\bmembers?\\b", "use": "group member (or team player on a tournament team)"}
   ]
 }
