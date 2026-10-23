@@ -40,11 +40,13 @@ export type NotificationType =
   | 'tournament_cancelled'
   | 'tournament_schedule_published'
   | 'tournament_standings_published'
+  | 'tournament_advanced'
+  | 'tournament_result_corrected'
   | 'team_invite'
   | 'group_deleted'
   | 'group_ownership_transferred';
 
-/** All 19 known notification types. */
+/** All 21 known notification types (match-scoring v1.2 AD-S8 added `tournament_advanced`, `tournament_result_corrected`). */
 export const NOTIFICATION_TYPES: NotificationType[] = [
   'global',
   'event_invite',
@@ -62,6 +64,8 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   'tournament_cancelled',
   'tournament_schedule_published',
   'tournament_standings_published',
+  'tournament_advanced',
+  'tournament_result_corrected',
   'team_invite',
   'group_deleted',
   'group_ownership_transferred',

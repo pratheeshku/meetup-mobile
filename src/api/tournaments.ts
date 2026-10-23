@@ -21,6 +21,8 @@
  */
 import { apiClient } from './client';
 import type { VenueSnapshot } from '../types/venue';
+import type { TournamentScoringState, TournamentStandingsView } from '../types/tournamentScoring';
+import { normaliseScoringState, normaliseStandings } from '../utils/tournamentScoring';
 import type {
   CreateTournamentInput,
   DeclineAck,
@@ -382,4 +384,47 @@ export async function getTournamentResponses(
     correlationId: options?.correlationId,
   });
   return data;
+}
+
+/**
+ * `GET /tournaments/{id}/standings` (match-scoring v1.2, ms-s4 Appendix A1). Any viewer of the
+ * tournament. Returns `null` when there is no scoring data to show: the v1 list shape, an
+ * unpublished fixture, or a 404 (scoring switched off). Other errors propagate.
+ */
+export async function getTournamentStandings(
+  id: string,
+  options?: RequestOptions,
+): Promise<TournamentStandingsView | null> {
+  try {
+    const { data } = await apiClient.get<unknown>(`/tournaments/${id}/standings`, {
+      correlationId: options?.correlationId,
+    });
+    return normaliseStandings(data);
+  } catch (error) {
+    if ((error as { response?: { status?: number } } | null)?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+/**
+ * `GET /tournaments/{id}/scoring/state` (match-scoring ms-s5). Any viewer; answers 200 whether or not the
+ * engine is on. Returns `null` for a 404 or an unreadable body. Other errors propagate.
+ */
+export async function getTournamentScoringState(
+  id: string,
+  options?: RequestOptions,
+): Promise<TournamentScoringState | null> {
+  try {
+    const { data } = await apiClient.get<unknown>(`/tournaments/${id}/scoring/state`, {
+      correlationId: options?.correlationId,
+    });
+    return normaliseScoringState(data);
+  } catch (error) {
+    if ((error as { response?: { status?: number } } | null)?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
 }

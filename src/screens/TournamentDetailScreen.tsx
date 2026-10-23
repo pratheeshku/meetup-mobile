@@ -67,6 +67,7 @@ import VenueRow from '../components/venue/VenueRow';
 import InviteTypeRow from '../components/invite/InviteTypeRow';
 import TournamentInvitationBanner from '../components/tournament/TournamentInvitationBanner';
 import TournamentInvitePanel from '../components/tournament/TournamentInvitePanel';
+import TournamentScoringEntry from '../components/scoring/TournamentScoringEntry';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
@@ -765,6 +766,11 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           )}
         </Card>
       ) : null}
+
+      <TournamentScoringEntry
+        tournamentId={tournamentId}
+        onOpen={() => navigation.navigate('TournamentScoring', { tournamentId })}
+      />
 
       <Card style={styles.block} testID="tournament-fixtures-section">
         <Text style={styles.sectionTitle} accessibilityRole="header">
