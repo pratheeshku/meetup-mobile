@@ -212,4 +212,4 @@ d8d2b4e Claude AD-19 static check: no screen draws its own + or - glyph outside 
  .../__tests__/addRemoveGlyphStatic.test.ts         | 79 ++++++++++++++++++++++
  1 file changed, 79 insertions(+)
 ```
-The report/status commit on each branch is the top commit shown; its own hash is not self-cited. Cited code hashes d9499a2 and d8d2b4e are reachable from their branch heads as shown.
+The report commits sit above the code commits (PR 3 has one more report commit than shown, added after this was captured); their own hashes are not self-cited. Cited code hashes d9499a2 and d8d2b4e are reachable from their branch heads as shown.
