@@ -26,12 +26,15 @@ import { formatDayShort } from '../../../../utils/tournamentExperience';
 import { approvalCards, type ApprovalCard } from '../../../../utils/tournamentTabs';
 import Button from '../../../Button';
 import { CardHead, EmptyLine, TabCard } from './parts';
+import ReviewFixturesSheet from './ReviewFixturesSheet';
 import type { StandingsBoard } from './useStandingsBoard';
 
 export interface ApprovalsTabProps {
   tournament: Tournament;
   board: StandingsBoard;
   viewerId: string | undefined;
+  /** Registration id (lower case) to display name, for the draft under review. */
+  names: ReadonlyMap<string, string>;
   /** A decision was made: the host refreshes the badge and the page. */
   onDecided: () => void;
 }
@@ -45,6 +48,7 @@ export default function ApprovalsTab(props: ApprovalsTabProps): React.JSX.Elemen
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<ApprovalCard | null>(null);
 
   const load = useCallback(async (): Promise<void> => {
     try {
@@ -165,6 +169,16 @@ export default function ApprovalsTab(props: ApprovalsTabProps): React.JSX.Elemen
           <View style={styles.actions}>
             {card.canDecide ? (
               <>
+                {card.draftId ? (
+                  <Button
+                    label={t('mob.tournament.approvals.review_and_approve')}
+                    variant="secondary"
+                    size="sm"
+                    onPress={() => setReviewing(card)}
+                    style={styles.action}
+                    testID={`approval-review-${card.id}`}
+                  />
+                ) : null}
                 <Button
                   label={t(card.titleKey === 'mob.tournament.approvals.type_publish' ? 'mob.tournament.approvals.approve_publish' : 'mob.tournament.approvals.approve')}
                   size="sm"
@@ -209,6 +223,26 @@ export default function ApprovalsTab(props: ApprovalsTabProps): React.JSX.Elemen
 
   return (
     <View testID="tournament-approvals">
+      {reviewing && reviewing.draftId ? (
+        <ReviewFixturesSheet
+          tournamentId={tournament.id}
+          draftId={reviewing.draftId}
+          requestedBy={t('mob.tournament.approvals.requested_by', { name: reviewing.initiatorName, when: formatDayShort(reviewing.createdAt) })}
+          names={props.names}
+          busy={busyId === reviewing.id}
+          onApprove={async () => {
+            const card = reviewing;
+            await decide(card, 'approve');
+            setReviewing(null);
+          }}
+          onReject={() => {
+            const card = reviewing;
+            setReviewing(null);
+            confirm(card, 'reject');
+          }}
+          onClose={() => setReviewing(null)}
+        />
+      ) : null}
       <View style={styles.note}>
         <Text style={styles.noteText}>{t('mob.tournament.approvals.note')}</Text>
       </View>

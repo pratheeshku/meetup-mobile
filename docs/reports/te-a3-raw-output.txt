@@ -1,0 +1,3761 @@
+# te-a3 raw command output (MacBook, cd ~/Developer/meetup-mobile && pwd)
+
+## tsc, eslint, check:labels, lint
+$ npx tsc --noEmit
+exit 0
+$ npx eslint <changed ts/tsx files>
+      28
+exit 0
+$ npm run check:labels
+scripts/check-labels.allowlist.json:0: [stale-allowlist] allowlist entry no longer matches anything (banned-term in src/labels/defaultLabels.ts: "mob.committee_invite.body") - remove it
+
+check-labels: FAILED - 7 problem(s) in 298 files scanned.
+$ npm run lint
+
+✖ 32 problems (31 errors, 1 warning)
+
+
+
+## Scoped jest on the branch with coverage (one invocation, 31 files). The 3 failing suites: keyboardInventory (baseline), tournamentScoring and tournamentScoringContract (fixed after this run, re-run alone: 31 passed)
+FAIL src/components/__tests__/keyboardInventory.test.ts
+  ● src/screens/ProfileScreen.tsx renders inside KeyboardAwareScreen
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "<KeyboardAwareScreen"
+    Received string:    "/**
+     * Profile screen (Phase 2 revamp, Main.png).
+     *
+     * Visual hierarchy:
+     * - Top cover banner with semi-transparent Edit Profile and Settings buttons
+     * - Centered overlapping avatar (88x88) with display name & @nickname
+     * - (stats strip moved to the Home dashboard)
+     * - Skills card with sport icon and colored level pills
+     * - My groups card with squircle logos/initials and \"View all\" link
+     * - Recent games card with sport icon, date/time, venue and \"View all\" link
+     * - Outlined Log out button with confirmation dialog
+     */
+    import React, { useCallback, useRef, useState } from 'react';
+    import {
+      ActivityIndicator,
+      Alert,
+      Image,
+      Pressable,
+      ScrollView,
+      StyleSheet,
+      Text,
+      View,
+      type AlertButton,
+    } from 'react-native';
+    import FastImage from '@d11/react-native-fast-image';
+    import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+    import { useFocusEffect } from '@react-navigation/native';·
+    import { useAuth } from '../auth/AuthContext';
+    import {
+      getProfile,
+      getProfileSummary,
+      type ProfileSummary,
+    } from '../api/profile';
+    import { getMyGroups } from '../api/groups';
+    import type { Group } from '../types/group';
+    import { getCachedBanners, type BannerFallback } from '../api/home';
+    import { BannerBackground, SportIcon } from '../components/icons/DashboardIcons';
+    import { sportPalette } from '../sports/style';
+    import { useSportVisual } from '../sports/catalog';
+    import { EditIcon } from '../components/icons/ActionIcons';
+    import {
+      ClockIcon,
+      DoorIcon,
+      GearIcon,
+      PinIcon,
+    } from '../components/icons/SharedIcons';
+    import ErrorView from '../components/ErrorView';
+    import LoadingView from '../components/LoadingView';
+    import ScreenContainer from '../components/ScreenContainer';
+    import { useSportDisplayName } from '../utils/labels';
+    import { getDisplayName } from '../utils/displayName';
+    import { useT } from '../labels/LabelsContext';
+    import {
+      borderWidth,
+      colors,
+      radius,
+      spacing,
+      typography,
+    } from '../theme/tokens';
+    import type { SkillLevelValue, UserProfile } from '../types/user';
+    import type { LabelKey } from '../labels/fallbackLabels';
+    import type { ProfileStackParamList } from '../navigation/types';
+    import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
+    import {
+      startSpan,
+      isPerfEnabled,
+      shareLog,
+      perfImageLoadStart,
+      perfImageLoad,
+      perfImageError,
+      setRuntimeFlag,
+    } from '../diagnostics/perfLog';·
+    type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;·
+    function getInitials(name?: string | null): string {
+      if (!name) return '??';
+      const parts = name.trim().split(/\\s+/).filter(Boolean);
+      if (parts.length === 0) return '??';
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }·
+    function formatRecentGameDate(isoString: string): string {
+      try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return '';
+        const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+        const day = d.getDate();
+        const month = d.toLocaleDateString(undefined, { month: 'short' });
+        const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        return `${weekday} ${day} ${month}, ${time}`;
+      } catch {
+        return '';
+      }
+    }·
+    const GROUP_BADGE_COLORS = [
+      colors.primary,
+      colors.success,
+      colors.warning,
+      colors.accentPurple,
+    ];·
+    const LEVEL_LABEL_KEY: Record<SkillLevelValue, LabelKey> = {
+      beginner: 'skill_level.beginner',
+      intermediate: 'skill_level.intermediate',
+      expert: 'skill_level.expert',
+    };·
+    function getLevelTextColor(level?: string | null): string {
+      const normalized = level?.trim().toLowerCase();
+      if (normalized === 'beginner') return colors.warning;
+      if (normalized === 'intermediate') return colors.primary;
+      if (normalized === 'expert') return colors.accentPurple;
+      return colors.textPrimary;
+    }·
+    function getLevelBgColor(level?: string | null): string {
+      const normalized = level?.trim().toLowerCase();
+      if (normalized === 'beginner') return colors.warningLight;
+      if (normalized === 'intermediate') return colors.primaryLight;
+      if (normalized === 'expert') return colors.avatarTint5;
+      return colors.avatarTint1;
+    }·
+    function SkillTileItem({
+      sport,
+      level,
+    }: {
+      sport: string;
+      level: string;
+    }): React.JSX.Element {
+      const t = useT();
+      const sportName = useSportDisplayName(sport);
+      const visual = useSportVisual(sport);
+      const palette = sportPalette(visual.color);
+      const textColor = getLevelTextColor(level);
+      const bgColor = getLevelBgColor(level);
+      const normalized = level.trim().toLowerCase() as SkillLevelValue;
+      const labelKey = LEVEL_LABEL_KEY[normalized];
+      const levelText = labelKey ? t(labelKey) : level;·
+      return (
+        <View style={[styles.skillTile, { backgroundColor: bgColor }]}>
+          <View style={[styles.skillIconCircle, { backgroundColor: palette.chip }]}>
+            <SportIcon iconKey={visual.iconKey} size={20} />
+          </View>
+          <View style={styles.skillTextCol}>
+            <Text numberOfLines={1} style={styles.skillSportName}>
+              {sportName}
+            </Text>
+            <Text style={[styles.skillLevelText, { color: textColor }]}>
+              {levelText}
+            </Text>
+          </View>
+        </View>
+      );
+    }·
+    function GameSportMark({ sport }: { sport: string }): React.JSX.Element {
+      const visual = useSportVisual(sport);
+      const palette = sportPalette(visual.color);
+      return (
+        <View style={[styles.gameSportIconCircle, { backgroundColor: palette.chip }]}>
+          <SportIcon iconKey={visual.iconKey} size={20} />
+        </View>
+      );
+    }·
+    export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
+      const { signOut } = useAuth();
+      const t = useT();·
+      const [profile, setProfile] = useState<UserProfile | null>(null);
+      const [profileSummary, setProfileSummary] = useState<ProfileSummary | null>(null);
+      const [groups, setGroups] = useState<Group[]>([]);
+      const [bannerFallback, setBannerFallback] = useState<BannerFallback | null>(null);
+      const [isLoading, setIsLoading] = useState(true);
+      const [loadError, setLoadError] = useState<string | null>(null);
+      const [isSigningOut, setIsSigningOut] = useState(false);·
+      // ── Perf: render count and screen timing ──────────────────────────────────
+      usePerfRender('ProfileScreen');
+      usePerfScreen('ProfileScreen', isLoading);·
+      // ── Perf: 7-tap diagnostics toggle (Item SWITCH) ──────────────────────────
+      // Tracks taps on the display name within a 3-second window.
+      const tapTimestamps = useRef<number[]>([]);·
+      const handleDisplayNamePress = useCallback((): void => {
+        const now = Date.now();
+        // Keep only taps within the last 3000 ms.
+        tapTimestamps.current = tapTimestamps.current.filter(ts => now - ts < 3000);
+        tapTimestamps.current.push(now);
+        if (tapTimestamps.current.length >= 7) {
+          tapTimestamps.current = [];
+          const enabled = isPerfEnabled();
+          const buttons: AlertButton[] = [
+            {
+              text: enabled ? 'Turn OFF' : 'Turn ON',
+              onPress: () => {
+                setRuntimeFlag(!enabled).catch(() => {});
+              },
+            },
+            {
+              text: 'Close',
+              style: 'cancel',
+            },
+          ];
+          if (enabled) {
+            buttons.splice(1, 0, {
+              text: 'Share log',
+              onPress: () => {
+                shareLog().catch(() => {});
+              },
+            });
+          }
+          Alert.alert(t(enabled ? 'mob.diagnostics.title_on' : 'mob.diagnostics.title_off'), '', buttons);
+        }
+      }, [t]);·
+      const loadData = useCallback(async () => {
+        try {
+          setLoadError(null);
+          // ── Perf: instrument each parallel call with a span ────────────────
+          const profileSpan = startSpan('fetch', { resource: 'getProfile', screen: 'ProfileScreen' });
+          const summarySpan = startSpan('fetch', { resource: 'getProfileSummary', screen: 'ProfileScreen' });
+          const groupsSpan = startSpan('fetch', { resource: 'getMyGroups', screen: 'ProfileScreen' });
+          const bannersSpan = startSpan('fetch', { resource: 'getCachedBanners', screen: 'ProfileScreen' });·
+          const [profileData, summaryData, myGroupsData, bannerData] = await Promise.all([
+            getProfile().then(r => { profileSpan({ result: 'ok' }); return r; }).catch(e => { profileSpan({ result: 'error' }); throw e; }),
+            getProfileSummary().then(r => { summarySpan({ result: 'ok' }); return r; }).catch(() => {
+              summarySpan({ result: 'fallback' });
+              return { games_played: 0, games_hosted: 0, groups_count: 0, recent_games: [] };
+            }),
+            getMyGroups().then(r => { groupsSpan({ result: 'ok' }); return r; }).catch(() => {
+              groupsSpan({ result: 'fallback' });
+              return { items: [], total: 0 };
+            }),
+            getCachedBanners().then(r => { bannersSpan({ result: 'ok' }); return r; }).catch(() => {
+              bannersSpan({ result: 'fallback' });
+              return null;
+            }),
+          ]);
+          setProfile(profileData);
+          setProfileSummary(summaryData);
+          setGroups(myGroupsData.items ?? []);
+          if (bannerData?.fallback) {
+            setBannerFallback(bannerData.fallback);
+          }
+        } catch {
+          setLoadError(t('mob.profile.load_error'));
+        } finally {
+          setIsLoading(false);
+        }
+      }, [t]);·
+      useFocusEffect(
+        useCallback(() => {
+          loadData();
+        }, [loadData]),
+      );·
+      const handleSignOut = async (): Promise<void> => {
+        try {
+          setIsSigningOut(true);
+          await signOut();
+        } catch {
+          setIsSigningOut(false);
+          Alert.alert(t('mob.profile.sign_out'), t('mob.profile.sign_out_error'));
+        }
+      };·
+      const handleLogoutPress = (): void => {
+        Alert.alert(
+          t('mob.profile.logout_confirm_title'),
+          t('mob.profile.logout_confirm_body'),
+          [
+            { text: t('mob.common.cancel'), style: 'cancel' },
+            { text: t('mob.profile.logout'), style: 'destructive', onPress: handleSignOut },
+          ],
+        );
+      };·
+      if (isLoading) {
+        return (
+          <ScreenContainer edges=\"top\">
+            <LoadingView />
+          </ScreenContainer>
+        );
+      }·
+      if (loadError || !profile) {
+        return (
+          <ScreenContainer edges=\"top\">
+            <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadData} />
+          </ScreenContainer>
+        );
+      }·
+      const initials = getInitials(getDisplayName(profile));
+      const coverUrl = profile.cover_url || bannerFallback?.image_url;·
+      return (
+        <ScreenContainer edges=\"top\" style={styles.screen}>
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Cover banner */}
+          <View style={styles.bannerContainer}>
+            {coverUrl ? (
+              <Image
+                source={{ uri: coverUrl }}
+                style={styles.bannerImage}
+                resizeMode=\"cover\"
+                onLoadStart={() => perfImageLoadStart('ProfileScreen', coverUrl, 'cover')}
+                onLoad={event =>
+                  perfImageLoad(
+                    'ProfileScreen',
+                    coverUrl,
+                    'cover',
+                    event.nativeEvent.source.width,
+                    event.nativeEvent.source.height,
+                  )
+                }
+                onError={() => perfImageError('ProfileScreen', coverUrl, 'cover')}
+              />
+            ) : (
+              <View style={styles.bannerFallback}>
+                <BannerBackground width=\"100%\" height=\"100%\" />
+              </View>
+            )}
+          </View>·
+          {/* Identity */}
+          <View style={styles.identityContainer}>
+            <View style={styles.avatarBorder}>
+              {profile.avatar_url ? (
+                <FastImage
+                  source={{ uri: profile.avatar_url }}
+                  style={styles.avatarImage}
+                  onLoadStart={() => perfImageLoadStart('ProfileScreen', profile.avatar_url, 'avatar')}
+                  onLoad={event =>
+                    perfImageLoad(
+                      'ProfileScreen',
+                      profile.avatar_url,
+                      'avatar',
+                      event.nativeEvent.width,
+                      event.nativeEvent.height,
+                    )
+                  }
+                  onError={() => perfImageError('ProfileScreen', profile.avatar_url, 'avatar')}
+                />
+              ) : (
+                <View style={styles.avatarInitials}>
+                  <Text style={styles.avatarInitialsText}>{initials}</Text>
+                </View>
+              )}
+            </View>·
+            <Pressable
+              onPress={handleDisplayNamePress}
+              accessibilityRole=\"text\"
+              accessibilityLabel={getDisplayName(profile)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
+            </Pressable>
+            <Text style={styles.nickname}>@{profile.nickname}</Text>
+          </View>·
+          {/* Main cards */}
+          <View style={styles.cardsContainer}>
+            {/* Skills card */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{t('mob.profile.skills')}</Text>
+              {profile.skill_levels && profile.skill_levels.length > 0 ? (
+                <View style={styles.skillsGrid}>
+                  {profile.skill_levels.map(skill => (
+                    <SkillTileItem
+                      key={skill.sport}
+                      sport={skill.sport}
+                      level={skill.skill_level}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_skills')}</Text>
+              )}
+            </View>·
+            {/* My groups card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>{t('mob.profile.my_groups')}</Text>
+                <Pressable
+                  accessibilityRole=\"button\"
+                  accessibilityLabel={t('mob.dashboard.view_all')}
+                  onPress={() => (navigation.getParent() as any)?.navigate('Groups', { screen: 'GroupsList' })}
+                >
+                  <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+                </Pressable>
+              </View>·
+              {groups.length > 0 ? (
+                <View style={styles.groupsRow}>
+                  {groups.slice(0, 3).map((group, idx) => (
+                    <Pressable
+                      key={group.id}
+                      style={styles.groupItem}
+                      onPress={() =>
+                        (navigation.getParent() as any)?.navigate('Groups', {
+                          screen: 'GroupDetail',
+                          params: { groupId: group.id },
+                        })
+                      }
+                      accessibilityRole=\"button\"
+                      accessibilityLabel={group.name}
+                    >
+                      {group.logo_url ? (
+                        <Image
+                          source={{ uri: group.logo_url }}
+                          style={styles.groupLogo}
+                          resizeMode=\"cover\"
+                          onLoadStart={() =>
+                            perfImageLoadStart('ProfileScreen', group.logo_url, 'group_logo')
+                          }
+                          onLoad={event =>
+                            perfImageLoad(
+                              'ProfileScreen',
+                              group.logo_url,
+                              'group_logo',
+                              event.nativeEvent.source.width,
+                              event.nativeEvent.source.height,
+                            )
+                          }
+                          onError={() => perfImageError('ProfileScreen', group.logo_url, 'group_logo')}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.groupLogoInitials,
+                            { backgroundColor: GROUP_BADGE_COLORS[idx % GROUP_BADGE_COLORS.length] },
+                          ]}
+                        >
+                          <Text style={styles.groupInitialsText}>{getInitials(group.name)}</Text>
+                        </View>
+                      )}
+                      <Text numberOfLines={2} style={styles.groupName}>
+                        {group.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_groups')}</Text>
+              )}
+            </View>·
+            {/* Recent games card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>{t('mob.profile.recent_games')}</Text>
+                <Pressable
+                  accessibilityRole=\"button\"
+                  accessibilityLabel={t('mob.dashboard.view_all')}
+                  onPress={() =>
+                    (navigation.getParent() as any)?.navigate('Tournaments', {
+                      screen: 'TournamentsList',
+                      params: { scope: 'mine' },
+                    })
+                  }
+                >
+                  <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+                </Pressable>
+              </View>·
+              {profileSummary?.recent_games && profileSummary.recent_games.length > 0 ? (
+                <View style={styles.recentGamesList}>
+                  {profileSummary.recent_games.map((game, idx) => (
+                    <View key={game.id}>
+                      {idx > 0 ? <View style={styles.gameDivider} /> : null}
+                      <Pressable
+                        style={styles.gameRow}
+                        onPress={() =>
+                          (navigation.getParent() as any)?.navigate('Home', {
+                            screen: 'EventDetail',
+                            params: { eventId: game.id },
+                          })
+                        }
+                        accessibilityRole=\"button\"
+                        accessibilityLabel={game.title}
+                      >
+                        <GameSportMark sport={game.sport} />
+                        <View style={styles.gameDetailsCol}>
+                          <Text numberOfLines={1} style={styles.gameTitle}>
+                            {game.title}
+                          </Text>
+                          <View style={styles.gameMetaRow}>
+                            <ClockIcon size={14} />
+                            <Text style={styles.gameMetaText}>
+                              {formatRecentGameDate(game.starts_at)}
+                            </Text>
+                            <PinIcon size={14} />
+                            <Text numberOfLines={1} style={styles.gameMetaText}>
+                              {game.venue_name}
+                            </Text>
+                          </View>
+                        </View>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_recent_games')}</Text>
+              )}
+            </View>·
+            {/* Action buttons (Edit Profile and Settings) */}
+            <View style={styles.actionRow}>
+              <Pressable
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('EditProfile')}
+                accessibilityRole=\"button\"
+                accessibilityLabel={t('mob.profile.edit_profile')}
+              >
+                <EditIcon size={18} color={colors.textPrimary} />
+                <Text style={styles.actionButtonText}>{t('mob.profile.edit_profile')}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('Settings')}
+                accessibilityRole=\"button\"
+                accessibilityLabel={t('mob.profile.settings')}
+              >
+                <GearIcon size={18} />
+                <Text style={styles.actionButtonText}>{t('mob.profile.settings')}</Text>
+              </Pressable>
+            </View>·
+            {/* Log out button */}
+            <Pressable
+              style={styles.logoutButton}
+              onPress={handleLogoutPress}
+              disabled={isSigningOut}
+              accessibilityRole=\"button\"
+              accessibilityLabel={t('mob.profile.logout')}
+            >
+              {isSigningOut ? (
+                <ActivityIndicator size=\"small\" color={colors.error} />
+              ) : (
+                <>
+                  <DoorIcon size={20} />
+                  <Text style={styles.logoutButtonText}>{t('mob.profile.logout')}</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+        </ScreenContainer>
+      );
+    }·
+    const styles = StyleSheet.create({
+      screen: {
+        flex: 1,
+        backgroundColor: colors.background,
+      },
+      scrollContent: {
+        paddingBottom: spacing.xxl + spacing.lg,
+      },
+      bannerContainer: {
+        height: 160,
+        backgroundColor: colors.primary,
+        position: 'relative',
+        overflow: 'hidden',
+      },
+      bannerImage: {
+        width: '100%',
+        height: '100%',
+      },
+      bannerFallback: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: colors.primary,
+      },
+      actionRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginTop: spacing.md,
+      },
+      actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.xs,
+        paddingVertical: 14,
+        backgroundColor: colors.surface,
+        borderWidth: borderWidth.thin,
+        borderColor: colors.border,
+        borderRadius: radius.lg,
+      },
+      actionButtonText: {
+        ...typography.button,
+        color: colors.textPrimary,
+      },
+      identityContainer: {
+        alignItems: 'center',
+        marginTop: -44,
+        marginBottom: spacing.md,
+      },
+      avatarBorder: {
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        borderWidth: 3,
+        borderColor: colors.surface,
+        backgroundColor: colors.surface,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      avatarImage: {
+        width: 82,
+        height: 82,
+        borderRadius: 41,
+      },
+      avatarInitials: {
+        width: 82,
+        height: 82,
+        borderRadius: 41,
+        backgroundColor: colors.avatarTint1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      avatarInitialsText: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: colors.avatarTintText1,
+      },
+      displayName: {
+        ...typography.h2,
+        color: colors.textPrimary,
+        marginTop: spacing.sm,
+      },
+      nickname: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: 2,
+      },
+      cardsContainer: {
+        paddingHorizontal: spacing.md,
+        gap: spacing.md,
+      },
+      card: {
+        backgroundColor: colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: borderWidth.thin,
+        borderColor: colors.border,
+        padding: spacing.md,
+      },
+      cardTitle: {
+        ...typography.h3,
+        color: colors.textPrimary,
+      },
+      cardHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+      },
+      viewAllLink: {
+        ...typography.label,
+        color: colors.primary,
+      },
+      skillsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        marginTop: spacing.sm,
+      },
+      skillTile: {
+        flexGrow: 1,
+        flexBasis: '45%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: radius.md,
+        padding: spacing.sm,
+        gap: spacing.sm,
+      },
+      skillIconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      skillTextCol: {
+        flex: 1,
+      },
+      skillSportName: {
+        ...typography.bodyBold,
+        color: colors.textPrimary,
+        fontSize: 14,
+      },
+      skillLevelText: {
+        ...typography.caption,
+        fontWeight: '600',
+        marginTop: 1,
+      },
+      groupsRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginTop: spacing.xs,
+      },
+      groupItem: {
+        alignItems: 'center',
+        width: 72,
+      },
+      groupLogo: {
+        width: 56,
+        height: 56,
+        borderRadius: radius.lg,
+      },
+      groupLogoInitials: {
+        width: 56,
+        height: 56,
+        borderRadius: radius.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      groupInitialsText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.white,
+      },
+      groupName: {
+        ...typography.label,
+        color: colors.textPrimary,
+        textAlign: 'center',
+        marginTop: 6,
+      },
+      recentGamesList: {
+        marginTop: spacing.xs,
+      },
+      gameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingVertical: spacing.xs,
+      },
+      gameDivider: {
+        height: borderWidth.thin,
+        backgroundColor: colors.border,
+        marginVertical: spacing.xs,
+      },
+      gameSportIconCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.avatarTint1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      gameDetailsCol: {
+        flex: 1,
+      },
+      gameTitle: {
+        ...typography.bodyBold,
+        color: colors.textPrimary,
+      },
+      gameMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        marginTop: 3,
+      },
+      gameMetaText: {
+        ...typography.caption,
+        color: colors.textSecondary,
+        marginRight: spacing.xs,
+      },
+      logoutButton: {
+        borderWidth: 1.5,
+        borderColor: colors.error,
+        borderRadius: radius.full,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: spacing.sm,
+        backgroundColor: colors.surface,
+        marginTop: spacing.xs,
+      },
+      logoutButtonText: {
+        ...typography.button,
+        color: colors.error,
+      },
+      emptyText: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: spacing.xs,
+      },
+    });
+    "
+
+      54 |
+      55 | it.each(INPUT_SCREENS)('%s renders inside KeyboardAwareScreen', path => {
+    > 56 |   expect(read(path)).toContain('<KeyboardAwareScreen');
+         |                      ^
+      57 | });
+      58 |
+      59 | it('every file that renders a TextField is a listed screen or a listed shared input component', () => {
+
+      at toContain (src/components/__tests__/keyboardInventory.test.ts:56:22)
+
+  ● every file that renders a TextField is a listed screen or a listed shared input component
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 5
+
+    - Array []
+    + Array [
+    +   "src/components/tournament/wizard/BasicsStep.tsx",
+    +   "src/components/tournament/wizard/VisibilityStep.tsx",
+    +   "src/components/tournament/wizard/WhenWhereStep.tsx",
+    + ]
+
+      60 |   const rendering = files.filter(path => /<TextField\b/.test(read(path)));
+      61 |   const allowed = new Set([...INPUT_SCREENS, ...SHARED_INPUT_COMPONENTS]);
+    > 62 |   expect(rendering.filter(path => !allowed.has(path))).toEqual([]);
+         |                                                        ^
+      63 | });
+      64 |
+      65 | it('only KeyboardAwareScreen uses KeyboardAvoidingView', () => {
+
+      at Object.toEqual (src/components/__tests__/keyboardInventory.test.ts:62:56)
+
+  ● only TextField renders a bare TextInput
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  0
+    + Received  + 10
+
+      Array [
+    +   "src/components/GroupMultiSelect.tsx",
+    +   "src/components/NumberField.tsx",
+        "src/components/TextField.tsx",
+    +   "src/components/venue/OthersVenueModal.tsx",
+    +   "src/components/venue/VenueDetailCard.tsx",
+    +   "src/components/venue/VenuePicker.tsx",
+    +   "src/screens/AccountDeletionCodeScreen.tsx",
+    +   "src/screens/CreateGameScreen.tsx",
+    +   "src/screens/EditProfileScreen.tsx",
+    +   "src/screens/EventDetailScreen.tsx",
+    +   "src/screens/TransferGroupOwnershipScreen.tsx",
+      ]
+
+      70 | it('only TextField renders a bare TextInput', () => {
+      71 |   const users = files.filter(path => /(^|\n)\s*<TextInput\b/.test(read(path)));
+    > 72 |   expect(users).toEqual(['src/components/TextField.tsx']);
+         |                 ^
+      73 | });
+      74 |
+
+      at Object.toEqual (src/components/__tests__/keyboardInventory.test.ts:72:17)
+
+PASS src/components/__tests__/KeyboardAwareScreen.test.tsx (5.118 s)
+PASS src/screens/__tests__/TournamentGameView.test.tsx
+PASS src/screens/__tests__/TournamentDetailCommittee.test.tsx (7.184 s)
+PASS src/components/__tests__/inviteControlsStatic.test.ts
+PASS src/screens/__tests__/AccessRefetchDetails.test.tsx (7.098 s)
+PASS src/screens/__tests__/AccessActionNotFound.test.tsx (7.933 s)
+PASS src/screens/__tests__/TournamentInvite.test.tsx (8.176 s)
+PASS src/screens/__tests__/TournamentRespond.test.tsx
+PASS src/screens/__tests__/TournamentScoringScreen.test.tsx
+PASS src/screens/__tests__/TournamentRegistrationsMenu.test.tsx
+PASS src/utils/__tests__/fixturesSetup.test.ts
+PASS src/screens/__tests__/TournamentShare.test.tsx
+  ● Console
+
+    console.warn
+      Clipboard has been extracted from react-native core and will be removed in a future release. It can now be installed and imported from '@react-native-clipboard/clipboard' instead of 'react-native'. See https://github.com/react-native-clipboard/clipboard
+
+      42 |     expect(has(root, 'Copy Link')).toBe(true);
+      43 |
+    > 44 |     const setString = jest.spyOn(Clipboard, 'setString');
+         |                                  ^
+      45 |     await act(async () => pressableLabelled(root, 'Copy Link').props.onPress());
+      46 |     expect(setString).toHaveBeenCalledWith(getShareUrl());
+      47 |
+
+      at warn (node_modules/react-native/Libraries/Utilities/warnOnce.js:27:11)
+      at Object.warnOnce [as Clipboard] (node_modules/react-native/index.js:218:5)
+      at Object.Clipboard (src/screens/__tests__/TournamentShare.test.tsx:44:34)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS src/utils/__tests__/tournamentExperience.test.ts
+PASS src/screens/__tests__/TournamentDetailV2.test.tsx (9.203 s)
+PASS src/screens/__tests__/TournamentResponses.test.tsx
+PASS src/components/scoring/__tests__/ScoringMatchCard.test.tsx
+PASS src/utils/__tests__/tournamentTabs.test.ts
+PASS src/labels/__tests__/LabelsContext.test.tsx
+FAIL src/utils/__tests__/tournamentScoringContract.test.ts
+  ● scoring/state contract (engine_service.scoring_state) › reads enabled and applicable, and the additive facts, from the full backend payload
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+      Object {
+        "any_result_posted": true,
+        "applicable": true,
+        "enabled": true,
+        "fixtures_published": true,
+    +   "is_committee": false,
+        "registration_phase": "frozen",
+      }
+
+      141 |
+      142 |   it('reads enabled and applicable, and the additive facts, from the full backend payload', () => {
+    > 143 |     expect(normaliseScoringState(BACKEND_SCORING_STATE)).toEqual({ enabled: true, applicable: true, ...FACTS });
+          |                                                          ^
+      144 |   });
+      145 |
+      146 |   it('reads off / not applicable as such', () => {
+
+      at Object.toEqual (src/utils/__tests__/tournamentScoringContract.test.ts:143:58)
+
+  ● scoring/state contract (engine_service.scoring_state) › reads off / not applicable as such
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+      Object {
+        "any_result_posted": true,
+        "applicable": true,
+        "enabled": false,
+        "fixtures_published": true,
+    +   "is_committee": false,
+        "registration_phase": "frozen",
+      }
+
+      145 |
+      146 |   it('reads off / not applicable as such', () => {
+    > 147 |     expect(normaliseScoringState({ ...BACKEND_SCORING_STATE, enabled: false })).toEqual({
+          |                                                                                 ^
+      148 |       enabled: false,
+      149 |       applicable: true,
+      150 |       ...FACTS,
+
+      at Object.toEqual (src/utils/__tests__/tournamentScoringContract.test.ts:147:81)
+
+PASS src/screens/__tests__/TournamentDetailScreen.test.tsx
+PASS src/utils/__tests__/tournamentWizard.test.ts
+PASS src/api/__tests__/tournaments.test.ts
+PASS src/api/__tests__/tournamentExperienceApi.test.ts
+PASS src/components/__tests__/addRemoveGlyphStatic.test.ts
+PASS src/api/__tests__/tournamentWizardApi.test.ts
+PASS src/components/scoring/__tests__/TournamentScoringEntry.test.tsx
+FAIL src/utils/__tests__/tournamentScoring.test.ts
+  ● normaliseScoringState › reads enabled and applicable as booleans and nothing else
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+      Object {
+        "applicable": true,
+        "enabled": true,
+    +   "is_committee": false,
+      }
+
+      114 | describe('normaliseScoringState', () => {
+      115 |   it('reads enabled and applicable as booleans and nothing else', () => {
+    > 116 |     expect(normaliseScoringState({ enabled: true, applicable: true, committee: null, is_committee: false })).toEqual({ enabled: true, applicable: true });
+          |                                                                                                              ^
+      117 |     expect(normaliseScoringState({ enabled: true })).toEqual({ enabled: true, applicable: false });
+      118 |     expect(normaliseScoringState({ enabled: 'true', applicable: 1 })).toEqual({ enabled: false, applicable: false });
+      119 |     expect(normaliseScoringState(null)).toBeNull();
+
+      at Object.toEqual (src/utils/__tests__/tournamentScoring.test.ts:116:110)
+
+PASS src/screens/__tests__/TournamentWizardScreen.test.tsx (9.598 s)
+PASS src/screens/__tests__/TournamentFixturesSetup.test.tsx
+PASS src/screens/__tests__/TournamentTabBodies.test.tsx
+-------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------------------------------------------------------------------------
+File                           | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                                                                                              
+-------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------------------------------------------------------------------------
+All files                      |   87.51 |    76.61 |   86.73 |   87.29 |                                                                                                                                                
+ api                           |   89.89 |     84.4 |   93.87 |   89.79 |                                                                                                                                                
+  tournaments.ts               |   89.89 |     84.4 |   93.87 |   89.79 | 324,443,483-486,507-538                                                                                                                        
+ components/tournament/v2      |    92.3 |    85.25 |   82.22 |   92.65 |                                                                                                                                                
+  LockedPreview.tsx            |     100 |      100 |     100 |     100 |                                                                                                                                                
+  PeopleSheet.tsx              |     100 |      100 |     100 |     100 |                                                                                                                                                
+  StatusStrip.tsx              |     100 |    96.77 |     100 |     100 | 101                                                                                                                                            
+  TournamentDetailV2.tsx       |   88.88 |    83.56 |   81.25 |    88.4 | 127,133,142-143,151,240,247,283                                                                                                                
+  TournamentHeader.tsx         |   88.88 |    68.18 |   66.66 |   88.88 | 41,130                                                                                                                                         
+  TournamentOverview.tsx       |   92.72 |     83.8 |   76.92 |   94.33 | 168,190,200                                                                                                                                    
+  TournamentTabs.tsx           |     100 |      100 |     100 |     100 |                                                                                                                                                
+ components/tournament/v2/tabs |   87.02 |    72.22 |   83.91 |   87.04 |                                                                                                                                                
+  ApprovalsTab.tsx             |   86.95 |    68.08 |   90.62 |   85.71 | 58,65,89,128,243,268-277                                                                                                                       
+  CloseSheet.tsx               |   79.31 |       44 |   60.86 |   78.84 | 62,79-81,91,134,153-173                                                                                                                        
+  FixturesSetup.tsx            |   92.56 |    87.75 |   96.66 |   92.37 | 137,143,177,183,189-190,211,242,252                                                                                                            
+  FixturesTab.tsx              |    93.1 |     93.1 |   81.25 |    93.1 | 219,249,257-258                                                                                                                                
+  KnockoutBracket.tsx          |   86.66 |    76.92 |      80 |   86.66 | 36,71                                                                                                                                          
+  MediaTab.tsx                 |   88.88 |    63.88 |   88.23 |      90 | 43,57,68,97,149                                                                                                                                
+  ParticipantsTab.tsx          |   90.24 |    83.87 |   81.25 |   89.18 | 71,166-177                                                                                                                                     
+  RefusalList.tsx              |   93.75 |    72.22 |     100 |   93.33 | 33                                                                                                                                             
+  ResultsFileCard.tsx          |      90 |    73.91 |     100 |   89.79 | 53,64,72,78,95                                                                                                                                 
+  ResultsTab.tsx               |   87.09 |    71.42 |      80 |   86.66 | 66,70,90,108                                                                                                                                   
+  ReviewFixturesSheet.tsx      |      72 |    73.52 |   71.42 |   70.83 | 44,54-60,98                                                                                                                                    
+  ScoreSheet.tsx               |   83.48 |     61.4 |   83.87 |      82 | 112-121,134-135,163-164,268-325                                                                                                                
+  StandingsTab.tsx             |   91.66 |    60.71 |     100 |   91.66 | 29                                                                                                                                             
+  WorkbookPicker.tsx           |     100 |       50 |     100 |     100 | 34-36                                                                                                                                          
+  matchLabels.ts               |   52.17 |    37.93 |      50 |   57.14 | 13,24-29,41-46                                                                                                                                 
+  parts.tsx                    |     100 |      100 |     100 |     100 |                                                                                                                                                
+  useStandingsBoard.ts         |   93.47 |    80.95 |   84.61 |   97.56 | 63                                                                                                                                             
+ screens                       |   74.84 |    70.99 |   66.66 |   74.51 |                                                                                                                                                
+  TournamentDetailScreen.tsx   |   74.84 |    70.99 |   66.66 |   74.51 | 207,221,268-271,298,305,349,362,371,378-381,435,448-449,461-462,467-476,484-505,515-516,520,527,544-617,641-644,758-773,858-869,1024,1068-1101 
+ utils                         |    93.4 |     79.5 |   96.04 |    93.2 |                                                                                                                                                
+  fileTransfer.ts              |   96.77 |     87.5 |     100 |   96.66 | 47                                                                                                                                             
+  fixturesSetup.ts             |   89.21 |    75.84 |   93.33 |   89.24 | 95,259-271                                                                                                                                     
+  tournamentScoring.ts         |   97.54 |    94.11 |     100 |   97.22 | 87,107,133                                                                                                                                     
+  tournamentTabs.ts            |   92.81 |    75.18 |   95.32 |   92.56 | 254,637-643,657-662,712,766,770,776,801-802,850-853                                                                                            
+-------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------------------------------------------------------------------------
+
+Summary of all failing tests
+FAIL src/components/__tests__/keyboardInventory.test.ts
+  ● src/screens/ProfileScreen.tsx renders inside KeyboardAwareScreen
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "<KeyboardAwareScreen"
+    Received string:    "/**
+     * Profile screen (Phase 2 revamp, Main.png).
+     *
+     * Visual hierarchy:
+     * - Top cover banner with semi-transparent Edit Profile and Settings buttons
+     * - Centered overlapping avatar (88x88) with display name & @nickname
+     * - (stats strip moved to the Home dashboard)
+     * - Skills card with sport icon and colored level pills
+     * - My groups card with squircle logos/initials and \"View all\" link
+     * - Recent games card with sport icon, date/time, venue and \"View all\" link
+     * - Outlined Log out button with confirmation dialog
+     */
+    import React, { useCallback, useRef, useState } from 'react';
+    import {
+      ActivityIndicator,
+      Alert,
+      Image,
+      Pressable,
+      ScrollView,
+      StyleSheet,
+      Text,
+      View,
+      type AlertButton,
+    } from 'react-native';
+    import FastImage from '@d11/react-native-fast-image';
+    import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+    import { useFocusEffect } from '@react-navigation/native';·
+    import { useAuth } from '../auth/AuthContext';
+    import {
+      getProfile,
+      getProfileSummary,
+      type ProfileSummary,
+    } from '../api/profile';
+    import { getMyGroups } from '../api/groups';
+    import type { Group } from '../types/group';
+    import { getCachedBanners, type BannerFallback } from '../api/home';
+    import { BannerBackground, SportIcon } from '../components/icons/DashboardIcons';
+    import { sportPalette } from '../sports/style';
+    import { useSportVisual } from '../sports/catalog';
+    import { EditIcon } from '../components/icons/ActionIcons';
+    import {
+      ClockIcon,
+      DoorIcon,
+      GearIcon,
+      PinIcon,
+    } from '../components/icons/SharedIcons';
+    import ErrorView from '../components/ErrorView';
+    import LoadingView from '../components/LoadingView';
+    import ScreenContainer from '../components/ScreenContainer';
+    import { useSportDisplayName } from '../utils/labels';
+    import { getDisplayName } from '../utils/displayName';
+    import { useT } from '../labels/LabelsContext';
+    import {
+      borderWidth,
+      colors,
+      radius,
+      spacing,
+      typography,
+    } from '../theme/tokens';
+    import type { SkillLevelValue, UserProfile } from '../types/user';
+    import type { LabelKey } from '../labels/fallbackLabels';
+    import type { ProfileStackParamList } from '../navigation/types';
+    import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
+    import {
+      startSpan,
+      isPerfEnabled,
+      shareLog,
+      perfImageLoadStart,
+      perfImageLoad,
+      perfImageError,
+      setRuntimeFlag,
+    } from '../diagnostics/perfLog';·
+    type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;·
+    function getInitials(name?: string | null): string {
+      if (!name) return '??';
+      const parts = name.trim().split(/\\s+/).filter(Boolean);
+      if (parts.length === 0) return '??';
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }·
+    function formatRecentGameDate(isoString: string): string {
+      try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return '';
+        const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+        const day = d.getDate();
+        const month = d.toLocaleDateString(undefined, { month: 'short' });
+        const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        return `${weekday} ${day} ${month}, ${time}`;
+      } catch {
+        return '';
+      }
+    }·
+    const GROUP_BADGE_COLORS = [
+      colors.primary,
+      colors.success,
+      colors.warning,
+      colors.accentPurple,
+    ];·
+    const LEVEL_LABEL_KEY: Record<SkillLevelValue, LabelKey> = {
+      beginner: 'skill_level.beginner',
+      intermediate: 'skill_level.intermediate',
+      expert: 'skill_level.expert',
+    };·
+    function getLevelTextColor(level?: string | null): string {
+      const normalized = level?.trim().toLowerCase();
+      if (normalized === 'beginner') return colors.warning;
+      if (normalized === 'intermediate') return colors.primary;
+      if (normalized === 'expert') return colors.accentPurple;
+      return colors.textPrimary;
+    }·
+    function getLevelBgColor(level?: string | null): string {
+      const normalized = level?.trim().toLowerCase();
+      if (normalized === 'beginner') return colors.warningLight;
+      if (normalized === 'intermediate') return colors.primaryLight;
+      if (normalized === 'expert') return colors.avatarTint5;
+      return colors.avatarTint1;
+    }·
+    function SkillTileItem({
+      sport,
+      level,
+    }: {
+      sport: string;
+      level: string;
+    }): React.JSX.Element {
+      const t = useT();
+      const sportName = useSportDisplayName(sport);
+      const visual = useSportVisual(sport);
+      const palette = sportPalette(visual.color);
+      const textColor = getLevelTextColor(level);
+      const bgColor = getLevelBgColor(level);
+      const normalized = level.trim().toLowerCase() as SkillLevelValue;
+      const labelKey = LEVEL_LABEL_KEY[normalized];
+      const levelText = labelKey ? t(labelKey) : level;·
+      return (
+        <View style={[styles.skillTile, { backgroundColor: bgColor }]}>
+          <View style={[styles.skillIconCircle, { backgroundColor: palette.chip }]}>
+            <SportIcon iconKey={visual.iconKey} size={20} />
+          </View>
+          <View style={styles.skillTextCol}>
+            <Text numberOfLines={1} style={styles.skillSportName}>
+              {sportName}
+            </Text>
+            <Text style={[styles.skillLevelText, { color: textColor }]}>
+              {levelText}
+            </Text>
+          </View>
+        </View>
+      );
+    }·
+    function GameSportMark({ sport }: { sport: string }): React.JSX.Element {
+      const visual = useSportVisual(sport);
+      const palette = sportPalette(visual.color);
+      return (
+        <View style={[styles.gameSportIconCircle, { backgroundColor: palette.chip }]}>
+          <SportIcon iconKey={visual.iconKey} size={20} />
+        </View>
+      );
+    }·
+    export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
+      const { signOut } = useAuth();
+      const t = useT();·
+      const [profile, setProfile] = useState<UserProfile | null>(null);
+      const [profileSummary, setProfileSummary] = useState<ProfileSummary | null>(null);
+      const [groups, setGroups] = useState<Group[]>([]);
+      const [bannerFallback, setBannerFallback] = useState<BannerFallback | null>(null);
+      const [isLoading, setIsLoading] = useState(true);
+      const [loadError, setLoadError] = useState<string | null>(null);
+      const [isSigningOut, setIsSigningOut] = useState(false);·
+      // ── Perf: render count and screen timing ──────────────────────────────────
+      usePerfRender('ProfileScreen');
+      usePerfScreen('ProfileScreen', isLoading);·
+      // ── Perf: 7-tap diagnostics toggle (Item SWITCH) ──────────────────────────
+      // Tracks taps on the display name within a 3-second window.
+      const tapTimestamps = useRef<number[]>([]);·
+      const handleDisplayNamePress = useCallback((): void => {
+        const now = Date.now();
+        // Keep only taps within the last 3000 ms.
+        tapTimestamps.current = tapTimestamps.current.filter(ts => now - ts < 3000);
+        tapTimestamps.current.push(now);
+        if (tapTimestamps.current.length >= 7) {
+          tapTimestamps.current = [];
+          const enabled = isPerfEnabled();
+          const buttons: AlertButton[] = [
+            {
+              text: enabled ? 'Turn OFF' : 'Turn ON',
+              onPress: () => {
+                setRuntimeFlag(!enabled).catch(() => {});
+              },
+            },
+            {
+              text: 'Close',
+              style: 'cancel',
+            },
+          ];
+          if (enabled) {
+            buttons.splice(1, 0, {
+              text: 'Share log',
+              onPress: () => {
+                shareLog().catch(() => {});
+              },
+            });
+          }
+          Alert.alert(t(enabled ? 'mob.diagnostics.title_on' : 'mob.diagnostics.title_off'), '', buttons);
+        }
+      }, [t]);·
+      const loadData = useCallback(async () => {
+        try {
+          setLoadError(null);
+          // ── Perf: instrument each parallel call with a span ────────────────
+          const profileSpan = startSpan('fetch', { resource: 'getProfile', screen: 'ProfileScreen' });
+          const summarySpan = startSpan('fetch', { resource: 'getProfileSummary', screen: 'ProfileScreen' });
+          const groupsSpan = startSpan('fetch', { resource: 'getMyGroups', screen: 'ProfileScreen' });
+          const bannersSpan = startSpan('fetch', { resource: 'getCachedBanners', screen: 'ProfileScreen' });·
+          const [profileData, summaryData, myGroupsData, bannerData] = await Promise.all([
+            getProfile().then(r => { profileSpan({ result: 'ok' }); return r; }).catch(e => { profileSpan({ result: 'error' }); throw e; }),
+            getProfileSummary().then(r => { summarySpan({ result: 'ok' }); return r; }).catch(() => {
+              summarySpan({ result: 'fallback' });
+              return { games_played: 0, games_hosted: 0, groups_count: 0, recent_games: [] };
+            }),
+            getMyGroups().then(r => { groupsSpan({ result: 'ok' }); return r; }).catch(() => {
+              groupsSpan({ result: 'fallback' });
+              return { items: [], total: 0 };
+            }),
+            getCachedBanners().then(r => { bannersSpan({ result: 'ok' }); return r; }).catch(() => {
+              bannersSpan({ result: 'fallback' });
+              return null;
+            }),
+          ]);
+          setProfile(profileData);
+          setProfileSummary(summaryData);
+          setGroups(myGroupsData.items ?? []);
+          if (bannerData?.fallback) {
+            setBannerFallback(bannerData.fallback);
+          }
+        } catch {
+          setLoadError(t('mob.profile.load_error'));
+        } finally {
+          setIsLoading(false);
+        }
+      }, [t]);·
+      useFocusEffect(
+        useCallback(() => {
+          loadData();
+        }, [loadData]),
+      );·
+      const handleSignOut = async (): Promise<void> => {
+        try {
+          setIsSigningOut(true);
+          await signOut();
+        } catch {
+          setIsSigningOut(false);
+          Alert.alert(t('mob.profile.sign_out'), t('mob.profile.sign_out_error'));
+        }
+      };·
+      const handleLogoutPress = (): void => {
+        Alert.alert(
+          t('mob.profile.logout_confirm_title'),
+          t('mob.profile.logout_confirm_body'),
+          [
+            { text: t('mob.common.cancel'), style: 'cancel' },
+            { text: t('mob.profile.logout'), style: 'destructive', onPress: handleSignOut },
+          ],
+        );
+      };·
+      if (isLoading) {
+        return (
+          <ScreenContainer edges=\"top\">
+            <LoadingView />
+          </ScreenContainer>
+        );
+      }·
+      if (loadError || !profile) {
+        return (
+          <ScreenContainer edges=\"top\">
+            <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadData} />
+          </ScreenContainer>
+        );
+      }·
+      const initials = getInitials(getDisplayName(profile));
+      const coverUrl = profile.cover_url || bannerFallback?.image_url;·
+      return (
+        <ScreenContainer edges=\"top\" style={styles.screen}>
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Cover banner */}
+          <View style={styles.bannerContainer}>
+            {coverUrl ? (
+              <Image
+                source={{ uri: coverUrl }}
+                style={styles.bannerImage}
+                resizeMode=\"cover\"
+                onLoadStart={() => perfImageLoadStart('ProfileScreen', coverUrl, 'cover')}
+                onLoad={event =>
+                  perfImageLoad(
+                    'ProfileScreen',
+                    coverUrl,
+                    'cover',
+                    event.nativeEvent.source.width,
+                    event.nativeEvent.source.height,
+                  )
+                }
+                onError={() => perfImageError('ProfileScreen', coverUrl, 'cover')}
+              />
+            ) : (
+              <View style={styles.bannerFallback}>
+                <BannerBackground width=\"100%\" height=\"100%\" />
+              </View>
+            )}
+          </View>·
+          {/* Identity */}
+          <View style={styles.identityContainer}>
+            <View style={styles.avatarBorder}>
+              {profile.avatar_url ? (
+                <FastImage
+                  source={{ uri: profile.avatar_url }}
+                  style={styles.avatarImage}
+                  onLoadStart={() => perfImageLoadStart('ProfileScreen', profile.avatar_url, 'avatar')}
+                  onLoad={event =>
+                    perfImageLoad(
+                      'ProfileScreen',
+                      profile.avatar_url,
+                      'avatar',
+                      event.nativeEvent.width,
+                      event.nativeEvent.height,
+                    )
+                  }
+                  onError={() => perfImageError('ProfileScreen', profile.avatar_url, 'avatar')}
+                />
+              ) : (
+                <View style={styles.avatarInitials}>
+                  <Text style={styles.avatarInitialsText}>{initials}</Text>
+                </View>
+              )}
+            </View>·
+            <Pressable
+              onPress={handleDisplayNamePress}
+              accessibilityRole=\"text\"
+              accessibilityLabel={getDisplayName(profile)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
+            </Pressable>
+            <Text style={styles.nickname}>@{profile.nickname}</Text>
+          </View>·
+          {/* Main cards */}
+          <View style={styles.cardsContainer}>
+            {/* Skills card */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{t('mob.profile.skills')}</Text>
+              {profile.skill_levels && profile.skill_levels.length > 0 ? (
+                <View style={styles.skillsGrid}>
+                  {profile.skill_levels.map(skill => (
+                    <SkillTileItem
+                      key={skill.sport}
+                      sport={skill.sport}
+                      level={skill.skill_level}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_skills')}</Text>
+              )}
+            </View>·
+            {/* My groups card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>{t('mob.profile.my_groups')}</Text>
+                <Pressable
+                  accessibilityRole=\"button\"
+                  accessibilityLabel={t('mob.dashboard.view_all')}
+                  onPress={() => (navigation.getParent() as any)?.navigate('Groups', { screen: 'GroupsList' })}
+                >
+                  <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+                </Pressable>
+              </View>·
+              {groups.length > 0 ? (
+                <View style={styles.groupsRow}>
+                  {groups.slice(0, 3).map((group, idx) => (
+                    <Pressable
+                      key={group.id}
+                      style={styles.groupItem}
+                      onPress={() =>
+                        (navigation.getParent() as any)?.navigate('Groups', {
+                          screen: 'GroupDetail',
+                          params: { groupId: group.id },
+                        })
+                      }
+                      accessibilityRole=\"button\"
+                      accessibilityLabel={group.name}
+                    >
+                      {group.logo_url ? (
+                        <Image
+                          source={{ uri: group.logo_url }}
+                          style={styles.groupLogo}
+                          resizeMode=\"cover\"
+                          onLoadStart={() =>
+                            perfImageLoadStart('ProfileScreen', group.logo_url, 'group_logo')
+                          }
+                          onLoad={event =>
+                            perfImageLoad(
+                              'ProfileScreen',
+                              group.logo_url,
+                              'group_logo',
+                              event.nativeEvent.source.width,
+                              event.nativeEvent.source.height,
+                            )
+                          }
+                          onError={() => perfImageError('ProfileScreen', group.logo_url, 'group_logo')}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.groupLogoInitials,
+                            { backgroundColor: GROUP_BADGE_COLORS[idx % GROUP_BADGE_COLORS.length] },
+                          ]}
+                        >
+                          <Text style={styles.groupInitialsText}>{getInitials(group.name)}</Text>
+                        </View>
+                      )}
+                      <Text numberOfLines={2} style={styles.groupName}>
+                        {group.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_groups')}</Text>
+              )}
+            </View>·
+            {/* Recent games card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>{t('mob.profile.recent_games')}</Text>
+                <Pressable
+                  accessibilityRole=\"button\"
+                  accessibilityLabel={t('mob.dashboard.view_all')}
+                  onPress={() =>
+                    (navigation.getParent() as any)?.navigate('Tournaments', {
+                      screen: 'TournamentsList',
+                      params: { scope: 'mine' },
+                    })
+                  }
+                >
+                  <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+                </Pressable>
+              </View>·
+              {profileSummary?.recent_games && profileSummary.recent_games.length > 0 ? (
+                <View style={styles.recentGamesList}>
+                  {profileSummary.recent_games.map((game, idx) => (
+                    <View key={game.id}>
+                      {idx > 0 ? <View style={styles.gameDivider} /> : null}
+                      <Pressable
+                        style={styles.gameRow}
+                        onPress={() =>
+                          (navigation.getParent() as any)?.navigate('Home', {
+                            screen: 'EventDetail',
+                            params: { eventId: game.id },
+                          })
+                        }
+                        accessibilityRole=\"button\"
+                        accessibilityLabel={game.title}
+                      >
+                        <GameSportMark sport={game.sport} />
+                        <View style={styles.gameDetailsCol}>
+                          <Text numberOfLines={1} style={styles.gameTitle}>
+                            {game.title}
+                          </Text>
+                          <View style={styles.gameMetaRow}>
+                            <ClockIcon size={14} />
+                            <Text style={styles.gameMetaText}>
+                              {formatRecentGameDate(game.starts_at)}
+                            </Text>
+                            <PinIcon size={14} />
+                            <Text numberOfLines={1} style={styles.gameMetaText}>
+                              {game.venue_name}
+                            </Text>
+                          </View>
+                        </View>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_recent_games')}</Text>
+              )}
+            </View>·
+            {/* Action buttons (Edit Profile and Settings) */}
+            <View style={styles.actionRow}>
+              <Pressable
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('EditProfile')}
+                accessibilityRole=\"button\"
+                accessibilityLabel={t('mob.profile.edit_profile')}
+              >
+                <EditIcon size={18} color={colors.textPrimary} />
+                <Text style={styles.actionButtonText}>{t('mob.profile.edit_profile')}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('Settings')}
+                accessibilityRole=\"button\"
+                accessibilityLabel={t('mob.profile.settings')}
+              >
+                <GearIcon size={18} />
+                <Text style={styles.actionButtonText}>{t('mob.profile.settings')}</Text>
+              </Pressable>
+            </View>·
+            {/* Log out button */}
+            <Pressable
+              style={styles.logoutButton}
+              onPress={handleLogoutPress}
+              disabled={isSigningOut}
+              accessibilityRole=\"button\"
+              accessibilityLabel={t('mob.profile.logout')}
+            >
+              {isSigningOut ? (
+                <ActivityIndicator size=\"small\" color={colors.error} />
+              ) : (
+                <>
+                  <DoorIcon size={20} />
+                  <Text style={styles.logoutButtonText}>{t('mob.profile.logout')}</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+        </ScreenContainer>
+      );
+    }·
+    const styles = StyleSheet.create({
+      screen: {
+        flex: 1,
+        backgroundColor: colors.background,
+      },
+      scrollContent: {
+        paddingBottom: spacing.xxl + spacing.lg,
+      },
+      bannerContainer: {
+        height: 160,
+        backgroundColor: colors.primary,
+        position: 'relative',
+        overflow: 'hidden',
+      },
+      bannerImage: {
+        width: '100%',
+        height: '100%',
+      },
+      bannerFallback: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: colors.primary,
+      },
+      actionRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginTop: spacing.md,
+      },
+      actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.xs,
+        paddingVertical: 14,
+        backgroundColor: colors.surface,
+        borderWidth: borderWidth.thin,
+        borderColor: colors.border,
+        borderRadius: radius.lg,
+      },
+      actionButtonText: {
+        ...typography.button,
+        color: colors.textPrimary,
+      },
+      identityContainer: {
+        alignItems: 'center',
+        marginTop: -44,
+        marginBottom: spacing.md,
+      },
+      avatarBorder: {
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        borderWidth: 3,
+        borderColor: colors.surface,
+        backgroundColor: colors.surface,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      avatarImage: {
+        width: 82,
+        height: 82,
+        borderRadius: 41,
+      },
+      avatarInitials: {
+        width: 82,
+        height: 82,
+        borderRadius: 41,
+        backgroundColor: colors.avatarTint1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      avatarInitialsText: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: colors.avatarTintText1,
+      },
+      displayName: {
+        ...typography.h2,
+        color: colors.textPrimary,
+        marginTop: spacing.sm,
+      },
+      nickname: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: 2,
+      },
+      cardsContainer: {
+        paddingHorizontal: spacing.md,
+        gap: spacing.md,
+      },
+      card: {
+        backgroundColor: colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: borderWidth.thin,
+        borderColor: colors.border,
+        padding: spacing.md,
+      },
+      cardTitle: {
+        ...typography.h3,
+        color: colors.textPrimary,
+      },
+      cardHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+      },
+      viewAllLink: {
+        ...typography.label,
+        color: colors.primary,
+      },
+      skillsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        marginTop: spacing.sm,
+      },
+      skillTile: {
+        flexGrow: 1,
+        flexBasis: '45%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: radius.md,
+        padding: spacing.sm,
+        gap: spacing.sm,
+      },
+      skillIconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      skillTextCol: {
+        flex: 1,
+      },
+      skillSportName: {
+        ...typography.bodyBold,
+        color: colors.textPrimary,
+        fontSize: 14,
+      },
+      skillLevelText: {
+        ...typography.caption,
+        fontWeight: '600',
+        marginTop: 1,
+      },
+      groupsRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginTop: spacing.xs,
+      },
+      groupItem: {
+        alignItems: 'center',
+        width: 72,
+      },
+      groupLogo: {
+        width: 56,
+        height: 56,
+        borderRadius: radius.lg,
+      },
+      groupLogoInitials: {
+        width: 56,
+        height: 56,
+        borderRadius: radius.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      groupInitialsText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.white,
+      },
+      groupName: {
+        ...typography.label,
+        color: colors.textPrimary,
+        textAlign: 'center',
+        marginTop: 6,
+      },
+      recentGamesList: {
+        marginTop: spacing.xs,
+      },
+      gameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingVertical: spacing.xs,
+      },
+      gameDivider: {
+        height: borderWidth.thin,
+        backgroundColor: colors.border,
+        marginVertical: spacing.xs,
+      },
+      gameSportIconCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.avatarTint1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      gameDetailsCol: {
+        flex: 1,
+      },
+      gameTitle: {
+        ...typography.bodyBold,
+        color: colors.textPrimary,
+      },
+      gameMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        marginTop: 3,
+      },
+      gameMetaText: {
+        ...typography.caption,
+        color: colors.textSecondary,
+        marginRight: spacing.xs,
+      },
+      logoutButton: {
+        borderWidth: 1.5,
+        borderColor: colors.error,
+        borderRadius: radius.full,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: spacing.sm,
+        backgroundColor: colors.surface,
+        marginTop: spacing.xs,
+      },
+      logoutButtonText: {
+        ...typography.button,
+        color: colors.error,
+      },
+      emptyText: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: spacing.xs,
+      },
+    });
+    "
+
+      54 |
+      55 | it.each(INPUT_SCREENS)('%s renders inside KeyboardAwareScreen', path => {
+    > 56 |   expect(read(path)).toContain('<KeyboardAwareScreen');
+         |                      ^
+      57 | });
+      58 |
+      59 | it('every file that renders a TextField is a listed screen or a listed shared input component', () => {
+
+      at toContain (src/components/__tests__/keyboardInventory.test.ts:56:22)
+
+  ● every file that renders a TextField is a listed screen or a listed shared input component
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 5
+
+    - Array []
+    + Array [
+    +   "src/components/tournament/wizard/BasicsStep.tsx",
+    +   "src/components/tournament/wizard/VisibilityStep.tsx",
+    +   "src/components/tournament/wizard/WhenWhereStep.tsx",
+    + ]
+
+      60 |   const rendering = files.filter(path => /<TextField\b/.test(read(path)));
+      61 |   const allowed = new Set([...INPUT_SCREENS, ...SHARED_INPUT_COMPONENTS]);
+    > 62 |   expect(rendering.filter(path => !allowed.has(path))).toEqual([]);
+         |                                                        ^
+      63 | });
+      64 |
+      65 | it('only KeyboardAwareScreen uses KeyboardAvoidingView', () => {
+
+      at Object.toEqual (src/components/__tests__/keyboardInventory.test.ts:62:56)
+
+  ● only TextField renders a bare TextInput
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  0
+    + Received  + 10
+
+      Array [
+    +   "src/components/GroupMultiSelect.tsx",
+    +   "src/components/NumberField.tsx",
+        "src/components/TextField.tsx",
+    +   "src/components/venue/OthersVenueModal.tsx",
+    +   "src/components/venue/VenueDetailCard.tsx",
+    +   "src/components/venue/VenuePicker.tsx",
+    +   "src/screens/AccountDeletionCodeScreen.tsx",
+    +   "src/screens/CreateGameScreen.tsx",
+    +   "src/screens/EditProfileScreen.tsx",
+    +   "src/screens/EventDetailScreen.tsx",
+    +   "src/screens/TransferGroupOwnershipScreen.tsx",
+      ]
+
+      70 | it('only TextField renders a bare TextInput', () => {
+      71 |   const users = files.filter(path => /(^|\n)\s*<TextInput\b/.test(read(path)));
+    > 72 |   expect(users).toEqual(['src/components/TextField.tsx']);
+         |                 ^
+      73 | });
+      74 |
+
+      at Object.toEqual (src/components/__tests__/keyboardInventory.test.ts:72:17)
+
+FAIL src/utils/__tests__/tournamentScoringContract.test.ts
+  ● scoring/state contract (engine_service.scoring_state) › reads enabled and applicable, and the additive facts, from the full backend payload
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+      Object {
+        "any_result_posted": true,
+        "applicable": true,
+        "enabled": true,
+        "fixtures_published": true,
+    +   "is_committee": false,
+        "registration_phase": "frozen",
+      }
+
+      141 |
+      142 |   it('reads enabled and applicable, and the additive facts, from the full backend payload', () => {
+    > 143 |     expect(normaliseScoringState(BACKEND_SCORING_STATE)).toEqual({ enabled: true, applicable: true, ...FACTS });
+          |                                                          ^
+      144 |   });
+      145 |
+      146 |   it('reads off / not applicable as such', () => {
+
+      at Object.toEqual (src/utils/__tests__/tournamentScoringContract.test.ts:143:58)
+
+  ● scoring/state contract (engine_service.scoring_state) › reads off / not applicable as such
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+      Object {
+        "any_result_posted": true,
+        "applicable": true,
+        "enabled": false,
+        "fixtures_published": true,
+    +   "is_committee": false,
+        "registration_phase": "frozen",
+      }
+
+      145 |
+      146 |   it('reads off / not applicable as such', () => {
+    > 147 |     expect(normaliseScoringState({ ...BACKEND_SCORING_STATE, enabled: false })).toEqual({
+          |                                                                                 ^
+      148 |       enabled: false,
+      149 |       applicable: true,
+      150 |       ...FACTS,
+
+      at Object.toEqual (src/utils/__tests__/tournamentScoringContract.test.ts:147:81)
+
+FAIL src/utils/__tests__/tournamentScoring.test.ts
+  ● normaliseScoringState › reads enabled and applicable as booleans and nothing else
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+      Object {
+        "applicable": true,
+        "enabled": true,
+    +   "is_committee": false,
+      }
+
+      114 | describe('normaliseScoringState', () => {
+      115 |   it('reads enabled and applicable as booleans and nothing else', () => {
+    > 116 |     expect(normaliseScoringState({ enabled: true, applicable: true, committee: null, is_committee: false })).toEqual({ enabled: true, applicable: true });
+          |                                                                                                              ^
+      117 |     expect(normaliseScoringState({ enabled: true })).toEqual({ enabled: true, applicable: false });
+      118 |     expect(normaliseScoringState({ enabled: 'true', applicable: 1 })).toEqual({ enabled: false, applicable: false });
+      119 |     expect(normaliseScoringState(null)).toBeNull();
+
+      at Object.toEqual (src/utils/__tests__/tournamentScoring.test.ts:116:110)
+
+
+Test Suites: 3 failed, 28 passed, 31 total
+Tests:       6 failed, 472 passed, 478 total
+Snapshots:   0 total
+Time:        11.195 s, estimated 13 s
+Ran all test suites matching /src\/api\/__tests__\/tournaments.test.ts|src\/api\/__tests__\/tournamentExperienceApi.test.ts|src\/api\/__tests__\/tournamentWizardApi.test.ts|src\/components\/__tests__\/keyboardInventory.test.ts|src\/components\/__tests__\/addRemoveGlyphStatic.test.ts|src\/components\/__tests__\/inviteControlsStatic.test.ts|src\/components\/__tests__\/KeyboardAwareScreen.test.tsx|src\/components\/scoring\/__tests__\/ScoringMatchCard.test.tsx|src\/components\/scoring\/__tests__\/TournamentScoringEntry.test.tsx|src\/labels\/__tests__\/LabelsContext.test.tsx|src\/screens\/__tests__\/TournamentDetailScreen.test.tsx|src\/screens\/__tests__\/TournamentDetailCommittee.test.tsx|src\/screens\/__tests__\/TournamentDetailV2.test.tsx|src\/screens\/__tests__\/TournamentGameView.test.tsx|src\/screens\/__tests__\/TournamentInvite.test.tsx|src\/screens\/__tests__\/TournamentRegistrationsMenu.test.tsx|src\/screens\/__tests__\/TournamentRespond.test.tsx|src\/screens\/__tests__\/TournamentResponses.test.tsx|src\/screens\/__tests__\/TournamentScoringScreen.test.tsx|src\/screens\/__tests__\/TournamentShare.test.tsx|src\/screens\/__tests__\/TournamentTabBodies.test.tsx|src\/screens\/__tests__\/TournamentWizardScreen.test.tsx|src\/screens\/__tests__\/AccessRefetchDetails.test.tsx|src\/screens\/__tests__\/AccessActionNotFound.test.tsx|src\/utils\/__tests__\/tournamentExperience.test.ts|src\/utils\/__tests__\/tournamentScoring.test.ts|src\/utils\/__tests__\/tournamentScoringContract.test.ts|src\/utils\/__tests__\/tournamentTabs.test.ts|src\/utils\/__tests__\/tournamentWizard.test.ts|src\/utils\/__tests__\/fixturesSetup.test.ts|src\/screens\/__tests__\/TournamentFixturesSetup.test.tsx/i.
+
+
+## Same list on clean origin/main (a8ff762) minus the 2 new test files, with coverage (before)
+PASS src/utils/__tests__/tournamentWizard.test.ts
+PASS src/utils/__tests__/tournamentTabs.test.ts
+PASS src/api/__tests__/tournaments.test.ts
+PASS src/components/__tests__/KeyboardAwareScreen.test.tsx
+PASS src/screens/__tests__/TournamentScoringScreen.test.tsx
+PASS src/screens/__tests__/TournamentDetailCommittee.test.tsx (6.195 s)
+PASS src/utils/__tests__/tournamentExperience.test.ts
+PASS src/screens/__tests__/AccessRefetchDetails.test.tsx
+PASS src/utils/__tests__/tournamentScoringContract.test.ts
+PASS src/labels/__tests__/LabelsContext.test.tsx
+PASS src/screens/__tests__/AccessActionNotFound.test.tsx (8.125 s)
+PASS src/api/__tests__/tournamentExperienceApi.test.ts
+PASS src/utils/__tests__/tournamentScoring.test.ts
+PASS src/components/scoring/__tests__/ScoringMatchCard.test.tsx
+PASS src/screens/__tests__/TournamentGameView.test.tsx
+PASS src/screens/__tests__/TournamentInvite.test.tsx (6.977 s)
+PASS src/screens/__tests__/TournamentResponses.test.tsx
+PASS src/screens/__tests__/TournamentRespond.test.tsx
+PASS src/components/__tests__/addRemoveGlyphStatic.test.ts
+PASS src/components/__tests__/inviteControlsStatic.test.ts
+PASS src/screens/__tests__/TournamentRegistrationsMenu.test.tsx
+PASS src/screens/__tests__/TournamentDetailScreen.test.tsx
+PASS src/api/__tests__/tournamentWizardApi.test.ts
+PASS src/components/scoring/__tests__/TournamentScoringEntry.test.tsx
+FAIL src/components/__tests__/keyboardInventory.test.ts
+  ● src/screens/ProfileScreen.tsx renders inside KeyboardAwareScreen
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "<KeyboardAwareScreen"
+    Received string:    "/**
+     * Profile screen (Phase 2 revamp, Main.png).
+     *
+     * Visual hierarchy:
+     * - Top cover banner with semi-transparent Edit Profile and Settings buttons
+     * - Centered overlapping avatar (88x88) with display name & @nickname
+     * - (stats strip moved to the Home dashboard)
+     * - Skills card with sport icon and colored level pills
+     * - My groups card with squircle logos/initials and \"View all\" link
+     * - Recent games card with sport icon, date/time, venue and \"View all\" link
+     * - Outlined Log out button with confirmation dialog
+     */
+    import React, { useCallback, useRef, useState } from 'react';
+    import {
+      ActivityIndicator,
+      Alert,
+      Image,
+      Pressable,
+      ScrollView,
+      StyleSheet,
+      Text,
+      View,
+      type AlertButton,
+    } from 'react-native';
+    import FastImage from '@d11/react-native-fast-image';
+    import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+    import { useFocusEffect } from '@react-navigation/native';·
+    import { useAuth } from '../auth/AuthContext';
+    import {
+      getProfile,
+      getProfileSummary,
+      type ProfileSummary,
+    } from '../api/profile';
+    import { getMyGroups } from '../api/groups';
+    import type { Group } from '../types/group';
+    import { getCachedBanners, type BannerFallback } from '../api/home';
+    import { BannerBackground, SportIcon } from '../components/icons/DashboardIcons';
+    import { sportPalette } from '../sports/style';
+    import { useSportVisual } from '../sports/catalog';
+    import { EditIcon } from '../components/icons/ActionIcons';
+    import {
+      ClockIcon,
+      DoorIcon,
+      GearIcon,
+      PinIcon,
+    } from '../components/icons/SharedIcons';
+    import ErrorView from '../components/ErrorView';
+    import LoadingView from '../components/LoadingView';
+    import ScreenContainer from '../components/ScreenContainer';
+    import { useSportDisplayName } from '../utils/labels';
+    import { getDisplayName } from '../utils/displayName';
+    import { useT } from '../labels/LabelsContext';
+    import {
+      borderWidth,
+      colors,
+      radius,
+      spacing,
+      typography,
+    } from '../theme/tokens';
+    import type { SkillLevelValue, UserProfile } from '../types/user';
+    import type { LabelKey } from '../labels/fallbackLabels';
+    import type { ProfileStackParamList } from '../navigation/types';
+    import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
+    import {
+      startSpan,
+      isPerfEnabled,
+      shareLog,
+      perfImageLoadStart,
+      perfImageLoad,
+      perfImageError,
+      setRuntimeFlag,
+    } from '../diagnostics/perfLog';·
+    type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;·
+    function getInitials(name?: string | null): string {
+      if (!name) return '??';
+      const parts = name.trim().split(/\\s+/).filter(Boolean);
+      if (parts.length === 0) return '??';
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }·
+    function formatRecentGameDate(isoString: string): string {
+      try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return '';
+        const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+        const day = d.getDate();
+        const month = d.toLocaleDateString(undefined, { month: 'short' });
+        const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        return `${weekday} ${day} ${month}, ${time}`;
+      } catch {
+        return '';
+      }
+    }·
+    const GROUP_BADGE_COLORS = [
+      colors.primary,
+      colors.success,
+      colors.warning,
+      colors.accentPurple,
+    ];·
+    const LEVEL_LABEL_KEY: Record<SkillLevelValue, LabelKey> = {
+      beginner: 'skill_level.beginner',
+      intermediate: 'skill_level.intermediate',
+      expert: 'skill_level.expert',
+    };·
+    function getLevelTextColor(level?: string | null): string {
+      const normalized = level?.trim().toLowerCase();
+      if (normalized === 'beginner') return colors.warning;
+      if (normalized === 'intermediate') return colors.primary;
+      if (normalized === 'expert') return colors.accentPurple;
+      return colors.textPrimary;
+    }·
+    function getLevelBgColor(level?: string | null): string {
+      const normalized = level?.trim().toLowerCase();
+      if (normalized === 'beginner') return colors.warningLight;
+      if (normalized === 'intermediate') return colors.primaryLight;
+      if (normalized === 'expert') return colors.avatarTint5;
+      return colors.avatarTint1;
+    }·
+    function SkillTileItem({
+      sport,
+      level,
+    }: {
+      sport: string;
+      level: string;
+    }): React.JSX.Element {
+      const t = useT();
+      const sportName = useSportDisplayName(sport);
+      const visual = useSportVisual(sport);
+      const palette = sportPalette(visual.color);
+      const textColor = getLevelTextColor(level);
+      const bgColor = getLevelBgColor(level);
+      const normalized = level.trim().toLowerCase() as SkillLevelValue;
+      const labelKey = LEVEL_LABEL_KEY[normalized];
+      const levelText = labelKey ? t(labelKey) : level;·
+      return (
+        <View style={[styles.skillTile, { backgroundColor: bgColor }]}>
+          <View style={[styles.skillIconCircle, { backgroundColor: palette.chip }]}>
+            <SportIcon iconKey={visual.iconKey} size={20} />
+          </View>
+          <View style={styles.skillTextCol}>
+            <Text numberOfLines={1} style={styles.skillSportName}>
+              {sportName}
+            </Text>
+            <Text style={[styles.skillLevelText, { color: textColor }]}>
+              {levelText}
+            </Text>
+          </View>
+        </View>
+      );
+    }·
+    function GameSportMark({ sport }: { sport: string }): React.JSX.Element {
+      const visual = useSportVisual(sport);
+      const palette = sportPalette(visual.color);
+      return (
+        <View style={[styles.gameSportIconCircle, { backgroundColor: palette.chip }]}>
+          <SportIcon iconKey={visual.iconKey} size={20} />
+        </View>
+      );
+    }·
+    export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
+      const { signOut } = useAuth();
+      const t = useT();·
+      const [profile, setProfile] = useState<UserProfile | null>(null);
+      const [profileSummary, setProfileSummary] = useState<ProfileSummary | null>(null);
+      const [groups, setGroups] = useState<Group[]>([]);
+      const [bannerFallback, setBannerFallback] = useState<BannerFallback | null>(null);
+      const [isLoading, setIsLoading] = useState(true);
+      const [loadError, setLoadError] = useState<string | null>(null);
+      const [isSigningOut, setIsSigningOut] = useState(false);·
+      // ── Perf: render count and screen timing ──────────────────────────────────
+      usePerfRender('ProfileScreen');
+      usePerfScreen('ProfileScreen', isLoading);·
+      // ── Perf: 7-tap diagnostics toggle (Item SWITCH) ──────────────────────────
+      // Tracks taps on the display name within a 3-second window.
+      const tapTimestamps = useRef<number[]>([]);·
+      const handleDisplayNamePress = useCallback((): void => {
+        const now = Date.now();
+        // Keep only taps within the last 3000 ms.
+        tapTimestamps.current = tapTimestamps.current.filter(ts => now - ts < 3000);
+        tapTimestamps.current.push(now);
+        if (tapTimestamps.current.length >= 7) {
+          tapTimestamps.current = [];
+          const enabled = isPerfEnabled();
+          const buttons: AlertButton[] = [
+            {
+              text: enabled ? 'Turn OFF' : 'Turn ON',
+              onPress: () => {
+                setRuntimeFlag(!enabled).catch(() => {});
+              },
+            },
+            {
+              text: 'Close',
+              style: 'cancel',
+            },
+          ];
+          if (enabled) {
+            buttons.splice(1, 0, {
+              text: 'Share log',
+              onPress: () => {
+                shareLog().catch(() => {});
+              },
+            });
+          }
+          Alert.alert(t(enabled ? 'mob.diagnostics.title_on' : 'mob.diagnostics.title_off'), '', buttons);
+        }
+      }, [t]);·
+      const loadData = useCallback(async () => {
+        try {
+          setLoadError(null);
+          // ── Perf: instrument each parallel call with a span ────────────────
+          const profileSpan = startSpan('fetch', { resource: 'getProfile', screen: 'ProfileScreen' });
+          const summarySpan = startSpan('fetch', { resource: 'getProfileSummary', screen: 'ProfileScreen' });
+          const groupsSpan = startSpan('fetch', { resource: 'getMyGroups', screen: 'ProfileScreen' });
+          const bannersSpan = startSpan('fetch', { resource: 'getCachedBanners', screen: 'ProfileScreen' });·
+          const [profileData, summaryData, myGroupsData, bannerData] = await Promise.all([
+            getProfile().then(r => { profileSpan({ result: 'ok' }); return r; }).catch(e => { profileSpan({ result: 'error' }); throw e; }),
+            getProfileSummary().then(r => { summarySpan({ result: 'ok' }); return r; }).catch(() => {
+              summarySpan({ result: 'fallback' });
+              return { games_played: 0, games_hosted: 0, groups_count: 0, recent_games: [] };
+            }),
+            getMyGroups().then(r => { groupsSpan({ result: 'ok' }); return r; }).catch(() => {
+              groupsSpan({ result: 'fallback' });
+              return { items: [], total: 0 };
+            }),
+            getCachedBanners().then(r => { bannersSpan({ result: 'ok' }); return r; }).catch(() => {
+              bannersSpan({ result: 'fallback' });
+              return null;
+            }),
+          ]);
+          setProfile(profileData);
+          setProfileSummary(summaryData);
+          setGroups(myGroupsData.items ?? []);
+          if (bannerData?.fallback) {
+            setBannerFallback(bannerData.fallback);
+          }
+        } catch {
+          setLoadError(t('mob.profile.load_error'));
+        } finally {
+          setIsLoading(false);
+        }
+      }, [t]);·
+      useFocusEffect(
+        useCallback(() => {
+          loadData();
+        }, [loadData]),
+      );·
+      const handleSignOut = async (): Promise<void> => {
+        try {
+          setIsSigningOut(true);
+          await signOut();
+        } catch {
+          setIsSigningOut(false);
+          Alert.alert(t('mob.profile.sign_out'), t('mob.profile.sign_out_error'));
+        }
+      };·
+      const handleLogoutPress = (): void => {
+        Alert.alert(
+          t('mob.profile.logout_confirm_title'),
+          t('mob.profile.logout_confirm_body'),
+          [
+            { text: t('mob.common.cancel'), style: 'cancel' },
+            { text: t('mob.profile.logout'), style: 'destructive', onPress: handleSignOut },
+          ],
+        );
+      };·
+      if (isLoading) {
+        return (
+          <ScreenContainer edges=\"top\">
+            <LoadingView />
+          </ScreenContainer>
+        );
+      }·
+      if (loadError || !profile) {
+        return (
+          <ScreenContainer edges=\"top\">
+            <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadData} />
+          </ScreenContainer>
+        );
+      }·
+      const initials = getInitials(getDisplayName(profile));
+      const coverUrl = profile.cover_url || bannerFallback?.image_url;·
+      return (
+        <ScreenContainer edges=\"top\" style={styles.screen}>
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Cover banner */}
+          <View style={styles.bannerContainer}>
+            {coverUrl ? (
+              <Image
+                source={{ uri: coverUrl }}
+                style={styles.bannerImage}
+                resizeMode=\"cover\"
+                onLoadStart={() => perfImageLoadStart('ProfileScreen', coverUrl, 'cover')}
+                onLoad={event =>
+                  perfImageLoad(
+                    'ProfileScreen',
+                    coverUrl,
+                    'cover',
+                    event.nativeEvent.source.width,
+                    event.nativeEvent.source.height,
+                  )
+                }
+                onError={() => perfImageError('ProfileScreen', coverUrl, 'cover')}
+              />
+            ) : (
+              <View style={styles.bannerFallback}>
+                <BannerBackground width=\"100%\" height=\"100%\" />
+              </View>
+            )}
+          </View>·
+          {/* Identity */}
+          <View style={styles.identityContainer}>
+            <View style={styles.avatarBorder}>
+              {profile.avatar_url ? (
+                <FastImage
+                  source={{ uri: profile.avatar_url }}
+                  style={styles.avatarImage}
+                  onLoadStart={() => perfImageLoadStart('ProfileScreen', profile.avatar_url, 'avatar')}
+                  onLoad={event =>
+                    perfImageLoad(
+                      'ProfileScreen',
+                      profile.avatar_url,
+                      'avatar',
+                      event.nativeEvent.width,
+                      event.nativeEvent.height,
+                    )
+                  }
+                  onError={() => perfImageError('ProfileScreen', profile.avatar_url, 'avatar')}
+                />
+              ) : (
+                <View style={styles.avatarInitials}>
+                  <Text style={styles.avatarInitialsText}>{initials}</Text>
+                </View>
+              )}
+            </View>·
+            <Pressable
+              onPress={handleDisplayNamePress}
+              accessibilityRole=\"text\"
+              accessibilityLabel={getDisplayName(profile)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
+            </Pressable>
+            <Text style={styles.nickname}>@{profile.nickname}</Text>
+          </View>·
+          {/* Main cards */}
+          <View style={styles.cardsContainer}>
+            {/* Skills card */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{t('mob.profile.skills')}</Text>
+              {profile.skill_levels && profile.skill_levels.length > 0 ? (
+                <View style={styles.skillsGrid}>
+                  {profile.skill_levels.map(skill => (
+                    <SkillTileItem
+                      key={skill.sport}
+                      sport={skill.sport}
+                      level={skill.skill_level}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_skills')}</Text>
+              )}
+            </View>·
+            {/* My groups card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>{t('mob.profile.my_groups')}</Text>
+                <Pressable
+                  accessibilityRole=\"button\"
+                  accessibilityLabel={t('mob.dashboard.view_all')}
+                  onPress={() => (navigation.getParent() as any)?.navigate('Groups', { screen: 'GroupsList' })}
+                >
+                  <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+                </Pressable>
+              </View>·
+              {groups.length > 0 ? (
+                <View style={styles.groupsRow}>
+                  {groups.slice(0, 3).map((group, idx) => (
+                    <Pressable
+                      key={group.id}
+                      style={styles.groupItem}
+                      onPress={() =>
+                        (navigation.getParent() as any)?.navigate('Groups', {
+                          screen: 'GroupDetail',
+                          params: { groupId: group.id },
+                        })
+                      }
+                      accessibilityRole=\"button\"
+                      accessibilityLabel={group.name}
+                    >
+                      {group.logo_url ? (
+                        <Image
+                          source={{ uri: group.logo_url }}
+                          style={styles.groupLogo}
+                          resizeMode=\"cover\"
+                          onLoadStart={() =>
+                            perfImageLoadStart('ProfileScreen', group.logo_url, 'group_logo')
+                          }
+                          onLoad={event =>
+                            perfImageLoad(
+                              'ProfileScreen',
+                              group.logo_url,
+                              'group_logo',
+                              event.nativeEvent.source.width,
+                              event.nativeEvent.source.height,
+                            )
+                          }
+                          onError={() => perfImageError('ProfileScreen', group.logo_url, 'group_logo')}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.groupLogoInitials,
+                            { backgroundColor: GROUP_BADGE_COLORS[idx % GROUP_BADGE_COLORS.length] },
+                          ]}
+                        >
+                          <Text style={styles.groupInitialsText}>{getInitials(group.name)}</Text>
+                        </View>
+                      )}
+                      <Text numberOfLines={2} style={styles.groupName}>
+                        {group.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_groups')}</Text>
+              )}
+            </View>·
+            {/* Recent games card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>{t('mob.profile.recent_games')}</Text>
+                <Pressable
+                  accessibilityRole=\"button\"
+                  accessibilityLabel={t('mob.dashboard.view_all')}
+                  onPress={() =>
+                    (navigation.getParent() as any)?.navigate('Tournaments', {
+                      screen: 'TournamentsList',
+                      params: { scope: 'mine' },
+                    })
+                  }
+                >
+                  <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+                </Pressable>
+              </View>·
+              {profileSummary?.recent_games && profileSummary.recent_games.length > 0 ? (
+                <View style={styles.recentGamesList}>
+                  {profileSummary.recent_games.map((game, idx) => (
+                    <View key={game.id}>
+                      {idx > 0 ? <View style={styles.gameDivider} /> : null}
+                      <Pressable
+                        style={styles.gameRow}
+                        onPress={() =>
+                          (navigation.getParent() as any)?.navigate('Home', {
+                            screen: 'EventDetail',
+                            params: { eventId: game.id },
+                          })
+                        }
+                        accessibilityRole=\"button\"
+                        accessibilityLabel={game.title}
+                      >
+                        <GameSportMark sport={game.sport} />
+                        <View style={styles.gameDetailsCol}>
+                          <Text numberOfLines={1} style={styles.gameTitle}>
+                            {game.title}
+                          </Text>
+                          <View style={styles.gameMetaRow}>
+                            <ClockIcon size={14} />
+                            <Text style={styles.gameMetaText}>
+                              {formatRecentGameDate(game.starts_at)}
+                            </Text>
+                            <PinIcon size={14} />
+                            <Text numberOfLines={1} style={styles.gameMetaText}>
+                              {game.venue_name}
+                            </Text>
+                          </View>
+                        </View>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_recent_games')}</Text>
+              )}
+            </View>·
+            {/* Action buttons (Edit Profile and Settings) */}
+            <View style={styles.actionRow}>
+              <Pressable
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('EditProfile')}
+                accessibilityRole=\"button\"
+                accessibilityLabel={t('mob.profile.edit_profile')}
+              >
+                <EditIcon size={18} color={colors.textPrimary} />
+                <Text style={styles.actionButtonText}>{t('mob.profile.edit_profile')}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('Settings')}
+                accessibilityRole=\"button\"
+                accessibilityLabel={t('mob.profile.settings')}
+              >
+                <GearIcon size={18} />
+                <Text style={styles.actionButtonText}>{t('mob.profile.settings')}</Text>
+              </Pressable>
+            </View>·
+            {/* Log out button */}
+            <Pressable
+              style={styles.logoutButton}
+              onPress={handleLogoutPress}
+              disabled={isSigningOut}
+              accessibilityRole=\"button\"
+              accessibilityLabel={t('mob.profile.logout')}
+            >
+              {isSigningOut ? (
+                <ActivityIndicator size=\"small\" color={colors.error} />
+              ) : (
+                <>
+                  <DoorIcon size={20} />
+                  <Text style={styles.logoutButtonText}>{t('mob.profile.logout')}</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+        </ScreenContainer>
+      );
+    }·
+    const styles = StyleSheet.create({
+      screen: {
+        flex: 1,
+        backgroundColor: colors.background,
+      },
+      scrollContent: {
+        paddingBottom: spacing.xxl + spacing.lg,
+      },
+      bannerContainer: {
+        height: 160,
+        backgroundColor: colors.primary,
+        position: 'relative',
+        overflow: 'hidden',
+      },
+      bannerImage: {
+        width: '100%',
+        height: '100%',
+      },
+      bannerFallback: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: colors.primary,
+      },
+      actionRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginTop: spacing.md,
+      },
+      actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.xs,
+        paddingVertical: 14,
+        backgroundColor: colors.surface,
+        borderWidth: borderWidth.thin,
+        borderColor: colors.border,
+        borderRadius: radius.lg,
+      },
+      actionButtonText: {
+        ...typography.button,
+        color: colors.textPrimary,
+      },
+      identityContainer: {
+        alignItems: 'center',
+        marginTop: -44,
+        marginBottom: spacing.md,
+      },
+      avatarBorder: {
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        borderWidth: 3,
+        borderColor: colors.surface,
+        backgroundColor: colors.surface,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      avatarImage: {
+        width: 82,
+        height: 82,
+        borderRadius: 41,
+      },
+      avatarInitials: {
+        width: 82,
+        height: 82,
+        borderRadius: 41,
+        backgroundColor: colors.avatarTint1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      avatarInitialsText: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: colors.avatarTintText1,
+      },
+      displayName: {
+        ...typography.h2,
+        color: colors.textPrimary,
+        marginTop: spacing.sm,
+      },
+      nickname: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: 2,
+      },
+      cardsContainer: {
+        paddingHorizontal: spacing.md,
+        gap: spacing.md,
+      },
+      card: {
+        backgroundColor: colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: borderWidth.thin,
+        borderColor: colors.border,
+        padding: spacing.md,
+      },
+      cardTitle: {
+        ...typography.h3,
+        color: colors.textPrimary,
+      },
+      cardHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+      },
+      viewAllLink: {
+        ...typography.label,
+        color: colors.primary,
+      },
+      skillsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        marginTop: spacing.sm,
+      },
+      skillTile: {
+        flexGrow: 1,
+        flexBasis: '45%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: radius.md,
+        padding: spacing.sm,
+        gap: spacing.sm,
+      },
+      skillIconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      skillTextCol: {
+        flex: 1,
+      },
+      skillSportName: {
+        ...typography.bodyBold,
+        color: colors.textPrimary,
+        fontSize: 14,
+      },
+      skillLevelText: {
+        ...typography.caption,
+        fontWeight: '600',
+        marginTop: 1,
+      },
+      groupsRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginTop: spacing.xs,
+      },
+      groupItem: {
+        alignItems: 'center',
+        width: 72,
+      },
+      groupLogo: {
+        width: 56,
+        height: 56,
+        borderRadius: radius.lg,
+      },
+      groupLogoInitials: {
+        width: 56,
+        height: 56,
+        borderRadius: radius.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      groupInitialsText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.white,
+      },
+      groupName: {
+        ...typography.label,
+        color: colors.textPrimary,
+        textAlign: 'center',
+        marginTop: 6,
+      },
+      recentGamesList: {
+        marginTop: spacing.xs,
+      },
+      gameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingVertical: spacing.xs,
+      },
+      gameDivider: {
+        height: borderWidth.thin,
+        backgroundColor: colors.border,
+        marginVertical: spacing.xs,
+      },
+      gameSportIconCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.avatarTint1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      gameDetailsCol: {
+        flex: 1,
+      },
+      gameTitle: {
+        ...typography.bodyBold,
+        color: colors.textPrimary,
+      },
+      gameMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        marginTop: 3,
+      },
+      gameMetaText: {
+        ...typography.caption,
+        color: colors.textSecondary,
+        marginRight: spacing.xs,
+      },
+      logoutButton: {
+        borderWidth: 1.5,
+        borderColor: colors.error,
+        borderRadius: radius.full,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: spacing.sm,
+        backgroundColor: colors.surface,
+        marginTop: spacing.xs,
+      },
+      logoutButtonText: {
+        ...typography.button,
+        color: colors.error,
+      },
+      emptyText: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: spacing.xs,
+      },
+    });
+    "
+
+      54 |
+      55 | it.each(INPUT_SCREENS)('%s renders inside KeyboardAwareScreen', path => {
+    > 56 |   expect(read(path)).toContain('<KeyboardAwareScreen');
+         |                      ^
+      57 | });
+      58 |
+      59 | it('every file that renders a TextField is a listed screen or a listed shared input component', () => {
+
+      at toContain (src/components/__tests__/keyboardInventory.test.ts:56:22)
+
+  ● every file that renders a TextField is a listed screen or a listed shared input component
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 5
+
+    - Array []
+    + Array [
+    +   "src/components/tournament/wizard/BasicsStep.tsx",
+    +   "src/components/tournament/wizard/VisibilityStep.tsx",
+    +   "src/components/tournament/wizard/WhenWhereStep.tsx",
+    + ]
+
+      60 |   const rendering = files.filter(path => /<TextField\b/.test(read(path)));
+      61 |   const allowed = new Set([...INPUT_SCREENS, ...SHARED_INPUT_COMPONENTS]);
+    > 62 |   expect(rendering.filter(path => !allowed.has(path))).toEqual([]);
+         |                                                        ^
+      63 | });
+      64 |
+      65 | it('only KeyboardAwareScreen uses KeyboardAvoidingView', () => {
+
+      at Object.toEqual (src/components/__tests__/keyboardInventory.test.ts:62:56)
+
+  ● only TextField renders a bare TextInput
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  0
+    + Received  + 10
+
+      Array [
+    +   "src/components/GroupMultiSelect.tsx",
+    +   "src/components/NumberField.tsx",
+        "src/components/TextField.tsx",
+    +   "src/components/venue/OthersVenueModal.tsx",
+    +   "src/components/venue/VenueDetailCard.tsx",
+    +   "src/components/venue/VenuePicker.tsx",
+    +   "src/screens/AccountDeletionCodeScreen.tsx",
+    +   "src/screens/CreateGameScreen.tsx",
+    +   "src/screens/EditProfileScreen.tsx",
+    +   "src/screens/EventDetailScreen.tsx",
+    +   "src/screens/TransferGroupOwnershipScreen.tsx",
+      ]
+
+      70 | it('only TextField renders a bare TextInput', () => {
+      71 |   const users = files.filter(path => /(^|\n)\s*<TextInput\b/.test(read(path)));
+    > 72 |   expect(users).toEqual(['src/components/TextField.tsx']);
+         |                 ^
+      73 | });
+      74 |
+
+      at Object.toEqual (src/components/__tests__/keyboardInventory.test.ts:72:17)
+
+PASS src/screens/__tests__/TournamentShare.test.tsx
+  ● Console
+
+    console.warn
+      Clipboard has been extracted from react-native core and will be removed in a future release. It can now be installed and imported from '@react-native-clipboard/clipboard' instead of 'react-native'. See https://github.com/react-native-clipboard/clipboard
+
+      42 |     expect(has(root, 'Copy Link')).toBe(true);
+      43 |
+    > 44 |     const setString = jest.spyOn(Clipboard, 'setString');
+         |                                  ^
+      45 |     await act(async () => pressableLabelled(root, 'Copy Link').props.onPress());
+      46 |     expect(setString).toHaveBeenCalledWith(getShareUrl());
+      47 |
+
+      at warn (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/react-native/Libraries/Utilities/warnOnce.js:27:11)
+      at Object.warnOnce [as Clipboard] (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/react-native/index.js:218:5)
+      at Object.Clipboard (src/screens/__tests__/TournamentShare.test.tsx:44:34)
+      at asyncGeneratorStep (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS src/screens/__tests__/TournamentDetailV2.test.tsx (9.62 s)
+PASS src/screens/__tests__/TournamentWizardScreen.test.tsx (9.772 s)
+PASS src/screens/__tests__/TournamentTabBodies.test.tsx (9.875 s)
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+-------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------------------------------------------------------------------------
+File                           | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                                                                                              
+-------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------------------------------------------------------------------------
+All files                      |   86.56 |    75.68 |   85.12 |   86.31 |                                                                                                                                                
+ api                           |   88.37 |    88.65 |   93.02 |   88.23 |                                                                                                                                                
+  tournaments.ts               |   88.37 |    88.65 |   93.02 |   88.23 | 320,439,479-482,503-534                                                                                                                        
+ components/tournament/v2      |   91.62 |    84.48 |   81.81 |      92 |                                                                                                                                                
+  LockedPreview.tsx            |     100 |      100 |     100 |     100 |                                                                                                                                                
+  PeopleSheet.tsx              |     100 |      100 |     100 |     100 |                                                                                                                                                
+  StatusStrip.tsx              |     100 |    96.77 |     100 |     100 | 101                                                                                                                                            
+  TournamentDetailV2.tsx       |    88.4 |    85.07 |      80 |   88.05 | 127,133,142-143,151,228,235,271                                                                                                                
+  TournamentHeader.tsx         |   88.88 |    63.63 |   66.66 |   88.88 | 41,130                                                                                                                                         
+  TournamentOverview.tsx       |    90.9 |     81.9 |   76.92 |   92.45 | 168,190,194-200                                                                                                                                
+  TournamentTabs.tsx           |     100 |      100 |     100 |     100 |                                                                                                                                                
+ components/tournament/v2/tabs |   85.74 |     68.4 |   80.92 |   85.82 |                                                                                                                                                
+  ApprovalsTab.tsx             |   86.74 |    64.77 |   92.85 |   85.33 | 54,61,85,124,234-243                                                                                                                           
+  CloseSheet.tsx               |   79.31 |       44 |   60.86 |   78.84 | 62,79-81,91,134,153-173                                                                                                                        
+  FixturesTab.tsx              |   92.45 |    90.74 |   78.57 |   92.45 | 198-217,225-226                                                                                                                                
+  KnockoutBracket.tsx          |   86.66 |    76.92 |      80 |   86.66 | 36,71                                                                                                                                          
+  MediaTab.tsx                 |   88.88 |    63.88 |   88.23 |      90 | 43,57,68,97,149                                                                                                                                
+  ParticipantsTab.tsx          |   90.24 |    83.87 |   81.25 |   89.18 | 71,166-177                                                                                                                                     
+  ResultsTab.tsx               |   87.09 |    71.42 |      80 |   86.66 | 66,70,90,108                                                                                                                                   
+  ScoreSheet.tsx               |   83.48 |     61.4 |   83.87 |      82 | 112-121,134-135,163-164,268-325                                                                                                                
+  StandingsTab.tsx             |   91.66 |    60.71 |     100 |   91.66 | 29                                                                                                                                             
+  matchLabels.ts               |   52.17 |    37.93 |      50 |   57.14 | 13,24-29,41-46                                                                                                                                 
+  parts.tsx                    |     100 |      100 |     100 |     100 |                                                                                                                                                
+  useStandingsBoard.ts         |   93.47 |    80.95 |   84.61 |   97.56 | 63                                                                                                                                             
+ screens                       |   74.84 |    70.99 |   66.66 |   74.51 |                                                                                                                                                
+  TournamentDetailScreen.tsx   |   74.84 |    70.99 |   66.66 |   74.51 | 207,221,268-271,298,305,349,362,371,378-381,435,448-449,461-462,467-476,484-505,515-516,520,527,544-617,641-644,758-773,858-869,1024,1068-1101 
+ utils                         |      94 |    80.07 |   96.42 |   93.75 |                                                                                                                                                
+  tournamentScoring.ts         |   97.29 |    96.74 |     100 |   96.96 | 86,106,132                                                                                                                                     
+  tournamentTabs.ts            |   92.81 |    75.06 |   95.32 |   92.56 | 254,634-640,654-659,707,761,765,771,796-797,845-848                                                                                            
+-------------------------------|---------|----------|---------|---------|------------------------------------------------------------------------------------------------------------------------------------------------
+
+Summary of all failing tests
+FAIL src/components/__tests__/keyboardInventory.test.ts
+  ● src/screens/ProfileScreen.tsx renders inside KeyboardAwareScreen
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "<KeyboardAwareScreen"
+    Received string:    "/**
+     * Profile screen (Phase 2 revamp, Main.png).
+     *
+     * Visual hierarchy:
+     * - Top cover banner with semi-transparent Edit Profile and Settings buttons
+     * - Centered overlapping avatar (88x88) with display name & @nickname
+     * - (stats strip moved to the Home dashboard)
+     * - Skills card with sport icon and colored level pills
+     * - My groups card with squircle logos/initials and \"View all\" link
+     * - Recent games card with sport icon, date/time, venue and \"View all\" link
+     * - Outlined Log out button with confirmation dialog
+     */
+    import React, { useCallback, useRef, useState } from 'react';
+    import {
+      ActivityIndicator,
+      Alert,
+      Image,
+      Pressable,
+      ScrollView,
+      StyleSheet,
+      Text,
+      View,
+      type AlertButton,
+    } from 'react-native';
+    import FastImage from '@d11/react-native-fast-image';
+    import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+    import { useFocusEffect } from '@react-navigation/native';·
+    import { useAuth } from '../auth/AuthContext';
+    import {
+      getProfile,
+      getProfileSummary,
+      type ProfileSummary,
+    } from '../api/profile';
+    import { getMyGroups } from '../api/groups';
+    import type { Group } from '../types/group';
+    import { getCachedBanners, type BannerFallback } from '../api/home';
+    import { BannerBackground, SportIcon } from '../components/icons/DashboardIcons';
+    import { sportPalette } from '../sports/style';
+    import { useSportVisual } from '../sports/catalog';
+    import { EditIcon } from '../components/icons/ActionIcons';
+    import {
+      ClockIcon,
+      DoorIcon,
+      GearIcon,
+      PinIcon,
+    } from '../components/icons/SharedIcons';
+    import ErrorView from '../components/ErrorView';
+    import LoadingView from '../components/LoadingView';
+    import ScreenContainer from '../components/ScreenContainer';
+    import { useSportDisplayName } from '../utils/labels';
+    import { getDisplayName } from '../utils/displayName';
+    import { useT } from '../labels/LabelsContext';
+    import {
+      borderWidth,
+      colors,
+      radius,
+      spacing,
+      typography,
+    } from '../theme/tokens';
+    import type { SkillLevelValue, UserProfile } from '../types/user';
+    import type { LabelKey } from '../labels/fallbackLabels';
+    import type { ProfileStackParamList } from '../navigation/types';
+    import { usePerfRender, usePerfScreen } from '../hooks/usePerfScreen';
+    import {
+      startSpan,
+      isPerfEnabled,
+      shareLog,
+      perfImageLoadStart,
+      perfImageLoad,
+      perfImageError,
+      setRuntimeFlag,
+    } from '../diagnostics/perfLog';·
+    type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileHome'>;·
+    function getInitials(name?: string | null): string {
+      if (!name) return '??';
+      const parts = name.trim().split(/\\s+/).filter(Boolean);
+      if (parts.length === 0) return '??';
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }·
+    function formatRecentGameDate(isoString: string): string {
+      try {
+        const d = new Date(isoString);
+        if (isNaN(d.getTime())) return '';
+        const weekday = d.toLocaleDateString(undefined, { weekday: 'short' });
+        const day = d.getDate();
+        const month = d.toLocaleDateString(undefined, { month: 'short' });
+        const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        return `${weekday} ${day} ${month}, ${time}`;
+      } catch {
+        return '';
+      }
+    }·
+    const GROUP_BADGE_COLORS = [
+      colors.primary,
+      colors.success,
+      colors.warning,
+      colors.accentPurple,
+    ];·
+    const LEVEL_LABEL_KEY: Record<SkillLevelValue, LabelKey> = {
+      beginner: 'skill_level.beginner',
+      intermediate: 'skill_level.intermediate',
+      expert: 'skill_level.expert',
+    };·
+    function getLevelTextColor(level?: string | null): string {
+      const normalized = level?.trim().toLowerCase();
+      if (normalized === 'beginner') return colors.warning;
+      if (normalized === 'intermediate') return colors.primary;
+      if (normalized === 'expert') return colors.accentPurple;
+      return colors.textPrimary;
+    }·
+    function getLevelBgColor(level?: string | null): string {
+      const normalized = level?.trim().toLowerCase();
+      if (normalized === 'beginner') return colors.warningLight;
+      if (normalized === 'intermediate') return colors.primaryLight;
+      if (normalized === 'expert') return colors.avatarTint5;
+      return colors.avatarTint1;
+    }·
+    function SkillTileItem({
+      sport,
+      level,
+    }: {
+      sport: string;
+      level: string;
+    }): React.JSX.Element {
+      const t = useT();
+      const sportName = useSportDisplayName(sport);
+      const visual = useSportVisual(sport);
+      const palette = sportPalette(visual.color);
+      const textColor = getLevelTextColor(level);
+      const bgColor = getLevelBgColor(level);
+      const normalized = level.trim().toLowerCase() as SkillLevelValue;
+      const labelKey = LEVEL_LABEL_KEY[normalized];
+      const levelText = labelKey ? t(labelKey) : level;·
+      return (
+        <View style={[styles.skillTile, { backgroundColor: bgColor }]}>
+          <View style={[styles.skillIconCircle, { backgroundColor: palette.chip }]}>
+            <SportIcon iconKey={visual.iconKey} size={20} />
+          </View>
+          <View style={styles.skillTextCol}>
+            <Text numberOfLines={1} style={styles.skillSportName}>
+              {sportName}
+            </Text>
+            <Text style={[styles.skillLevelText, { color: textColor }]}>
+              {levelText}
+            </Text>
+          </View>
+        </View>
+      );
+    }·
+    function GameSportMark({ sport }: { sport: string }): React.JSX.Element {
+      const visual = useSportVisual(sport);
+      const palette = sportPalette(visual.color);
+      return (
+        <View style={[styles.gameSportIconCircle, { backgroundColor: palette.chip }]}>
+          <SportIcon iconKey={visual.iconKey} size={20} />
+        </View>
+      );
+    }·
+    export default function ProfileScreen({ navigation }: Props): React.JSX.Element {
+      const { signOut } = useAuth();
+      const t = useT();·
+      const [profile, setProfile] = useState<UserProfile | null>(null);
+      const [profileSummary, setProfileSummary] = useState<ProfileSummary | null>(null);
+      const [groups, setGroups] = useState<Group[]>([]);
+      const [bannerFallback, setBannerFallback] = useState<BannerFallback | null>(null);
+      const [isLoading, setIsLoading] = useState(true);
+      const [loadError, setLoadError] = useState<string | null>(null);
+      const [isSigningOut, setIsSigningOut] = useState(false);·
+      // ── Perf: render count and screen timing ──────────────────────────────────
+      usePerfRender('ProfileScreen');
+      usePerfScreen('ProfileScreen', isLoading);·
+      // ── Perf: 7-tap diagnostics toggle (Item SWITCH) ──────────────────────────
+      // Tracks taps on the display name within a 3-second window.
+      const tapTimestamps = useRef<number[]>([]);·
+      const handleDisplayNamePress = useCallback((): void => {
+        const now = Date.now();
+        // Keep only taps within the last 3000 ms.
+        tapTimestamps.current = tapTimestamps.current.filter(ts => now - ts < 3000);
+        tapTimestamps.current.push(now);
+        if (tapTimestamps.current.length >= 7) {
+          tapTimestamps.current = [];
+          const enabled = isPerfEnabled();
+          const buttons: AlertButton[] = [
+            {
+              text: enabled ? 'Turn OFF' : 'Turn ON',
+              onPress: () => {
+                setRuntimeFlag(!enabled).catch(() => {});
+              },
+            },
+            {
+              text: 'Close',
+              style: 'cancel',
+            },
+          ];
+          if (enabled) {
+            buttons.splice(1, 0, {
+              text: 'Share log',
+              onPress: () => {
+                shareLog().catch(() => {});
+              },
+            });
+          }
+          Alert.alert(t(enabled ? 'mob.diagnostics.title_on' : 'mob.diagnostics.title_off'), '', buttons);
+        }
+      }, [t]);·
+      const loadData = useCallback(async () => {
+        try {
+          setLoadError(null);
+          // ── Perf: instrument each parallel call with a span ────────────────
+          const profileSpan = startSpan('fetch', { resource: 'getProfile', screen: 'ProfileScreen' });
+          const summarySpan = startSpan('fetch', { resource: 'getProfileSummary', screen: 'ProfileScreen' });
+          const groupsSpan = startSpan('fetch', { resource: 'getMyGroups', screen: 'ProfileScreen' });
+          const bannersSpan = startSpan('fetch', { resource: 'getCachedBanners', screen: 'ProfileScreen' });·
+          const [profileData, summaryData, myGroupsData, bannerData] = await Promise.all([
+            getProfile().then(r => { profileSpan({ result: 'ok' }); return r; }).catch(e => { profileSpan({ result: 'error' }); throw e; }),
+            getProfileSummary().then(r => { summarySpan({ result: 'ok' }); return r; }).catch(() => {
+              summarySpan({ result: 'fallback' });
+              return { games_played: 0, games_hosted: 0, groups_count: 0, recent_games: [] };
+            }),
+            getMyGroups().then(r => { groupsSpan({ result: 'ok' }); return r; }).catch(() => {
+              groupsSpan({ result: 'fallback' });
+              return { items: [], total: 0 };
+            }),
+            getCachedBanners().then(r => { bannersSpan({ result: 'ok' }); return r; }).catch(() => {
+              bannersSpan({ result: 'fallback' });
+              return null;
+            }),
+          ]);
+          setProfile(profileData);
+          setProfileSummary(summaryData);
+          setGroups(myGroupsData.items ?? []);
+          if (bannerData?.fallback) {
+            setBannerFallback(bannerData.fallback);
+          }
+        } catch {
+          setLoadError(t('mob.profile.load_error'));
+        } finally {
+          setIsLoading(false);
+        }
+      }, [t]);·
+      useFocusEffect(
+        useCallback(() => {
+          loadData();
+        }, [loadData]),
+      );·
+      const handleSignOut = async (): Promise<void> => {
+        try {
+          setIsSigningOut(true);
+          await signOut();
+        } catch {
+          setIsSigningOut(false);
+          Alert.alert(t('mob.profile.sign_out'), t('mob.profile.sign_out_error'));
+        }
+      };·
+      const handleLogoutPress = (): void => {
+        Alert.alert(
+          t('mob.profile.logout_confirm_title'),
+          t('mob.profile.logout_confirm_body'),
+          [
+            { text: t('mob.common.cancel'), style: 'cancel' },
+            { text: t('mob.profile.logout'), style: 'destructive', onPress: handleSignOut },
+          ],
+        );
+      };·
+      if (isLoading) {
+        return (
+          <ScreenContainer edges=\"top\">
+            <LoadingView />
+          </ScreenContainer>
+        );
+      }·
+      if (loadError || !profile) {
+        return (
+          <ScreenContainer edges=\"top\">
+            <ErrorView message={loadError ?? t('mob.profile.not_found')} onRetry={loadData} />
+          </ScreenContainer>
+        );
+      }·
+      const initials = getInitials(getDisplayName(profile));
+      const coverUrl = profile.cover_url || bannerFallback?.image_url;·
+      return (
+        <ScreenContainer edges=\"top\" style={styles.screen}>
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Cover banner */}
+          <View style={styles.bannerContainer}>
+            {coverUrl ? (
+              <Image
+                source={{ uri: coverUrl }}
+                style={styles.bannerImage}
+                resizeMode=\"cover\"
+                onLoadStart={() => perfImageLoadStart('ProfileScreen', coverUrl, 'cover')}
+                onLoad={event =>
+                  perfImageLoad(
+                    'ProfileScreen',
+                    coverUrl,
+                    'cover',
+                    event.nativeEvent.source.width,
+                    event.nativeEvent.source.height,
+                  )
+                }
+                onError={() => perfImageError('ProfileScreen', coverUrl, 'cover')}
+              />
+            ) : (
+              <View style={styles.bannerFallback}>
+                <BannerBackground width=\"100%\" height=\"100%\" />
+              </View>
+            )}
+          </View>·
+          {/* Identity */}
+          <View style={styles.identityContainer}>
+            <View style={styles.avatarBorder}>
+              {profile.avatar_url ? (
+                <FastImage
+                  source={{ uri: profile.avatar_url }}
+                  style={styles.avatarImage}
+                  onLoadStart={() => perfImageLoadStart('ProfileScreen', profile.avatar_url, 'avatar')}
+                  onLoad={event =>
+                    perfImageLoad(
+                      'ProfileScreen',
+                      profile.avatar_url,
+                      'avatar',
+                      event.nativeEvent.width,
+                      event.nativeEvent.height,
+                    )
+                  }
+                  onError={() => perfImageError('ProfileScreen', profile.avatar_url, 'avatar')}
+                />
+              ) : (
+                <View style={styles.avatarInitials}>
+                  <Text style={styles.avatarInitialsText}>{initials}</Text>
+                </View>
+              )}
+            </View>·
+            <Pressable
+              onPress={handleDisplayNamePress}
+              accessibilityRole=\"text\"
+              accessibilityLabel={getDisplayName(profile)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.displayName}>{getDisplayName(profile)}</Text>
+            </Pressable>
+            <Text style={styles.nickname}>@{profile.nickname}</Text>
+          </View>·
+          {/* Main cards */}
+          <View style={styles.cardsContainer}>
+            {/* Skills card */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{t('mob.profile.skills')}</Text>
+              {profile.skill_levels && profile.skill_levels.length > 0 ? (
+                <View style={styles.skillsGrid}>
+                  {profile.skill_levels.map(skill => (
+                    <SkillTileItem
+                      key={skill.sport}
+                      sport={skill.sport}
+                      level={skill.skill_level}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_skills')}</Text>
+              )}
+            </View>·
+            {/* My groups card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>{t('mob.profile.my_groups')}</Text>
+                <Pressable
+                  accessibilityRole=\"button\"
+                  accessibilityLabel={t('mob.dashboard.view_all')}
+                  onPress={() => (navigation.getParent() as any)?.navigate('Groups', { screen: 'GroupsList' })}
+                >
+                  <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+                </Pressable>
+              </View>·
+              {groups.length > 0 ? (
+                <View style={styles.groupsRow}>
+                  {groups.slice(0, 3).map((group, idx) => (
+                    <Pressable
+                      key={group.id}
+                      style={styles.groupItem}
+                      onPress={() =>
+                        (navigation.getParent() as any)?.navigate('Groups', {
+                          screen: 'GroupDetail',
+                          params: { groupId: group.id },
+                        })
+                      }
+                      accessibilityRole=\"button\"
+                      accessibilityLabel={group.name}
+                    >
+                      {group.logo_url ? (
+                        <Image
+                          source={{ uri: group.logo_url }}
+                          style={styles.groupLogo}
+                          resizeMode=\"cover\"
+                          onLoadStart={() =>
+                            perfImageLoadStart('ProfileScreen', group.logo_url, 'group_logo')
+                          }
+                          onLoad={event =>
+                            perfImageLoad(
+                              'ProfileScreen',
+                              group.logo_url,
+                              'group_logo',
+                              event.nativeEvent.source.width,
+                              event.nativeEvent.source.height,
+                            )
+                          }
+                          onError={() => perfImageError('ProfileScreen', group.logo_url, 'group_logo')}
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.groupLogoInitials,
+                            { backgroundColor: GROUP_BADGE_COLORS[idx % GROUP_BADGE_COLORS.length] },
+                          ]}
+                        >
+                          <Text style={styles.groupInitialsText}>{getInitials(group.name)}</Text>
+                        </View>
+                      )}
+                      <Text numberOfLines={2} style={styles.groupName}>
+                        {group.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_groups')}</Text>
+              )}
+            </View>·
+            {/* Recent games card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardTitle}>{t('mob.profile.recent_games')}</Text>
+                <Pressable
+                  accessibilityRole=\"button\"
+                  accessibilityLabel={t('mob.dashboard.view_all')}
+                  onPress={() =>
+                    (navigation.getParent() as any)?.navigate('Tournaments', {
+                      screen: 'TournamentsList',
+                      params: { scope: 'mine' },
+                    })
+                  }
+                >
+                  <Text style={styles.viewAllLink}>{t('mob.dashboard.view_all')}</Text>
+                </Pressable>
+              </View>·
+              {profileSummary?.recent_games && profileSummary.recent_games.length > 0 ? (
+                <View style={styles.recentGamesList}>
+                  {profileSummary.recent_games.map((game, idx) => (
+                    <View key={game.id}>
+                      {idx > 0 ? <View style={styles.gameDivider} /> : null}
+                      <Pressable
+                        style={styles.gameRow}
+                        onPress={() =>
+                          (navigation.getParent() as any)?.navigate('Home', {
+                            screen: 'EventDetail',
+                            params: { eventId: game.id },
+                          })
+                        }
+                        accessibilityRole=\"button\"
+                        accessibilityLabel={game.title}
+                      >
+                        <GameSportMark sport={game.sport} />
+                        <View style={styles.gameDetailsCol}>
+                          <Text numberOfLines={1} style={styles.gameTitle}>
+                            {game.title}
+                          </Text>
+                          <View style={styles.gameMetaRow}>
+                            <ClockIcon size={14} />
+                            <Text style={styles.gameMetaText}>
+                              {formatRecentGameDate(game.starts_at)}
+                            </Text>
+                            <PinIcon size={14} />
+                            <Text numberOfLines={1} style={styles.gameMetaText}>
+                              {game.venue_name}
+                            </Text>
+                          </View>
+                        </View>
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>{t('mob.profile.no_recent_games')}</Text>
+              )}
+            </View>·
+            {/* Action buttons (Edit Profile and Settings) */}
+            <View style={styles.actionRow}>
+              <Pressable
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('EditProfile')}
+                accessibilityRole=\"button\"
+                accessibilityLabel={t('mob.profile.edit_profile')}
+              >
+                <EditIcon size={18} color={colors.textPrimary} />
+                <Text style={styles.actionButtonText}>{t('mob.profile.edit_profile')}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.actionButton}
+                onPress={() => navigation.navigate('Settings')}
+                accessibilityRole=\"button\"
+                accessibilityLabel={t('mob.profile.settings')}
+              >
+                <GearIcon size={18} />
+                <Text style={styles.actionButtonText}>{t('mob.profile.settings')}</Text>
+              </Pressable>
+            </View>·
+            {/* Log out button */}
+            <Pressable
+              style={styles.logoutButton}
+              onPress={handleLogoutPress}
+              disabled={isSigningOut}
+              accessibilityRole=\"button\"
+              accessibilityLabel={t('mob.profile.logout')}
+            >
+              {isSigningOut ? (
+                <ActivityIndicator size=\"small\" color={colors.error} />
+              ) : (
+                <>
+                  <DoorIcon size={20} />
+                  <Text style={styles.logoutButtonText}>{t('mob.profile.logout')}</Text>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+        </ScreenContainer>
+      );
+    }·
+    const styles = StyleSheet.create({
+      screen: {
+        flex: 1,
+        backgroundColor: colors.background,
+      },
+      scrollContent: {
+        paddingBottom: spacing.xxl + spacing.lg,
+      },
+      bannerContainer: {
+        height: 160,
+        backgroundColor: colors.primary,
+        position: 'relative',
+        overflow: 'hidden',
+      },
+      bannerImage: {
+        width: '100%',
+        height: '100%',
+      },
+      bannerFallback: {
+        width: '100%',
+        height: '100%',
+        backgroundColor: colors.primary,
+      },
+      actionRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginTop: spacing.md,
+      },
+      actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.xs,
+        paddingVertical: 14,
+        backgroundColor: colors.surface,
+        borderWidth: borderWidth.thin,
+        borderColor: colors.border,
+        borderRadius: radius.lg,
+      },
+      actionButtonText: {
+        ...typography.button,
+        color: colors.textPrimary,
+      },
+      identityContainer: {
+        alignItems: 'center',
+        marginTop: -44,
+        marginBottom: spacing.md,
+      },
+      avatarBorder: {
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        borderWidth: 3,
+        borderColor: colors.surface,
+        backgroundColor: colors.surface,
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      avatarImage: {
+        width: 82,
+        height: 82,
+        borderRadius: 41,
+      },
+      avatarInitials: {
+        width: 82,
+        height: 82,
+        borderRadius: 41,
+        backgroundColor: colors.avatarTint1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      avatarInitialsText: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: colors.avatarTintText1,
+      },
+      displayName: {
+        ...typography.h2,
+        color: colors.textPrimary,
+        marginTop: spacing.sm,
+      },
+      nickname: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: 2,
+      },
+      cardsContainer: {
+        paddingHorizontal: spacing.md,
+        gap: spacing.md,
+      },
+      card: {
+        backgroundColor: colors.surface,
+        borderRadius: radius.lg,
+        borderWidth: borderWidth.thin,
+        borderColor: colors.border,
+        padding: spacing.md,
+      },
+      cardTitle: {
+        ...typography.h3,
+        color: colors.textPrimary,
+      },
+      cardHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.sm,
+      },
+      viewAllLink: {
+        ...typography.label,
+        color: colors.primary,
+      },
+      skillsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        marginTop: spacing.sm,
+      },
+      skillTile: {
+        flexGrow: 1,
+        flexBasis: '45%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: radius.md,
+        padding: spacing.sm,
+        gap: spacing.sm,
+      },
+      skillIconCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      skillTextCol: {
+        flex: 1,
+      },
+      skillSportName: {
+        ...typography.bodyBold,
+        color: colors.textPrimary,
+        fontSize: 14,
+      },
+      skillLevelText: {
+        ...typography.caption,
+        fontWeight: '600',
+        marginTop: 1,
+      },
+      groupsRow: {
+        flexDirection: 'row',
+        gap: spacing.md,
+        marginTop: spacing.xs,
+      },
+      groupItem: {
+        alignItems: 'center',
+        width: 72,
+      },
+      groupLogo: {
+        width: 56,
+        height: 56,
+        borderRadius: radius.lg,
+      },
+      groupLogoInitials: {
+        width: 56,
+        height: 56,
+        borderRadius: radius.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      groupInitialsText: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.white,
+      },
+      groupName: {
+        ...typography.label,
+        color: colors.textPrimary,
+        textAlign: 'center',
+        marginTop: 6,
+      },
+      recentGamesList: {
+        marginTop: spacing.xs,
+      },
+      gameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingVertical: spacing.xs,
+      },
+      gameDivider: {
+        height: borderWidth.thin,
+        backgroundColor: colors.border,
+        marginVertical: spacing.xs,
+      },
+      gameSportIconCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: colors.avatarTint1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      gameDetailsCol: {
+        flex: 1,
+      },
+      gameTitle: {
+        ...typography.bodyBold,
+        color: colors.textPrimary,
+      },
+      gameMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        marginTop: 3,
+      },
+      gameMetaText: {
+        ...typography.caption,
+        color: colors.textSecondary,
+        marginRight: spacing.xs,
+      },
+      logoutButton: {
+        borderWidth: 1.5,
+        borderColor: colors.error,
+        borderRadius: radius.full,
+        paddingVertical: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+        gap: spacing.sm,
+        backgroundColor: colors.surface,
+        marginTop: spacing.xs,
+      },
+      logoutButtonText: {
+        ...typography.button,
+        color: colors.error,
+      },
+      emptyText: {
+        ...typography.body,
+        color: colors.textSecondary,
+        marginTop: spacing.xs,
+      },
+    });
+    "
+
+      54 |
+      55 | it.each(INPUT_SCREENS)('%s renders inside KeyboardAwareScreen', path => {
+    > 56 |   expect(read(path)).toContain('<KeyboardAwareScreen');
+         |                      ^
+      57 | });
+      58 |
+      59 | it('every file that renders a TextField is a listed screen or a listed shared input component', () => {
+
+      at toContain (src/components/__tests__/keyboardInventory.test.ts:56:22)
+
+  ● every file that renders a TextField is a listed screen or a listed shared input component
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 5
+
+    - Array []
+    + Array [
+    +   "src/components/tournament/wizard/BasicsStep.tsx",
+    +   "src/components/tournament/wizard/VisibilityStep.tsx",
+    +   "src/components/tournament/wizard/WhenWhereStep.tsx",
+    + ]
+
+      60 |   const rendering = files.filter(path => /<TextField\b/.test(read(path)));
+      61 |   const allowed = new Set([...INPUT_SCREENS, ...SHARED_INPUT_COMPONENTS]);
+    > 62 |   expect(rendering.filter(path => !allowed.has(path))).toEqual([]);
+         |                                                        ^
+      63 | });
+      64 |
+      65 | it('only KeyboardAwareScreen uses KeyboardAvoidingView', () => {
+
+      at Object.toEqual (src/components/__tests__/keyboardInventory.test.ts:62:56)
+
+  ● only TextField renders a bare TextInput
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  0
+    + Received  + 10
+
+      Array [
+    +   "src/components/GroupMultiSelect.tsx",
+    +   "src/components/NumberField.tsx",
+        "src/components/TextField.tsx",
+    +   "src/components/venue/OthersVenueModal.tsx",
+    +   "src/components/venue/VenueDetailCard.tsx",
+    +   "src/components/venue/VenuePicker.tsx",
+    +   "src/screens/AccountDeletionCodeScreen.tsx",
+    +   "src/screens/CreateGameScreen.tsx",
+    +   "src/screens/EditProfileScreen.tsx",
+    +   "src/screens/EventDetailScreen.tsx",
+    +   "src/screens/TransferGroupOwnershipScreen.tsx",
+      ]
+
+      70 | it('only TextField renders a bare TextInput', () => {
+      71 |   const users = files.filter(path => /(^|\n)\s*<TextInput\b/.test(read(path)));
+    > 72 |   expect(users).toEqual(['src/components/TextField.tsx']);
+         |                 ^
+      73 | });
+      74 |
+
+      at Object.toEqual (src/components/__tests__/keyboardInventory.test.ts:72:17)
+
+
+Test Suites: 1 failed, 28 passed, 29 total
+Tests:       3 failed, 440 passed, 443 total
+Snapshots:   0 total
+Time:        11.465 s
+Ran all test suites matching /src\/api\/__tests__\/tournaments.test.ts|src\/api\/__tests__\/tournamentExperienceApi.test.ts|src\/api\/__tests__\/tournamentWizardApi.test.ts|src\/components\/__tests__\/keyboardInventory.test.ts|src\/components\/__tests__\/addRemoveGlyphStatic.test.ts|src\/components\/__tests__\/inviteControlsStatic.test.ts|src\/components\/__tests__\/KeyboardAwareScreen.test.tsx|src\/components\/scoring\/__tests__\/ScoringMatchCard.test.tsx|src\/components\/scoring\/__tests__\/TournamentScoringEntry.test.tsx|src\/labels\/__tests__\/LabelsContext.test.tsx|src\/screens\/__tests__\/TournamentDetailScreen.test.tsx|src\/screens\/__tests__\/TournamentDetailCommittee.test.tsx|src\/screens\/__tests__\/TournamentDetailV2.test.tsx|src\/screens\/__tests__\/TournamentGameView.test.tsx|src\/screens\/__tests__\/TournamentInvite.test.tsx|src\/screens\/__tests__\/TournamentRegistrationsMenu.test.tsx|src\/screens\/__tests__\/TournamentRespond.test.tsx|src\/screens\/__tests__\/TournamentResponses.test.tsx|src\/screens\/__tests__\/TournamentScoringScreen.test.tsx|src\/screens\/__tests__\/TournamentShare.test.tsx|src\/screens\/__tests__\/TournamentTabBodies.test.tsx|src\/screens\/__tests__\/TournamentWizardScreen.test.tsx|src\/screens\/__tests__\/AccessRefetchDetails.test.tsx|src\/screens\/__tests__\/AccessActionNotFound.test.tsx|src\/utils\/__tests__\/tournamentExperience.test.ts|src\/utils\/__tests__\/tournamentScoring.test.ts|src\/utils\/__tests__\/tournamentScoringContract.test.ts|src\/utils\/__tests__\/tournamentTabs.test.ts|src\/utils\/__tests__\/tournamentWizard.test.ts/i.
+
+
+## Baseline pair on origin/main
+Test Suites: 2 failed, 2 total
+Tests:       64 failed, 26 passed, 90 total
+
+## Baseline pair on the branch
+Test Suites: 2 failed, 2 total
+Tests:       64 failed, 26 passed, 90 total

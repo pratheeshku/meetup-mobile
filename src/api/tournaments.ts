@@ -53,7 +53,11 @@ import type {
   MatchPreview,
   MatchResultBody,
   MediaPage,
+  PointsAccepted,
+  ResultsUploadSummary,
 } from '../types/tournamentTabs';
+import type { DraftDetail } from '../types/tournamentTabs';
+import { normaliseDraft } from '../utils/fixturesSetup';
 import { normaliseApprovals, normaliseEntryResponse, normaliseMediaPage, normalisePreview } from '../utils/tournamentTabs';
 import type {
   WizardCreateBody,
@@ -722,4 +726,63 @@ export async function uploadTournamentMedia(
 /** `DELETE /tournaments/{id}/media/{media_id}` (204): the uploader or an active committee member. */
 export async function deleteTournamentMedia(id: string, mediaId: string, options?: RequestOptions): Promise<void> {
   await apiClient.delete(`/tournaments/${id}/media/${mediaId}`, { correlationId: options?.correlationId });
+}
+
+// ---- Fixtures setup and results file (te-a3, AD-T12): the routes the web already uses ------------------------------
+type UploadFile = { uri: string; name: string; type: string };
+
+async function postWorkbook<T>(path: string, file: UploadFile, options?: RequestOptions): Promise<T> {
+  const formData = new FormData();
+  formData.append('file', file as unknown as Blob);
+  const { data } = await apiClient.post<T>(path, formData, {
+    correlationId: options?.correlationId,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+/** `POST /tournaments/{id}/points` (all or nothing): 422 lists the row errors and nothing is saved. */
+export async function uploadPoints(id: string, file: UploadFile, options?: RequestOptions): Promise<PointsAccepted> {
+  const data = await postWorkbook<Partial<PointsAccepted>>(`/tournaments/${id}/points`, file, options);
+  return { entrants: data.entrants ?? 0, rated: data.rated ?? 0, unrated: data.unrated ?? 0 };
+}
+
+/** `POST /tournaments/{id}/fixtures/generate`: a new draft (replaces the open one). 409 `FIXTURE_FROZEN` once a result exists. */
+export async function generateFixtureDraft(
+  id: string,
+  body: { group_count: number | null; advance_per_group: number },
+  options?: RequestOptions,
+): Promise<DraftDetail | null> {
+  const { data } = await apiClient.post<unknown>(`/tournaments/${id}/fixtures/generate`, body, {
+    correlationId: options?.correlationId,
+  });
+  return normaliseDraft(data);
+}
+
+/** `GET /tournaments/{id}/drafts/{draft_id}`: registration ids only (no names). */
+export async function getFixtureDraft(id: string, draftId: string, options?: RequestOptions): Promise<DraftDetail | null> {
+  const { data } = await apiClient.get<unknown>(`/tournaments/${id}/drafts/${draftId}`, {
+    correlationId: options?.correlationId,
+  });
+  return normaliseDraft(data);
+}
+
+/** `POST .../committee/actions` `fixture_publication`: submits the draft, bound by its hash, for a second member to approve. */
+export async function submitFixturePublication(
+  id: string,
+  draftId: string,
+  payloadHash: string,
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.post(
+    `/tournaments/${id}/committee/actions`,
+    { action_type: 'fixture_publication', draft_id: draftId, payload_hash: payloadHash },
+    { correlationId: options?.correlationId },
+  );
+}
+
+/** `POST /tournaments/{id}/fixtures/results-upload`: the optional bulk scoring workbook. */
+export async function uploadResultsFile(id: string, file: UploadFile, options?: RequestOptions): Promise<ResultsUploadSummary> {
+  const data = await postWorkbook<Partial<ResultsUploadSummary>>(`/tournaments/${id}/fixtures/results-upload`, file, options);
+  return { posted: data.posted ?? 0, corrected: data.corrected ?? 0, unchanged: data.unchanged ?? 0 };
 }

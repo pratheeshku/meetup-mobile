@@ -137,7 +137,8 @@ describe('standings contract (backend board_view)', () => {
 
 describe('scoring/state contract (engine_service.scoring_state)', () => {
   // Additive reads (te-a1): the registration phase and the two published/posted facts, as the server sent them.
-  const FACTS = { registration_phase: 'frozen', fixtures_published: true, any_result_posted: true };
+  // te-a3 also reads `is_committee` (and the `committee` block when the server sends one).
+  const FACTS = { registration_phase: 'frozen', fixtures_published: true, any_result_posted: true, is_committee: false };
 
   it('reads enabled and applicable, and the additive facts, from the full backend payload', () => {
     expect(normaliseScoringState(BACKEND_SCORING_STATE)).toEqual({ enabled: true, applicable: true, ...FACTS });

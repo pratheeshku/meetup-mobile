@@ -596,6 +596,9 @@ export interface ApprovalCard {
   id: string;
   bucket: ApprovalBucket;
   titleKey: LabelKey;
+  actionType: string;
+  /** The draft of a publication request (read from the server to review it); null for other types. */
+  draftId: string | null;
   /** One line about the subject (match, group), built from names; null when nothing could be named. */
   subject: string | null;
   /** The reason the maker gave, when the payload carries one. */
@@ -665,6 +668,8 @@ export function approvalCards(requests: ApprovalRequest[], ctx: ApprovalContext)
         id: request.id,
         bucket,
         titleKey: APPROVAL_TITLES[request.action_type],
+        actionType: request.action_type,
+        draftId: request.action_type === 'fixture_publication' ? str(payload.draft_id) : null,
         subject,
         reason,
         initiatorName: ctx.names.get(request.initiator_user_id.toLowerCase()) ?? '',
