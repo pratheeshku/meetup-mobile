@@ -90,6 +90,18 @@
       "file": "src/labels/defaultLabels.ts",
       "match": "mob.committee_invite.body",
       "reason": "Web card copy (WebCommitteeAccept, web.tca.body): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
+    },
+    {
+      "kind": "banned-term",
+      "file": "src/labels/defaultLabels.ts",
+      "match": "mob.tw.group_row_one",
+      "reason": "AD-T13 (tournament-experience addendum, approved): a group row in the wizard's audience list reads \"Group name (10 members)\"; these are group members, not tournament participants, and the addendum states \"Members is correct here\". The word sits in the row text, not in a label naming tournament people."
+    },
+    {
+      "kind": "banned-term",
+      "file": "src/labels/defaultLabels.ts",
+      "match": "mob.tw.group_row_many",
+      "reason": "AD-T13 (tournament-experience addendum, approved): a group row in the wizard's audience list reads \"Group name (10 members)\"; these are group members, not tournament participants, and the addendum states \"Members is correct here\". The word sits in the row text, not in a label naming tournament people."
     }
   ]
 }

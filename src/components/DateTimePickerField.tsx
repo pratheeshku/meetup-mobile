@@ -39,6 +39,7 @@ import {
 } from '../utils/localDateTime';
 import { useT } from '../labels/LabelsContext';
 import { iosPickerThemeProps } from './iosPickerTheme';
+import { focusRingStyle, useAccessibilityFocus } from '../hooks/useAccessibilityFocus';
 
 export interface DateTimePickerFieldProps {
   value: string;
@@ -49,6 +50,8 @@ export interface DateTimePickerFieldProps {
   testID?: string;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** A new non-zero value moves focus here (ring and screen-reader focus) without opening the picker (te-a4). */
+  focusToken?: number;
 }
 
 export default function DateTimePickerField({
@@ -60,8 +63,10 @@ export default function DateTimePickerField({
   testID,
   disabled = false,
   style,
+  focusToken,
 }: DateTimePickerFieldProps): React.JSX.Element {
   const t = useT();
+  const focus = useAccessibilityFocus(focusToken);
   // Parsing the initial Date from string value
   const parseCurrentValue = (): Date => {
     if (mode === 'datetime') {
@@ -83,6 +88,7 @@ export default function DateTimePickerField({
     if (disabled) {
       return;
     }
+    focus.clear();
     const current = parseCurrentValue();
     if (Platform.OS === 'ios') {
       setIosTempDate(current);
@@ -151,15 +157,18 @@ export default function DateTimePickerField({
   return (
     <>
       <Pressable
+        ref={focus.ref}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         testID={testID}
         disabled={disabled}
         onPress={handleOpen}
+        onBlur={focus.clear}
         style={({ pressed }) => [
           styles.trigger,
           disabled ? styles.disabled : pressed ? styles.pressed : null,
           style,
+          focus.ringed ? focusRingStyle : null,
         ]}
       >
         <Text style={value ? styles.valueText : styles.placeholderText}>

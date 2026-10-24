@@ -59,6 +59,11 @@ interface VenuePickerProps {
   mapsApiKey?: string | null;
   variant?: 'standard' | 'tournament';
   helperText?: string;
+  /**
+   * Opens the keyboard on the search box when no venue is chosen (default true, as on Create game). The tournament
+   * wizard turns it off: it moves focus to the first field of the step itself (te-a4, AD-T13).
+   */
+  autoFocusSearch?: boolean;
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -74,6 +79,7 @@ export default function VenuePicker({
   mapsApiKey,
   variant = 'standard',
   helperText,
+  autoFocusSearch = true,
 }: VenuePickerProps): React.JSX.Element {
   const t = useT();
   const [isOpen, setIsOpen] = useState(!selectedVenue || !selectedVenue.name);
@@ -307,7 +313,7 @@ export default function VenuePicker({
               onChangeText={setQuery}
               placeholder={t('venue.search_placeholder')}
               placeholderTextColor={colors.textMuted}
-              autoFocus={!selectedVenue?.name}
+              autoFocus={autoFocusSearch && !selectedVenue?.name}
             />
             {query ? (
               <Pressable

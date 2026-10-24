@@ -146,6 +146,19 @@ describe('which page', () => {
   });
 });
 
+describe('court or hall details (te-a4, AD-T13)', () => {
+  it('shows venue_detail after the venue name in the header and in the Overview; hidden when there is none', async () => {
+    const root = await mount({ venue_detail: 'Court 2' });
+    expect(everyText(root)).toContain('Punggol Sports Hall, Court 2');
+    expect(texts(byId(root, 'overview-venue-detail')[0])).toEqual(['Court 2']);
+    const none = await mount({ venue_detail: null });
+    expect(byId(none, 'overview-venue-detail')).toHaveLength(0);
+    expect(everyText(none)).not.toContain('Punggol Sports Hall,');
+    const blank = await mount({ venue_detail: '   ' });
+    expect(byId(blank, 'overview-venue-detail')).toHaveLength(0);
+  });
+});
+
 describe('header (AD-T6)', () => {
   it('shows the title, meta line, organizer and committee by name, and never an id', async () => {
     const root = await mount();

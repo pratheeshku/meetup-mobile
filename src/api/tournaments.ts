@@ -98,6 +98,7 @@ interface TournamentApiItem {
   my_committee_invitation?: string | null;
   venue_name?: string | null;
   venue_label?: string | null;
+  venue_detail?: string | null;
   venue_id?: string | null;
   venue_snapshot?: VenueSnapshot | null;
   lifecycle_status?: string | null;
@@ -181,6 +182,7 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     my_committee_invitation: raw.my_committee_invitation === 'pending' ? 'pending' : null,
     venue_name: raw.venue_name ?? null,
     venue_label: raw.venue_label ?? null,
+    venue_detail: raw.venue_detail?.trim() ? raw.venue_detail.trim() : null,
     venue_id: raw.venue_id ?? null,
     venue_snapshot: raw.venue_snapshot ?? null,
     lifecycle_status: (raw.lifecycle_status as any) ?? 'active',

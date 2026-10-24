@@ -51,6 +51,7 @@ import {
   WIZARD_TOTAL_STEPS,
   buildCreateBody,
   displayStep,
+  firstFocusField,
   firstInvalidStep,
   initialWizardState,
   mapCreateRejection,
@@ -92,6 +93,9 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   const [submitIssue, setSubmitIssue] = useState<WizardIssue | null>(null);
   const [created, setCreated] = useState<WizardCreateResult | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
+  // AD-T13: every step change (and every error) moves focus again; 0 until the first change.
+  const [focusToken, setFocusToken] = useState(0);
+  const bumpFocus = useCallback(() => setFocusToken(token => token + 1), []);
 
   const allowLeave = useRef(false);
   const pendingAction = useRef<NavigationAction | null>(null);
@@ -199,6 +203,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
 
   const addCommittee = (people: UserSearchResult[]): void => {
     setServerIssue(null);
+    bumpFocus();
     setState(current => {
       const known = new Set(current.committee.map(person => person.id));
       const next = people
@@ -238,10 +243,12 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
     const issues = validateStep(step, state, ctx);
     if (issues.length > 0) {
       setAttempted(current => ({ ...current, [step]: true }));
+      bumpFocus();
       return;
     }
     setServerIssue(null);
     setStep(current => Math.min(current + 1, WIZARD_STEP.review));
+    bumpFocus();
   };
 
   const goBack = (): void => {
@@ -249,10 +256,12 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
     setSubmitIssue(null);
     if (view === 'committee-picker') {
       setView('wizard');
+      bumpFocus();
       return;
     }
     if (step > WIZARD_STEP.basics) {
       setStep(current => current - 1);
+      bumpFocus();
     } else {
       navigation.goBack();
     }
@@ -272,6 +281,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
     if (invalid !== null) {
       setAttempted(current => ({ ...current, [invalid]: true }));
       setStep(invalid);
+      bumpFocus();
       return;
     }
     submitLock.current = true;
@@ -320,6 +330,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
           setState(current => ({ ...current, committee: current.committee.filter(person => person.id !== outcome.dropUserId) }));
         }
         setStep(outcome.step);
+        bumpFocus();
       } else {
         setSubmitIssue(outcome.issue);
       }
@@ -378,6 +389,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   }
 
   const errors = errorsFor(step);
+  const stepFocus = { field: firstFocusField(step, errors), token: focusToken };
   const windowError = errors.starts_at && errors.starts_at === errors.ends_at ? errors.starts_at : null;
   const venueLabel = catalogueEnabled ? state.venue?.name ?? '' : state.venueName.trim();
 
@@ -392,10 +404,11 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
             onRetrySports={loadSports}
             onChange={update}
             errors={errors}
+            focus={stepFocus}
           />
         );
       case WIZARD_STEP.participation:
-        return <ParticipationStep state={state} onChange={update} />;
+        return <ParticipationStep state={state} onChange={update} focus={stepFocus} />;
       case WIZARD_STEP.when:
         return (
           <WhenWhereStep
@@ -406,6 +419,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
             onChange={update}
             errors={errors}
             windowError={windowError}
+            focus={stepFocus}
           />
         );
       case WIZARD_STEP.registration:
@@ -422,6 +436,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
               setState(current => withHardBlock(current, value));
             }}
             errors={errors}
+            focus={stepFocus}
           />
         );
       case WIZARD_STEP.visibility:
@@ -435,6 +450,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
             onChange={update}
             onToggleGroup={toggleGroup}
             serverError={serverIssue && serverIssue.step === WIZARD_STEP.visibility ? t(serverIssue.key, serverIssue.params) : null}
+            focus={stepFocus}
           />
         );
       case WIZARD_STEP.committee:
@@ -448,6 +464,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
             onOpenPicker={() => setView('committee-picker')}
             errorMessage={stepIssues[0] ? t(stepIssues[0].key, stepIssues[0].params) : null}
             max={limits.committee_max - 1 - state.committee.length}
+            focus={stepFocus}
           />
         );
       default:
@@ -458,7 +475,9 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
             onEdit={target => {
               setServerIssue(null);
               setStep(target);
+              bumpFocus();
             }}
+            focus={stepFocus}
           />
         );
     }
@@ -475,7 +494,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
         totalSteps={WIZARD_TOTAL_STEPS}
         onBack={goBack}
       />
-      <KeyboardAwareScreen contentContainerStyle={wizardStyles.content}>
+      <KeyboardAwareScreen contentContainerStyle={wizardStyles.content} scrollToTopKey={focusToken}>
         {renderStep()}
       </KeyboardAwareScreen>
       {isReview && submitIssue ? (

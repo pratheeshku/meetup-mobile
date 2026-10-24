@@ -9,15 +9,17 @@ import { useT } from '../../../labels/LabelsContext';
 import { spacing } from '../../../theme/tokens';
 import type { WizardParticipation } from '../../../types/tournamentWizard';
 import SegmentedSwitch from '../../SegmentedSwitch';
-import { Banner, SectionCard, StepHeading } from './parts';
+import { Banner, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
 import type { WizardState } from '../../../utils/tournamentWizard';
 
 export default function ParticipationStep({
   state,
   onChange,
+  focus,
 }: {
   state: WizardState;
   onChange: (patch: Partial<WizardState>) => void;
+  focus?: StepFocus;
 }): React.JSX.Element {
   const t = useT();
   const team = state.participation === 'team';
@@ -27,6 +29,7 @@ export default function ParticipationStep({
       <SegmentedSwitch<WizardParticipation>
         value={state.participation}
         onChange={participation => onChange({ participation })}
+        focusToken={tokenFor(focus, 'participation')}
         options={[
           { value: 'individual', label: t('mob.tw.part_individual') },
           { value: 'team', label: t('mob.tw.part_team') },

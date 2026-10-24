@@ -7,6 +7,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
+import { useAccessibilityFocus } from '../../../hooks/useAccessibilityFocus';
 import { InfoIcon } from '../../icons/HomeV2Icons';
 import { LockIcon, WarningIcon } from '../../icons/ActionIcons';
 import { useT } from '../../../labels/LabelsContext';
@@ -32,9 +33,23 @@ export function SectionCard({
   );
 }
 
-export function StepHeading({ children }: { children: string }): React.JSX.Element {
+/**
+ * Where focus goes on a step change or an error (te-a4, AD-T13): the field name and a token that changes every time
+ * focus must move again. A control takes the token only when it is the target, so every other control sees 0.
+ */
+export interface StepFocus {
+  field: string | null;
+  token: number;
+}
+
+export function tokenFor(focus: StepFocus | undefined, field: string): number {
+  return focus && focus.field === field ? focus.token : 0;
+}
+
+export function StepHeading({ children, focusToken }: { children: string; focusToken?: number }): React.JSX.Element {
+  const focus = useAccessibilityFocus(focusToken);
   return (
-    <Text style={styles.heading} accessibilityRole="header">
+    <Text ref={focus.ref as React.RefObject<Text | null>} style={styles.heading} accessibilityRole="header">
       {children}
     </Text>
   );
@@ -44,9 +59,19 @@ export function FieldLabel({ children }: { children: string }): React.JSX.Elemen
   return <Text style={styles.fieldLabel}>{children}</Text>;
 }
 
-export function FieldError({ message, testID }: { message?: string | null; testID?: string }): React.JSX.Element | null {
+export function FieldError({
+  message,
+  testID,
+  focusToken,
+}: {
+  message?: string | null;
+  testID?: string;
+  /** Screen-reader focus on the message (the field it explains has no text input of its own to focus). */
+  focusToken?: number;
+}): React.JSX.Element | null {
+  const focus = useAccessibilityFocus(message ? focusToken : 0);
   return message ? (
-    <Text style={styles.fieldError} accessibilityRole="alert" testID={testID}>
+    <Text ref={focus.ref as React.RefObject<Text | null>} style={styles.fieldError} accessibilityRole="alert" testID={testID}>
       {message}
     </Text>
   ) : null;

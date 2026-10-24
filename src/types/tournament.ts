@@ -113,6 +113,8 @@ export interface Tournament {
   my_committee_invitation?: 'pending' | null;
   venue_name?: string | null;
   venue_label?: string | null;
+  /** AD-T13 (te-b6): the optional court or hall text shown after the venue name; null when none. */
+  venue_detail?: string | null;
   venue_id?: string | null;
   venue_snapshot?: VenueSnapshot | null;
   /** DES-MEETUP-ADDENDUM-closure-report AD-1: computed lifecycle status */

@@ -70,6 +70,8 @@ export interface WizardCreateBody {
   others?: OthersVenueInput;
   venue_name?: string;
   venue_address?: string;
+  /** Optional court or hall text (AD-T13), trimmed, at most 100 characters; omitted when empty. */
+  venue_detail?: string;
   starts_at: string;
   ends_at: string;
   registration_closes_at: string;
@@ -100,6 +102,8 @@ export interface WizardCreateResult {
   registration_hard_block_at: string;
   starts_at: string;
   ends_at: string;
+  /** AD-T13: the optional court or hall text, null when none. */
+  venue_detail?: string | null;
   committee: WizardCommitteeRow[];
 }
 

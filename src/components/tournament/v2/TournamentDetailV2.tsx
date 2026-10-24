@@ -110,7 +110,9 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
   const { tone, scrim } = stripTone(tournament.banner_tone, tournament.banner_scrim);
 
   const visibilityKey = tournament.visibility ? (`tournament_visibility.${tournament.visibility}` as const) : null;
-  const venue = tournament.venue_name || tournament.venue_label || null;
+  const venueName = tournament.venue_name || tournament.venue_label || null;
+  // AD-T13: the optional court or hall text follows the venue name, as on Create game ("Venue, Court 2").
+  const venue = venueName && tournament.venue_detail ? `${venueName}, ${tournament.venue_detail}` : venueName;
   const metaLine = [
     props.sportLabel,
     formatDateRange(tournament.starts_at, tournament.ends_at),

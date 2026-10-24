@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { CheckIcon } from './icons/ActionIcons';
+import { focusRingStyle, useAccessibilityFocus } from '../hooks/useAccessibilityFocus';
 import { borderWidth, colors, opacity, radius, spacing, typography } from '../theme/tokens';
 
 export interface SelectableCardProps {
@@ -14,6 +15,8 @@ export interface SelectableCardProps {
   style?: ViewStyle;
   testID?: string;
   accessibilityLabel?: string;
+  /** A new non-zero value moves focus here (ring and screen reader) without pressing it (te-a4). */
+  focusToken?: number;
 }
 
 export default function SelectableCard({
@@ -26,9 +29,13 @@ export default function SelectableCard({
   style,
   testID,
   accessibilityLabel,
+  focusToken,
 }: SelectableCardProps): React.JSX.Element {
+  const focus = useAccessibilityFocus(focusToken);
   return (
     <Pressable
+      ref={focus.ref}
+      onBlur={focus.clear}
       testID={testID}
       onPress={onPress}
       disabled={disabled}
@@ -41,6 +48,7 @@ export default function SelectableCard({
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
         style,
+        focus.ringed ? focusRingStyle : null,
       ]}
     >
       {leading ? <View style={styles.leadingContainer}>{leading}</View> : null}
