@@ -106,3 +106,55 @@ Not exercised: the real keyboard and screen reader (doubles: `focus()` on the te
 | `mob.tw.group_row_many` | {name} ({count} members) |
 
 Seeded already, bundled with exact text (not new): `mob.tw.err_venue_detail_too_long` = Keep it to 100 characters or fewer; `mob.create_game.court_details_label`, `mob.create_game.court_details_placeholder`, `mob.create_game.venue_label` (existing).
+
+## Git evidence (literal output, after the code commit and the push)
+PR: https://github.com/pratheeshku/meetup-mobile/pull/59 (not a draft, open, not merged). Evidence added in one later commit (report text only).
+```
+$ git log --oneline origin/main..HEAD
+074fe05 te-a4: create-wizard polish (group sizes, focus on every step, one Venue heading, court or hall details)
+
+$ git show HEAD --stat --format="%H %s"
+074fe05bed8b3d2ef60c0418c723995e07468c1e te-a4: create-wizard polish (group sizes, focus on every step, one Venue heading, court or hall details)
+
+ docs/reports/te-a4-raw-output.txt                  | 6458 ++++++++++++++++++++
+ docs/reports/te-a4-report.md                       |  108 +
+ docs/status/te-a4-status.md                        |   30 +
+ scripts/check-labels.allowlist.json                |   12 +
+ src/api/tournaments.ts                             |    2 +
+ src/components/AddRemoveControl.tsx                |   31 +-
+ src/components/DateTimePickerField.tsx             |    9 +
+ src/components/KeyboardAwareScreen.tsx             |   10 +
+ src/components/SegmentedSwitch.tsx                 |    8 +
+ src/components/SelectableCard.tsx                  |    8 +
+ .../tournament/v2/TournamentDetailV2.tsx           |    4 +-
+ .../tournament/v2/TournamentOverview.tsx           |    5 +
+ src/components/tournament/wizard/BasicsStep.tsx    |   19 +-
+ src/components/tournament/wizard/CommitteeStep.tsx |    5 +-
+ .../tournament/wizard/ParticipationStep.tsx        |    5 +-
+ .../tournament/wizard/RegistrationStep.tsx         |    6 +-
+ src/components/tournament/wizard/ReviewStep.tsx    |   13 +-
+ .../tournament/wizard/VisibilityStep.tsx           |    7 +-
+ src/components/tournament/wizard/WhenWhereStep.tsx |   41 +-
+ src/components/tournament/wizard/parts.tsx         |   33 +-
+ src/components/venue/VenuePicker.tsx               |    8 +-
+ src/hooks/useAccessibilityFocus.ts                 |   50 +
+ src/labels/defaultLabels.ts                        |    5 +
+ src/screens/TournamentWizardScreen.tsx             |   23 +-
+ src/screens/__tests__/TournamentDetailV2.test.tsx  |   13 +
+ .../__tests__/TournamentWizardPolish.test.tsx      |  353 ++
+ src/types/tournament.ts                            |    2 +
+ src/types/tournamentWizard.ts                      |    4 +
+ src/utils/__tests__/tournamentWizard.test.ts       |   39 +
+ src/utils/tournamentWizard.ts                      |   48 +-
+ 30 files changed, 7328 insertions(+), 31 deletions(-)
+
+$ git branch -r --contains HEAD
+  origin/claude/te-a4-mobile
+
+$ git rev-parse origin/claude/te-a4-mobile
+074fe05bed8b3d2ef60c0418c723995e07468c1e
+
+$ git status --short
+ M android/version.properties
+ M docs/reports/te-a4-report.md
+```
