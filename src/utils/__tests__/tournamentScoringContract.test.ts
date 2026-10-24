@@ -25,7 +25,8 @@ const sorted = (a: string[]) => [...a].sort();
 
 /** Backend fields the app deliberately does not read. Listed in docs/reports/tl-c-mobile-report.md. */
 const IGNORED = {
-  top: ['tiebreakers'],
+  // te-a2 reads `tiebreakers` (the order the server uses, shown as words), so no top-level field is ignored any more
+  top: [] as string[],
   result: ['summary'],
 };
 

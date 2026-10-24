@@ -135,7 +135,16 @@ export interface Tournament {
   banner_tone?: BannerTone | null;
   /** Strip scrim opacity, 0 to 60 percent, chosen by the server. */
   banner_scrim?: number | null;
-  has_custom_banner?: boolean;
+  /** `false` only when the server says so (the organizer is then offered "Add banner"); null when it did not say. */
+  has_custom_banner?: boolean | null;
+  /** te-b3 (additive): 2 picks the version 2 page; 1 or null keeps the legacy screen. */
+  lifecycle_version?: number | null;
+  /** te-b3: stored dates of the registration window; null on version 1 and on the routes that do not set them. */
+  registration_opened_at?: string | null;
+  registration_hard_block_at?: string | null;
+  roster_frozen_at?: string | null;
+  /** te-b3: the stored rules. A value that is not stored is null; `elimination` and `courts` are always null today. */
+  format_rules?: TournamentFormatRules | null;
   /** AD-T6, set by `GET /tournaments/{id}` only. */
   organizer?: TournamentPerson | null;
   /** AD-T6: active committee members other than the organizer. */
@@ -143,6 +152,15 @@ export interface Tournament {
 }
 
 export type BannerTone = 'light' | 'dark';
+
+export interface TournamentFormatRules {
+  elimination: string | null;
+  sets_best_of: number | null;
+  points_to_win: number | null;
+  courts: number | null;
+  min_participants: number | null;
+  max_participants: number | null;
+}
 
 /** Header chip data (AD-T6): names and picture only. Never an email or a number. */
 export interface TournamentPerson {
@@ -295,6 +313,8 @@ export interface TournamentClosurePerson {
   photo_url?: string | null;
   registration_id?: string | null;
   kind?: string | null;
+  /** AD-T9, `candidates` only (organizer and committee): the people of this registration, to pick the star from. */
+  members?: { user_id: string; display_name: string; photo_url?: string | null }[];
 }
 
 export interface TournamentClosureResponse {
@@ -311,6 +331,12 @@ export interface TournamentClosureResponse {
   updated_at?: string | null;
   attendees?: TournamentClosurePerson[] | null;
   candidates?: TournamentClosurePerson[] | null;
+  /** Match-scoring AD-S10: starting values taken from the posted results while no report is saved. */
+  prefill?: {
+    winner?: TournamentClosurePerson | null;
+    runner_up?: TournamentClosurePerson | null;
+    attendees?: TournamentClosurePerson[] | null;
+  } | null;
 }
 
 export interface TournamentClosurePut {
@@ -318,6 +344,10 @@ export interface TournamentClosurePut {
   attendee_registration_ids: string[];
   winner_registration_id: string | null;
   runner_up_registration_id: string | null;
+  /** AD-T9, tournaments only; omitted = none. */
+  third_place_registration_id?: string | null;
+  star_user_id?: string | null;
+  comments?: string | null;
   expected_version: number;
 }
 

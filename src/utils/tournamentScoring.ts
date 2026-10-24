@@ -77,7 +77,7 @@ function normaliseResult(raw: unknown): ScoringResult | null {
   };
 }
 
-function normaliseMatch(raw: unknown): ScoringMatch | null {
+export function normaliseMatch(raw: unknown): ScoringMatch | null {
   if (!isObject(raw)) {
     return null;
   }
@@ -127,7 +127,7 @@ function normaliseRow(raw: unknown): ScoringTableRow | null {
   };
 }
 
-function normaliseGroup(raw: unknown): ScoringGroup | null {
+export function normaliseGroup(raw: unknown): ScoringGroup | null {
   if (!isObject(raw)) {
     return null;
   }
@@ -170,7 +170,14 @@ export function normaliseStandings(raw: unknown): TournamentStandingsView | null
   if (groups.length === 0 && knockout.length === 0) {
     return null;
   }
-  return { tournament_id: str(raw.tournament_id) ?? '', published: true, groups, knockout };
+  const tiebreakers = list(raw.tiebreakers).filter((code): code is string => typeof code === 'string');
+  return {
+    tournament_id: str(raw.tournament_id) ?? '',
+    published: true,
+    groups,
+    knockout,
+    ...(tiebreakers.length > 0 ? { tiebreakers } : {}),
+  };
 }
 
 /** Knockout matches ordered round_number, then fixture_order (round numbers continue after the group rounds). */

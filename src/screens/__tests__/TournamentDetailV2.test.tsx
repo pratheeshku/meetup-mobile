@@ -122,13 +122,27 @@ const tabKeys = (root: Instance): string[] =>
 const everyText = (root: Instance): string => texts(root).join(' | ');
 
 describe('which page', () => {
-  it('shows the new page when the server sent tabs, and the legacy page when it did not', async () => {
+  it('lifecycle_version 2 shows the new page; 1 keeps the legacy page, whatever tabs say (te-a2)', async () => {
+    expect(byId(await mount({ lifecycle_version: 2 }), 'tournament-detail-v2')).toHaveLength(1);
+    const legacy = await mount({ lifecycle_version: 1 });
+    expect(byId(legacy, 'tournament-detail-v2')).toHaveLength(0);
+    expect(texts(legacy)).toContain('Summer Smash');
+  });
+
+  it('a server that sends no version falls back to the presence of the server tabs object', async () => {
     expect(byId(await mount(), 'tournament-detail-v2')).toHaveLength(1);
     const legacy = await mount({}, stateOf({ tabs: undefined }));
     expect(byId(legacy, 'tournament-detail-v2')).toHaveLength(0);
     expect(texts(legacy)).toContain('Summer Smash');
-    // no scoring state at all (404): legacy as well
+    // no scoring state at all (404) and no version: legacy as well
     expect(byId(await mount({}, null), 'tournament-detail-v2')).toHaveLength(0);
+  });
+
+  it('version 2 whose scoring state could not be read still gets the new page, with Overview only (always open)', async () => {
+    const root = await mount({ lifecycle_version: 2 }, null);
+    expect(byId(root, 'tournament-detail-v2')).toHaveLength(1);
+    expect(tabKeys(root)).toEqual(['overview']);
+    expect(byId(root, 'tournament-overview')).toHaveLength(1);
   });
 });
 
@@ -265,12 +279,12 @@ describe('tabs (AD-T5): server object only', () => {
     expect(texts(byId(root, 'tournament-locked-message')[0])).toEqual(['Fixtures setup opens when registration closes.']);
   });
 
-  it('an open tab other than Overview shows a neutral placeholder from a label (te-a2)', async () => {
+  it('an open tab other than Overview shows its body, and the way back to Overview works (te-a2)', async () => {
     const root = await mount();
     await press(root, 'tournament-tab-participants');
-    expect(byId(root, 'tournament-tab-body-participants')).toHaveLength(1);
-    expect(texts(byId(root, 'tournament-tab-body-participants')[0])).toEqual(['Coming to the app soon', 'This section is not in the app yet.']);
-    // and the way back
+    expect(byId(root, 'tournament-participants')).toHaveLength(1);
+    expect(texts(byId(root, 'tournament-participants')[0])).toContain('Players');
+    expect(everyText(root)).not.toContain('Coming to the app soon');
     await press(root, 'tournament-tab-overview');
     expect(byId(root, 'tournament-overview')).toHaveLength(1);
   });
@@ -296,12 +310,14 @@ describe('Overview per status', () => {
   });
 
   it('closed (TV2MobClosedOverview): "Registration is closed", players locked in, soft block done and fixtures current', async () => {
-    const root = await mount({ capacity: 32 }, stateOf({ registration_phase: 'frozen' }));
+    const root = await mount({ capacity: 32, roster_frozen_at: '2026-10-31T10:00:00Z' }, stateOf({ registration_phase: 'frozen' }));
     const inCard = texts(byId(root, 'overview-status-closed')[0]);
     expect(inCard).toContain('Registration is closed');
     expect(inCard.join(' ')).toContain('18 players are locked in. The committee is preparing the fixtures.');
     expect(byId(root, 'key-date-soft-done')).toHaveLength(1);
+    // the server's roster_frozen_at (set only once the hard block passed) decides the hard block and the next row
     expect(byId(root, 'key-date-fixtures-current')).toHaveLength(1);
+    expect(byId(root, 'overview-roster-frozen')).toHaveLength(1);
   });
 
   it('completed (TV2MobDoneOverview): champion, runner-up and third place by name; every key date done', async () => {
@@ -354,7 +370,7 @@ describe('organizer tools: only what has a working target', () => {
     expect(byId(committee, 'overview-tool-invite').length).toBeGreaterThan(0);
     expect(byId(committee, 'overview-tool-review').length).toBeGreaterThan(0);
     await press(committee, 'overview-tool-review');
-    expect(byId(committee, 'tournament-tab-body-approvals')).toHaveLength(1);
+    expect(byId(committee, 'tournament-approvals')).toHaveLength(1);
 
     const player = await mount();
     expect(byId(player, 'overview-tools')).toHaveLength(0);

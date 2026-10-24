@@ -1,6 +1,7 @@
 import {
   committeeNames,
   formatDateRange,
+  dayCount,
   keyDateStates,
   overviewKind,
   stripModel,
@@ -57,9 +58,11 @@ describe('status strip model (server facts only)', () => {
     expect(overviewKind({ ...base, lifecycle: 'closed' })).toBe('done');
     expect(overviewKind({ ...base, lifecycle: 'cancelled' })).toBe('cancelled');
     expect(overviewKind({ ...base, phase: null })).toBe('unknown');
-    expect(keyDateStates('open')).toEqual({ soft: 'current', fixtures: 'upcoming', days: 'upcoming' });
-    expect(keyDateStates('closed')).toEqual({ soft: 'done', fixtures: 'current', days: 'upcoming' });
-    expect(keyDateStates('done')).toEqual({ soft: 'done', fixtures: 'done', days: 'done' });
+    expect(keyDateStates('open')).toEqual({ opened: 'done', soft: 'current', hard: 'upcoming', fixtures: 'upcoming', days: 'upcoming' });
+    // between the soft and the hard block (committee only) the hard block is the current row; once frozen, fixtures are
+    expect(keyDateStates('closed')).toEqual({ opened: 'done', soft: 'done', hard: 'current', fixtures: 'upcoming', days: 'upcoming' });
+    expect(keyDateStates('closed', true)).toEqual({ opened: 'done', soft: 'done', hard: 'done', fixtures: 'current', days: 'upcoming' });
+    expect(keyDateStates('done')).toEqual({ opened: 'done', soft: 'done', hard: 'done', fixtures: 'done', days: 'done' });
   });
 });
 
@@ -133,5 +136,13 @@ describe('names, never ids', () => {
     expect(formatDateRange('2026-11-14T01:00:00Z', '2026-11-14T10:00:00Z')).not.toContain('–');
     expect(formatDateRange('2026-11-28T01:00:00Z', '2026-12-02T10:00:00Z')).toMatch(/Nov.*–.*Dec/);
     expect(formatDateRange('2026-11-14T01:00:00Z', null)).not.toContain('–');
+  });
+});
+
+describe('dayCount (Results summary)', () => {
+  it('counts the days of the span, at least one, and nothing when a date is missing', () => {
+    expect(dayCount('2026-11-14T01:00:00Z', '2026-11-15T10:00:00Z')).toBe(2);
+    expect(dayCount('2026-11-14T01:00:00Z', '2026-11-14T10:00:00Z')).toBe(1);
+    expect(dayCount('2026-11-14T01:00:00Z', null)).toBeNull();
   });
 });

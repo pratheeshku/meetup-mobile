@@ -95,6 +95,7 @@ import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
 import { committeeAnswerOutcome, type CommitteeAnswerState } from '../utils/committeeInvitation';
 import type { LabelKey } from '../labels/fallbackLabels';
 import { isActiveRegistration } from '../utils/responseGroups';
+import { usesV2Page } from '../utils/tournamentTabs';
 import { useSportDisplayName } from '../utils/labels';
 import { formatEventDate } from '../utils/formatEventDateTime';
 import type { TournamentsStackParamList } from '../navigation/types';
@@ -137,6 +138,16 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const [scoring, setScoring] = useState<TournamentScoringState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // The live refresh of the version 2 tabs runs only while this screen is the focused one.
+  const [focused, setFocused] = useState(true);
+  useEffect(() => {
+    const unsubscribeFocus = navigation.addListener?.('focus', () => setFocused(true));
+    const unsubscribeBlur = navigation.addListener?.('blur', () => setFocused(false));
+    return () => {
+      unsubscribeFocus?.();
+      unsubscribeBlur?.();
+    };
+  }, [navigation]);
   // Called before the loading/error early returns below (Rules of Hooks) —
   // `tournament` is still possibly `null` here.
   const sportLabel = useSportDisplayName(tournament?.sport ?? '');
@@ -695,11 +706,11 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     tournament.status !== 'cancelled' &&
     tournament.lifecycle_status !== 'closed';
 
-  // Lifecycle version 2 (the server sent `tabs`): header, tabs and Overview of the tournament-experience design.
-  // Version 1 tournaments keep the page below unchanged.
-  if (scoring?.tabs) {
+  // Lifecycle version 2 (`lifecycle_version`; an older server that sends none falls back to the server `tabs` object):
+  // header, tabs and tab bodies of the tournament-experience design. Version 1 keeps the page below unchanged.
+  if (usesV2Page(tournament, scoring)) {
     const activeCount = registrations.filter(isActiveRegistration).length;
-    const registrationOpen = scoring.registration_phase === 'open';
+    const registrationOpen = scoring?.registration_phase === 'open';
     const canRegisterV2 =
       !isTournamentEnded &&
       registrationOpen &&
@@ -728,13 +739,15 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         registeredCount={activeCount}
         closure={closure}
         sportLabel={sportLabel}
+        viewerId={currentUserId}
+        registrations={registrations}
+        focused={focused}
         isOrganiser={isOrganiser}
         isCommittee={canReadResponses}
         register={register}
         secondary={secondary}
         notice={registerError ?? withdrawError}
         cancel={{ visible: canCancel, loading: isCancelling, error: cancelError, onPress: handleCancel }}
-        onOpenClosure={() => setIsClosureModalOpen(true)}
         banners={
           <>
             {committeeCard}
@@ -760,26 +773,25 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             onSent={() => loadAll(true)}
           />
         }
-        onOpenScoring={() => navigation.navigate('TournamentScoring', { tournamentId })}
-      >
-        <ClosureModal
-          visible={isClosureModalOpen}
-          onClose={() => {
-            setIsClosureModalOpen(false);
-            setClosureError(null);
-          }}
-          entityType="tournament"
-          candidates={closureCandidates}
-          initialOutcome={tournament.closure_outcome ?? closure?.outcome}
-          initialAttendeeIds={closure?.attendees?.map(a => a.registration_id ?? '').filter(Boolean)}
-          initialWinnerId={closure?.winner?.registration_id}
-          initialRunnerUpId={closure?.runner_up?.registration_id}
-          expectedVersion={closure?.version ?? 0}
-          onSubmit={handleSaveClosure}
-          isSubmitting={isClosureSubmitting}
-          error={closureError}
-        />
-      </TournamentDetailV2>
+        responses={
+          responses ? (
+            <View style={styles.block}>
+              <ResponsesSection
+                responses={responses}
+                entity="tournament"
+                menu={personMenu}
+                summary={t('mob.gv.registered_of', {
+                  registered: registrations.filter(isActiveRegistration).length,
+                  capacity: tournament.max_participants,
+                })}
+                organizerId={tournament.organiser_id}
+                registrations={registrations}
+              />
+            </View>
+          ) : null
+        }
+        onChanged={() => loadAll(true)}
+      />
     );
   }
 
