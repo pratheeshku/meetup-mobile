@@ -121,24 +121,31 @@ export function overviewKind(input: StripInput): OverviewKind {
 }
 
 export interface KeyDateStates {
+  opened: StageState;
   soft: StageState;
+  hard: StageState;
   fixtures: StageState;
   days: StageState;
 }
 
-/** Glyph state of the rows of "Key dates" per Overview kind (server facts only, no date arithmetic). */
-export function keyDateStates(kind: OverviewKind): KeyDateStates {
+/**
+ * Glyph state of the rows of "Key dates" per Overview kind (server facts only, no date arithmetic). `rosterFrozen` is
+ * the server's `roster_frozen_at` (set only once the hard block has passed): it decides the hard block row.
+ */
+export function keyDateStates(kind: OverviewKind, rosterFrozen = false): KeyDateStates {
   switch (kind) {
     case 'open':
-      return { soft: 'current', fixtures: 'upcoming', days: 'upcoming' };
+      return { opened: 'done', soft: 'current', hard: 'upcoming', fixtures: 'upcoming', days: 'upcoming' };
     case 'closed':
-      return { soft: 'done', fixtures: 'current', days: 'upcoming' };
+      return rosterFrozen
+        ? { opened: 'done', soft: 'done', hard: 'done', fixtures: 'current', days: 'upcoming' }
+        : { opened: 'done', soft: 'done', hard: 'current', fixtures: 'upcoming', days: 'upcoming' };
     case 'live':
-      return { soft: 'done', fixtures: 'done', days: 'current' };
+      return { opened: 'done', soft: 'done', hard: 'done', fixtures: 'done', days: 'current' };
     case 'done':
-      return { soft: 'done', fixtures: 'done', days: 'done' };
+      return { opened: 'done', soft: 'done', hard: 'done', fixtures: 'done', days: 'done' };
     default:
-      return { soft: 'upcoming', fixtures: 'upcoming', days: 'upcoming' };
+      return { opened: 'upcoming', soft: 'upcoming', hard: 'upcoming', fixtures: 'upcoming', days: 'upcoming' };
   }
 }
 
@@ -217,4 +224,14 @@ export function formatDateRange(startIso: string, endIso: string | null | undefi
 /** "9:00 AM" */
 export function formatClock(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Number of tournament days for the Results summary: the span of the two server dates, counted in whole days (at least 1). */
+export function dayCount(startIso: string, endIso: string | null | undefined): number | null {
+  const start = Date.parse(startIso);
+  const end = endIso ? Date.parse(endIso) : NaN;
+  if (Number.isNaN(start) || Number.isNaN(end)) {
+    return null;
+  }
+  return Math.max(1, Math.round((end - start) / 86400000) + 1);
 }

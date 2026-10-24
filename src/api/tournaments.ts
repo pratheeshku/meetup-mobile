@@ -38,6 +38,7 @@ import type {
   TournamentInvitationStatus,
   TournamentInviteAccess,
   TournamentParticipationMode,
+  TournamentFormatRules,
   TournamentPerson,
   Tournament,
   TournamentFixture,
@@ -46,6 +47,14 @@ import type {
   TournamentsListResponse,
   TournamentStatus,
 } from '../types/tournament';
+import type {
+  ApprovalRequest,
+  MatchEntryResponse,
+  MatchPreview,
+  MatchResultBody,
+  MediaPage,
+} from '../types/tournamentTabs';
+import { normaliseApprovals, normaliseEntryResponse, normaliseMediaPage, normalisePreview } from '../utils/tournamentTabs';
 import type {
   WizardCreateBody,
   WizardCreateResult,
@@ -100,6 +109,30 @@ interface TournamentApiItem {
   has_custom_banner?: boolean | null;
   organizer?: TournamentPerson | null;
   committee?: TournamentPerson[] | null;
+  lifecycle_version?: number | null;
+  registration_opened_at?: string | null;
+  registration_hard_block_at?: string | null;
+  roster_frozen_at?: string | null;
+  format_rules?: TournamentFormatRules | null;
+}
+
+const ruleNumber = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+/** `format_rules` as stored (te-b3): a value that is not a number or a string stays null; nothing is defaulted. */
+function normaliseFormatRules(raw: unknown): TournamentFormatRules | null {
+  if (typeof raw !== 'object' || raw === null) {
+    return null;
+  }
+  const rules = raw as Record<string, unknown>;
+  return {
+    elimination: typeof rules.elimination === 'string' && rules.elimination ? rules.elimination : null,
+    sets_best_of: ruleNumber(rules.sets_best_of),
+    points_to_win: ruleNumber(rules.points_to_win),
+    courts: ruleNumber(rules.courts),
+    min_participants: ruleNumber(rules.min_participants),
+    max_participants: ruleNumber(rules.max_participants),
+  };
 }
 
 /** Unknown, null or absent -> `'none'` (never a value that shows buttons). */
@@ -159,9 +192,14 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     logo_url: raw.logo_url ?? null,
     banner_tone: raw.banner_tone === 'light' || raw.banner_tone === 'dark' ? raw.banner_tone : null,
     banner_scrim: typeof raw.banner_scrim === 'number' ? raw.banner_scrim : null,
-    has_custom_banner: Boolean(raw.has_custom_banner),
+    has_custom_banner: typeof raw.has_custom_banner === 'boolean' ? raw.has_custom_banner : null,
     organizer: raw.organizer ?? null,
     committee: Array.isArray(raw.committee) ? raw.committee : [],
+    lifecycle_version: typeof raw.lifecycle_version === 'number' ? raw.lifecycle_version : null,
+    registration_opened_at: raw.registration_opened_at ?? null,
+    registration_hard_block_at: raw.registration_hard_block_at ?? null,
+    roster_frozen_at: raw.roster_frozen_at ?? null,
+    format_rules: normaliseFormatRules(raw.format_rules),
   };
 }
 
@@ -560,4 +598,128 @@ export async function deleteTournamentImage(
     correlationId: options?.correlationId,
   });
   return data;
+}
+
+/**
+ * `POST /tournaments/{id}/matches/{match_id}/result/preview` (AD-T7, te-b2): the impact box of Enter score and Edit
+ * score. Writes nothing. The body never carries a winner. Active committee members only; refusals reject with the axios
+ * error (`readResultRefusal` reads them).
+ */
+export async function previewMatchResult(
+  id: string,
+  fixtureId: string,
+  body: MatchResultBody,
+  options?: RequestOptions,
+): Promise<MatchPreview> {
+  const { data } = await apiClient.post<unknown>(`/tournaments/${id}/matches/${fixtureId}/result/preview`, body, {
+    correlationId: options?.correlationId,
+  });
+  return normalisePreview(data);
+}
+
+/**
+ * `POST /tournaments/{id}/matches/{match_id}/result` (AD-S13, AD-T8). The server derives the winner from the sets; the
+ * answer carries `advanced`, `qualified`, `standings_delta` and `bracket_version` for the live fill. Refusals reject with
+ * the axios error: 422 `MATCH_TIED` / `REASON_REQUIRED` / `SIDES_NOT_KNOWN`, 409 `RESULTS_LOCKED` / `RESULT_STALE` /
+ * `CORRECTION_NEEDS_APPROVAL`.
+ */
+export async function postMatchResult(
+  id: string,
+  fixtureId: string,
+  body: MatchResultBody,
+  options?: RequestOptions,
+): Promise<MatchEntryResponse> {
+  const { data } = await apiClient.post<unknown>(`/tournaments/${id}/matches/${fixtureId}/result`, body, {
+    correlationId: options?.correlationId,
+  });
+  return normaliseEntryResponse(data);
+}
+
+/**
+ * `POST /tournaments/{id}/committee/actions` with `result_winner_change`: the proposed result of a correction that
+ * changes the winner, sent for a second committee member to approve (match-scoring AD-S6). The server derives the winner.
+ */
+export async function submitResultChangeForApproval(
+  id: string,
+  fixtureId: string,
+  body: Pick<MatchResultBody, 'result_type' | 'sets' | 'advancing_side'> & { reason: string },
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.post(
+    `/tournaments/${id}/committee/actions`,
+    {
+      action_type: 'result_winner_change',
+      fixture_id: fixtureId,
+      result_type: body.result_type,
+      sets: body.sets,
+      advancing_side: body.advancing_side,
+      reason: body.reason,
+    },
+    { correlationId: options?.correlationId },
+  );
+}
+
+/** `GET /tournaments/{id}/committee/actions`: the requests the caller may see (all for an active committee member). */
+export async function getCommitteeActions(id: string, options?: RequestOptions): Promise<ApprovalRequest[]> {
+  const { data } = await apiClient.get<unknown>(`/tournaments/${id}/committee/actions`, {
+    correlationId: options?.correlationId,
+  });
+  return normaliseApprovals(data);
+}
+
+/** `POST .../committee/actions/{request_id}/approve`: a version 2 approval executes in the same call (no code, no confirm). */
+export async function approveCommitteeAction(id: string, requestId: string, options?: RequestOptions): Promise<void> {
+  await apiClient.post(`/tournaments/${id}/committee/actions/${requestId}/approve`, {}, {
+    correlationId: options?.correlationId,
+  });
+}
+
+/** `POST .../committee/actions/{request_id}/reject`: takes no body and no reason. The maker uses it to withdraw. */
+export async function rejectCommitteeAction(id: string, requestId: string, options?: RequestOptions): Promise<void> {
+  await apiClient.post(`/tournaments/${id}/committee/actions/${requestId}/reject`, undefined, {
+    correlationId: options?.correlationId,
+  });
+}
+
+/** `POST /tournaments/{id}/registrations/committee-add`: an active committee member adds one individual (version 2). */
+export async function committeeAddPlayer(id: string, userId: string, options?: RequestOptions): Promise<void> {
+  await apiClient.post(`/tournaments/${id}/registrations/committee-add`, { user_id: userId }, {
+    correlationId: options?.correlationId,
+  });
+}
+
+/** `GET /tournaments/{id}/media`: newest first, paginated. Anyone who can view the tournament. */
+export async function getTournamentMedia(
+  id: string,
+  page: { limit: number; offset: number },
+  options?: RequestOptions,
+): Promise<MediaPage> {
+  const { data } = await apiClient.get<unknown>(`/tournaments/${id}/media`, {
+    params: { limit: page.limit, offset: page.offset },
+    correlationId: options?.correlationId,
+  });
+  return normaliseMediaPage(data);
+}
+
+/**
+ * `POST /tournaments/{id}/media`, one multipart field `file`. The server decides the kind from the bytes and holds every
+ * limit (size, count, video on or off): the app hard-codes none and shows the server's coded error
+ * (`MEDIA_NOT_ALLOWED`, `MEDIA_TOO_LARGE`, `MEDIA_LIMIT_REACHED`, `IMAGE_INVALID`).
+ */
+export async function uploadTournamentMedia(
+  id: string,
+  file: { uri: string; name: string; type: string },
+  options?: RequestOptions,
+): Promise<void> {
+  const formData = new FormData();
+  formData.append('file', file as unknown as Blob);
+  await apiClient.post(`/tournaments/${id}/media`, formData, {
+    correlationId: options?.correlationId,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+}
+
+/** `DELETE /tournaments/{id}/media/{media_id}` (204): the uploader or an active committee member. */
+export async function deleteTournamentMedia(id: string, mediaId: string, options?: RequestOptions): Promise<void> {
+  await apiClient.delete(`/tournaments/${id}/media/${mediaId}`, { correlationId: options?.correlationId });
 }

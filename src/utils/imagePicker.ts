@@ -15,13 +15,13 @@ export interface CropSize {
 export async function pickImage(
   source: 'camera' | 'library',
   cropTitle: string,
-  size: CropSize = { width: 500, height: 500 },
+  size: CropSize | null = { width: 500, height: 500 },
 ): Promise<PickedImage | null> {
+  // `size: null` picks the photo as it is, with no crop step (tournament Media: the server re-encodes and strips EXIF).
   const cropOptions = {
     mediaType: 'photo' as const,
-    cropping: true,
-    width: size.width,
-    height: size.height,
+    cropping: size !== null,
+    ...(size ? { width: size.width, height: size.height } : {}),
     compressImageQuality: 0.8,
     // iOS only (ignored on Android): HEIC must never reach the backend.
     forceJpg: true,

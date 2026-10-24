@@ -24,10 +24,11 @@ import {
   keyDateStates,
   type OverviewKind,
 } from '../../../utils/tournamentExperience';
+import { formatRuleRows } from '../../../utils/tournamentTabs';
 import type { StageState } from '../../../utils/tournamentExperience';
 import Button from '../../Button';
 import CourtBookingBlock from '../../court/CourtBookingBlock';
-import { CheckIcon, ChevronRightIcon, EditIcon } from '../../icons/ActionIcons';
+import { CameraIcon, CheckIcon, ChevronRightIcon, EditIcon } from '../../icons/ActionIcons';
 import { PersonPlusIcon } from '../../icons/GroupViewIcons';
 import { CalendarIcon, MapPinIcon, PeopleGreenIcon } from '../../icons/HomeV2Icons';
 import { TrophyIcon } from '../../icons/SharedIcons';
@@ -76,6 +77,8 @@ export interface OverviewProps {
   notice: string | null;
   cancel: { visible: boolean; loading: boolean; error: string | null; onPress: () => void };
   courtProviders: CourtProvider[] | null;
+  /** "Add banner" (AD-T1, te-a2): offered to the committee while the server says the tournament has no banner of its own. */
+  banner: { visible: boolean; loading: boolean; error: string | null; onPress: () => void };
 }
 
 export default function TournamentOverview(props: OverviewProps): React.JSX.Element {
@@ -86,7 +89,9 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
   const range = formatDateRange(tournament.starts_at, tournament.ends_at);
   const venue = tournament.venue_name || tournament.venue_label || null;
   const max = tournament.max_participants;
-  const states = keyDateStates(kind);
+  const states = keyDateStates(kind, Boolean(tournament.roster_frozen_at));
+  const ruleRows = formatRuleRows(tournament.format_rules);
+  const entrants = ruleRows.find(row => row.key === 'entrants');
 
   const status = (() => {
     switch (kind) {
@@ -111,6 +116,11 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
             <Text style={styles.cardTitle}>{t('mob.tournament.v2.ov_closed_title')}</Text>
             <Text style={styles.body}>{t('mob.tournament.v2.ov_closed_body', { count: props.registeredCount })}</Text>
             <Progress count={props.registeredCount} max={max} />
+            {tournament.roster_frozen_at ? (
+              <Text style={styles.frozen} testID="overview-roster-frozen">
+                {t('mob.tournament.v2.ov_roster_frozen', { date: formatDayShort(tournament.roster_frozen_at) })}
+              </Text>
+            ) : null}
           </Block>
         );
       case 'done': {
@@ -167,7 +177,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
   })();
 
   // Organizer tools: only the rows that have a working target in this build.
-  type Tool = { key: string; titleKey: LabelKey; subKey: LabelKey; tone: keyof typeof gradientTokens; icon: React.ReactNode; onPress: () => void };
+  type Tool = { key: string; titleKey: LabelKey; subKey?: LabelKey; tone: keyof typeof gradientTokens; icon: React.ReactNode; onPress: () => void };
   const tools: Tool[] = [];
   if (props.isCommittee) {
     if (kind === 'open' || kind === 'closed' || kind === 'live') {
@@ -200,6 +210,15 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
         onPress: () => props.onSelectTab('approvals'),
       });
     }
+    if (props.banner.visible) {
+      tools.push({
+        key: 'banner',
+        titleKey: 'mob.tournament.v2.add_banner',
+        tone: 'purple',
+        icon: <CameraIcon size={20} color={colors.white} />,
+        onPress: props.banner.onPress,
+      });
+    }
     if (props.isOrganiser && (kind === 'done' || tournament.lifecycle_status === 'past')) {
       tools.push({
         key: 'closure',
@@ -212,15 +231,32 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
     }
   }
 
-  const keyRows: { key: string; title: string; sub: string; state: StageState }[] = [
-    {
-      key: 'soft',
-      title: t('mob.tournament.v2.kd_soft'),
-      sub: tournament.registration_closes_at
-        ? t('mob.tournament.v2.kd_soft_sub', { date: formatDayShort(tournament.registration_closes_at) })
-        : '–',
-      state: states.soft,
-    },
+  const keyRows: { key: string; title: string; sub: string; state: StageState }[] = [];
+  if (tournament.registration_opened_at) {
+    keyRows.push({
+      key: 'opened',
+      title: t('mob.tournament.v2.kd_opened'),
+      sub: formatDayShort(tournament.registration_opened_at),
+      state: states.opened,
+    });
+  }
+  keyRows.push({
+    key: 'soft',
+    title: t('mob.tournament.v2.kd_soft'),
+    sub: tournament.registration_closes_at
+      ? t('mob.tournament.v2.kd_soft_sub', { date: formatDayShort(tournament.registration_closes_at) })
+      : '–',
+    state: states.soft,
+  });
+  if (tournament.registration_hard_block_at) {
+    keyRows.push({
+      key: 'hard',
+      title: t('mob.tournament.v2.kd_hard'),
+      sub: t('mob.tournament.v2.kd_hard_sub', { date: formatDayShort(tournament.registration_hard_block_at) }),
+      state: states.hard,
+    });
+  }
+  keyRows.push(
     {
       key: 'fixtures',
       title: t('mob.tournament.v2.kd_fixtures'),
@@ -230,7 +266,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
       state: states.fixtures,
     },
     { key: 'days', title: t('mob.tournament.v2.kd_days'), sub: range, state: states.days },
-  ];
+  );
 
   return (
     <View testID="tournament-overview">
@@ -259,7 +295,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
             <View key={tool.key}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`${t(tool.titleKey)}. ${t(tool.subKey)}`}
+                accessibilityLabel={tool.subKey ? `${t(tool.titleKey)}. ${t(tool.subKey)}` : t(tool.titleKey)}
                 onPress={tool.onPress}
                 style={[styles.toolRow, index > 0 ? styles.toolDivider : null]}
                 testID={`overview-tool-${tool.key}`}
@@ -267,7 +303,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
                 <View style={[styles.tile, { backgroundColor: gradientTokens[tool.tone].start }]}>{tool.icon}</View>
                 <View style={styles.rowText}>
                   <Text style={styles.rowTitle}>{t(tool.titleKey)}</Text>
-                  <Text style={styles.rowSub}>{t(tool.subKey)}</Text>
+                  {tool.subKey ? <Text style={styles.rowSub}>{t(tool.subKey)}</Text> : null}
                 </View>
                 <View style={styles.chevronBox}>
                   <ChevronRightIcon size={16} color={colors.textMuted} />
@@ -318,10 +354,24 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
                   ? t('mob.tournament.v2.format_teams')
                   : t('mob.tournament.v2.format_individuals')}
               </Text>
-              <Text style={styles.rowSub}>{t('mob.tournament.v2.format_max', { max })}</Text>
+              <Text style={styles.rowSub}>
+                {entrants ? t(entrants.labelKey, entrants.params) : t('mob.tournament.v2.format_max', { max })}
+              </Text>
             </View>
           </View>
         ) : null}
+        {ruleRows
+          .filter(row => row.key !== 'entrants')
+          .map(row => (
+            <View key={row.key} style={styles.formatRow} testID={`format-rule-${row.key}`}>
+              <View style={[styles.tile, styles.tileLight]}>
+                <TrophyIcon size={22} />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowTitle}>{t(row.labelKey, row.params)}</Text>
+              </View>
+            </View>
+          ))}
       </Block>
 
       <Block testID="overview-key-dates">
@@ -361,6 +411,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
 
       <CourtBookingBlock providers={props.courtProviders} testID="overview-court-booking" />
 
+      {props.banner.error ? <Text style={styles.error}>{props.banner.error}</Text> : null}
       {props.cancel.visible ? (
         <View style={styles.cancel}>
           {props.cancel.error ? <Text style={styles.error}>{props.cancel.error}</Text> : null}
@@ -411,6 +462,7 @@ const styles = StyleSheet.create({
   chipPurple: { backgroundColor: colors.avatarTint5, borderRadius: radius.full, paddingHorizontal: spacing.sm + 2, paddingVertical: 4, marginBottom: spacing.xs },
   chipPurpleText: { ...typography.label, color: colors.avatarTintText5 },
   secondary: { marginBottom: spacing.md },
+  frozen: { ...typography.caption, color: dash.textMuted, marginTop: spacing.xs },
   toolsHead: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs },
   toolsTitle: { flex: 1, marginBottom: 0 },
   badge: { backgroundColor: colors.avatarTint5, borderRadius: radius.full, paddingHorizontal: spacing.sm + 2, paddingVertical: 3 },

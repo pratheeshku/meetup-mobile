@@ -145,4 +145,6 @@ export interface TournamentStandingsView {
   published: boolean;
   groups: ScoringGroup[];
   knockout: ScoringMatch[];
+  /** The tie-break order the server uses (codes such as `matches_won`); shown as words, never applied here. */
+  tiebreakers?: string[];
 }

@@ -35,6 +35,9 @@ const INPUT_SCREENS = [
   'src/screens/GroupDetailScreen.tsx',
   'src/screens/ProfileScreen.tsx',
   'src/components/onboarding/MobileNumberStep.tsx',
+  // te-a2: bottom sheets with their own keyboard-aware body
+  'src/components/tournament/v2/tabs/ScoreSheet.tsx',
+  'src/components/tournament/v2/tabs/CloseSheet.tsx',
 ];
 
 /** Components that render inputs but are always placed inside one of the screens above. */
@@ -43,6 +46,8 @@ const SHARED_INPUT_COMPONENTS = [
   'src/components/MobileNumberInput.tsx',
   'src/components/MobileNumberCard.tsx',
   'src/components/UserSearchPicker.tsx',
+  // te-a2: the search box of Participants, inside the version 2 tournament page (a KeyboardAwareScreen)
+  'src/components/tournament/v2/tabs/ParticipantsTab.tsx',
 ];
 
 const files = sourceFiles('src');

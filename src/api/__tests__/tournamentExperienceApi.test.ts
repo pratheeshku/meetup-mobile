@@ -63,7 +63,7 @@ describe('tournament read: additive fields', () => {
     ['banner_url', 'logo_url', 'banner_tone', 'banner_scrim', 'has_custom_banner', 'organizer', 'committee'].forEach(key => delete older[key]);
     get.mockResolvedValueOnce({ data: older });
     const t = await getTournament('t-1');
-    expect(t).toMatchObject({ banner_url: null, logo_url: null, banner_tone: null, banner_scrim: null, has_custom_banner: false, organizer: null, committee: [] });
+    expect(t).toMatchObject({ banner_url: null, logo_url: null, banner_tone: null, banner_scrim: null, has_custom_banner: null, organizer: null, committee: [], lifecycle_version: null, format_rules: null });
   });
 
   it('an unknown tone is dropped rather than shown', async () => {
