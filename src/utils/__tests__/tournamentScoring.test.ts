@@ -112,8 +112,8 @@ describe('ms-s5 fields', () => {
 });
 
 describe('normaliseScoringState', () => {
-  it('reads enabled and applicable as booleans and nothing else', () => {
-    expect(normaliseScoringState({ enabled: true, applicable: true, committee: null, is_committee: false })).toEqual({ enabled: true, applicable: true });
+  it('reads enabled and applicable as booleans, plus is_committee (te-a3), and nothing else', () => {
+    expect(normaliseScoringState({ enabled: true, applicable: true, committee: null, is_committee: false })).toEqual({ enabled: true, applicable: true, is_committee: false });
     expect(normaliseScoringState({ enabled: true })).toEqual({ enabled: true, applicable: false });
     expect(normaliseScoringState({ enabled: 'true', applicable: 1 })).toEqual({ enabled: false, applicable: false });
     expect(normaliseScoringState(null)).toBeNull();

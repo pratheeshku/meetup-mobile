@@ -67,7 +67,7 @@ export interface TournamentDetailV2Props {
   invitePanel: React.ReactNode;
   /** The Responses block kept inside Participants (addendum section 2). */
   responses: React.ReactNode;
-  /** A change was made (a player added or removed, a decision, a saved report): the host re-reads the page. */
+  /** A change was made (a player added or removed, a decision, a saved report, a setup step): the host re-reads the page. */
   onChanged: () => void;
 }
 
@@ -153,6 +153,13 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
     ]);
   };
 
+  // Registration id (lower case) to display name: the draft and the review sheet carry ids, the screen shows names.
+  const names = new Map(props.registrations.map(r => [r.id.toLowerCase(), r.nickname] as const));
+  const fileStem =
+    tournament.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'tournament';
   const hasRegistration = props.registrations.some(r => r.user_id === props.viewerId && r.status === 'registered');
 
   const body = (): React.JSX.Element => {
@@ -211,12 +218,17 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
             isCommittee={isCommittee}
             resultsLocked={resultsLocked}
             onSentForApproval={props.onChanged}
+            setup={scoring?.committee ?? null}
+            phase={scoring?.registration_phase ?? null}
+            names={names}
+            fileStem={fileStem}
+            onChanged={props.onChanged}
           />
         );
       case 'standings':
         return <StandingsTab board={board} isCommittee={isCommittee} />;
       case 'approvals':
-        return <ApprovalsTab tournament={tournament} board={board} viewerId={props.viewerId} onDecided={props.onChanged} />;
+        return <ApprovalsTab tournament={tournament} board={board} viewerId={props.viewerId} names={names} onDecided={props.onChanged} />;
       case 'results':
         return (
           <ResultsTab

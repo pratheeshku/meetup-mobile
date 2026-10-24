@@ -108,3 +108,66 @@ export interface ParticipantRow {
   name: string;
   registered_at: string;
 }
+
+/** A coded refusal of an upload (422 `POINTS_UPLOAD_INVALID`, `RESULTS_UPLOAD_INVALID`, file codes) or of a setup call. */
+export interface UploadRow {
+  sheet: string | null;
+  row: number | null;
+  column: string | null;
+  code: string;
+  matchId: string | null;
+}
+
+export interface UploadRefusal {
+  status: number;
+  code: string | null;
+  detail: string;
+  errorCount: number;
+  rows: UploadRow[];
+}
+
+export interface PointsAccepted {
+  entrants: number;
+  rated: number;
+  unrated: number;
+}
+
+export interface ResultsUploadSummary {
+  posted: number;
+  corrected: number;
+  unchanged: number;
+}
+
+export interface DraftSide {
+  kind: 'entrant' | 'group_place' | 'winner' | 'loser' | 'other';
+  entrantId: string | null;
+  group: string | null;
+  place: number | null;
+}
+
+export interface DraftMatch {
+  knockout: boolean;
+  round: number;
+  ordinal: number;
+  group: string;
+  start: string | null;
+  court: string | null;
+  a: DraftSide;
+  b: DraftSide;
+}
+
+/** `GET .../drafts/{id}`: registration ids only; names are filled in at the screen from the participants it loads. */
+export interface DraftDetail {
+  draftId: string;
+  version: number;
+  status: string;
+  payloadHash: string;
+  groups: number | null;
+  advance: number | null;
+  matchCount: number;
+  /** Groups with their entrants in the server's order; `seed` is the entrant's own rank in the draft. */
+  groupList: { key: string; members: { entrantId: string; seed: number | null }[] }[];
+  groupMatches: number;
+  knockoutMatches: number;
+  matches: DraftMatch[];
+}

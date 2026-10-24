@@ -56,6 +56,42 @@ export interface TournamentScoringState {
   tabs?: TournamentTabs | null;
   /** Seconds between refreshes for other viewers (v2 only). */
   live_poll_seconds?: number | null;
+  /** The server's answer to "is the viewer an active committee member" (te-a3 reads the draw block only when true). */
+  is_committee?: boolean;
+  /** Committee only: the points on file, the latest draft and the draw options the server allows (te-a3). */
+  committee?: CommitteeSetup | null;
+}
+
+export interface PointsOnFile {
+  entrants: number;
+  rated: number;
+  unrated: number;
+  locked: boolean;
+  uploaded_at: string | null;
+}
+
+export interface DraftSummary {
+  draft_id: string;
+  version: number;
+  /** `draft` (open), `published` or `superseded`. */
+  status: string;
+  payload_hash: string;
+  groups: number | null;
+  advance_per_group: number | null;
+  created_at: string | null;
+}
+
+/** `allowed` and `advance_per_group_allowed` are the server's: nothing is hard-coded on the device. */
+export interface GroupOptions {
+  suggested: number | null;
+  allowed: number[];
+  advance_per_group_allowed: number[];
+}
+
+export interface CommitteeSetup {
+  points: PointsOnFile | null;
+  latest_draft: DraftSummary | null;
+  group_options: GroupOptions | null;
 }
 
 export type TournamentTabKey = 'overview' | 'participants' | 'fixtures' | 'standings' | 'results' | 'media' | 'approvals';

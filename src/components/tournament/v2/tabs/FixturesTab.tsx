@@ -14,7 +14,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useT } from '../../../../labels/LabelsContext';
 import { dash } from '../../../../theme/dashboardTheme';
 import { borderWidth, colors, radius, spacing, typography } from '../../../../theme/tokens';
-import type { ScoringMatch } from '../../../../types/tournamentScoring';
+import type { CommitteeSetup, ScoringMatch } from '../../../../types/tournamentScoring';
 import type { MatchEntryResponse } from '../../../../types/tournamentTabs';
 import { formatClock, formatDayShort } from '../../../../utils/tournamentExperience';
 import {
@@ -27,9 +27,11 @@ import {
 } from '../../../../utils/tournamentTabs';
 import Button from '../../../Button';
 import UserAvatar from '../../../UserAvatar';
+import FixturesSetup from './FixturesSetup';
 import KnockoutBracket from './KnockoutBracket';
 import { knockoutName, slotText } from './matchLabels';
 import { CardHead, Chip, CommitteeNote, EmptyLine, TabCard } from './parts';
+import ResultsFileCard from './ResultsFileCard';
 import ScoreSheet from './ScoreSheet';
 import type { StandingsBoard } from './useStandingsBoard';
 
@@ -52,6 +54,13 @@ export interface FixturesTabProps {
   resultsLocked: boolean;
   /** A proposal was sent for approval: the host refreshes the Approvals badge. */
   onSentForApproval: () => void;
+  /** Committee setup of `scoring/state` (points, latest draft, draw options), and what the setup steps need (AD-T12). */
+  setup: CommitteeSetup | null;
+  phase: string | null;
+  names: ReadonlyMap<string, string>;
+  fileStem: string;
+  /** Something changed on the server that the page's scoring state shows: the host reads it again. */
+  onChanged: () => void;
 }
 
 export default function FixturesTab(props: FixturesTabProps): React.JSX.Element {
@@ -85,6 +94,18 @@ export default function FixturesTab(props: FixturesTabProps): React.JSX.Element 
     return t('mob.tournament.knockouts.group_finished', { group, names });
   };
 
+  if (!props.fixturesPublished && props.isCommittee) {
+    return (
+      <FixturesSetup
+        tournamentId={props.tournamentId}
+        fileStem={props.fileStem}
+        setup={props.setup}
+        phase={props.phase}
+        names={props.names}
+        onChanged={props.onChanged}
+      />
+    );
+  }
   if (!props.fixturesPublished) {
     return (
       <View testID="tournament-fixtures">
@@ -208,6 +229,17 @@ export default function FixturesTab(props: FixturesTabProps): React.JSX.Element 
           )
         ) : null}
       </TabCard>
+      {props.isCommittee && !props.resultsLocked ? (
+        <ResultsFileCard
+          tournamentId={props.tournamentId}
+          fileStem={props.fileStem}
+          matches={matchesFor(view, 'all').map(e => e.match)}
+          onUploaded={() => {
+            board.reload();
+            props.onChanged();
+          }}
+        />
+      ) : null}
       {editing ? (
         <ScoreSheet
           tournamentId={props.tournamentId}

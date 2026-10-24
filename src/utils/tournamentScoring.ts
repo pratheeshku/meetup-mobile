@@ -8,6 +8,7 @@
  * "mine" are the backend's fields.
  */
 import type {
+  CommitteeSetup,
   ScoringGroup,
   ScoringMatch,
   ScoringPlaceholder,
@@ -258,7 +259,49 @@ export function normaliseScoringState(raw: unknown): TournamentScoringState | nu
   if (typeof raw.live_poll_seconds === 'number') {
     state.live_poll_seconds = raw.live_poll_seconds;
   }
+  if (typeof raw.is_committee === 'boolean') {
+    state.is_committee = raw.is_committee;
+  }
+  if (isObject(raw.committee)) {
+    state.committee = normaliseCommitteeSetup(raw.committee);
+  }
   return state;
+}
+
+function normaliseCommitteeSetup(raw: Json): CommitteeSetup {
+  const points = isObject(raw.points) ? raw.points : null;
+  const draft = isObject(raw.latest_draft) && str(raw.latest_draft.draft_id) ? raw.latest_draft : null;
+  const options = isObject(raw.group_options) ? raw.group_options : null;
+  const numbers = (value: unknown): number[] => list(value).filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
+  return {
+    points: points
+      ? {
+          entrants: num(points.entrants),
+          rated: num(points.rated),
+          unrated: num(points.unrated),
+          locked: points.locked === true,
+          uploaded_at: str(points.uploaded_at),
+        }
+      : null,
+    latest_draft: draft
+      ? {
+          draft_id: str(draft.draft_id) as string,
+          version: num(draft.version),
+          status: str(draft.status) ?? '',
+          payload_hash: str(draft.payload_hash) ?? '',
+          groups: typeof draft.groups === 'number' ? draft.groups : null,
+          advance_per_group: typeof draft.advance_per_group === 'number' ? draft.advance_per_group : null,
+          created_at: str(draft.created_at),
+        }
+      : null,
+    group_options: options
+      ? {
+          suggested: typeof options.suggested === 'number' ? options.suggested : null,
+          allowed: numbers(options.allowed),
+          advance_per_group_allowed: numbers(options.advance_per_group_allowed),
+        }
+      : null,
+  };
 }
 
 const TAB_KEYS: TournamentTabKey[] = ['overview', 'participants', 'fixtures', 'standings', 'results', 'media', 'approvals'];
