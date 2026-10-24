@@ -12,7 +12,7 @@ import { borderWidth, colors, radius, spacing, typography } from '../../../theme
 import AddRemoveControl, { AddEntryRow } from '../../AddRemoveControl';
 import UserAvatar from '../../UserAvatar';
 import { ShieldIcon } from '../../icons/SharedIcons';
-import { Banner, StepHeading } from './parts';
+import { Banner, StepHeading, tokenFor, type StepFocus } from './parts';
 import type { WizardState } from '../../../utils/tournamentWizard';
 
 const AVATAR = 40;
@@ -24,6 +24,7 @@ export default function CommitteeStep({
   onOpenPicker,
   errorMessage,
   max,
+  focus,
 }: {
   state: WizardState;
   onRemove: (userId: string) => void;
@@ -31,6 +32,7 @@ export default function CommitteeStep({
   errorMessage: string | null;
   /** Additional members still allowed (`committee_max - 1 - added`). */
   max: number;
+  focus?: StepFocus;
 }): React.JSX.Element {
   const t = useT();
   const { user } = useAuth();
@@ -70,6 +72,7 @@ export default function CommitteeStep({
           title={t('mob.tw.committee_add')}
           onPress={onOpenPicker}
           disabled={max <= 0}
+          focusToken={tokenFor(focus, 'committee_add')}
           testID="tw-committee-add"
         />
       </View>

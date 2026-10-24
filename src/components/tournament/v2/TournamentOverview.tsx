@@ -340,6 +340,11 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
             </View>
             <View style={styles.rowText}>
               <Text style={styles.rowTitle}>{venue}</Text>
+              {tournament.venue_detail ? (
+                <Text style={styles.rowSub} testID="overview-venue-detail">
+                  {tournament.venue_detail}
+                </Text>
+              ) : null}
             </View>
           </View>
         ) : null}

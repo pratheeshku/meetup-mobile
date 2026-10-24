@@ -1688,5 +1688,10 @@ export const DEFAULT_LABELS = {
   // te-a3: no web equivalent (board text of the picked-file row).
   'mob.tournament.setup.file_tile': 'XLS',
   'mob.tournament.setup.file_size': '{kb} KB',
+  // te-a4 (AD-T13): seeded by the backend (te-b6), exact text.
+  'mob.tw.err_venue_detail_too_long': 'Keep it to 100 characters or fewer',
+  // te-a4 (AD-T13): new, not seeded yet (report, Appendix A).
+  'mob.tw.group_row_one': '{name} (1 member)',
+  'mob.tw.group_row_many': '{name} ({count} members)',
 } as const;
 

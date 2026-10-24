@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useT } from '../../../labels/LabelsContext';
 import { colors, spacing, typography } from '../../../theme/tokens';
-import { Banner, SectionCard, StepHeading } from './parts';
+import { Banner, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
 import { toDate, WIZARD_STEP, type WizardState } from '../../../utils/tournamentWizard';
 import { formatDay } from './RegistrationStep';
 
@@ -17,10 +17,12 @@ export default function ReviewStep({
   state,
   venueLabel,
   onEdit,
+  focus,
 }: {
   state: WizardState;
   venueLabel: string;
   onEdit: (step: number) => void;
+  focus?: StepFocus;
 }): React.JSX.Element {
   const t = useT();
   const team = state.participation === 'team';
@@ -35,7 +37,12 @@ export default function ReviewStep({
     {
       key: 'window',
       label: t('mob.tw.review_window'),
-      value: t('mob.tw.review_window_value', { start: day(state.startsAt), end: day(state.endsAt), venue: venueLabel }),
+      value: t('mob.tw.review_window_value', {
+        start: day(state.startsAt),
+        end: day(state.endsAt),
+        // AD-T13: the optional court or hall text follows the venue name ("Venue, Court 2").
+        venue: state.venueDetail.trim() ? `${venueLabel}, ${state.venueDetail.trim()}` : venueLabel,
+      }),
       step: WIZARD_STEP.when,
     },
     {
@@ -63,7 +70,7 @@ export default function ReviewStep({
   ];
   return (
     <View>
-      <StepHeading>{t('mob.tw.step_review')}</StepHeading>
+      <StepHeading focusToken={tokenFor(focus, 'heading')}>{t('mob.tw.step_review')}</StepHeading>
       <SectionCard>
         {rows.map(row => (
           <View key={row.key} style={styles.row} testID={`tw-review-${row.key}`}>

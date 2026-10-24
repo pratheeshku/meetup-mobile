@@ -61,6 +61,8 @@ export const FALLBACK_LIMITS: WizardLimits = { audience_group_cap: 20, committee
 
 export const TITLE_MAX = 150;
 export const DESCRIPTION_MAX = 5000;
+/** AD-T13: the server's limit on `venue_detail`, counted after trimming. */
+export const VENUE_DETAIL_MAX = 100;
 
 export interface WizardVenue {
   /** Catalogue venue (`venue_id`) or the "Others" form; null id with `othersInput` = Others. */
@@ -68,6 +70,9 @@ export interface WizardVenue {
   othersInput?: OthersVenueInput;
   name: string;
   address: string;
+  /** Catalogue venue coordinates, for the map preview of the shared picker (never sent to the server). */
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface WizardCommitteePerson {
@@ -94,6 +99,8 @@ export interface WizardState {
   /** Catalogue-off venue text. */
   venueName: string;
   venueAddress: string;
+  /** Optional "Court or hall details" (AD-T13), at most `VENUE_DETAIL_MAX` characters; sent as `venue_detail`. */
+  venueDetail: string;
   /** Board "Public / Private". Private with groups = `group`; private with none = `invite`. */
   isPrivate: boolean;
   groupIds: string[];
@@ -118,6 +125,7 @@ export function initialWizardState(clientRequestId: string, sport = ''): WizardS
     venue: null,
     venueName: '',
     venueAddress: '',
+    venueDetail: '',
     isPrivate: false,
     groupIds: [],
     committee: [],
@@ -313,7 +321,13 @@ export function hasVenue(state: WizardState, catalogueEnabled: boolean): boolean
 }
 
 export function validateVenue(state: WizardState, catalogueEnabled: boolean): WizardIssue[] {
-  return hasVenue(state, catalogueEnabled) ? [] : [{ key: 'mob.tw.err_venue', field: 'venue', step: WIZARD_STEP.when }];
+  const issues: WizardIssue[] = hasVenue(state, catalogueEnabled)
+    ? []
+    : [{ key: 'mob.tw.err_venue', field: 'venue', step: WIZARD_STEP.when }];
+  if (state.venueDetail.trim().length > VENUE_DETAIL_MAX) {
+    issues.push({ key: 'mob.tw.err_venue_detail_too_long', field: 'venue_detail', step: WIZARD_STEP.when });
+  }
+  return issues;
 }
 
 /** Registration dates: closure and hard block present and consistent with the window (first failure, the server's order). */
@@ -430,6 +444,7 @@ export function buildCreateBody(state: WizardState, catalogueEnabled: boolean): 
       venue.venue_address = state.venueAddress.trim();
     }
   }
+  const venueDetail = state.venueDetail.trim();
   return {
     client_request_id: state.clientRequestId,
     title: state.title.trim(),
@@ -438,6 +453,7 @@ export function buildCreateBody(state: WizardState, catalogueEnabled: boolean): 
     participation_mode: state.participation,
     visibility,
     ...venue,
+    ...(venueDetail ? { venue_detail: venueDetail } : {}),
     starts_at: isoOf(state.startsAt),
     ends_at: isoOf(state.endsAt),
     registration_closes_at: isoOf(state.closesAt),
@@ -535,6 +551,12 @@ export function mapCreateRejection(
       // The client sends neither (AD-T3), so these mean the server's default format is not active: nothing the
       // organizer can change. Shown on Review, state kept.
       return { kind: 'failed', issue: { key: 'mob.tw.err_template_unavailable', step: WIZARD_STEP.review } };
+    case 'VENUE_DETAIL_TOO_LONG':
+      return {
+        kind: 'step',
+        step: WIZARD_STEP.when,
+        issue: { key: 'mob.tw.err_venue_detail_too_long', field: 'venue_detail', step: WIZARD_STEP.when },
+      };
     case 'VENUE_INVALID':
       return { kind: 'step', step: WIZARD_STEP.when, issue: { key: 'mob.tw.err_venue', field: 'venue', step: WIZARD_STEP.when } };
     default:
@@ -544,4 +566,28 @@ export function mapCreateRejection(
     return { kind: 'disabled', issue: { key: 'mob.tw.err_disabled', step: WIZARD_STEP.review } };
   }
   return { kind: 'failed', issue: FAILED };
+}
+
+/**
+ * The field that takes focus on a step (te-a4, AD-T13): the first field with an error, else the first field of the step.
+ * `errors` is the step's error map keyed by field name. Text fields get the keyboard; date, choice and add fields get the
+ * focus ring and screen-reader focus without opening anything.
+ */
+export function firstFocusField(step: number, errors: Record<string, string>): string {
+  const order: Record<number, string[]> = {
+    [WIZARD_STEP.basics]: ['sport', 'title', 'description'],
+    [WIZARD_STEP.when]: ['starts_at', 'ends_at', 'venue', 'venue_detail'],
+    [WIZARD_STEP.registration]: ['registration_closes_at', 'registration_hard_block_at'],
+  };
+  const first: Record<number, string> = {
+    [WIZARD_STEP.basics]: 'title',
+    [WIZARD_STEP.participation]: 'participation',
+    [WIZARD_STEP.when]: 'starts_at',
+    [WIZARD_STEP.registration]: 'registration_closes_at',
+    [WIZARD_STEP.visibility]: 'visibility',
+    [WIZARD_STEP.committee]: 'committee_add',
+    [WIZARD_STEP.review]: 'heading',
+  };
+  const hit = (order[step] ?? []).find(field => errors[field]);
+  return hit ?? first[step] ?? 'heading';
 }

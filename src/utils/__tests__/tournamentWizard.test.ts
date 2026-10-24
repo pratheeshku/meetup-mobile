@@ -7,6 +7,7 @@ import {
   dateFailureIssue,
   displayStep,
   firstDateFailure,
+  firstFocusField,
   firstInvalidStep,
   initialWizardState,
   listableTemplates,
@@ -16,6 +17,8 @@ import {
   validateCommittee,
   validateRegistration,
   validateStep,
+  validateVenue,
+  VENUE_DETAIL_MAX,
   validateWindow,
   visibilityOf,
   withClosure,
@@ -305,5 +308,41 @@ describe('server rejections map to the step and field the boards show', () => {
     expect(boardStepFor(3, 'ends_at')).toBe(WIZARD_STEP.when);
     expect(boardStepFor(3, 'registration_hard_block_at')).toBe(WIZARD_STEP.registration);
     expect(boardStepFor(undefined, undefined)).toBeNull();
+  });
+});
+
+describe('venue_detail and focus (te-a4, AD-T13)', () => {
+  it('the court or hall text is trimmed, sent only when it has content, and counted after trimming', () => {
+    expect(buildCreateBody(validState(), false)).not.toHaveProperty('venue_detail');
+    expect(buildCreateBody(validState({ venueDetail: '   ' }), false)).not.toHaveProperty('venue_detail');
+    expect(buildCreateBody(validState({ venueDetail: '  Court 2 ' }), false).venue_detail).toBe('Court 2');
+    expect(validateVenue(validState({ venueDetail: 'x'.repeat(VENUE_DETAIL_MAX) }), false)).toEqual([]);
+    expect(validateVenue(validState({ venueDetail: ` ${'x'.repeat(VENUE_DETAIL_MAX)} ` }), false)).toEqual([]);
+    expect(validateVenue(validState({ venueDetail: 'x'.repeat(VENUE_DETAIL_MAX + 1) }), false)).toEqual([
+      { key: 'mob.tw.err_venue_detail_too_long', field: 'venue_detail', step: WIZARD_STEP.when },
+    ]);
+  });
+
+  it('VENUE_DETAIL_TOO_LONG goes back to When and where on the court field', () => {
+    const out = mapCreateRejection(
+      { response: { status: 422, data: { code: 'VENUE_DETAIL_TOO_LONG', field: 'venue_detail', reason: 'too_long', step: 1 } } },
+      { committeeMax: 10, startLabel: '' },
+    );
+    expect(out).toEqual({ kind: 'step', step: WIZARD_STEP.when, issue: { key: 'mob.tw.err_venue_detail_too_long', field: 'venue_detail', step: WIZARD_STEP.when } });
+  });
+
+  it('focus goes to the first field of each step, or to the first field with an error', () => {
+    expect(firstFocusField(WIZARD_STEP.basics, {})).toBe('title');
+    expect(firstFocusField(WIZARD_STEP.basics, { description: 'x', title: 'y' })).toBe('title');
+    expect(firstFocusField(WIZARD_STEP.basics, { description: 'x' })).toBe('description');
+    expect(firstFocusField(WIZARD_STEP.participation, {})).toBe('participation');
+    expect(firstFocusField(WIZARD_STEP.when, {})).toBe('starts_at');
+    expect(firstFocusField(WIZARD_STEP.when, { venue: 'v', ends_at: 'e' })).toBe('ends_at');
+    expect(firstFocusField(WIZARD_STEP.when, { venue_detail: 'd', venue: 'v' })).toBe('venue');
+    expect(firstFocusField(WIZARD_STEP.registration, { registration_hard_block_at: 'h' })).toBe('registration_hard_block_at');
+    expect(firstFocusField(WIZARD_STEP.registration, {})).toBe('registration_closes_at');
+    expect(firstFocusField(WIZARD_STEP.visibility, { group_ids: 'x' })).toBe('visibility');
+    expect(firstFocusField(WIZARD_STEP.committee, {})).toBe('committee_add');
+    expect(firstFocusField(WIZARD_STEP.review, {})).toBe('heading');
   });
 });

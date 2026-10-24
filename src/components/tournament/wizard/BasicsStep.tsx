@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { focusRingStyle, useAccessibilityFocus, useTextFocus } from '../../../hooks/useAccessibilityFocus';
 import { useT } from '../../../labels/LabelsContext';
 import { borderWidth, colors, radius, spacing, typography } from '../../../theme/tokens';
 import type { Sport } from '../../../types/sport';
@@ -11,7 +12,7 @@ import { ChevronRightIcon } from '../../icons/ActionIcons';
 import { TrophyIcon } from '../../icons/SharedIcons';
 import InlineError from '../../InlineError';
 import ImagesCard from './ImagesCard';
-import { FieldError, FieldLabel, SectionCard, StepHeading } from './parts';
+import { FieldError, FieldLabel, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
 import { DESCRIPTION_MAX, TITLE_MAX, type WizardState } from '../../../utils/tournamentWizard';
 
 const BADGE = 44;
@@ -23,6 +24,7 @@ export default function BasicsStep({
   onRetrySports,
   onChange,
   errors,
+  focus,
 }: {
   state: WizardState;
   sports: Sport[];
@@ -30,8 +32,12 @@ export default function BasicsStep({
   onRetrySports: () => void;
   onChange: (patch: Partial<WizardState>) => void;
   errors: Record<string, string>;
+  focus?: StepFocus;
 }): React.JSX.Element {
   const t = useT();
+  const sportFocus = useAccessibilityFocus(tokenFor(focus, 'sport'));
+  const titleRef = useTextFocus(tokenFor(focus, 'title'));
+  const descriptionRef = useTextFocus(tokenFor(focus, 'description'));
   const [picking, setPicking] = useState(false);
   const [pickFailed, setPickFailed] = useState(false);
   const current = sports.find(item => item.name === state.sport);
@@ -55,10 +61,15 @@ export default function BasicsStep({
       {pickFailed ? <FieldError message={t('mob.tw.images_pick_failed')} testID="tw-images-pick-error" /> : null}
       <SectionCard title={t('mob.tw.sport')} style={styles.basicsCard}>
         <Pressable
+          ref={sportFocus.ref}
+          onBlur={sportFocus.clear}
           accessibilityRole="button"
           accessibilityLabel={t('mob.tw.sport_change')}
-          onPress={() => setPicking(open => !open)}
-          style={styles.sportRow}
+          onPress={() => {
+            sportFocus.clear();
+            setPicking(open => !open);
+          }}
+          style={[styles.sportRow, sportFocus.ringed ? focusRingStyle : null]}
           testID="tw-sport-row"
         >
           <IconBadge size={BADGE} color="blue">
@@ -96,6 +107,7 @@ export default function BasicsStep({
 
         <FieldLabel>{t('mob.tw.name')}</FieldLabel>
         <TextField
+          ref={titleRef}
           value={state.title}
           onChangeText={title => onChange({ title })}
           placeholder={t('mob.tw.name_placeholder')}
@@ -108,6 +120,7 @@ export default function BasicsStep({
 
         <FieldLabel>{t('mob.tw.description')}</FieldLabel>
         <TextField
+          ref={descriptionRef}
           value={state.description}
           onChangeText={description => onChange({ description })}
           multiline

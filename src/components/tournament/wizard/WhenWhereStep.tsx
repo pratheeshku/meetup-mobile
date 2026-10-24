@@ -5,14 +5,15 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { useTextFocus } from '../../../hooks/useAccessibilityFocus';
 import { useT } from '../../../labels/LabelsContext';
 import { colors, spacing, typography } from '../../../theme/tokens';
 import type { Sport } from '../../../types/sport';
 import DateTimePickerField from '../../DateTimePickerField';
 import TextField from '../../TextField';
 import VenuePicker from '../../venue/VenuePicker';
-import { Banner, FieldError, FieldLabel, SectionCard, StepHeading } from './parts';
-import { toDate, type WizardState, type WizardVenue } from '../../../utils/tournamentWizard';
+import { Banner, FieldError, FieldLabel, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
+import { toDate, VENUE_DETAIL_MAX, type WizardState, type WizardVenue } from '../../../utils/tournamentWizard';
 
 function timeOf(value: string): string {
   const date = toDate(value);
@@ -27,6 +28,7 @@ export default function WhenWhereStep({
   onChange,
   errors,
   windowError,
+  focus,
 }: {
   state: WizardState;
   sport: Sport | undefined;
@@ -35,8 +37,10 @@ export default function WhenWhereStep({
   onChange: (patch: Partial<WizardState>) => void;
   errors: Record<string, string>;
   windowError: string | null;
+  focus?: StepFocus;
 }): React.JSX.Element {
   const t = useT();
+  const detailRef = useTextFocus(tokenFor(focus, 'venue_detail'));
   const start = timeOf(state.startsAt);
   const end = timeOf(state.endsAt);
   const selectedVenue = state.venue
@@ -44,8 +48,8 @@ export default function WhenWhereStep({
         venueId: state.venue.venueId,
         name: state.venue.name,
         address: state.venue.address,
-        lat: null,
-        lng: null,
+        lat: state.venue.lat ?? null,
+        lng: state.venue.lng ?? null,
         source: '',
         isOthers: Boolean(state.venue.othersInput),
         othersInput: state.venue.othersInput,
@@ -64,6 +68,7 @@ export default function WhenWhereStep({
               onChange={startsAt => onChange({ startsAt })}
               placeholder={t('mob.tw.pick_date')}
               accessibilityLabel={t('mob.tw.starts')}
+              focusToken={tokenFor(focus, 'starts_at')}
               testID="tw-starts"
             />
             <FieldError message={errors.starts_at} testID="tw-starts-error" />
@@ -76,6 +81,7 @@ export default function WhenWhereStep({
               onChange={endsAt => onChange({ endsAt })}
               placeholder={t('mob.tw.pick_date')}
               accessibilityLabel={t('mob.tw.ends')}
+              focusToken={tokenFor(focus, 'ends_at')}
               testID="tw-ends"
             />
             <FieldError message={errors.ends_at} testID="tw-ends-error" />
@@ -85,17 +91,18 @@ export default function WhenWhereStep({
         <Text style={styles.readonly} testID="tw-daily-hours">
           {start && end ? t('mob.tw.daily_hours_value', { start, end }) : t('mob.tw.daily_hours_empty')}
         </Text>
-        <FieldLabel>{t('mob.tw.venue')}</FieldLabel>
         {catalogueEnabled ? (
           <VenuePicker
             sportId={sport?.id ?? ''}
             sportDisplayName={sport?.display_name ?? state.sport}
             selectedVenue={selectedVenue}
-            variant="tournament"
             mapsApiKey={mapsApiKey}
+            autoFocusSearch={false}
             onSelectVenue={venue => {
               const address = [venue.block, venue.street].filter(Boolean).join(' ') || venue.street || '';
-              onChange({ venue: { venueId: venue.id, name: venue.name, address } as WizardVenue });
+              onChange({
+                venue: { venueId: venue.id, name: venue.name, address, lat: venue.lat ?? null, lng: venue.lng ?? null } as WizardVenue,
+              });
             }}
             onSaveOthersVenue={others =>
               onChange({
@@ -104,6 +111,8 @@ export default function WhenWhereStep({
                   othersInput: others.othersInput,
                   name: others.othersInput.name,
                   address: others.address ?? '',
+                  lat: others.lat ?? null,
+                  lng: others.lng ?? null,
                 },
               })
             }
@@ -111,6 +120,8 @@ export default function WhenWhereStep({
           />
         ) : (
           <>
+            {/* No picker here, so no heading of its own: the one "Venue" heading is this one. */}
+            <FieldLabel>{t('mob.create_game.venue_label')}</FieldLabel>
             <TextField
               value={state.venueName}
               onChangeText={venueName => onChange({ venueName })}
@@ -128,7 +139,20 @@ export default function WhenWhereStep({
             />
           </>
         )}
-        <FieldError message={errors.venue} testID="tw-venue-error" />
+        <FieldError message={errors.venue} testID="tw-venue-error" focusToken={tokenFor(focus, 'venue')} />
+        {/* AD-T13: optional "Court or hall details", the same field and labels as Create game (max 100). */}
+        <FieldLabel>{t('mob.create_game.court_details_label')}</FieldLabel>
+        <TextField
+          ref={detailRef}
+          value={state.venueDetail}
+          onChangeText={venueDetail => onChange({ venueDetail })}
+          placeholder={t('mob.create_game.court_details_placeholder')}
+          maxLength={VENUE_DETAIL_MAX + 20}
+          accessibilityLabel={t('mob.create_game.court_details_label')}
+          style={errors.venue_detail ? styles.invalid : undefined}
+          testID="tw-venue-detail"
+        />
+        <FieldError message={errors.venue_detail} testID="tw-venue-detail-error" />
       </SectionCard>
       {windowError ? <Banner tone="error" message={windowError} testID="tw-window-error" /> : null}
       <Text style={styles.footer}>{t('mob.tw.when_footer')}</Text>
@@ -140,6 +164,7 @@ const styles = StyleSheet.create({
   pair: { flexDirection: 'row', gap: spacing.sm },
   half: { flex: 1 },
   readonly: { ...typography.body, color: colors.textPrimary, paddingVertical: spacing.sm },
+  invalid: { borderColor: colors.error },
   addressField: { marginTop: spacing.sm },
   footer: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.md, textAlign: 'center' },
 });

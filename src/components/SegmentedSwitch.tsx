@@ -9,6 +9,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { focusRingStyle, useAccessibilityFocus } from '../hooks/useAccessibilityFocus';
 import { dash, dashRadius, dashSize } from '../theme/dashboardTheme';
 import { spacing, typography } from '../theme/tokens';
 
@@ -17,6 +18,8 @@ interface SegmentedSwitchProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   compact?: boolean;
+  /** A new non-zero value moves focus to the selected segment (ring and screen reader) without changing it (te-a4). */
+  focusToken?: number;
 }
 
 export default function SegmentedSwitch<T extends string>({
@@ -24,7 +27,9 @@ export default function SegmentedSwitch<T extends string>({
   value,
   onChange,
   compact = false,
+  focusToken,
 }: SegmentedSwitchProps<T>): React.JSX.Element {
+  const focus = useAccessibilityFocus(focusToken);
   return (
     <View style={[styles.track, compact ? styles.trackCompact : null]} accessibilityRole="tablist">
       {options.map(option => {
@@ -32,6 +37,8 @@ export default function SegmentedSwitch<T extends string>({
         return (
           <Pressable
             key={option.value}
+            ref={selected ? focus.ref : undefined}
+            onBlur={selected ? focus.clear : undefined}
             accessibilityRole="tab"
             accessibilityLabel={option.label}
             accessibilityState={{ selected }}
@@ -41,6 +48,7 @@ export default function SegmentedSwitch<T extends string>({
               compact ? styles.segmentCompact : null,
               selected ? styles.segmentSelected : null,
               pressed ? styles.pressed : null,
+              selected && focus.ringed ? focusRingStyle : null,
             ]}
           >
             <Text

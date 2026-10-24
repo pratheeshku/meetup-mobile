@@ -16,7 +16,7 @@ import TextField from '../../TextField';
 import { GroupInviteList } from '../../AddRemoveControl';
 import { LockIcon } from '../../icons/ActionIcons';
 import { GroupsIcon } from '../../icons/SharedIcons';
-import { Banner, SectionCard, StepHeading } from './parts';
+import { Banner, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
 import { groupCapReached, type WizardState } from '../../../utils/tournamentWizard';
 
 const BADGE = 44;
@@ -30,6 +30,7 @@ export default function VisibilityStep({
   onChange,
   onToggleGroup,
   serverError,
+  focus,
 }: {
   state: WizardState;
   groups: Group[];
@@ -40,6 +41,7 @@ export default function VisibilityStep({
   onToggleGroup: (groupId: string) => void;
   /** A rejection the server returned for this step (cap exceeded, not a member). */
   serverError: string | null;
+  focus?: StepFocus;
 }): React.JSX.Element {
   const t = useT();
   const [query, setQuery] = useState('');
@@ -62,6 +64,7 @@ export default function VisibilityStep({
           </IconBadge>
         }
         selected={!state.isPrivate}
+        focusToken={state.isPrivate ? 0 : tokenFor(focus, 'visibility')}
         onPress={() => onChange({ isPrivate: false })}
         style={styles.option}
       />
@@ -75,6 +78,7 @@ export default function VisibilityStep({
           </IconBadge>
         }
         selected={state.isPrivate}
+        focusToken={state.isPrivate ? tokenFor(focus, 'visibility') : 0}
         onPress={() => onChange({ isPrivate: true })}
         style={styles.option}
       />
@@ -105,6 +109,7 @@ export default function VisibilityStep({
               selectedIds={state.groupIds}
               onToggle={onToggleGroup}
               disabledIds={atCap ? unselectedIds : []}
+              showMemberCount
             />
           )}
           {atCap ? <Banner tone="error" message={t('mob.tw.err_group_cap', { cap })} testID="tw-group-cap" /> : null}

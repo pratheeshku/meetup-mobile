@@ -11,7 +11,7 @@ import { useT } from '../../../labels/LabelsContext';
 import { borderWidth, colors, radius, spacing, typography } from '../../../theme/tokens';
 import DateTimePickerField from '../../DateTimePickerField';
 import { CheckIcon, CrossIcon } from '../../icons/ActionIcons';
-import { FieldLabel, SectionCard, StepHeading } from './parts';
+import { FieldLabel, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
 import { registrationRules, toDate, type RuleState, type WizardState } from '../../../utils/tournamentWizard';
 
 const RULE_BOX = 22;
@@ -35,12 +35,14 @@ export default function RegistrationStep({
   onClosure,
   onHardBlock,
   errors,
+  focus,
 }: {
   state: WizardState;
   now: Date;
   onClosure: (value: string) => void;
   onHardBlock: (value: string) => void;
   errors: Record<string, string>;
+  focus?: StepFocus;
 }): React.JSX.Element {
   const t = useT();
   const closes = toDate(state.closesAt);
@@ -72,6 +74,7 @@ export default function RegistrationStep({
           onChange={onClosure}
           placeholder={t('mob.tw.pick_date')}
           accessibilityLabel={t('mob.tw.dates_soft')}
+          focusToken={tokenFor(focus, 'registration_closes_at')}
           testID="tw-soft-block"
         />
         {errors.registration_closes_at ? (
@@ -85,6 +88,7 @@ export default function RegistrationStep({
           onChange={onHardBlock}
           placeholder={t('mob.tw.pick_date')}
           accessibilityLabel={t('mob.tw.dates_hard')}
+          focusToken={tokenFor(focus, 'registration_hard_block_at')}
           testID="tw-hard-block"
         />
         {errors.registration_hard_block_at ? (

@@ -26,6 +26,7 @@ import { useT } from '../labels/LabelsContext';
 import { borderWidth, colors, groupView, radius, sizes, spacing, typography } from '../theme/tokens';
 import { MinusIcon, PlusIcon } from './icons/ActionIcons';
 import UserAvatar from './UserAvatar';
+import { focusRingStyle, useAccessibilityFocus } from '../hooks/useAccessibilityFocus';
 
 const CIRCLE = 36;
 const GLYPH = 20;
@@ -176,20 +177,26 @@ export function AddEntryButton({
   onPress,
   disabled = false,
   testID,
+  focusToken,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
   testID?: string;
+  /** A new non-zero value moves focus here (ring and screen reader) without pressing it (te-a4). */
+  focusToken?: number;
 }): React.JSX.Element {
+  const focus = useAccessibilityFocus(focusToken);
   return (
     <Pressable
+      ref={focus.ref}
+      onBlur={focus.clear}
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
-      style={({ pressed }) => [styles.target, pressed && !disabled ? styles.pressed : null]}
+      style={({ pressed }) => [styles.target, pressed && !disabled ? styles.pressed : null, focus.ringed ? focusRingStyle : null]}
       testID={testID ?? 'add-entry-button'}
     >
       <View style={[styles.circle, styles.circleAdd]}>
@@ -206,6 +213,7 @@ export function AddEntryRow({
   onPress,
   disabled = false,
   testID,
+  focusToken,
 }: {
   title: string;
   /** Accessible name; keeps the word "Invite" (defaults to the title). */
@@ -213,11 +221,12 @@ export function AddEntryRow({
   onPress: () => void;
   disabled?: boolean;
   testID?: string;
+  focusToken?: number;
 }): React.JSX.Element {
   return (
     <View style={styles.entryRow}>
       <Text style={styles.entryTitle}>{title}</Text>
-      <AddEntryButton label={label ?? title} onPress={onPress} disabled={disabled} testID={testID} />
+      <AddEntryButton label={label ?? title} onPress={onPress} disabled={disabled} testID={testID} focusToken={focusToken} />
     </View>
   );
 }
@@ -235,6 +244,8 @@ export interface GroupInviteRow {
   id: string;
   name: string;
   logo_url?: string | null;
+  /** From the group feed; null or absent when the server did not say. */
+  member_count?: number | null;
 }
 
 const GROUP_AVATAR = 36;
@@ -248,6 +259,7 @@ export function GroupInviteList({
   alreadyLabel,
   sectionLabels,
   disabledIds = [],
+  showMemberCount = false,
 }: {
   groups: readonly GroupInviteRow[];
   selectedIds: readonly string[];
@@ -259,7 +271,18 @@ export function GroupInviteList({
   sectionLabels?: { selected: string; available: string; alreadyIn: string };
   /** Rows whose "+" is off (for example at a cap); a staged row keeps its "−". */
   disabledIds?: readonly string[];
+  /** "Group name (10 members)" (te-a4, AD-T13); a group without a count shows its name only. */
+  showMemberCount?: boolean;
 }): React.JSX.Element {
+  const t = useT();
+  const rowTitle = (group: GroupInviteRow): string => {
+    if (!showMemberCount || group.member_count === null || group.member_count === undefined) {
+      return group.name;
+    }
+    return group.member_count === 1
+      ? t('mob.tw.group_row_one', { name: group.name })
+      : t('mob.tw.group_row_many', { name: group.name, count: group.member_count });
+  };
   const renderRow = (group: GroupInviteRow, already: boolean): React.JSX.Element => (
     <View key={group.id} style={styles.entryRow}>
       <View style={styles.entryMain}>
@@ -267,8 +290,8 @@ export function GroupInviteList({
         <View style={styles.groupAvatarBox}>
           <UserAvatar imageUrl={group.logo_url} name={group.name} size={GROUP_AVATAR} fallback="initials" />
         </View>
-        <Text style={styles.entryTitle} numberOfLines={1}>
-          {group.name}
+        <Text style={styles.entryTitle} numberOfLines={1} testID={`group-invite-title-${group.id}`}>
+          {rowTitle(group)}
         </Text>
       </View>
       <AddRemoveControl

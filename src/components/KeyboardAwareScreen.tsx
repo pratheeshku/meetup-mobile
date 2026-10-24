@@ -91,12 +91,15 @@ interface Props {
   /** Same as `ScrollView`'s: padding and layout of the scrolled content. */
   contentContainerStyle?: StyleProp<ViewStyle>;
   testID?: string;
+  /** A new value scrolls the content back to the top without animation (te-a4: a wizard step change). */
+  scrollToTopKey?: string | number;
 }
 
 export default function KeyboardAwareScreen({
   children,
   contentContainerStyle,
   testID,
+  scrollToTopKey,
 }: Props): React.JSX.Element {
   const isIos = Platform.OS === 'ios';
   const containerRef = useRef<View>(null);
@@ -115,6 +118,13 @@ export default function KeyboardAwareScreen({
       hide.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (scrollToTopKey !== undefined) {
+      scrollY.current = 0;
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [scrollToTopKey]);
 
   const ensureVisible = useCallback((input: TextInput) => {
     const container = containerRef.current;
