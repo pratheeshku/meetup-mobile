@@ -241,3 +241,52 @@ Text mirrors the web key in the last column (the backend serves it). Glossary: n
 | `mob.tournament.fixtures.setup_note` | Players cannot see these fixtures until a second committee member approves. After approval the Fixtures and Standings tabs open. | `web.tournament.fixtures.setup_note` |
 | `mob.tournament.setup.file_tile` | XLS | none (board text) |
 | `mob.tournament.setup.file_size` | {kb} KB | none (board text) |
+
+## Git evidence (literal output, after the code commit and the push)
+PR: https://github.com/pratheeshku/meetup-mobile/pull/58 (not a draft, open, not merged). Evidence added in one later commit (report text only).
+```
+$ git log --oneline origin/main..HEAD
+a9e9dc1 te-a3: fixtures setup, Review fixtures sheet and results file on mobile (AD-T12)
+
+$ git show HEAD --stat --format="%H %s"
+a9e9dc1cd1afbb665766cb5bc0b7cff47488de40 te-a3: fixtures setup, Review fixtures sheet and results file on mobile (AD-T12)
+
+ docs/reports/te-a3-raw-output.txt                  | 3761 ++++++++++++++++++++
+ docs/reports/te-a3-report.md                       |  243 ++
+ docs/status/te-a3-status.md                        |   30 +
+ jest.config.js                                     |    2 +-
+ jest.setup.documents.js                            |   16 +
+ package-lock.json                                  |   38 +
+ package.json                                       |    2 +
+ src/api/tournaments.ts                             |   63 +
+ .../tournament/v2/TournamentDetailV2.tsx           |   16 +-
+ src/components/tournament/v2/tabs/ApprovalsTab.tsx |   34 +
+ .../tournament/v2/tabs/FixturesSetup.tsx           |  440 +++
+ src/components/tournament/v2/tabs/FixturesTab.tsx  |   34 +-
+ src/components/tournament/v2/tabs/RefusalList.tsx  |   69 +
+ .../tournament/v2/tabs/ResultsFileCard.tsx         |  143 +
+ .../tournament/v2/tabs/ReviewFixturesSheet.tsx     |  132 +
+ .../tournament/v2/tabs/WorkbookPicker.tsx          |   52 +
+ src/labels/defaultLabels.ts                        |  120 +
+ .../__tests__/TournamentFixturesSetup.test.tsx     |  404 +++
+ src/types/tournamentScoring.ts                     |   36 +
+ src/types/tournamentTabs.ts                        |   63 +
+ src/utils/__tests__/fixturesSetup.test.ts          |  196 +
+ src/utils/__tests__/tournamentScoring.test.ts      |    4 +-
+ .../__tests__/tournamentScoringContract.test.ts    |    3 +-
+ src/utils/fileTransfer.ts                          |   83 +
+ src/utils/fixturesSetup.ts                         |  272 ++
+ src/utils/tournamentScoring.ts                     |   43 +
+ src/utils/tournamentTabs.ts                        |    5 +
+ 27 files changed, 6297 insertions(+), 7 deletions(-)
+
+$ git branch -r --contains HEAD
+  origin/claude/te-a3-mobile
+
+$ git rev-parse origin/claude/te-a3-mobile
+a9e9dc1cd1afbb665766cb5bc0b7cff47488de40
+
+$ git status --short
+ M android/version.properties
+ M docs/reports/te-a3-report.md
+```
