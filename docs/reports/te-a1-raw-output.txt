@@ -1,0 +1,259 @@
+# te-a1 raw command output (generated 2026-10-24, machine: MacBook, cwd ~/Developer/meetup-mobile)
+
+===== lint, whole repo (npm run lint), tail =====
+$ cd ~/Developer/meetup-mobile && pwd && npm run lint (whole repo)
+  105:1   error  'jest' is not defined                                                                                     no-undef
+  106:17  error  'jest' is not defined                                                                                     no-undef
+  107:22  error  'jest' is not defined                                                                                     no-undef
+  108:18  error  'jest' is not defined                                                                                     no-undef
+  110:13  error  'jest' is not defined                                                                                     no-undef
+  111:19  error  'jest' is not defined                                                                                     no-undef
+  112:14  error  'jest' is not defined                                                                                     no-undef
+  113:28  error  'jest' is not defined                                                                                     no-undef
+  114:27  error  'jest' is not defined                                                                                     no-undef
+  115:32  error  'jest' is not defined                                                                                     no-undef
+  124:1   error  'jest' is not defined                                                                                     no-undef
+  325:7   error  React Hook useEffect received a function whose dependencies are unknown. Pass an inline function instead  react-hooks/exhaustive-deps
+
+/Users/pratheesh/Developer/meetup-mobile/scripts/check-labels.js
+  45:7  warning  'used' is assigned a value but never used  no-unused-vars
+
+/Users/pratheesh/Developer/meetup-mobile/src/components/__tests__/NotificationCard.test.tsx
+  2:10  error  'Pressable' is defined but never used  @typescript-eslint/no-unused-vars
+  2:33  error  'Text' is defined but never used       @typescript-eslint/no-unused-vars
+
+/Users/pratheesh/Developer/meetup-mobile/src/components/icons/__tests__/RegistryIcons.test.tsx
+  7:3  error  'REGISTRY_CONFIG' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 32 problems (31 errors, 1 warning)
+
+
+===== eslint on every file changed or added by this task =====
+$ npx eslint <the files changed or added by this task>
+eslint exit=0
+
+===== type check =====
+$ npx tsc --noEmit
+tsc exit=0
+
+===== label scan =====
+$ npm run check:labels
+
+> MeetupMobile@0.0.1 check:labels
+> node scripts/check-labels.js
+
+scripts/check-labels.allowlist.json:0: [stale-allowlist] allowlist entry no longer matches anything (banned-term in src/labels/defaultLabels.ts: "mob.tw.committee_member") - remove it
+scripts/check-labels.allowlist.json:0: [stale-allowlist] allowlist entry no longer matches anything (banned-term in src/labels/defaultLabels.ts: "mob.tw.committee_add") - remove it
+scripts/check-labels.allowlist.json:0: [stale-allowlist] allowlist entry no longer matches anything (banned-term in src/labels/defaultLabels.ts: "mob.tw.committee_info") - remove it
+scripts/check-labels.allowlist.json:0: [stale-allowlist] allowlist entry no longer matches anything (banned-term in src/labels/defaultLabels.ts: "mob.tw.err_committee_few") - remove it
+scripts/check-labels.allowlist.json:0: [stale-allowlist] allowlist entry no longer matches anything (banned-term in src/labels/defaultLabels.ts: "mob.tw.err_committee_duplicate") - remove it
+scripts/check-labels.allowlist.json:0: [stale-allowlist] allowlist entry no longer matches anything (banned-term in src/labels/defaultLabels.ts: "mob.tw.created_committee_note") - remove it
+scripts/check-labels.allowlist.json:0: [stale-allowlist] allowlist entry no longer matches anything (banned-term in src/labels/defaultLabels.ts: "mob.committee_invite.body") - remove it
+
+check-labels: FAILED - 7 problem(s) in 277 files scanned.
+check:labels exit=1
+
+===== jest, AFTER (this branch), scoped list, full raw output =====
+PASS src/components/__tests__/GroupInviteListLogo.test.tsx
+PASS src/screens/__tests__/TournamentDetailCommittee.test.tsx
+PASS src/navigation/__tests__/RootNavigatorHomeTab.test.tsx
+PASS src/screens/__tests__/HomeTabs.test.tsx
+PASS src/api/__tests__/tournamentExperienceApi.test.ts
+PASS src/screens/__tests__/CreateTournamentEntry.test.tsx
+PASS src/screens/__tests__/HomeUpcomingJoin.test.tsx
+PASS src/screens/__tests__/TournamentInvite.test.tsx
+PASS src/screens/__tests__/AccessRefetchDetails.test.tsx
+PASS src/screens/__tests__/HomeStatsStrip.test.tsx
+PASS src/screens/__tests__/TournamentGameView.test.tsx
+PASS src/screens/__tests__/TournamentRespond.test.tsx
+PASS src/screens/__tests__/TournamentScoringScreen.test.tsx
+PASS src/screens/__tests__/TournamentDetailV2.test.tsx
+PASS src/components/__tests__/inviteControlsStatic.test.ts
+PASS src/screens/__tests__/TournamentResponses.test.tsx
+PASS src/screens/__tests__/TournamentDetailScreen.test.tsx
+PASS src/screens/__tests__/TournamentShare.test.tsx
+  ● Console
+
+    console.warn
+      Clipboard has been extracted from react-native core and will be removed in a future release. It can now be installed and imported from '@react-native-clipboard/clipboard' instead of 'react-native'. See https://github.com/react-native-clipboard/clipboard
+
+      42 |     expect(has(root, 'Copy Link')).toBe(true);
+      43 |
+    > 44 |     const setString = jest.spyOn(Clipboard, 'setString');
+         |                                  ^
+      45 |     await act(async () => pressableLabelled(root, 'Copy Link').props.onPress());
+      46 |     expect(setString).toHaveBeenCalledWith(getShareUrl());
+      47 |
+
+      at warn (node_modules/react-native/Libraries/Utilities/warnOnce.js:27:11)
+      at Object.warnOnce [as Clipboard] (node_modules/react-native/index.js:218:5)
+      at Object.Clipboard (src/screens/__tests__/TournamentShare.test.tsx:44:34)
+      at asyncGeneratorStep (node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS src/utils/__tests__/tournamentWizard.test.ts
+PASS src/api/__tests__/tournaments.test.ts
+PASS src/screens/__tests__/HomeCourtBooking.test.tsx
+PASS src/components/__tests__/AddRemoveControl.test.tsx
+PASS src/utils/__tests__/tournamentExperience.test.ts
+PASS src/components/__tests__/addRemoveGlyphStatic.test.ts
+PASS src/labels/__tests__/LabelsContext.test.tsx
+PASS src/api/__tests__/tournamentWizardApi.test.ts
+PASS src/utils/__tests__/tournamentScoring.test.ts
+PASS src/components/scoring/__tests__/TournamentScoringEntry.test.tsx
+PASS src/utils/__tests__/tournamentScoringContract.test.ts
+PASS src/screens/__tests__/TournamentRegistrationsMenu.test.tsx
+PASS src/screens/__tests__/TournamentWizardScreen.test.tsx
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+------------------------------|---------|----------|---------|---------|--------------------------------------------------------------------------------------------------------------------------------------------
+File                          | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                                                                                          
+------------------------------|---------|----------|---------|---------|--------------------------------------------------------------------------------------------------------------------------------------------
+All files                     |   78.55 |    73.21 |    74.1 |   78.63 |                                                                                                                                            
+ api                          |    39.1 |    50.71 |      60 |   38.31 |                                                                                                                                            
+  home.ts                     |    16.3 |     9.23 |   21.42 |   15.38 | 92-294                                                                                                                                     
+  tournaments.ts              |   71.87 |    86.66 |   77.41 |   71.42 | 204,282,385-388,401,435-444,465-504                                                                                                        
+ components                   |   97.26 |    82.27 |   95.83 |   97.05 |                                                                                                                                            
+  AddRemoveControl.tsx        |   97.26 |    82.27 |   95.83 |   97.05 | 94,317                                                                                                                                     
+ components/court             |   91.89 |    65.21 |    92.3 |   91.89 |                                                                                                                                            
+  CourtBookingBlock.tsx       |   91.89 |    65.21 |    92.3 |   91.89 | 35,69-73                                                                                                                                   
+ components/tournament/v2     |    91.4 |     73.6 |   81.81 |   92.06 |                                                                                                                                            
+  LockedPreview.tsx           |     100 |      100 |     100 |     100 |                                                                                                                                            
+  PeopleSheet.tsx             |     100 |      100 |     100 |     100 |                                                                                                                                            
+  StatusStrip.tsx             |     100 |    90.32 |     100 |     100 | 58,67,101                                                                                                                                  
+  TournamentDetailV2.tsx      |   93.54 |    68.57 |   85.71 |   93.33 | 61,158                                                                                                                                     
+  TournamentHeader.tsx        |   88.88 |    63.63 |   66.66 |   88.88 | 41,130                                                                                                                                     
+  TournamentOverview.tsx      |   83.33 |    66.29 |      70 |   85.36 | 158-165,180,184-190,204                                                                                                                    
+  TournamentTabs.tsx          |     100 |      100 |     100 |     100 |                                                                                                                                            
+ components/tournament/wizard |   80.23 |    65.89 |   67.94 |    82.2 |                                                                                                                                            
+  BasicsStep.tsx              |    61.9 |       50 |   45.45 |   63.15 | 53-84,112                                                                                                                                  
+  CommitteePicker.tsx         |   71.42 |    66.66 |   55.55 |      90 | 45                                                                                                                                         
+  CommitteeStep.tsx           |   88.88 |       75 |      75 |   88.88 | 61                                                                                                                                         
+  CreatedView.tsx             |     100 |    71.42 |     100 |     100 | 29,71                                                                                                                                      
+  DiscardDialog.tsx           |     100 |      100 |     100 |     100 |                                                                                                                                            
+  ImagesCard.tsx              |   81.25 |     87.5 |   63.63 |   81.25 | 60-61,69,95,138,157                                                                                                                        
+  ParticipationStep.tsx       |     100 |      100 |     100 |     100 |                                                                                                                                            
+  RegistrationStep.tsx        |     100 |     92.3 |     100 |     100 | 51,126                                                                                                                                     
+  ReviewStep.tsx              |     100 |     62.5 |     100 |     100 | 13-32,52                                                                                                                                   
+  VisibilityStep.tsx          |   86.66 |    77.77 |   71.42 |   91.66 | 65                                                                                                                                         
+  WhenWhereStep.tsx           |   68.75 |    42.85 |   55.55 |   68.75 | 97-110,123                                                                                                                                 
+  parts.tsx                   |      60 |    46.51 |   55.55 |      60 | 106-145                                                                                                                                    
+ screens                      |   73.31 |     66.6 |   63.68 |    73.4 |                                                                                                                                            
+  HomeScreen.tsx              |   72.85 |     58.1 |   55.93 |   73.39 | 150,159,167-184,194,226-234,262-263,283-284,297,388-393,403-404,411-412,433,473,495-496,501-502,507,512,519,549-551,614,650-707            
+  TournamentDetailScreen.tsx  |   63.25 |    66.56 |      50 |   63.51 | 165,196,210,257-260,287,294,334-338,351,360,367-370,416-426,434-468,473-494,504-505,509,516,533-606,611-636,737-774,846-857,1012,1056-1089 
+  TournamentWizardScreen.tsx  |   88.12 |     79.2 |   82.81 |   88.83 | 118,126,162-166,177,192,248-257,273-275,334,371-375                                                                                        
+ utils                        |   97.04 |    94.45 |     100 |   96.89 |                                                                                                                                            
+  tournamentExperience.ts     |   96.77 |    95.89 |     100 |   96.72 | 137,141                                                                                                                                    
+  tournamentScoring.ts        |   97.24 |    95.86 |     100 |   96.93 | 86,106,132                                                                                                                                 
+  tournamentWizard.ts         |      97 |    92.81 |     100 |   96.93 | 158,301,305,409,501                                                                                                                        
+------------------------------|---------|----------|---------|---------|--------------------------------------------------------------------------------------------------------------------------------------------
+
+Test Suites: 31 passed, 31 total
+Tests:       351 passed, 351 total
+Snapshots:   0 total
+Time:        4.729 s, estimated 11 s
+Ran all test suites matching /src\/utils\/__tests__\/tournamentWizard.test.ts|src\/utils\/__tests__\/tournamentExperience.test.ts|src\/utils\/__tests__\/tournamentScoring.test.ts|src\/utils\/__tests__\/tournamentScoringContract.test.ts|src\/api\/__tests__\/tournamentExperienceApi.test.ts|src\/api\/__tests__\/tournamentWizardApi.test.ts|src\/api\/__tests__\/tournaments.test.ts|src\/screens\/__tests__\/TournamentWizardScreen.test.tsx|src\/screens\/__tests__\/CreateTournamentEntry.test.tsx|src\/screens\/__tests__\/HomeCourtBooking.test.tsx|src\/screens\/__tests__\/HomeTabs.test.tsx|src\/screens\/__tests__\/HomeStatsStrip.test.tsx|src\/screens\/__tests__\/HomeUpcomingJoin.test.tsx|src\/screens\/__tests__\/TournamentDetailV2.test.tsx|src\/screens\/__tests__\/TournamentDetailScreen.test.tsx|src\/screens\/__tests__\/TournamentDetailCommittee.test.tsx|src\/screens\/__tests__\/TournamentGameView.test.tsx|src\/screens\/__tests__\/TournamentInvite.test.tsx|src\/screens\/__tests__\/TournamentRespond.test.tsx|src\/screens\/__tests__\/TournamentResponses.test.tsx|src\/screens\/__tests__\/TournamentRegistrationsMenu.test.tsx|src\/screens\/__tests__\/TournamentShare.test.tsx|src\/screens\/__tests__\/AccessRefetchDetails.test.tsx|src\/screens\/__tests__\/TournamentScoringScreen.test.tsx|src\/components\/__tests__\/GroupInviteListLogo.test.tsx|src\/components\/__tests__\/AddRemoveControl.test.tsx|src\/components\/__tests__\/addRemoveGlyphStatic.test.ts|src\/components\/__tests__\/inviteControlsStatic.test.ts|src\/components\/scoring\/__tests__\/TournamentScoringEntry.test.tsx|src\/labels\/__tests__\/LabelsContext.test.tsx|src\/navigation\/__tests__\/RootNavigatorHomeTab.test.tsx/i.
+
+===== jest, BEFORE (origin/main 5284339, same coverage file list, the scoped tests that exist there), full raw output =====
+PASS src/api/__tests__/tournaments.test.ts
+PASS src/utils/__tests__/tournamentWizard.test.ts
+PASS src/screens/__tests__/TournamentScoringScreen.test.tsx (5.401 s)
+PASS src/screens/__tests__/TournamentDetailCommittee.test.tsx (6.191 s)
+PASS src/screens/__tests__/HomeStatsStrip.test.tsx (5.215 s)
+PASS src/labels/__tests__/LabelsContext.test.tsx
+PASS src/screens/__tests__/HomeTabs.test.tsx
+PASS src/screens/__tests__/AccessRefetchDetails.test.tsx (6.543 s)
+PASS src/utils/__tests__/tournamentScoringContract.test.ts
+PASS src/components/__tests__/AddRemoveControl.test.tsx
+PASS src/screens/__tests__/HomeUpcomingJoin.test.tsx (5.498 s)
+PASS src/utils/__tests__/tournamentScoring.test.ts
+PASS src/screens/__tests__/TournamentGameView.test.tsx
+PASS src/components/__tests__/addRemoveGlyphStatic.test.ts
+PASS src/screens/__tests__/TournamentResponses.test.tsx
+PASS src/screens/__tests__/TournamentRespond.test.tsx
+PASS src/screens/__tests__/TournamentInvite.test.tsx (7.205 s)
+PASS src/screens/__tests__/TournamentRegistrationsMenu.test.tsx
+PASS src/api/__tests__/tournamentWizardApi.test.ts
+PASS src/components/__tests__/inviteControlsStatic.test.ts
+PASS src/components/scoring/__tests__/TournamentScoringEntry.test.tsx
+PASS src/screens/__tests__/TournamentShare.test.tsx
+  ● Console
+
+    console.warn
+      Clipboard has been extracted from react-native core and will be removed in a future release. It can now be installed and imported from '@react-native-clipboard/clipboard' instead of 'react-native'. See https://github.com/react-native-clipboard/clipboard
+
+      42 |     expect(has(root, 'Copy Link')).toBe(true);
+      43 |
+    > 44 |     const setString = jest.spyOn(Clipboard, 'setString');
+         |                                  ^
+      45 |     await act(async () => pressableLabelled(root, 'Copy Link').props.onPress());
+      46 |     expect(setString).toHaveBeenCalledWith(getShareUrl());
+      47 |
+
+      at warn (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/react-native/Libraries/Utilities/warnOnce.js:27:11)
+      at Object.warnOnce [as Clipboard] (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/react-native/index.js:218:5)
+      at Object.Clipboard (src/screens/__tests__/TournamentShare.test.tsx:44:34)
+      at asyncGeneratorStep (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+PASS src/screens/__tests__/TournamentDetailScreen.test.tsx
+PASS src/screens/__tests__/CreateTournamentEntry.test.tsx
+PASS src/screens/__tests__/TournamentWizardScreen.test.tsx (7.637 s)
+PASS src/navigation/__tests__/RootNavigatorHomeTab.test.tsx
+------------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------
+File                          | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                                                                               
+------------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------
+All files                     |   76.65 |    70.62 |   74.01 |   76.49 |                                                                                                                                 
+ api                          |   33.56 |    38.05 |   56.09 |    33.1 |                                                                                                                                 
+  home.ts                     |    12.5 |     1.66 |    8.33 |    12.5 | 91-293                                                                                                                          
+  tournaments.ts              |   65.51 |    79.24 |   75.86 |   64.91 | 177,255,358-361,374,408-417,435-477                                                                                             
+ components                   |   97.22 |    82.27 |   95.83 |   97.01 |                                                                                                                                 
+  AddRemoveControl.tsx        |   97.22 |    82.27 |   95.83 |   97.01 | 93,301                                                                                                                          
+ components/tournament/wizard |   82.55 |    67.64 |   71.64 |   84.89 |                                                                                                                                 
+  BasicsStep.tsx              |   53.33 |       50 |    37.5 |   53.84 | 44-68,96                                                                                                                        
+  CommitteePicker.tsx         |   71.42 |    66.66 |   55.55 |      90 | 45                                                                                                                              
+  CommitteeStep.tsx           |   88.88 |       75 |      75 |   88.88 | 61                                                                                                                              
+  CreatedView.tsx             |     100 |       75 |     100 |     100 | 68                                                                                                                              
+  DiscardDialog.tsx           |     100 |      100 |     100 |     100 |                                                                                                                                 
+  FormatStep.tsx              |    90.9 |       80 |     100 |    90.9 | 46                                                                                                                              
+  ParticipationStep.tsx       |   76.92 |       70 |      80 |   76.92 | 39-40,87                                                                                                                        
+  RegistrationStep.tsx        |     100 |    93.75 |     100 |     100 | 45                                                                                                                              
+  ReviewStep.tsx              |     100 |    46.15 |     100 |     100 | 14,42-50,70                                                                                                                     
+  VisibilityStep.tsx          |   86.66 |    77.77 |   71.42 |   91.66 | 65                                                                                                                              
+  WhenWhereStep.tsx           |   68.75 |    42.85 |   55.55 |   68.75 | 97-110,123                                                                                                                      
+  parts.tsx                   |      85 |    79.06 |   77.77 |      85 | 132-145                                                                                                                         
+ screens                      |   74.42 |    65.14 |   66.29 |   74.32 |                                                                                                                                 
+  HomeScreen.tsx              |   72.38 |     58.1 |      55 |    72.9 | 149,158,166-183,193,225-233,261-262,282-283,296,387-392,402-403,410-411,432,472,494-495,500-501,506,511,518,548-550,613,649-706 
+  TournamentDetailScreen.tsx  |   63.91 |    63.23 |   55.31 |   64.33 | 154,185,199,246,271,278,318-322,335,344,351-354,400-410,418-452,457-478,488-489,493,500,517-590,595-620,742-753,908,952-985     
+  TournamentWizardScreen.tsx  |   89.07 |    77.27 |   82.43 |   89.15 | 129,137,145,181-185,196,217,257,281-290,354,390-394,437-438                                                                     
+ utils                        |   96.45 |    92.73 |     100 |   96.25 |                                                                                                                                 
+  tournamentScoring.ts        |   96.59 |    94.89 |     100 |    96.1 | 84,104,130                                                                                                                      
+  tournamentWizard.ts         |   96.39 |    91.62 |     100 |   96.31 | 146,190,206,360,364,483,578                                                                                                     
+------------------------------|---------|----------|---------|---------|---------------------------------------------------------------------------------------------------------------------------------
+
+Test Suites: 26 passed, 26 total
+Tests:       291 passed, 291 total
+Snapshots:   0 total
+Time:        9.901 s
+Ran all test suites matching /src\/utils\/__tests__\/tournamentWizard.test.ts|src\/utils\/__tests__\/tournamentScoring.test.ts|src\/utils\/__tests__\/tournamentScoringContract.test.ts|src\/api\/__tests__\/tournamentWizardApi.test.ts|src\/api\/__tests__\/tournaments.test.ts|src\/screens\/__tests__\/TournamentWizardScreen.test.tsx|src\/screens\/__tests__\/CreateTournamentEntry.test.tsx|src\/screens\/__tests__\/HomeTabs.test.tsx|src\/screens\/__tests__\/HomeStatsStrip.test.tsx|src\/screens\/__tests__\/HomeUpcomingJoin.test.tsx|src\/screens\/__tests__\/TournamentDetailScreen.test.tsx|src\/screens\/__tests__\/TournamentDetailCommittee.test.tsx|src\/screens\/__tests__\/TournamentGameView.test.tsx|src\/screens\/__tests__\/TournamentInvite.test.tsx|src\/screens\/__tests__\/TournamentRespond.test.tsx|src\/screens\/__tests__\/TournamentResponses.test.tsx|src\/screens\/__tests__\/TournamentRegistrationsMenu.test.tsx|src\/screens\/__tests__\/TournamentShare.test.tsx|src\/screens\/__tests__\/AccessRefetchDetails.test.tsx|src\/screens\/__tests__\/TournamentScoringScreen.test.tsx|src\/components\/__tests__\/AddRemoveControl.test.tsx|src\/components\/__tests__\/addRemoveGlyphStatic.test.ts|src\/components\/__tests__\/inviteControlsStatic.test.ts|src\/components\/scoring\/__tests__\/TournamentScoringEntry.test.tsx|src\/labels\/__tests__\/LabelsContext.test.tsx|src\/navigation\/__tests__\/RootNavigatorHomeTab.test.tsx/i.
+
+===== jest, BASELINE of the two suites that fail on origin/main (HomeScreen.test.tsx, EventDetailScreen.test.tsx), tail =====
+      at pressableLabelled (src/test-utils/render.ts:88:11)
+      at src/screens/__tests__/EventDetailScreen.test.tsx:1082:32
+      at Object.<anonymous>.process.env.NODE_ENV.exports.act (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/react/cjs/react.development.js:814:22)
+      at Object.<anonymous> (src/screens/__tests__/EventDetailScreen.test.tsx:1082:8)
+      at asyncGeneratorStep (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../../../../../../Users/pratheesh/Developer/meetup-mobile/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 2 failed, 2 total
+Tests:       64 failed, 26 passed, 90 total
+Snapshots:   0 total
+Time:        5.418 s
+Ran all test suites matching /src\/screens\/__tests__\/HomeScreen.test.tsx|src\/screens\/__tests__\/EventDetailScreen.test.tsx/i.
+===== jest, FIRST run on this branch (before my test fixes), tail =====
+      at _next (node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+
+Test Suites: 6 failed, 27 passed, 33 total
+Tests:       73 failed, 368 passed, 441 total
+Snapshots:   0 total
+Time:        12.722 s

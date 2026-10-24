@@ -4,16 +4,18 @@
  * rejection to the wizard step and field the boards show. The server stays the only authority (AD-20): nothing is
  * adjusted silently and a server rejection always wins over what the client believed.
  *
- * Board order (390x844 boards, "Step n of 8"): 1 Basics, 2 Format, 3 Participation, 4 When and where,
- * 5 Registration dates, 6 Who can see it, 7 Committee, 8 Review. The server numbers AD-20's own seven steps
- * (`create_contract.STEP_*`), so `step` in a rejection is translated here, never shown.
+ * Screens (tournament-experience AD-T3: the Format step is gone, there is one format): 1 Basics, 2 Participation,
+ * 3 When and where, 4 Registration dates, 5 Who can see it, 6 Committee, 7 Review. The server numbers the wizard in
+ * six steps (te-b1 report: Basics 1, Participation 2, Dates 3, Groups 4, Committee 5, Review 6 client only), where
+ * "When and where" and "Registration dates" are both its Dates step. `step` in a rejection is translated here and
+ * the count shown in the header follows the server mapping (`displayStep`).
  */
 import type { LabelKey } from '../labels/fallbackLabels';
+import type { PickedImage } from './imagePicker';
 import type { OthersVenueInput } from '../types/venue';
 import type {
   WizardCreateBody,
   WizardLimits,
-  WizardOverrideField,
   WizardParticipation,
   WizardRejection,
   WizardTemplate,
@@ -23,18 +25,39 @@ import { localDateTimeToDate } from './localDateTime';
 
 export const WIZARD_STEP = {
   basics: 1,
-  format: 2,
-  participation: 3,
-  when: 4,
-  registration: 5,
-  visibility: 6,
-  committee: 7,
-  review: 8,
+  participation: 2,
+  when: 3,
+  registration: 4,
+  visibility: 5,
+  committee: 6,
+  review: 7,
 } as const;
-export const WIZARD_TOTAL_STEPS = 8;
+/** Number of screens. */
+export const WIZARD_SCREEN_COUNT = 7;
+/** Steps the server counts (te-b1 report): the count the header shows. */
+export const WIZARD_TOTAL_STEPS = 6;
+
+/** The server's step number for a screen: "When and where" and "Registration dates" are both its Dates step 3. */
+export function displayStep(step: number): number {
+  switch (step) {
+    case WIZARD_STEP.basics:
+      return 1;
+    case WIZARD_STEP.participation:
+      return 2;
+    case WIZARD_STEP.when:
+    case WIZARD_STEP.registration:
+      return 3;
+    case WIZARD_STEP.visibility:
+      return 4;
+    case WIZARD_STEP.committee:
+      return 5;
+    default:
+      return 6;
+  }
+}
 
 /** Server defaults when `limits` is absent (`create_contract.DEFAULT_*`). Read from the server whenever it sends them. */
-export const FALLBACK_LIMITS: WizardLimits = { audience_group_cap: 20, committee_max: 10, min_gap_hours: 72 };
+export const FALLBACK_LIMITS: WizardLimits = { audience_group_cap: 20, committee_max: 10 };
 
 export const TITLE_MAX = 150;
 export const DESCRIPTION_MAX = 5000;
@@ -59,13 +82,7 @@ export interface WizardState {
   sport: string;
   title: string;
   description: string;
-  templateId: string | null;
   participation: WizardParticipation;
-  /** Player (individual) or team (team) count range. */
-  entrantsMin: number | null;
-  entrantsMax: number | null;
-  teamSizeMin: number | null;
-  teamSizeMax: number | null;
   /** "YYYY-MM-DD HH:mm" in the device's local time, as the shared date-time field emits. */
   startsAt: string;
   endsAt: string;
@@ -81,6 +98,9 @@ export interface WizardState {
   isPrivate: boolean;
   groupIds: string[];
   committee: WizardCommitteePerson[];
+  /** Optional pictures, uploaded after the tournament is created (AD-T1). A failed upload never blocks creation. */
+  banner: PickedImage | null;
+  logo: PickedImage | null;
 }
 
 export function initialWizardState(clientRequestId: string, sport = ''): WizardState {
@@ -89,12 +109,7 @@ export function initialWizardState(clientRequestId: string, sport = ''): WizardS
     sport,
     title: '',
     description: '',
-    templateId: null,
     participation: 'individual',
-    entrantsMin: null,
-    entrantsMax: null,
-    teamSizeMin: null,
-    teamSizeMax: null,
     startsAt: '',
     endsAt: '',
     closesAt: '',
@@ -106,6 +121,8 @@ export function initialWizardState(clientRequestId: string, sport = ''): WizardS
     isPrivate: false,
     groupIds: [],
     committee: [],
+    banner: null,
+    logo: null,
   };
 }
 
@@ -126,55 +143,6 @@ export function listableTemplates(response: WizardTemplatesResponse | null | und
   return (response?.templates ?? []).filter(item => item.format?.algorithm === GROUP_STAGE_ALGORITHM);
 }
 
-export function findTemplate(templates: readonly WizardTemplate[], id: string | null): WizardTemplate | null {
-  return templates.find(item => item.id === id) ?? null;
-}
-
-export function overrideLimits(template: WizardTemplate | null, field: WizardOverrideField): { min: number; max: number } | null {
-  const hit = template?.format.organizer_overrides.find(item => item.field === field);
-  return hit ? { min: hit.min, max: hit.max } : null;
-}
-
-/** The template's own value for a field. */
-export function templateDefault(template: WizardTemplate, field: WizardOverrideField): number | null {
-  return template.format[field] ?? null;
-}
-
-/** Entering Participation or choosing a template starts each count at the template's own value. */
-export function applyTemplateDefaults(state: WizardState, template: WizardTemplate | null): WizardState {
-  if (!template) {
-    return { ...state, templateId: null, entrantsMin: null, entrantsMax: null, teamSizeMin: null, teamSizeMax: null };
-  }
-  return {
-    ...state,
-    templateId: template.id,
-    entrantsMin: templateDefault(template, 'entrants_min'),
-    entrantsMax: templateDefault(template, 'entrants_max'),
-    teamSizeMin: templateDefault(template, 'team_size_min'),
-    teamSizeMax: templateDefault(template, 'team_size_max'),
-  };
-}
-
-/** Only the fields the template lists AND the organizer changed travel as overrides. */
-export function buildOverrides(state: WizardState, template: WizardTemplate): Partial<Record<WizardOverrideField, number>> {
-  const out: Partial<Record<WizardOverrideField, number>> = {};
-  const entries: [WizardOverrideField, number | null][] = [
-    ['entrants_min', state.entrantsMin],
-    ['entrants_max', state.entrantsMax],
-    ['team_size_min', state.teamSizeMin],
-    ['team_size_max', state.teamSizeMax],
-  ];
-  for (const [field, value] of entries) {
-    if (value === null || !overrideLimits(template, field)) {
-      continue;
-    }
-    if (value !== templateDefault(template, field)) {
-      out[field] = value;
-    }
-  }
-  return out;
-}
-
 // ---- step validation -------------------------------------------------------------------------------------
 export function validateBasics(state: WizardState): WizardIssue[] {
   const issues: WizardIssue[] = [];
@@ -188,41 +156,6 @@ export function validateBasics(state: WizardState): WizardIssue[] {
   }
   if (state.description.length > DESCRIPTION_MAX) {
     issues.push({ key: 'mob.tw.err_description_long', params: { max: DESCRIPTION_MAX }, field: 'description', step: WIZARD_STEP.basics });
-  }
-  return issues;
-}
-
-export function validateFormat(state: WizardState, templates: readonly WizardTemplate[]): WizardIssue[] {
-  return findTemplate(templates, state.templateId)
-    ? []
-    : [{ key: 'mob.tw.err_format', field: 'template_id', step: WIZARD_STEP.format }];
-}
-
-export function validateParticipation(state: WizardState, template: WizardTemplate | null): WizardIssue[] {
-  const issues: WizardIssue[] = [];
-  const range = (field: WizardOverrideField, value: number | null): void => {
-    const limit = overrideLimits(template, field);
-    if (value === null) {
-      issues.push({ key: 'mob.tw.err_count_required', field, step: WIZARD_STEP.participation });
-    } else if (limit && (value < limit.min || value > limit.max)) {
-      issues.push({ key: 'mob.tw.err_count_range', params: { min: limit.min, max: limit.max }, field, step: WIZARD_STEP.participation });
-    }
-  };
-  range('entrants_min', state.entrantsMin);
-  range('entrants_max', state.entrantsMax);
-  if (state.entrantsMin !== null && state.entrantsMax !== null && state.entrantsMax < state.entrantsMin) {
-    issues.push({
-      key: state.participation === 'team' ? 'mob.tw.err_teams_order' : 'mob.tw.err_players_order',
-      field: 'entrants_max',
-      step: WIZARD_STEP.participation,
-    });
-  }
-  if (state.participation === 'team') {
-    range('team_size_min', state.teamSizeMin);
-    range('team_size_max', state.teamSizeMax);
-    if (state.teamSizeMin !== null && state.teamSizeMax !== null && state.teamSizeMax < state.teamSizeMin) {
-      issues.push({ key: 'mob.tw.err_team_size_order', field: 'team_size_max', step: WIZARD_STEP.participation });
-    }
   }
   return issues;
 }
@@ -252,13 +185,13 @@ function minutesOfDay(date: Date): number {
 }
 
 /**
- * The five rules, first failure only, in the server's order (`create_contract.validate_dates`). Exactly at the gap
- * boundary passes. `null` for a field the organizer has not filled yet: required-ness is reported separately.
+ * The five rules, first failure only, in the server's order (`create_contract.validate_dates`, AD-T4). There is no
+ * minimum gap: a hard block exactly at the first game passes. `null` for a field the organizer has not filled yet:
+ * required-ness is reported separately.
  */
 export function firstDateFailure(
   dates: { startsAt: Date; endsAt: Date; closesAt: Date; hardBlockAt: Date },
   now: Date,
-  minGapHours: number,
 ): DateFailure | null {
   const { startsAt, endsAt, closesAt, hardBlockAt } = dates;
   const checks: [DateField, Date][] = [
@@ -281,54 +214,62 @@ export function firstDateFailure(
   if (closesAt.getTime() > hardBlockAt.getTime()) {
     return { field: 'registration_closes_at', reason: 'REG_CLOSE_AFTER_HARD' };
   }
-  if (hardBlockAt.getTime() + minGapHours * 3_600_000 > startsAt.getTime()) {
+  if (hardBlockAt.getTime() > startsAt.getTime()) {
     return { field: 'registration_hard_block_at', reason: 'HARD_BLOCK_TOO_CLOSE' };
   }
   return null;
 }
 
-/** Board step a date failure is shown on: the window fields on "When and where", the registration ones on step 5. */
+/** Screen a date failure is shown on: the window fields on "When and where", the registration ones on "Registration dates". */
 export function dateFailureStep(field: DateField | string | undefined): number {
   return field === 'starts_at' || field === 'ends_at' ? WIZARD_STEP.when : WIZARD_STEP.registration;
 }
 
-export function gapLabel(minGapHours: number): { key: LabelKey; params: Record<string, number> } {
-  return minGapHours > 0 && minGapHours % 24 === 0
-    ? { key: 'mob.tw.err_hard_gap_days', params: { gap: minGapHours / 24 } }
-    : { key: 'mob.tw.err_hard_gap_hours', params: { gap: minGapHours } };
-}
-
 /**
- * The message for a date failure (server or client). `startLabel` is the formatted start ("Sat 14 Nov") for the
- * gap message. A hard block at or after the start reads "must be before the tournament starts" (TournRegErrStart);
- * otherwise the gap wording (TournRegErrGap) applies.
+ * The message for a date failure (server or client). `startLabel` is the formatted first game ("Sat 14 Nov, 9:00 AM")
+ * for the hard-block message. The code `HARD_BLOCK_TOO_CLOSE` is kept by the server; its meaning is now "the hard
+ * block is after the start" (AD-T4).
  */
-export function dateFailureIssue(
-  failure: DateFailure,
-  ctx: { minGapHours: number; startLabel: string; hardBlockAtOrAfterStart: boolean },
-): WizardIssue {
+export function dateFailureIssue(failure: DateFailure, ctx: { startLabel: string }): WizardIssue {
   const step = dateFailureStep(failure.field);
   const base = { field: failure.field, step };
   switch (failure.reason) {
     case 'DATE_IN_PAST':
       return failure.field === 'starts_at' || failure.field === 'ends_at'
         ? { ...base, key: 'mob.tw.err_window' }
-        : { ...base, key: 'mob.tw.err_reg_past' };
+        : { ...base, key: 'mob.tw.dates_err_past' };
     case 'END_BEFORE_START':
       return { ...base, key: 'mob.tw.err_window' };
     case 'DAILY_WINDOW_INVALID':
       return { ...base, key: 'mob.tw.err_daily_window' };
     case 'REG_CLOSE_AFTER_HARD':
-      return { ...base, key: 'mob.tw.err_soft_after_hard' };
+      return { ...base, key: 'mob.tw.dates_err_soft_after_hard' };
     case 'HARD_BLOCK_TOO_CLOSE':
-    default: {
-      if (ctx.hardBlockAtOrAfterStart) {
-        return { ...base, key: 'mob.tw.err_hard_after_start' };
-      }
-      const gap = gapLabel(ctx.minGapHours);
-      return { ...base, key: gap.key, params: { ...gap.params, start: ctx.startLabel } };
-    }
+    default:
+      return { ...base, key: 'mob.tw.dates_err_hard_after_start', params: { when: ctx.startLabel } };
   }
+}
+
+/** One row of the rule checklist of the board TV2MobCreateDates: met, broken, or not decidable yet. */
+export type RuleState = 'ok' | 'bad' | 'unknown';
+
+/**
+ * The three registration rules the board lists, for the dates entered so far. The first game is "start"; a missing
+ * date leaves its rules `unknown` (never shown as met).
+ */
+export function registrationRules(
+  state: WizardState,
+  now: Date,
+): { future: RuleState; order: RuleState; start: RuleState } {
+  const closes = toDate(state.closesAt);
+  const hard = toDate(state.hardBlockAt);
+  const starts = toDate(state.startsAt);
+  const dates = [closes, hard].filter((value): value is Date => value !== null);
+  const future: RuleState =
+    dates.length === 0 ? 'unknown' : dates.every(value => value.getTime() > now.getTime()) ? 'ok' : 'bad';
+  const order: RuleState = closes && hard ? (closes.getTime() <= hard.getTime() ? 'ok' : 'bad') : 'unknown';
+  const start: RuleState = hard && starts ? (hard.getTime() <= starts.getTime() ? 'ok' : 'bad') : 'unknown';
+  return { future, order, start };
 }
 
 /** Hard block follows the closure until the organizer sets it (AD-20). */
@@ -375,12 +316,11 @@ export function validateVenue(state: WizardState, catalogueEnabled: boolean): Wi
   return hasVenue(state, catalogueEnabled) ? [] : [{ key: 'mob.tw.err_venue', field: 'venue', step: WIZARD_STEP.when }];
 }
 
-/** Step 5: closure and hard block present and consistent with the window (first failure, the server's order). */
+/** Registration dates: closure and hard block present and consistent with the window (first failure, the server's order). */
 export function validateRegistration(
   state: WizardState,
   now: Date,
-  minGapHours: number,
-  formatDay: (date: Date) => string,
+  formatDayTime: (date: Date) => string,
 ): WizardIssue[] {
   const closes = toDate(state.closesAt);
   const hard = toDate(state.hardBlockAt);
@@ -394,16 +334,10 @@ export function validateRegistration(
   const startsAt = toDate(state.startsAt);
   const endsAt = toDate(state.endsAt);
   if (closes && hard && startsAt && endsAt) {
-    const failure = firstDateFailure({ startsAt, endsAt, closesAt: closes, hardBlockAt: hard }, now, minGapHours);
-    // Window failures belong to step 4 and are caught there; only registration failures are shown here.
+    const failure = firstDateFailure({ startsAt, endsAt, closesAt: closes, hardBlockAt: hard }, now);
+    // Window failures belong to "When and where" and are caught there; only registration failures are shown here.
     if (failure && dateFailureStep(failure.field) === WIZARD_STEP.registration) {
-      issues.push(
-        dateFailureIssue(failure, {
-          minGapHours,
-          startLabel: formatDay(startsAt),
-          hardBlockAtOrAfterStart: hard.getTime() >= startsAt.getTime(),
-        }),
-      );
+      issues.push(dateFailureIssue(failure, { startLabel: formatDayTime(startsAt) }));
     }
   }
   return issues;
@@ -436,29 +370,21 @@ export function validateCommittee(state: WizardState, committeeMax: number): Wiz
 }
 
 export interface WizardContext {
-  templates: readonly WizardTemplate[];
   limits: WizardLimits;
   catalogueEnabled: boolean;
   now: Date;
-  formatDay: (date: Date) => string;
+  formatDayTime: (date: Date) => string;
 }
 
-/** Issues for one board step. */
+/** Issues for one screen. */
 export function validateStep(step: number, state: WizardState, ctx: WizardContext): WizardIssue[] {
-  const template = findTemplate(ctx.templates, state.templateId);
   switch (step) {
     case WIZARD_STEP.basics:
       return validateBasics(state);
-    case WIZARD_STEP.format:
-      return validateFormat(state, ctx.templates);
-    case WIZARD_STEP.participation:
-      return validateParticipation(state, template);
     case WIZARD_STEP.when:
       return [...validateWindow(state, ctx.now), ...validateVenue(state, ctx.catalogueEnabled)];
     case WIZARD_STEP.registration:
-      return validateRegistration(state, ctx.now, ctx.limits.min_gap_hours, ctx.formatDay);
-    case WIZARD_STEP.visibility:
-      return [];
+      return validateRegistration(state, ctx.now, ctx.formatDayTime);
     case WIZARD_STEP.committee:
       return validateCommittee(state, ctx.limits.committee_max);
     default:
@@ -466,7 +392,7 @@ export function validateStep(step: number, state: WizardState, ctx: WizardContex
   }
 }
 
-/** First board step (1 to 7) with an issue, or null when the whole wizard is valid. */
+/** First screen (1 to 6) with an issue, or null when the whole wizard is valid. */
 export function firstInvalidStep(state: WizardState, ctx: WizardContext): number | null {
   for (let step = WIZARD_STEP.basics; step < WIZARD_STEP.review; step += 1) {
     if (validateStep(step, state, ctx).length > 0) {
@@ -485,8 +411,10 @@ function isoOf(value: string): string {
   return date.toISOString();
 }
 
-/** The exact `POST /tournaments/v2/create` body. Throws only when called on an invalid state (a programming error). */
-export function buildCreateBody(state: WizardState, template: WizardTemplate, catalogueEnabled: boolean): WizardCreateBody {
+/**
+ * The exact `POST /tournaments/v2/create` body. `template_id` and `overrides` are never sent (AD-T3): the server uses
+ * the single default format. Throws only when called on an invalid state (a programming error). */
+export function buildCreateBody(state: WizardState, catalogueEnabled: boolean): WizardCreateBody {
   const visibility = visibilityOf(state);
   const description = state.description.trim();
   const venue: Partial<WizardCreateBody> = {};
@@ -504,8 +432,6 @@ export function buildCreateBody(state: WizardState, template: WizardTemplate, ca
   }
   return {
     client_request_id: state.clientRequestId,
-    template_id: template.id,
-    overrides: buildOverrides(state, template),
     title: state.title.trim(),
     sport: state.sport,
     ...(description ? { description } : {}),
@@ -524,7 +450,6 @@ export function buildCreateBody(state: WizardState, template: WizardTemplate, ca
 // ---- server rejections -----------------------------------------------------------------------------------
 export type RejectionOutcome =
   | { kind: 'step'; step: number; issue: WizardIssue; dropGroupId?: string; dropUserId?: string }
-  | { kind: 'format_retired'; step: number; issue: WizardIssue }
   | { kind: 'disabled'; issue: WizardIssue }
   | { kind: 'failed'; issue: WizardIssue };
 
@@ -532,7 +457,7 @@ interface ErrorLike {
   response?: { status?: number; data?: WizardRejection };
 }
 
-/** Server step (AD-20 numbering) to board step; a date rejection goes by field. */
+/** Server step (te-b1 six-step numbering) to screen; a date rejection goes by field. */
 export function boardStepFor(serverStep: number | undefined, field: string | undefined): number | null {
   switch (serverStep) {
     case 1:
@@ -544,8 +469,6 @@ export function boardStepFor(serverStep: number | undefined, field: string | und
     case 4:
       return WIZARD_STEP.visibility;
     case 5:
-      return WIZARD_STEP.format;
-    case 6:
       return WIZARD_STEP.committee;
     default:
       return null;
@@ -561,7 +484,7 @@ const FAILED: WizardIssue = { key: 'mob.tw.err_create_failed', step: WIZARD_STEP
  */
 export function mapCreateRejection(
   error: unknown,
-  ctx: { minGapHours: number; committeeMax: number; startLabel: string; hardBlockAtOrAfterStart: boolean },
+  ctx: { committeeMax: number; startLabel: string },
 ): RejectionOutcome {
   const response = (error as ErrorLike | null)?.response;
   const status = response?.status;
@@ -608,9 +531,10 @@ export function mapCreateRejection(
     }
     case 'TEMPLATE_NOT_FOUND':
     case 'TEMPLATE_NOT_ACTIVE':
-      return { kind: 'format_retired', step: WIZARD_STEP.format, issue: { key: 'mob.tw.err_format_retired', field: 'template_id', step: WIZARD_STEP.format } };
     case 'OVERRIDES_INVALID':
-      return { kind: 'step', step: WIZARD_STEP.participation, issue: { key: 'mob.tw.err_overrides', field: 'overrides', step: WIZARD_STEP.participation } };
+      // The client sends neither (AD-T3), so these mean the server's default format is not active: nothing the
+      // organizer can change. Shown on Review, state kept.
+      return { kind: 'failed', issue: { key: 'mob.tw.err_template_unavailable', step: WIZARD_STEP.review } };
     case 'VENUE_INVALID':
       return { kind: 'step', step: WIZARD_STEP.when, issue: { key: 'mob.tw.err_venue', field: 'venue', step: WIZARD_STEP.when } };
     default:

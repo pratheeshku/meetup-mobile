@@ -55,7 +55,7 @@ import { getProfile, getProfileSummary, type ProfileSummary } from '../api/profi
 import { getSports } from '../api/sports';
 import { useAuth } from '../auth/AuthContext';
 import BannerCarousel from '../components/home/BannerCarousel';
-import CreateGameCard from '../components/home/CreateGameCard';
+import CourtBookingBlock, { useCourtProviders } from '../components/court/CourtBookingBlock';
 import DrawerMenu from '../components/home/DrawerMenu';
 import ProfileStatsStrip from '../components/ProfileStatsStrip';
 import HomeTabTiles, { panelStyle, type HomeTab } from '../components/home/HomeTabTiles';
@@ -96,6 +96,7 @@ type Props = CompositeScreenProps<
 export default function HomeScreen({ navigation, route }: Props): React.JSX.Element {
   const { user } = useAuth();
   const t = useT();
+  const courtProviders = useCourtProviders();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState<HomeTab>('upcoming');
@@ -658,8 +659,8 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
           </View>
         )}
 
-        {/* Create Game card: stays visible on both tabs */}
-        <CreateGameCard onPress={() => navigation.navigate('CreateGame')} />
+        {/* Book a court (AD-T2): hidden when the admin list is empty. Create game stays on the centre + of the bottom bar. */}
+        <CourtBookingBlock providers={courtProviders} />
       </ScrollView>
 
       {/* Hamburger Drawer Menu */}

@@ -34,7 +34,7 @@ export const KNOCKOUT_TEMPLATE: WizardTemplate = {
 
 export const TEMPLATES: WizardTemplatesResponse = {
   templates: [KNOCKOUT_TEMPLATE, GROUP_TEMPLATE],
-  limits: { audience_group_cap: 20, committee_max: 10, min_gap_hours: 72 },
+  limits: { audience_group_cap: 20, committee_max: 10, min_gap_hours: 0 },
   home_timezone: 'Asia/Singapore',
 };
 

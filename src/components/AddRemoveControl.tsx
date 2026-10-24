@@ -25,6 +25,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { useT } from '../labels/LabelsContext';
 import { borderWidth, colors, groupView, radius, sizes, spacing, typography } from '../theme/tokens';
 import { MinusIcon, PlusIcon } from './icons/ActionIcons';
+import UserAvatar from './UserAvatar';
 
 const CIRCLE = 36;
 const GLYPH = 20;
@@ -229,6 +230,15 @@ export function AddEntryRow({
  * "−", a group in `alreadyIds` shows `alreadyLabel` instead of a glyph. Without it the flat list is
  * unchanged.
  */
+/** A group row of the invite picker. `logo_url` is what the group feeds already return. */
+export interface GroupInviteRow {
+  id: string;
+  name: string;
+  logo_url?: string | null;
+}
+
+const GROUP_AVATAR = 36;
+
 export function GroupInviteList({
   groups,
   selectedIds,
@@ -239,7 +249,7 @@ export function GroupInviteList({
   sectionLabels,
   disabledIds = [],
 }: {
-  groups: readonly { id: string; name: string }[];
+  groups: readonly GroupInviteRow[];
   selectedIds: readonly string[];
   onToggle: (groupId: string) => void;
   disabled?: boolean;
@@ -250,11 +260,17 @@ export function GroupInviteList({
   /** Rows whose "+" is off (for example at a cap); a staged row keeps its "−". */
   disabledIds?: readonly string[];
 }): React.JSX.Element {
-  const renderRow = (group: { id: string; name: string }, already: boolean): React.JSX.Element => (
+  const renderRow = (group: GroupInviteRow, already: boolean): React.JSX.Element => (
     <View key={group.id} style={styles.entryRow}>
-      <Text style={styles.entryTitle} numberOfLines={1}>
-        {group.name}
-      </Text>
+      <View style={styles.entryMain}>
+        {/* Same logo the Groups list shows (te-a1, AD-T11): the shared avatar, initials when there is none. */}
+        <View style={styles.groupAvatarBox}>
+          <UserAvatar imageUrl={group.logo_url} name={group.name} size={GROUP_AVATAR} fallback="initials" />
+        </View>
+        <Text style={styles.entryTitle} numberOfLines={1}>
+          {group.name}
+        </Text>
+      </View>
       <AddRemoveControl
         mode="staged"
         name={group.name}
@@ -312,6 +328,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: sizes.touchTarget,
   },
+  entryMain: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
+  groupAvatarBox: { width: GROUP_AVATAR, height: GROUP_AVATAR, marginRight: spacing.sm },
   entryTitle: { ...typography.bodyBold, color: colors.textPrimary, flexShrink: 1 },
   sectionHeading: {
     ...typography.label,

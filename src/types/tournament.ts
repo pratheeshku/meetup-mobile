@@ -121,6 +121,55 @@ export interface Tournament {
   closure_outcome?: string | null;
   /** DES-MEETUP-ADDENDUM-decline-response AD-4: true when caller has a current decline row */
   my_declined?: boolean;
+  /** `individual` or `team` (`TournamentResponse.participation_mode`). */
+  participation_mode?: TournamentParticipationMode | null;
+  /** When the committee published the fixtures, else null. A server fact; never derived on the device. */
+  schedule_published_at?: string | null;
+  /**
+   * Tournament-experience AD-T1 (te-b1), additive: the EFFECTIVE banner and logo (own image, else the admin default,
+   * else null: the app then shows its built-in asset). Set by the list and the single read.
+   */
+  banner_url?: string | null;
+  logo_url?: string | null;
+  /** Text colour on the status strip: `light` or `dark`, chosen by the server from the picture (AD-T1). */
+  banner_tone?: BannerTone | null;
+  /** Strip scrim opacity, 0 to 60 percent, chosen by the server. */
+  banner_scrim?: number | null;
+  has_custom_banner?: boolean;
+  /** AD-T6, set by `GET /tournaments/{id}` only. */
+  organizer?: TournamentPerson | null;
+  /** AD-T6: active committee members other than the organizer. */
+  committee?: TournamentPerson[];
+}
+
+export type BannerTone = 'light' | 'dark';
+
+/** Header chip data (AD-T6): names and picture only. Never an email or a number. */
+export interface TournamentPerson {
+  user_id: string;
+  display_name: string;
+  nickname: string | null;
+  avatar_url: string | null;
+}
+
+/** `PUT` and `DELETE /tournaments/{id}/banner` and `/logo`: the new effective values. */
+export interface TournamentImages {
+  banner_url: string | null;
+  logo_url: string | null;
+  banner_tone: BannerTone | null;
+  banner_scrim: number | null;
+  has_custom_banner: boolean;
+}
+
+export type TournamentImageKind = 'banner' | 'logo';
+
+/** `GET /home/court-booking` item (AD-T2). `booking_url` is https only; opened in the system browser. */
+export interface CourtProvider {
+  id: string;
+  name: string;
+  description: string | null;
+  booking_url: string;
+  logo_url: string | null;
 }
 
 export interface TournamentFixture {
@@ -254,6 +303,10 @@ export interface TournamentClosureResponse {
   version: number;
   winner?: TournamentClosurePerson | null;
   runner_up?: TournamentClosurePerson | null;
+  /** AD-T9 (te-b2), additive: third place, star of the tournament and the closing comments. */
+  third_place?: TournamentClosurePerson | null;
+  star?: TournamentClosurePerson | null;
+  comments?: string | null;
   closed_at?: string | null;
   updated_at?: string | null;
   attendees?: TournamentClosurePerson[] | null;

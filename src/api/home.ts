@@ -14,6 +14,7 @@ import appConfig from '../../config/appConfig.json';
 import { apiClient } from './client';
 import type { Event } from '../types/event';
 import { type EventApiItem, mapEventApiItem } from './events';
+import type { CourtProvider } from '../types/tournament';
 
 export interface BannerItem {
   id: string;
@@ -297,3 +298,16 @@ export async function getUpcoming(options?: RequestOptions): Promise<HomeUpcomin
   };
 }
 
+
+/**
+ * `GET /home/court-booking` (tournament-experience AD-T2, te-b1): the active booking providers in order. An empty list
+ * means the Home block and the tournament Overview block are not rendered. A failed call also renders nothing (no
+ * cache: the block is optional and carries no user data). Items without an https link are dropped here.
+ */
+export async function getCourtBooking(options?: RequestOptions): Promise<CourtProvider[]> {
+  const { data } = await apiClient.get<{ items?: CourtProvider[] }>('/home/court-booking', {
+    correlationId: options?.correlationId,
+  });
+  const items = Array.isArray(data?.items) ? data.items : [];
+  return items.filter(item => item && typeof item.booking_url === 'string' && /^https:\/\/\S+$/.test(item.booking_url));
+}

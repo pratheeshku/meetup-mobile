@@ -45,7 +45,34 @@ export interface ScoringSide {
 export interface TournamentScoringState {
   enabled: boolean;
   applicable: boolean;
+  /** Server fact (`registration_phase`): `open`, `committee_only` or `frozen`; null when it cannot be decided. */
+  registration_phase?: string | null;
+  fixtures_published?: boolean;
+  any_result_posted?: boolean;
+  /**
+   * Tournament-experience AD-T5 (te-b2): the server-computed tab availability. Present for lifecycle version 2
+   * tournaments only, so its absence means the legacy page. Never computed on the device.
+   */
+  tabs?: TournamentTabs | null;
+  /** Seconds between refreshes for other viewers (v2 only). */
+  live_poll_seconds?: number | null;
 }
+
+export type TournamentTabKey = 'overview' | 'participants' | 'fixtures' | 'standings' | 'results' | 'media' | 'approvals';
+
+/** Why a locked tab is locked; the unlock message comes from labels. */
+export type TabUnlockCode = 'registration_closes' | 'fixtures_published' | 'play_starts' | 'tournament_closed';
+
+export interface TournamentTabState {
+  state: 'open' | 'locked';
+  /** Locked tabs only. */
+  unlocks?: TabUnlockCode | string;
+  /** Approvals only: requests this viewer can decide. */
+  badge?: number;
+}
+
+/** `approvals` is present only for the organizer and active committee members (the server decides). */
+export type TournamentTabs = Partial<Record<TournamentTabKey, TournamentTabState>>;
 
 export interface ScoringSet {
   a: number;

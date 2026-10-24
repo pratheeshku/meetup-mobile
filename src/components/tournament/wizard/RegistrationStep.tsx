@@ -1,21 +1,32 @@
 /**
- * Step 5, boards TournReg / TournRegErrGap / TournRegErrOrder / TournRegErrStart: soft block (registration closes),
- * hard block (roster frozen), and the "what this means" timeline. Registration opens at creation (AD-20: DB now()),
- * so that row is information, not a field.
+ * Registration dates, boards TV2MobCreateDates and TV2MobCreateDatesErr (tournament-experience AD-T4): the soft block
+ * and the hard block, a checklist of the three rules, and a "So far" summary. Registration opens at creation
+ * (AD-20: DB now()), so that row is information, not a field. The rules mirror the server for early feedback only:
+ * the server's answer always wins. Rule state is carried by the glyph (check or cross) as well as the colour.
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { useT } from '../../../labels/LabelsContext';
-import { colors, spacing, typography } from '../../../theme/tokens';
+import { borderWidth, colors, radius, spacing, typography } from '../../../theme/tokens';
 import DateTimePickerField from '../../DateTimePickerField';
-import { FieldError, FieldLabel, SectionCard, StepHeading } from './parts';
-import { toDate, type WizardState } from '../../../utils/tournamentWizard';
+import { CheckIcon, CrossIcon } from '../../icons/ActionIcons';
+import { FieldLabel, SectionCard, StepHeading } from './parts';
+import { registrationRules, toDate, type RuleState, type WizardState } from '../../../utils/tournamentWizard';
 
-const DOT = 14;
+const RULE_BOX = 22;
 
 export function formatDay(date: Date): string {
   return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** "Sat 14 Nov, 9:00 AM". */
+export function formatDayTime(date: Date): string {
+  return `${formatDay(date)}, ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+}
+
+function shortDay(date: Date): string {
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
 export default function RegistrationStep({
@@ -36,84 +47,145 @@ export default function RegistrationStep({
   const hard = toDate(state.hardBlockAt);
   const starts = toDate(state.startsAt);
   const dash = t('mob.tw.reg_tl_unset');
-  // A date that failed its rule is shown as "—" in the timeline, as the error boards do.
-  const shown = (date: Date | null, field: string): string => (date && !errors[field] ? formatDay(date) : dash);
-  const steps: { color: 'green' | 'blue' | 'grey'; title: string; when: string }[] = [
-    { color: 'green', title: t('mob.tw.reg_tl_opens'), when: formatDay(now) },
-    { color: 'blue', title: t('mob.tw.reg_tl_soft'), when: shown(closes, 'registration_closes_at') },
-    { color: 'grey', title: t('mob.tw.reg_tl_hard'), when: shown(hard, 'registration_hard_block_at') },
-    { color: 'grey', title: t('mob.tw.reg_tl_start'), when: starts ? formatDay(starts) : dash },
+  const rules = registrationRules(state, now);
+  const firstGame = starts ? formatDayTime(starts) : dash;
+  const rows: { key: 'future' | 'order' | 'start'; state: RuleState; text: string }[] = [
+    { key: 'future', state: rules.future, text: t('mob.tw.dates_rule_future') },
+    { key: 'order', state: rules.order, text: t('mob.tw.dates_rule_order') },
+    { key: 'start', state: rules.start, text: t('mob.tw.dates_rule_start', { when: firstGame }) },
   ];
   return (
     <View>
-      <StepHeading>{t('mob.tw.step_registration')}</StepHeading>
-      <SectionCard title={t('mob.tw.reg_section')}>
+      <StepHeading>{t('mob.tw.dates_title')}</StepHeading>
+      <SectionCard>
         <FieldLabel>{t('mob.tw.reg_opens')}</FieldLabel>
-        <Text style={styles.readonly} testID="tw-reg-opens">
-          {t('mob.tw.reg_opens_today', { date: formatDay(now) })}
-        </Text>
+        <View style={styles.readonly}>
+          <Text style={styles.readonlyText} testID="tw-reg-opens">
+            {t('mob.tw.dates_opens_now', { date: formatDay(now) })}
+          </Text>
+        </View>
 
-        <FieldLabel>{t('mob.tw.reg_soft')}</FieldLabel>
+        <FieldLabel>{t('mob.tw.dates_soft')}</FieldLabel>
         <DateTimePickerField
           mode="datetime"
           value={state.closesAt}
           onChange={onClosure}
           placeholder={t('mob.tw.pick_date')}
-          accessibilityLabel={t('mob.tw.reg_soft')}
+          accessibilityLabel={t('mob.tw.dates_soft')}
           testID="tw-soft-block"
         />
         {errors.registration_closes_at ? (
-          <FieldError message={errors.registration_closes_at} testID="tw-soft-error" />
-        ) : (
-          <Text style={styles.help}>{t('mob.tw.reg_soft_help')}</Text>
-        )}
+          <FieldProblem message={errors.registration_closes_at} testID="tw-soft-error" />
+        ) : null}
 
-        <FieldLabel>{t('mob.tw.reg_hard')}</FieldLabel>
+        <FieldLabel>{t('mob.tw.dates_hard')}</FieldLabel>
         <DateTimePickerField
           mode="datetime"
           value={state.hardBlockAt}
           onChange={onHardBlock}
           placeholder={t('mob.tw.pick_date')}
-          accessibilityLabel={t('mob.tw.reg_hard')}
+          accessibilityLabel={t('mob.tw.dates_hard')}
           testID="tw-hard-block"
         />
         {errors.registration_hard_block_at ? (
-          <FieldError message={errors.registration_hard_block_at} testID="tw-hard-error" />
-        ) : (
-          <Text style={styles.help}>{t('mob.tw.reg_hard_help')}</Text>
-        )}
+          <FieldProblem message={errors.registration_hard_block_at} testID="tw-hard-error" />
+        ) : null}
+
+        <View style={styles.rules} testID="tw-date-rules">
+          {rows.map(row => (
+            <View key={row.key} style={styles.ruleRow} testID={`tw-rule-${row.key}-${row.state}`}>
+              <View
+                style={[
+                  styles.ruleBox,
+                  row.state === 'ok' ? styles.ruleOk : row.state === 'bad' ? styles.ruleBad : styles.ruleUnknown,
+                ]}
+                accessible
+                accessibilityLabel={
+                  row.state === 'ok'
+                    ? t('mob.tw.dates_rule_ok_a11y')
+                    : row.state === 'bad'
+                    ? t('mob.tw.dates_rule_bad_a11y')
+                    : undefined
+                }
+              >
+                {row.state === 'ok' ? <CheckIcon size={14} color={colors.white} /> : null}
+                {row.state === 'bad' ? <CrossIcon size={14} color={colors.white} /> : null}
+              </View>
+              <Text style={[styles.ruleText, row.state === 'bad' ? styles.ruleTextBad : null]}>{row.text}</Text>
+            </View>
+          ))}
+        </View>
       </SectionCard>
 
-      <SectionCard title={t('mob.tw.reg_means')} style={styles.timeline}>
-        {steps.map((item, index) => (
-          <View key={item.title} style={styles.timelineRow}>
-            <View style={styles.dotColumn}>
-              <View style={[styles.dot, item.color === 'green' ? styles.dotGreen : item.color === 'blue' ? styles.dotBlue : styles.dotGrey]} />
-              {index < steps.length - 1 ? <View style={styles.line} /> : null}
-            </View>
-            <View style={styles.timelineText}>
-              <Text style={styles.timelineTitle}>{item.title}</Text>
-              <Text style={styles.timelineWhen}>{item.when}</Text>
-            </View>
-          </View>
-        ))}
+      <SectionCard style={styles.sofar}>
+        <Text style={styles.sofarTitle}>{t('mob.tw.dates_sofar')}</Text>
+        <SoFarRow label={t('mob.tw.dates_sofar_soft')} value={closes ? shortDay(closes) : dash} />
+        <SoFarRow label={t('mob.tw.dates_sofar_hard')} value={hard ? shortDay(hard) : dash} />
+        <SoFarRow
+          label={t('mob.tw.dates_sofar_first')}
+          value={starts ? `${shortDay(starts)}, ${starts.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : dash}
+        />
+        <Text style={styles.sofarNote}>{t('mob.tw.dates_sofar_note')}</Text>
       </SectionCard>
     </View>
   );
 }
 
+function FieldProblem({ message, testID }: { message: string; testID: string }): React.JSX.Element {
+  return (
+    <View style={styles.problem} accessibilityRole="alert">
+      <View style={styles.problemGlyph}>
+        <CrossIcon size={12} color={colors.error} />
+      </View>
+      <Text style={styles.problemText} testID={testID}>
+        {message}
+      </Text>
+    </View>
+  );
+}
+
+function SoFarRow({ label, value }: { label: string; value: string }): React.JSX.Element {
+  return (
+    <View style={styles.sofarRow}>
+      <Text style={styles.sofarLabel}>{label}</Text>
+      <Text style={styles.sofarValue}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  readonly: { ...typography.body, color: colors.textPrimary, paddingVertical: spacing.sm },
-  help: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
-  timeline: { marginTop: spacing.md },
-  timelineRow: { flexDirection: 'row' },
-  dotColumn: { width: DOT + spacing.sm, alignItems: 'center' },
-  dot: { width: DOT, height: DOT, borderRadius: DOT / 2 },
-  dotGreen: { backgroundColor: colors.success },
-  dotBlue: { backgroundColor: colors.primary },
-  dotGrey: { backgroundColor: colors.border },
-  line: { width: 2, flex: 1, backgroundColor: colors.border, minHeight: spacing.md },
-  timelineText: { flex: 1, paddingLeft: spacing.sm, paddingBottom: spacing.sm },
-  timelineTitle: { ...typography.bodyBold, color: colors.textPrimary },
-  timelineWhen: { ...typography.caption, color: colors.textSecondary },
+  readonly: {
+    minHeight: 48,
+    borderWidth: borderWidth.medium,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.track,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md - 2,
+  },
+  readonlyText: { ...typography.body, color: colors.textPrimary },
+  problem: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.xs },
+  problemGlyph: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center', marginRight: spacing.xs },
+  problemText: { ...typography.caption, fontWeight: '600', color: colors.error, flex: 1 },
+  rules: { marginTop: spacing.md },
+  ruleRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
+  ruleBox: {
+    width: RULE_BOX,
+    height: RULE_BOX,
+    borderRadius: RULE_BOX / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  ruleOk: { backgroundColor: colors.successDark },
+  ruleBad: { backgroundColor: colors.error },
+  ruleUnknown: { borderWidth: borderWidth.medium, borderColor: colors.border },
+  ruleText: { ...typography.caption, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  ruleTextBad: { color: colors.error },
+  sofar: { marginTop: spacing.md },
+  sofarTitle: { ...typography.bodyBold, color: colors.textPrimary, marginBottom: spacing.sm },
+  sofarRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.xs },
+  sofarLabel: { ...typography.caption, color: colors.textSecondary },
+  sofarValue: { ...typography.caption, fontWeight: '700', color: colors.textPrimary },
+  sofarNote: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
 });

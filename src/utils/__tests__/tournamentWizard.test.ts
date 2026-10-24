@@ -1,19 +1,19 @@
 import {
   FALLBACK_LIMITS,
   WIZARD_STEP,
-  applyTemplateDefaults,
+  WIZARD_TOTAL_STEPS,
   boardStepFor,
   buildCreateBody,
-  buildOverrides,
   dateFailureIssue,
+  displayStep,
   firstDateFailure,
   firstInvalidStep,
   initialWizardState,
   listableTemplates,
   mapCreateRejection,
+  registrationRules,
   validateBasics,
   validateCommittee,
-  validateParticipation,
   validateRegistration,
   validateStep,
   validateWindow,
@@ -23,11 +23,11 @@ import {
   type WizardContext,
   type WizardState,
 } from '../tournamentWizard';
-import { GROUP_TEMPLATE, KNOCKOUT_TEMPLATE, TEMPLATES } from '../../test-utils/tournamentWizardFixtures';
+import { KNOCKOUT_TEMPLATE, GROUP_TEMPLATE, TEMPLATES } from '../../test-utils/tournamentWizardFixtures';
 
 const NOW = new Date(2026, 9, 14, 9, 0); // 14 Oct 2026 09:00 local
-const day = (date: Date): string => `d${date.getDate()}`;
-const ctx: WizardContext = { templates: listableTemplates(TEMPLATES), limits: FALLBACK_LIMITS, catalogueEnabled: false, now: NOW, formatDay: day };
+const dayTime = (date: Date): string => `d${date.getDate()}`;
+const ctx: WizardContext = { limits: FALLBACK_LIMITS, catalogueEnabled: false, now: NOW, formatDayTime: dayTime };
 
 /** "YYYY-MM-DD HH:mm" as the shared date-time field emits it. */
 const at = (month: number, dayOfMonth: number, hour = 9, minute = 0): string =>
@@ -36,7 +36,7 @@ const dt = (month: number, dayOfMonth: number, hour = 9, minute = 0): Date => ne
 
 function validState(over: Partial<WizardState> = {}): WizardState {
   return {
-    ...applyTemplateDefaults(initialWizardState('req-1', 'badminton'), GROUP_TEMPLATE),
+    ...initialWizardState('req-1', 'badminton'),
     title: 'Punggol Open 2026',
     startsAt: at(11, 14, 9),
     endsAt: at(11, 15, 18),
@@ -50,23 +50,22 @@ function validState(over: Partial<WizardState> = {}): WizardState {
 }
 
 describe('templates', () => {
-  it('lists only groups and knockout templates', () => {
+  it('lists only groups and knockout templates (the entry check of the wizard)', () => {
     expect(listableTemplates(TEMPLATES).map(t => t.id)).toEqual([GROUP_TEMPLATE.id]);
     expect(listableTemplates({ templates: [KNOCKOUT_TEMPLATE] })).toEqual([]);
     expect(listableTemplates({ templates: [] })).toEqual([]);
     expect(listableTemplates(null)).toEqual([]);
   });
+});
 
-  it('choosing a template starts the counts at the template values', () => {
-    const state = applyTemplateDefaults(initialWizardState('r'), GROUP_TEMPLATE);
-    expect([state.entrantsMin, state.entrantsMax, state.teamSizeMin, state.teamSizeMax]).toEqual([8, 32, 2, 4]);
-  });
-
-  it('sends only the overrides the template lists and the organizer changed', () => {
-    const state = validState({ entrantsMin: 6, entrantsMax: 32 });
-    expect(buildOverrides(state, GROUP_TEMPLATE)).toEqual({ entrants_min: 6 });
-    const noOverrides = { ...GROUP_TEMPLATE, format: { ...GROUP_TEMPLATE.format, organizer_overrides: [] } };
-    expect(buildOverrides(state, noOverrides)).toEqual({});
+describe('six steps (AD-T3)', () => {
+  it('the header counts the server steps: Dates covers both date screens, Review is the sixth', () => {
+    expect(WIZARD_TOTAL_STEPS).toBe(6);
+    expect(
+      [WIZARD_STEP.basics, WIZARD_STEP.participation, WIZARD_STEP.when, WIZARD_STEP.registration, WIZARD_STEP.visibility, WIZARD_STEP.committee, WIZARD_STEP.review].map(
+        displayStep,
+      ),
+    ).toEqual([1, 2, 3, 3, 4, 5, 6]);
   });
 });
 
@@ -76,15 +75,6 @@ describe('step validation', () => {
     expect(validateBasics({ ...validState(), sport: '' }).map(i => i.key)).toEqual(['mob.tw.err_sport']);
     expect(validateBasics({ ...validState(), title: 'x'.repeat(151) }).map(i => i.key)).toEqual(['mob.tw.err_title_long']);
     expect(validateBasics(validState())).toEqual([]);
-  });
-
-  it('participation: maximum below minimum, and values outside the template limits', () => {
-    expect(validateParticipation(validState({ entrantsMin: 12, entrantsMax: 8 }), GROUP_TEMPLATE).map(i => i.key)).toContain('mob.tw.err_players_order');
-    expect(
-      validateParticipation(validState({ participation: 'team', teamSizeMin: 2, teamSizeMax: 1 }), GROUP_TEMPLATE).map(i => i.key),
-    ).toContain('mob.tw.err_team_size_order');
-    expect(validateParticipation(validState({ entrantsMin: 2 }), GROUP_TEMPLATE).map(i => i.key)).toContain('mob.tw.err_count_range');
-    expect(validateParticipation(validState(), GROUP_TEMPLATE)).toEqual([]);
   });
 
   it('committee: at least one besides the organizer, at most committee_max - 1', () => {
@@ -97,82 +87,88 @@ describe('step validation', () => {
   });
 });
 
-describe('the five date rules (AD-20 step 3), in the server order', () => {
+describe('the five date rules (AD-T4), in the server order', () => {
   const ok = { startsAt: dt(11, 14, 9), endsAt: dt(11, 15, 18), closesAt: dt(10, 30, 9), hardBlockAt: dt(11, 3, 9) };
 
   it('passes a consistent set', () => {
-    expect(firstDateFailure(ok, NOW, 72)).toBeNull();
+    expect(firstDateFailure(ok, NOW)).toBeNull();
   });
 
   it('1: closure, hard block, start and end must all be in the future', () => {
-    expect(firstDateFailure({ ...ok, closesAt: dt(10, 14, 8) }, NOW, 72)).toEqual({ field: 'registration_closes_at', reason: 'DATE_IN_PAST' });
-    expect(firstDateFailure({ ...ok, hardBlockAt: dt(10, 14, 9) }, NOW, 72)).toEqual({ field: 'registration_hard_block_at', reason: 'DATE_IN_PAST' });
-    expect(firstDateFailure({ ...ok, startsAt: dt(10, 13, 9) }, NOW, 72)).toEqual({ field: 'starts_at', reason: 'DATE_IN_PAST' });
-    expect(firstDateFailure({ ...ok, endsAt: dt(10, 13, 18) }, NOW, 72)).toEqual({ field: 'ends_at', reason: 'DATE_IN_PAST' });
+    expect(firstDateFailure({ ...ok, closesAt: dt(10, 14, 8) }, NOW)).toEqual({ field: 'registration_closes_at', reason: 'DATE_IN_PAST' });
+    expect(firstDateFailure({ ...ok, hardBlockAt: dt(10, 14, 9) }, NOW)).toEqual({ field: 'registration_hard_block_at', reason: 'DATE_IN_PAST' });
+    expect(firstDateFailure({ ...ok, startsAt: dt(10, 13, 9) }, NOW)).toEqual({ field: 'starts_at', reason: 'DATE_IN_PAST' });
+    expect(firstDateFailure({ ...ok, endsAt: dt(10, 13, 18) }, NOW)).toEqual({ field: 'ends_at', reason: 'DATE_IN_PAST' });
   });
 
   it('2: end after start', () => {
-    expect(firstDateFailure({ ...ok, endsAt: dt(11, 14, 9) }, NOW, 72)).toEqual({ field: 'ends_at', reason: 'END_BEFORE_START' });
+    expect(firstDateFailure({ ...ok, endsAt: dt(11, 14, 9) }, NOW)).toEqual({ field: 'ends_at', reason: 'END_BEFORE_START' });
   });
 
   it('3: daily start time before daily end time (no overnight window)', () => {
-    expect(firstDateFailure({ ...ok, startsAt: dt(11, 14, 19), endsAt: dt(11, 15, 8) }, NOW, 72)).toEqual({
+    expect(firstDateFailure({ ...ok, startsAt: dt(11, 14, 19), endsAt: dt(11, 15, 8) }, NOW)).toEqual({
       field: 'ends_at',
       reason: 'DAILY_WINDOW_INVALID',
     });
   });
 
   it('4: closure not after the hard block', () => {
-    expect(firstDateFailure({ ...ok, closesAt: dt(11, 4, 9), hardBlockAt: dt(11, 3, 9) }, NOW, 72)).toEqual({
+    expect(firstDateFailure({ ...ok, closesAt: dt(11, 4, 9), hardBlockAt: dt(11, 3, 9) }, NOW)).toEqual({
       field: 'registration_closes_at',
       reason: 'REG_CLOSE_AFTER_HARD',
     });
     // closure equal to the hard block is allowed
-    expect(firstDateFailure({ ...ok, closesAt: dt(11, 3, 9) }, NOW, 72)).toBeNull();
+    expect(firstDateFailure({ ...ok, closesAt: dt(11, 3, 9) }, NOW)).toBeNull();
   });
 
-  it('5: hard block + gap <= start', () => {
-    expect(firstDateFailure({ ...ok, hardBlockAt: dt(11, 12, 9) }, NOW, 72)).toEqual({
+  it('5: hard block not after the start (no minimum gap)', () => {
+    expect(firstDateFailure({ ...ok, hardBlockAt: dt(11, 14, 9, 1) }, NOW)).toEqual({
       field: 'registration_hard_block_at',
       reason: 'HARD_BLOCK_TOO_CLOSE',
     });
+    expect(firstDateFailure({ ...ok, hardBlockAt: dt(11, 16, 9) }, NOW)?.reason).toBe('HARD_BLOCK_TOO_CLOSE');
   });
 
   it('when two rules fail the lower-numbered one is returned', () => {
-    expect(firstDateFailure({ ...ok, startsAt: dt(10, 13, 9), endsAt: dt(10, 13, 8), closesAt: dt(11, 4, 9) }, NOW, 72)?.reason).toBe('DATE_IN_PAST');
+    expect(firstDateFailure({ ...ok, startsAt: dt(10, 13, 9), endsAt: dt(10, 13, 8), closesAt: dt(11, 4, 9) }, NOW)?.reason).toBe('DATE_IN_PAST');
   });
 
-  it('the exact boundary passes (hard block exactly gap hours before the start)', () => {
-    expect(firstDateFailure({ ...ok, hardBlockAt: dt(11, 11, 8, 59) }, NOW, 72)).toBeNull();
-    expect(firstDateFailure({ ...ok, hardBlockAt: dt(11, 11, 9, 0) }, NOW, 72)).toBeNull();
-    expect(firstDateFailure({ ...ok, hardBlockAt: dt(11, 11, 9, 1) }, NOW, 72)?.reason).toBe('HARD_BLOCK_TOO_CLOSE');
+  it('the exact boundary passes: a hard block at the first game, and no gap is enforced', () => {
+    expect(firstDateFailure({ ...ok, hardBlockAt: dt(11, 14, 9, 0) }, NOW)).toBeNull();
+    expect(firstDateFailure({ ...ok, hardBlockAt: dt(11, 14, 8, 59) }, NOW)).toBeNull();
+    expect(firstDateFailure({ ...ok, closesAt: dt(10, 14, 9, 1), hardBlockAt: dt(10, 14, 9, 2) }, NOW)).toBeNull();
   });
 
-  it('messages: gap wording, "before the tournament starts" when at or after the start, window wording', () => {
-    const gap = dateFailureIssue({ field: 'registration_hard_block_at', reason: 'HARD_BLOCK_TOO_CLOSE' }, { minGapHours: 72, startLabel: 'Sat 14 Nov', hardBlockAtOrAfterStart: false });
-    expect(gap).toMatchObject({ key: 'mob.tw.err_hard_gap_days', params: { gap: 3, start: 'Sat 14 Nov' }, step: WIZARD_STEP.registration });
-    const hours = dateFailureIssue({ field: 'registration_hard_block_at', reason: 'HARD_BLOCK_TOO_CLOSE' }, { minGapHours: 36, startLabel: 'x', hardBlockAtOrAfterStart: false });
-    expect(hours.key).toBe('mob.tw.err_hard_gap_hours');
-    const after = dateFailureIssue({ field: 'registration_hard_block_at', reason: 'HARD_BLOCK_TOO_CLOSE' }, { minGapHours: 72, startLabel: 'x', hardBlockAtOrAfterStart: true });
-    expect(after.key).toBe('mob.tw.err_hard_after_start');
-    expect(dateFailureIssue({ field: 'ends_at', reason: 'END_BEFORE_START' }, { minGapHours: 72, startLabel: '', hardBlockAtOrAfterStart: false })).toMatchObject({
+  it('messages: board wording per rule, with the first game named', () => {
+    const after = dateFailureIssue({ field: 'registration_hard_block_at', reason: 'HARD_BLOCK_TOO_CLOSE' }, { startLabel: 'Sat 14 Nov, 9:00 AM' });
+    expect(after).toMatchObject({ key: 'mob.tw.dates_err_hard_after_start', params: { when: 'Sat 14 Nov, 9:00 AM' }, step: WIZARD_STEP.registration });
+    expect(dateFailureIssue({ field: 'registration_closes_at', reason: 'DATE_IN_PAST' }, { startLabel: '' }).key).toBe('mob.tw.dates_err_past');
+    expect(dateFailureIssue({ field: 'ends_at', reason: 'END_BEFORE_START' }, { startLabel: '' })).toMatchObject({
       key: 'mob.tw.err_window',
       step: WIZARD_STEP.when,
     });
-    expect(
-      dateFailureIssue({ field: 'registration_closes_at', reason: 'REG_CLOSE_AFTER_HARD' }, { minGapHours: 72, startLabel: '', hardBlockAtOrAfterStart: false }).key,
-    ).toBe('mob.tw.err_soft_after_hard');
+    expect(dateFailureIssue({ field: 'registration_closes_at', reason: 'REG_CLOSE_AFTER_HARD' }, { startLabel: '' }).key).toBe('mob.tw.dates_err_soft_after_hard');
   });
 
-  it('step 4 reports the window, step 5 only the registration rules', () => {
+  it('the rule checklist of the board: met, broken or not decidable yet', () => {
+    expect(registrationRules(validState(), NOW)).toEqual({ future: 'ok', order: 'ok', start: 'ok' });
+    expect(registrationRules(validState({ closesAt: at(10, 13, 9) }), NOW)).toEqual({ future: 'bad', order: 'ok', start: 'ok' });
+    expect(registrationRules(validState({ hardBlockAt: at(11, 16, 9) }), NOW)).toEqual({ future: 'ok', order: 'ok', start: 'bad' });
+    expect(registrationRules(validState({ closesAt: at(11, 4, 9) }), NOW).order).toBe('bad');
+    expect(registrationRules(initialWizardState('r'), NOW)).toEqual({ future: 'unknown', order: 'unknown', start: 'unknown' });
+  });
+
+  it('the window screen reports the window, the registration screen only the registration rules', () => {
     expect(validateWindow(validState({ startsAt: '', endsAt: '' }), NOW).map(i => i.field)).toEqual(['starts_at', 'ends_at']);
     expect(validateWindow(validState({ endsAt: at(11, 14, 9) }), NOW).map(i => i.key)).toEqual(['mob.tw.err_window']);
-    expect(validateRegistration(validState({ closesAt: at(11, 4, 9) }), NOW, 72, day).map(i => i.key)).toEqual(['mob.tw.err_soft_after_hard']);
-    expect(validateRegistration(validState({ hardBlockAt: at(11, 16, 9) }), NOW, 72, day).map(i => i.key)).toEqual(['mob.tw.err_hard_after_start']);
-    expect(validateRegistration(validState({ hardBlockAt: at(11, 12, 9) }), NOW, 72, day).map(i => i.key)).toEqual(['mob.tw.err_hard_gap_days']);
-    expect(validateRegistration(validState({ closesAt: '' }), NOW, 72, day).map(i => i.key)).toEqual(['mob.tw.err_required']);
+    expect(validateRegistration(validState({ closesAt: at(11, 4, 9) }), NOW, dayTime).map(i => i.key)).toEqual(['mob.tw.dates_err_soft_after_hard']);
+    expect(validateRegistration(validState({ hardBlockAt: at(11, 16, 9) }), NOW, dayTime).map(i => i.key)).toEqual(['mob.tw.dates_err_hard_after_start']);
+    // a hard block exactly at the first game is fine; so is one a day before (no gap)
+    expect(validateRegistration(validState({ hardBlockAt: at(11, 14, 9) }), NOW, dayTime)).toEqual([]);
+    expect(validateRegistration(validState({ hardBlockAt: at(11, 13, 9) }), NOW, dayTime)).toEqual([]);
+    expect(validateRegistration(validState({ closesAt: '' }), NOW, dayTime).map(i => i.key)).toEqual(['mob.tw.err_required']);
     // a window failure is not repeated on the registration step
-    expect(validateRegistration(validState({ endsAt: at(11, 14, 9) }), NOW, 72, day)).toEqual([]);
+    expect(validateRegistration(validState({ endsAt: at(11, 14, 9) }), NOW, dayTime)).toEqual([]);
   });
 
   it('the hard block follows the closure until the organizer sets it', () => {
@@ -195,10 +191,13 @@ describe('visibility mapping', () => {
 
 describe('request body', () => {
   it('has exactly the contract fields, ISO instants, and the one client_request_id', () => {
-    const body = buildCreateBody(validState(), GROUP_TEMPLATE, false);
+    const body = buildCreateBody(validState(), false);
+    // AD-T3: neither template_id nor overrides is ever sent.
+    expect(body).not.toHaveProperty('template_id');
+    expect(body).not.toHaveProperty('overrides');
     expect(Object.keys(body).sort()).toEqual(
       [
-        'client_request_id', 'template_id', 'overrides', 'title', 'sport', 'participation_mode', 'visibility', 'venue_name',
+        'client_request_id', 'title', 'sport', 'participation_mode', 'visibility', 'venue_name',
         'starts_at', 'ends_at', 'registration_closes_at', 'registration_hard_block_at', 'committee_member_ids',
       ].sort(),
     );
@@ -210,24 +209,23 @@ describe('request body', () => {
   });
 
   it('group visibility carries group_ids; a description is trimmed and sent when present', () => {
-    const body = buildCreateBody(validState({ isPrivate: true, groupIds: ['g1', 'g2'], description: '  Bring shuttles  ' }), GROUP_TEMPLATE, false);
+    const body = buildCreateBody(validState({ isPrivate: true, groupIds: ['g1', 'g2'], description: '  Bring shuttles  ' }), false);
     expect(body.visibility).toBe('group');
     expect(body.group_ids).toEqual(['g1', 'g2']);
     expect(body.description).toBe('Bring shuttles');
   });
 
   it('venue: catalogue id, Others form, or the text fields when the catalogue is off', () => {
-    const catalogue = buildCreateBody(validState({ venue: { venueId: 'v-1', name: 'Hall', address: 'x' } }), GROUP_TEMPLATE, true);
+    const catalogue = buildCreateBody(validState({ venue: { venueId: 'v-1', name: 'Hall', address: 'x' } }), true);
     expect(catalogue.venue_id).toBe('v-1');
     expect(catalogue).not.toHaveProperty('venue_name');
     const others = buildCreateBody(
       validState({ venue: { venueId: null, othersInput: { name: 'Court', postal_code: '123456' }, name: 'Court', address: '' } }),
-      GROUP_TEMPLATE,
       true,
     );
     expect(others.others).toEqual({ name: 'Court', postal_code: '123456' });
     expect(others).not.toHaveProperty('venue_id');
-    const text = buildCreateBody(validState({ venueName: ' Hall ', venueAddress: ' 1 Road ' }), GROUP_TEMPLATE, false);
+    const text = buildCreateBody(validState({ venueName: ' Hall ', venueAddress: ' 1 Road ' }), false);
     expect([text.venue_name, text.venue_address]).toEqual(['Hall', '1 Road']);
   });
 });
@@ -237,12 +235,13 @@ describe('whole-wizard validity', () => {
     expect(firstInvalidStep(validState(), ctx)).toBeNull();
     expect(firstInvalidStep(initialWizardState('r', 'badminton'), ctx)).toBe(WIZARD_STEP.basics);
     expect(firstInvalidStep(validState({ committee: [] }), ctx)).toBe(WIZARD_STEP.committee);
+    expect(firstInvalidStep(validState({ hardBlockAt: at(11, 16, 9) }), ctx)).toBe(WIZARD_STEP.registration);
     expect(validateStep(WIZARD_STEP.visibility, validState(), ctx)).toEqual([]);
   });
 });
 
 describe('server rejections map to the step and field the boards show', () => {
-  const rctx = { minGapHours: 72, committeeMax: 10, startLabel: 'Sat 14 Nov', hardBlockAtOrAfterStart: false };
+  const rctx = { committeeMax: 10, startLabel: 'Sat 14 Nov, 9:00 AM' };
   const reject = (status: number, data: unknown) => ({ response: { status, data } });
 
   it('TOURNAMENT_DATES_INVALID by field and reason', () => {
@@ -250,9 +249,9 @@ describe('server rejections map to the step and field the boards show', () => {
       [{ field: 'starts_at', reason: 'DATE_IN_PAST' }, WIZARD_STEP.when, 'starts_at', 'mob.tw.err_window'],
       [{ field: 'ends_at', reason: 'END_BEFORE_START' }, WIZARD_STEP.when, 'ends_at', 'mob.tw.err_window'],
       [{ field: 'ends_at', reason: 'DAILY_WINDOW_INVALID' }, WIZARD_STEP.when, 'ends_at', 'mob.tw.err_daily_window'],
-      [{ field: 'registration_closes_at', reason: 'REG_CLOSE_AFTER_HARD' }, WIZARD_STEP.registration, 'registration_closes_at', 'mob.tw.err_soft_after_hard'],
-      [{ field: 'registration_closes_at', reason: 'DATE_IN_PAST' }, WIZARD_STEP.registration, 'registration_closes_at', 'mob.tw.err_reg_past'],
-      [{ field: 'registration_hard_block_at', reason: 'HARD_BLOCK_TOO_CLOSE' }, WIZARD_STEP.registration, 'registration_hard_block_at', 'mob.tw.err_hard_gap_days'],
+      [{ field: 'registration_closes_at', reason: 'REG_CLOSE_AFTER_HARD' }, WIZARD_STEP.registration, 'registration_closes_at', 'mob.tw.dates_err_soft_after_hard'],
+      [{ field: 'registration_closes_at', reason: 'DATE_IN_PAST' }, WIZARD_STEP.registration, 'registration_closes_at', 'mob.tw.dates_err_past'],
+      [{ field: 'registration_hard_block_at', reason: 'HARD_BLOCK_TOO_CLOSE' }, WIZARD_STEP.registration, 'registration_hard_block_at', 'mob.tw.dates_err_hard_after_start'],
     ];
     cases.forEach(([body, step, field, key]) => {
       const outcome = mapCreateRejection(reject(422, { code: 'TOURNAMENT_DATES_INVALID', step: 3, ...body }), rctx);
@@ -267,25 +266,28 @@ describe('server rejections map to the step and field the boards show', () => {
       step: WIZARD_STEP.visibility,
       dropGroupId: 'g9',
     });
-    expect(mapCreateRejection(reject(422, { code: 'COMMITTEE_INVALID', reason: 'TOO_FEW', step: 6 }), rctx)).toMatchObject({
+    expect(mapCreateRejection(reject(422, { code: 'COMMITTEE_INVALID', reason: 'TOO_FEW', step: 5 }), rctx)).toMatchObject({
       step: WIZARD_STEP.committee,
       issue: { key: 'mob.tw.err_committee_few' },
     });
-    expect(mapCreateRejection(reject(422, { code: 'COMMITTEE_INVALID', reason: 'TOO_MANY', step: 6 }), rctx)).toMatchObject({
+    expect(mapCreateRejection(reject(422, { code: 'COMMITTEE_INVALID', reason: 'TOO_MANY', step: 5 }), rctx)).toMatchObject({
       issue: { key: 'mob.tw.err_committee_many', params: { max: 10 } },
     });
-    expect(mapCreateRejection(reject(422, { code: 'COMMITTEE_INVALID', reason: 'USER_UNAVAILABLE', user_id: 'u9', step: 6 }), rctx)).toMatchObject({
+    expect(mapCreateRejection(reject(422, { code: 'COMMITTEE_INVALID', reason: 'USER_UNAVAILABLE', user_id: 'u9', step: 5 }), rctx)).toMatchObject({
       dropUserId: 'u9',
     });
-    expect(mapCreateRejection(reject(422, { code: 'COMMITTEE_INVALID', reason: 'DUPLICATE', user_id: 'u9', step: 6 }), rctx)).toMatchObject({
+    expect(mapCreateRejection(reject(422, { code: 'COMMITTEE_INVALID', reason: 'DUPLICATE', user_id: 'u9', step: 5 }), rctx)).toMatchObject({
       issue: { key: 'mob.tw.err_committee_duplicate' },
     });
   });
 
-  it('a retired or missing template returns to the format step', () => {
-    expect(mapCreateRejection(reject(409, { code: 'TEMPLATE_NOT_ACTIVE', step: 5 }), rctx)).toMatchObject({ kind: 'format_retired', step: WIZARD_STEP.format });
-    expect(mapCreateRejection(reject(404, { code: 'TEMPLATE_NOT_FOUND', step: 5 }), rctx)).toMatchObject({ kind: 'format_retired' });
-    expect(mapCreateRejection(reject(422, { code: 'OVERRIDES_INVALID', step: 5 }), rctx)).toMatchObject({ step: WIZARD_STEP.participation });
+  it('a template or override failure is not something the organizer can change: it stays on review', () => {
+    expect(mapCreateRejection(reject(409, { code: 'TEMPLATE_NOT_ACTIVE', field: 'template_id', step: 1 }), rctx)).toMatchObject({
+      kind: 'failed',
+      issue: { key: 'mob.tw.err_template_unavailable' },
+    });
+    expect(mapCreateRejection(reject(404, { code: 'TEMPLATE_NOT_FOUND', step: 1 }), rctx).kind).toBe('failed');
+    expect(mapCreateRejection(reject(422, { code: 'OVERRIDES_INVALID', step: 1 }), rctx).kind).toBe('failed');
     expect(mapCreateRejection(reject(422, { code: 'VENUE_INVALID', step: 1 }), rctx)).toMatchObject({ step: WIZARD_STEP.when });
   });
 
@@ -297,8 +299,9 @@ describe('server rejections map to the step and field the boards show', () => {
     expect(mapCreateRejection(reject(503, { code: 'TOURNAMENT_CONFIG_INVALID' }), rctx).kind).toBe('failed');
   });
 
-  it('server step numbers translate to board steps', () => {
-    expect([1, 2, 4, 5, 6].map(step => boardStepFor(step, undefined))).toEqual([4, 3, 6, 2, 7]);
+  it('server step numbers (te-b1: Basics 1, Participation 2, Dates 3, Groups 4, Committee 5) translate to screens', () => {
+    expect([1, 2, 4, 5].map(step => boardStepFor(step, undefined))).toEqual([WIZARD_STEP.when, WIZARD_STEP.participation, WIZARD_STEP.visibility, WIZARD_STEP.committee]);
+    expect(boardStepFor(6, undefined)).toBeNull();
     expect(boardStepFor(3, 'ends_at')).toBe(WIZARD_STEP.when);
     expect(boardStepFor(3, 'registration_hard_block_at')).toBe(WIZARD_STEP.registration);
     expect(boardStepFor(undefined, undefined)).toBeNull();

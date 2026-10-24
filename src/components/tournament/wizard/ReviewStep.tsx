@@ -1,10 +1,9 @@
-/** Step 8, boards TournReview / TournReviewErr / TournReviewFail: a read-only summary, one "Edit" per section. */
+/** Step 7, boards TournReview / TournReviewErr / TournReviewFail: a read-only summary, one "Edit" per section. */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useT } from '../../../labels/LabelsContext';
 import { colors, spacing, typography } from '../../../theme/tokens';
-import type { WizardTemplate } from '../../../types/tournamentWizard';
 import { Banner, SectionCard, StepHeading } from './parts';
 import { toDate, WIZARD_STEP, type WizardState } from '../../../utils/tournamentWizard';
 import { formatDay } from './RegistrationStep';
@@ -16,38 +15,21 @@ function day(value: string): string {
 
 export default function ReviewStep({
   state,
-  template,
   venueLabel,
   onEdit,
-  retiredMessage,
 }: {
   state: WizardState;
-  template: WizardTemplate | null;
   venueLabel: string;
   onEdit: (step: number) => void;
-  retiredMessage: string | null;
 }): React.JSX.Element {
   const t = useT();
   const team = state.participation === 'team';
   const rows: { key: string; label: string; value: string; step: number }[] = [
     { key: 'name', label: t('mob.tw.review_name'), value: state.title.trim(), step: WIZARD_STEP.basics },
     {
-      key: 'format',
-      label: t('mob.tw.review_format'),
-      value: template ? t('mob.tw.review_format_value', { name: template.display_name, version: template.version }) : '–',
-      step: WIZARD_STEP.format,
-    },
-    {
       key: 'players',
-      label: team ? t('mob.tw.part_team') : t('mob.tw.review_players'),
-      value: team
-        ? t('mob.tw.review_teams', {
-            min: state.entrantsMin ?? '–',
-            max: state.entrantsMax ?? '–',
-            sizeMin: state.teamSizeMin ?? '–',
-            sizeMax: state.teamSizeMax ?? '–',
-          })
-        : t('mob.tw.review_individuals', { min: state.entrantsMin ?? '–', max: state.entrantsMax ?? '–' }),
+      label: t('mob.tw.review_players'),
+      value: team ? t('mob.tw.part_team') : t('mob.tw.part_individual'),
       step: WIZARD_STEP.participation,
     },
     {
@@ -82,7 +64,6 @@ export default function ReviewStep({
   return (
     <View>
       <StepHeading>{t('mob.tw.step_review')}</StepHeading>
-      {retiredMessage ? <Banner tone="error" message={retiredMessage} testID="tw-review-retired" style={styles.banner} /> : null}
       <SectionCard>
         {rows.map(row => (
           <View key={row.key} style={styles.row} testID={`tw-review-${row.key}`}>
@@ -109,7 +90,6 @@ export default function ReviewStep({
 }
 
 const styles = StyleSheet.create({
-  banner: { marginBottom: spacing.md, marginTop: 0 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
   rowText: { flex: 1, paddingRight: spacing.sm },
   label: { ...typography.caption, color: colors.textSecondary },

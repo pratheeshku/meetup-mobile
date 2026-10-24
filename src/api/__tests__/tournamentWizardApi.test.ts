@@ -18,7 +18,7 @@ describe('getWizardTemplates', () => {
     get.mockResolvedValueOnce({ data: TEMPLATES });
     const out = await getWizardTemplates({ correlationId: 'c-1' });
     expect(get).toHaveBeenCalledWith('/tournaments/v2/templates', { correlationId: 'c-1' });
-    expect(out.limits?.min_gap_hours).toBe(72);
+    expect(out.limits?.min_gap_hours).toBe(0);
     expect(out.templates).toHaveLength(2);
   });
 

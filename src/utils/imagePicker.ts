@@ -6,15 +6,22 @@ export interface PickedImage {
   mime: string;
 }
 
+/** Crop box in pixels. The default is the square avatar crop; a tournament banner is 4:1 (1600 x 400). */
+export interface CropSize {
+  width: number;
+  height: number;
+}
+
 export async function pickImage(
   source: 'camera' | 'library',
   cropTitle: string,
+  size: CropSize = { width: 500, height: 500 },
 ): Promise<PickedImage | null> {
   const cropOptions = {
     mediaType: 'photo' as const,
     cropping: true,
-    width: 500,
-    height: 500,
+    width: size.width,
+    height: size.height,
     compressImageQuality: 0.8,
     // iOS only (ignored on Android): HEIC must never reach the backend.
     forceJpg: true,
