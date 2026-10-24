@@ -322,3 +322,28 @@ All files                     |   78.55 |    73.21 |    74.1 |   78.63 |
   tournamentWizard.ts         |      97 |    92.81 |     100 |   96.93 | 158,301,305,409,501                                                                                                                        
 ------------------------------|---------|----------|---------|---------|--------------------------------------------------------------------------------------------------------------------------------------------
 ```
+
+## Git evidence
+Generated after the code commit and push (template section 7). This section was appended afterwards and is committed in the next commit on the same branch, so the branch tip is one commit after the hash below.
+
+```
+$ git log -1 --stat 0a029b5 (first lines)
+commit 0a029b549a1de14b374b94e2a034c82497281d3b
+te-a1: mobile tournament experience (Home court booking, six-step wizard with banner and logo, v2 tournament page)
+Pratheesh <pratheeshknow@gmail.com>
+Sat Oct 24 16:51:55 2026 +0800
+ src/utils/tournamentScoring.ts                     |  43 +-
+ src/utils/tournamentWizard.ts                      | 264 +++++--------
+ 44 files changed, 4449 insertions(+), 855 deletions(-)
+
+$ git log --oneline | grep 0a029b5
+0a029b5 te-a1: mobile tournament experience (Home court booking, six-step wizard with banner and logo, v2 tournament page)
+
+$ git branch -r --contains 0a029b5
+  origin/claude/te-a1-mobile
+
+$ git status -sb (before this section was committed)
+## claude/te-a1-mobile...origin/claude/te-a1-mobile
+ M android/version.properties
+ M docs/reports/te-a1-report.md
+```
