@@ -18,6 +18,8 @@ import type {
   ScoringTableRow,
   TournamentScoringState,
   TournamentStandingsView,
+  TournamentTabKey,
+  TournamentTabs,
 } from '../types/tournamentScoring';
 
 type Json = Record<string, unknown>;
@@ -231,7 +233,46 @@ export function normaliseScoringState(raw: unknown): TournamentScoringState | nu
   if (!isObject(raw)) {
     return null;
   }
-  return { enabled: raw.enabled === true, applicable: raw.applicable === true };
+  const state: TournamentScoringState = { enabled: raw.enabled === true, applicable: raw.applicable === true };
+  // Additive (te-b2): only what the server sent is carried; an older answer keeps its old shape.
+  if (typeof raw.registration_phase === 'string') {
+    state.registration_phase = raw.registration_phase;
+  }
+  if (typeof raw.fixtures_published === 'boolean') {
+    state.fixtures_published = raw.fixtures_published;
+  }
+  if (typeof raw.any_result_posted === 'boolean') {
+    state.any_result_posted = raw.any_result_posted;
+  }
+  const tabs = normaliseTabs(raw.tabs);
+  if (tabs) {
+    state.tabs = tabs;
+  }
+  if (typeof raw.live_poll_seconds === 'number') {
+    state.live_poll_seconds = raw.live_poll_seconds;
+  }
+  return state;
+}
+
+const TAB_KEYS: TournamentTabKey[] = ['overview', 'participants', 'fixtures', 'standings', 'results', 'media', 'approvals'];
+
+/** The `tabs` object as sent; `null` when absent or unreadable (the legacy page). Unknown tabs are ignored. */
+export function normaliseTabs(raw: unknown): TournamentTabs | null {
+  if (!isObject(raw)) {
+    return null;
+  }
+  const tabs: TournamentTabs = {};
+  for (const key of TAB_KEYS) {
+    const entry = raw[key];
+    if (isObject(entry) && (entry.state === 'open' || entry.state === 'locked')) {
+      tabs[key] = {
+        state: entry.state,
+        ...(typeof entry.unlocks === 'string' ? { unlocks: entry.unlocks } : {}),
+        ...(typeof entry.badge === 'number' ? { badge: entry.badge } : {}),
+      };
+    }
+  }
+  return Object.keys(tabs).length > 0 ? tabs : null;
 }
 
 /** The score line of one side: its games in each set, as returned. */

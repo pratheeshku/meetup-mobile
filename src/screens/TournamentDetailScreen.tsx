@@ -48,6 +48,7 @@ import {
   getTournamentClosure,
   getTournamentInvitations,
   getTournamentResponses,
+  getTournamentScoringState,
   putTournamentClosure,
   registerForTournament,
   respondToTournamentInvitation,
@@ -70,6 +71,9 @@ import CommitteeInvitationCard from '../components/tournament/CommitteeInvitatio
 import TournamentInvitationBanner from '../components/tournament/TournamentInvitationBanner';
 import TournamentInvitePanel from '../components/tournament/TournamentInvitePanel';
 import TournamentScoringEntry from '../components/scoring/TournamentScoringEntry';
+import TournamentDetailV2 from '../components/tournament/v2/TournamentDetailV2';
+import type { RegisterAction } from '../components/tournament/v2/TournamentHeader';
+import type { TournamentScoringState } from '../types/tournamentScoring';
 import ErrorView from '../components/ErrorView';
 import LoadingView from '../components/LoadingView';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
@@ -98,6 +102,11 @@ import { useT } from '../labels/LabelsContext';
 
 type Props = NativeStackScreenProps<TournamentsStackParamList, 'TournamentDetail'>;
 
+/** The viewer's own registration is active and the tournament is still on: the banner shows "You're registered". */
+function canWithdrawNow(status: string, ended: boolean): boolean {
+  return !ended && status === 'registered';
+}
+
 function formatDateTime(isoString: string): string {
   return new Date(isoString).toLocaleString(undefined, {
     weekday: 'short',
@@ -124,6 +133,8 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [fixtures, setFixtures] = useState<TournamentFixture[]>([]);
   const [registrations, setRegistrations] = useState<TournamentRegistration[]>([]);
+  // `GET .../scoring/state`: its server `tabs` object exists for lifecycle version 2 only, so it also tells which page to show.
+  const [scoring, setScoring] = useState<TournamentScoringState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   // Called before the loading/error early returns below (Rules of Hooks) —
@@ -231,7 +242,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         setLoadError(null);
       }
       try {
-        const [tournamentData, fixturesData, registrationsData, closureData, responsesData, invitationsData] =
+        const [tournamentData, fixturesData, registrationsData, closureData, responsesData, invitationsData, scoringData] =
           await Promise.all([
             getTournament(tournamentId, options),
             getFixtures(tournamentId, options),
@@ -244,6 +255,9 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
               : Promise.resolve(null),
             typeof getTournamentInvitations === 'function'
               ? getTournamentInvitations(tournamentId, options).catch(() => null)
+              : Promise.resolve(null),
+            typeof getTournamentScoringState === 'function'
+              ? getTournamentScoringState(tournamentId, options).catch(() => null)
               : Promise.resolve(null),
           ]);
         setTournament(tournamentData);
@@ -258,6 +272,8 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           setResponses(null);
         }
         setInvitations(Array.isArray(invitationsData) ? invitationsData : null);
+        // A failed state read on a silent refresh keeps the page the viewer is on (no flip to the legacy page).
+        setScoring(previous => scoringData ?? (silent ? previous : null));
         if (tournamentData.my_committee_invitation === 'pending' && !committeeAnswered.current) {
           setCommitteeCardOpen(true);
           await loadCommitteeSummary();
@@ -678,6 +694,94 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     tournament.status !== 'completed' &&
     tournament.status !== 'cancelled' &&
     tournament.lifecycle_status !== 'closed';
+
+  // Lifecycle version 2 (the server sent `tabs`): header, tabs and Overview of the tournament-experience design.
+  // Version 1 tournaments keep the page below unchanged.
+  if (scoring?.tabs) {
+    const activeCount = registrations.filter(isActiveRegistration).length;
+    const registrationOpen = scoring.registration_phase === 'open';
+    const canRegisterV2 =
+      !isTournamentEnded &&
+      registrationOpen &&
+      (currentUserRegistrationStatus === 'none' || Boolean(tournament.my_declined)) &&
+      tournament.my_invitation_status !== 'pending';
+    const recoverByInvitation = tournament.visibility === 'invite' || tournament.my_invitation_status !== null;
+    const register: RegisterAction = canWithdrawNow(currentUserRegistrationStatus, isTournamentEnded)
+      ? { kind: 'registered' }
+      : canRegisterV2
+      ? {
+          kind: 'register',
+          spotsLeft: Math.max(0, tournament.max_participants - activeCount),
+          loading: isRegistering,
+          onPress: tournament.my_declined && recoverByInvitation ? handleAcceptInvite : handleRegister,
+        }
+      : null;
+    const secondary = canWithdraw
+      ? { label: t('mob.respond.decline'), loading: isWithdrawing, onPress: handleWithdraw }
+      : canRegisterV2 && !tournament.my_declined && tournament.my_invitation_status !== 'accepted'
+      ? { label: t('mob.respond.decline'), loading: isWithdrawing, onPress: handleDecline }
+      : null;
+    return (
+      <TournamentDetailV2
+        tournament={tournament}
+        scoring={scoring}
+        registeredCount={activeCount}
+        closure={closure}
+        sportLabel={sportLabel}
+        isOrganiser={isOrganiser}
+        isCommittee={canReadResponses}
+        register={register}
+        secondary={secondary}
+        notice={registerError ?? withdrawError}
+        cancel={{ visible: canCancel, loading: isCancelling, error: cancelError, onPress: handleCancel }}
+        onOpenClosure={() => setIsClosureModalOpen(true)}
+        banners={
+          <>
+            {committeeCard}
+            <TournamentInvitationBanner
+              tournamentId={tournament.id}
+              status={tournament.my_invitation_status}
+              onResponded={async result => {
+                if (result?.accepted === false) {
+                  unavailable.markOwnAction();
+                }
+                await refreshTournament();
+              }}
+              onNotFound={unavailable.onNotFound}
+            />
+          </>
+        }
+        invitePanel={
+          <TournamentInvitePanel
+            tournamentId={tournament.id}
+            access={tournament.my_invite_access}
+            title={tournament.name}
+            responses={canReadResponses ? responses : null}
+            onSent={() => loadAll(true)}
+          />
+        }
+        onOpenScoring={() => navigation.navigate('TournamentScoring', { tournamentId })}
+      >
+        <ClosureModal
+          visible={isClosureModalOpen}
+          onClose={() => {
+            setIsClosureModalOpen(false);
+            setClosureError(null);
+          }}
+          entityType="tournament"
+          candidates={closureCandidates}
+          initialOutcome={tournament.closure_outcome ?? closure?.outcome}
+          initialAttendeeIds={closure?.attendees?.map(a => a.registration_id ?? '').filter(Boolean)}
+          initialWinnerId={closure?.winner?.registration_id}
+          initialRunnerUpId={closure?.runner_up?.registration_id}
+          expectedVersion={closure?.version ?? 0}
+          onSubmit={handleSaveClosure}
+          isSubmitting={isClosureSubmitting}
+          error={closureError}
+        />
+      </TournamentDetailV2>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

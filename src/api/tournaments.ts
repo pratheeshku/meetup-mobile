@@ -33,8 +33,12 @@ import type {
   TournamentClosurePut,
   TournamentClosureResponse,
   TournamentInvitation,
+  TournamentImageKind,
+  TournamentImages,
   TournamentInvitationStatus,
   TournamentInviteAccess,
+  TournamentParticipationMode,
+  TournamentPerson,
   Tournament,
   TournamentFixture,
   TournamentRegistration,
@@ -86,6 +90,16 @@ interface TournamentApiItem {
   lifecycle_status?: string | null;
   closure_outcome?: string | null;
   my_declined?: boolean | null;
+  participation_mode?: string | null;
+  ends_at?: string | null;
+  schedule_published_at?: string | null;
+  banner_url?: string | null;
+  logo_url?: string | null;
+  banner_tone?: string | null;
+  banner_scrim?: number | null;
+  has_custom_banner?: boolean | null;
+  organizer?: TournamentPerson | null;
+  committee?: TournamentPerson[] | null;
 }
 
 /** Unknown, null or absent -> `'none'` (never a value that shows buttons). */
@@ -135,6 +149,19 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     lifecycle_status: (raw.lifecycle_status as any) ?? 'active',
     closure_outcome: raw.closure_outcome ?? null,
     my_declined: Boolean(raw.my_declined),
+    ends_at: raw.ends_at ?? null,
+    participation_mode:
+      raw.participation_mode === 'individual' || raw.participation_mode === 'team'
+        ? (raw.participation_mode as TournamentParticipationMode)
+        : null,
+    schedule_published_at: raw.schedule_published_at ?? null,
+    banner_url: raw.banner_url ?? null,
+    logo_url: raw.logo_url ?? null,
+    banner_tone: raw.banner_tone === 'light' || raw.banner_tone === 'dark' ? raw.banner_tone : null,
+    banner_scrim: typeof raw.banner_scrim === 'number' ? raw.banner_scrim : null,
+    has_custom_banner: Boolean(raw.has_custom_banner),
+    organizer: raw.organizer ?? null,
+    committee: Array.isArray(raw.committee) ? raw.committee : [],
   };
 }
 
@@ -500,4 +527,37 @@ export async function createWizardTournament(
     correlationId: options?.correlationId,
   });
   return { result: response.data, replayed: response.status === 200 };
+}
+
+/**
+ * Tournament banner and logo (tournament-experience AD-T1, te-b1). `PUT /tournaments/{id}/banner` and `/logo` take one
+ * multipart field named `file` (JPEG or PNG; the server crops, strips EXIF and computes the text tone). Organizer or
+ * active committee member only. The answer is the new effective values. Coded errors: `422`/`413` with
+ * `detail.code = IMAGE_INVALID`, `409 tournament_ended`, `403`, `502`.
+ */
+export async function uploadTournamentImage(
+  id: string,
+  kind: TournamentImageKind,
+  file: { uri: string; name: string; type: string },
+  options?: RequestOptions,
+): Promise<TournamentImages> {
+  const formData = new FormData();
+  formData.append('file', file as unknown as Blob);
+  const { data } = await apiClient.put<TournamentImages>(`/tournaments/${id}/${kind}`, formData, {
+    correlationId: options?.correlationId,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+/** `DELETE /tournaments/{id}/banner` or `/logo`: clears the tournament's own image; the default shows again. */
+export async function deleteTournamentImage(
+  id: string,
+  kind: TournamentImageKind,
+  options?: RequestOptions,
+): Promise<TournamentImages> {
+  const { data } = await apiClient.delete<TournamentImages>(`/tournaments/${id}/${kind}`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
 }

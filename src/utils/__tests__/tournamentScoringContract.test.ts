@@ -135,18 +135,32 @@ describe('standings contract (backend board_view)', () => {
 });
 
 describe('scoring/state contract (engine_service.scoring_state)', () => {
-  it('reads enabled and applicable from the full backend payload', () => {
-    expect(normaliseScoringState(BACKEND_SCORING_STATE)).toEqual({ enabled: true, applicable: true });
+  // Additive reads (te-a1): the registration phase and the two published/posted facts, as the server sent them.
+  const FACTS = { registration_phase: 'frozen', fixtures_published: true, any_result_posted: true };
+
+  it('reads enabled and applicable, and the additive facts, from the full backend payload', () => {
+    expect(normaliseScoringState(BACKEND_SCORING_STATE)).toEqual({ enabled: true, applicable: true, ...FACTS });
   });
 
   it('reads off / not applicable as such', () => {
     expect(normaliseScoringState({ ...BACKEND_SCORING_STATE, enabled: false })).toEqual({
       enabled: false,
       applicable: true,
+      ...FACTS,
     });
     expect(normaliseScoringState({ ...BACKEND_SCORING_STATE, applicable: false })).toEqual({
       enabled: true,
       applicable: false,
+      ...FACTS,
     });
+  });
+
+  it('te-b2: the tabs object and the poll interval ride along for a version 2 tournament and are absent otherwise', () => {
+    const tabs = { overview: { state: 'open' }, fixtures: { state: 'locked', unlocks: 'fixtures_published' } };
+    expect(normaliseScoringState({ ...BACKEND_SCORING_STATE, tabs, live_poll_seconds: 10 })).toMatchObject({
+      tabs: { overview: { state: 'open' }, fixtures: { state: 'locked', unlocks: 'fixtures_published' } },
+      live_poll_seconds: 10,
+    });
+    expect(normaliseScoringState(BACKEND_SCORING_STATE)).not.toHaveProperty('tabs');
   });
 });

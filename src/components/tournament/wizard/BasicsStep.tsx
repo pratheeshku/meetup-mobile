@@ -10,6 +10,7 @@ import TextField from '../../TextField';
 import { ChevronRightIcon } from '../../icons/ActionIcons';
 import { TrophyIcon } from '../../icons/SharedIcons';
 import InlineError from '../../InlineError';
+import ImagesCard from './ImagesCard';
 import { FieldError, FieldLabel, SectionCard, StepHeading } from './parts';
 import { DESCRIPTION_MAX, TITLE_MAX, type WizardState } from '../../../utils/tournamentWizard';
 
@@ -32,12 +33,27 @@ export default function BasicsStep({
 }): React.JSX.Element {
   const t = useT();
   const [picking, setPicking] = useState(false);
+  const [pickFailed, setPickFailed] = useState(false);
   const current = sports.find(item => item.name === state.sport);
   return (
     <View>
       <StepHeading>{t('mob.tw.step_basics')}</StepHeading>
       {sportsError ? <InlineError message={t('mob.common.sports_load_error')} onRetry={onRetrySports} /> : null}
-      <SectionCard title={t('mob.tw.sport')}>
+      <ImagesCard
+        banner={state.banner}
+        logo={state.logo}
+        onBanner={banner => {
+          setPickFailed(false);
+          onChange({ banner });
+        }}
+        onLogo={logo => {
+          setPickFailed(false);
+          onChange({ logo });
+        }}
+        onPickFailed={() => setPickFailed(true)}
+      />
+      {pickFailed ? <FieldError message={t('mob.tw.images_pick_failed')} testID="tw-images-pick-error" /> : null}
+      <SectionCard title={t('mob.tw.sport')} style={styles.basicsCard}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('mob.tw.sport_change')}
@@ -120,6 +136,7 @@ const styles = StyleSheet.create({
   sportOption: { paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, minHeight: 44, justifyContent: 'center' },
   sportOptionText: { ...typography.body, color: colors.textPrimary },
   sportOptionOn: { fontWeight: '700', color: colors.primary },
+  basicsCard: { marginTop: spacing.md },
   invalid: { borderColor: colors.error },
   multiline: { minHeight: 96, textAlignVertical: 'top' },
 });

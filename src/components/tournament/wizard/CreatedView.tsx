@@ -26,10 +26,13 @@ function day(iso: string): string {
 export default function CreatedView({
   result,
   hasInvitedCommittee,
+  imagesFailed = false,
   onOpen,
 }: {
   result: WizardCreateResult;
   hasInvitedCommittee: boolean;
+  /** A banner or logo upload failed after the create: the tournament exists and the default shows (AD-T1). */
+  imagesFailed?: boolean;
   onOpen: () => void;
 }): React.JSX.Element {
   const t = useT();
@@ -66,6 +69,7 @@ export default function CreatedView({
           ))}
         </SectionCard>
         {hasInvitedCommittee ? <Banner tone="info" message={t('mob.tw.created_committee_note')} /> : null}
+        {imagesFailed ? <Banner tone="warning" message={t('mob.tw.created_images_failed')} testID="tw-created-images-failed" /> : null}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
         <Button label={t('mob.tw.created_open')} variant="cta" onPress={onOpen} />

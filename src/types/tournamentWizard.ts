@@ -41,7 +41,8 @@ export interface WizardTemplate {
 export interface WizardLimits {
   audience_group_cap: number;
   committee_max: number;
-  min_gap_hours: number;
+  /** Always 0 now: the minimum gap is gone (AD-T4). Kept optional so an older answer still parses; never read. */
+  min_gap_hours?: number;
 }
 
 /** `GET /tournaments/v2/templates`. `{ templates: [] }` alone while the v2 flag is off. */
@@ -57,8 +58,9 @@ export type WizardParticipation = 'individual' | 'team';
 /** `POST /tournaments/v2/create` body. `extra="forbid"` on the server: send nothing else. */
 export interface WizardCreateBody {
   client_request_id: string;
-  template_id: string;
-  overrides: Partial<Record<WizardOverrideField, number>>;
+  /** Never sent (AD-T3): the server uses the single default format. */
+  template_id?: string;
+  overrides?: Partial<Record<WizardOverrideField, number>>;
   title: string;
   sport: string;
   description?: string;

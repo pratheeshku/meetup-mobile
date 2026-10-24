@@ -1,8 +1,9 @@
 /**
  * Tournament creation wizard (DES-MEETUP-ADDENDUM-tournament-lifecycle AD-20, AD-19; task tl-c-mobile-2 PR 1).
  *
- * Eight board steps (Basics, Format, Participation, When and where, Registration, Visibility, Committee, Review) then
- * the Created screen. The client holds all state (BP-12: no server draft), submits once to
+ * Seven screens (Basics, Participation, When and where, Registration dates, Visibility, Committee, Review) then
+ * the Created screen; the Format step is gone (tournament-experience AD-T3) and the header counts the server's six
+ * steps (`displayStep`). The client holds all state (BP-12: no server draft), submits once to
  * `POST /tournaments/v2/create` with one `client_request_id` per wizard session (reused on every retry), and shows
  * server rejections on the step and field the boards show. The server is the only authority for dates, caps and
  * committee rules; the client only mirrors them for early feedback.
@@ -19,7 +20,7 @@ import { withCorrelationId, generateCorrelationId } from '../api/correlationId';
 import { getClientConfig } from '../api/config';
 import { getMyGroups } from '../api/groups';
 import { getSports } from '../api/sports';
-import { createWizardTournament, getWizardTemplates } from '../api/tournaments';
+import { createWizardTournament, uploadTournamentImage } from '../api/tournaments';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
@@ -29,9 +30,8 @@ import CommitteePicker from '../components/tournament/wizard/CommitteePicker';
 import CommitteeStep from '../components/tournament/wizard/CommitteeStep';
 import CreatedView from '../components/tournament/wizard/CreatedView';
 import DiscardDialog from '../components/tournament/wizard/DiscardDialog';
-import FormatStep from '../components/tournament/wizard/FormatStep';
 import ParticipationStep from '../components/tournament/wizard/ParticipationStep';
-import RegistrationStep, { formatDay } from '../components/tournament/wizard/RegistrationStep';
+import RegistrationStep, { formatDayTime } from '../components/tournament/wizard/RegistrationStep';
 import ReviewStep from '../components/tournament/wizard/ReviewStep';
 import VisibilityStep from '../components/tournament/wizard/VisibilityStep';
 import WhenWhereStep from '../components/tournament/wizard/WhenWhereStep';
@@ -44,17 +44,15 @@ import { colors, spacing } from '../theme/tokens';
 import type { Group } from '../types/group';
 import type { Sport } from '../types/sport';
 import type { UserSearchResult } from '../types/user';
-import type { WizardCreateResult, WizardTemplate, WizardTemplatesResponse } from '../types/tournamentWizard';
+import type { WizardCreateResult, WizardTemplatesResponse } from '../types/tournamentWizard';
 import {
   FALLBACK_LIMITS,
   WIZARD_STEP,
   WIZARD_TOTAL_STEPS,
-  applyTemplateDefaults,
   buildCreateBody,
-  findTemplate,
+  displayStep,
   firstInvalidStep,
   initialWizardState,
-  listableTemplates,
   mapCreateRejection,
   toDate,
   validateStep,
@@ -70,20 +68,13 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'TournamentWizard'>;
 type View_ = 'wizard' | 'committee-picker' | 'created';
 
 /** Issues that only mean "not filled in yet": shown after the first Next on that step. */
-const NEEDS_INPUT = new Set<LabelKey>([
-  'mob.tw.err_sport',
-  'mob.tw.err_title',
-  'mob.tw.err_required',
-  'mob.tw.err_venue',
-  'mob.tw.err_format',
-  'mob.tw.err_count_required',
-]);
+const NEEDS_INPUT = new Set<LabelKey>(['mob.tw.err_sport', 'mob.tw.err_title', 'mob.tw.err_required', 'mob.tw.err_venue']);
 
 
 export default function TournamentWizardScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
-  const [response, setResponse] = useState<WizardTemplatesResponse>(route.params.templates);
-  const [templatesError, setTemplatesError] = useState(false);
+  // Only the limits are read from the templates answer now (no Format step).
+  const response: WizardTemplatesResponse = route.params.templates;
   const [sports, setSports] = useState<Sport[]>([]);
   const [sportsError, setSportsError] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -96,7 +87,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   const [view, setView] = useState<View_>('wizard');
   const [attempted, setAttempted] = useState<Record<number, boolean>>({});
   const [serverIssue, setServerIssue] = useState<WizardIssue | null>(null);
-  const [retired, setRetired] = useState<{ name: string; version: number } | null>(null);
+  const [imagesFailed, setImagesFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitIssue, setSubmitIssue] = useState<WizardIssue | null>(null);
   const [created, setCreated] = useState<WizardCreateResult | null>(null);
@@ -108,14 +99,12 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   // Fixed for the life of the screen: "Today" and the past-date checks.
   const [now] = useState(() => new Date());
 
-  const templates = useMemo(() => listableTemplates(response), [response]);
   const limits = response.limits ?? FALLBACK_LIMITS;
-  const template = findTemplate(templates, state.templateId);
   const sport = sports.find(item => item.name === state.sport);
 
   const ctx: WizardContext = useMemo(
-    () => ({ templates, limits, catalogueEnabled, now, formatDay }),
-    [templates, limits, catalogueEnabled, now],
+    () => ({ limits, catalogueEnabled, now, formatDayTime }),
+    [limits, catalogueEnabled, now],
   );
 
   // ---- loading ------------------------------------------------------------------------------------------
@@ -136,15 +125,6 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
       })
       .catch(() => setGroupsError(true));
   }, []);
-  const loadTemplates = useCallback(() => {
-    getWizardTemplates()
-      .then(next => {
-        setResponse(next);
-        setTemplatesError(false);
-      })
-      .catch(() => setTemplatesError(true));
-  }, []);
-
   useEffect(() => {
     loadSports();
     loadGroups();
@@ -160,7 +140,8 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   const dirty =
     state.title.trim() !== '' ||
     state.description.trim() !== '' ||
-    state.templateId !== null ||
+    state.banner !== null ||
+    state.logo !== null ||
     state.startsAt !== '' ||
     state.committee.length > 0 ||
     step > WIZARD_STEP.basics;
@@ -204,12 +185,6 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
     setSubmitIssue(null);
   };
 
-  const selectTemplate = (next: WizardTemplate): void => {
-    setRetired(null);
-    setServerIssue(null);
-    setState(current => (current.templateId === next.id ? current : applyTemplateDefaults(current, next)));
-  };
-
   const toggleGroup = (groupId: string): void => {
     setServerIssue(null);
     setState(current => {
@@ -247,25 +222,17 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
     issuesFor(forStep).forEach(issue => {
       const field = issue.field ?? '_';
       if (!out[field]) {
-        out[field] = t(issue.key, withRetiredValues(issue));
+        out[field] = t(issue.key, issue.params);
       }
     });
     return out;
   };
-  function withRetiredValues(issue: WizardIssue): Record<string, string | number> | undefined {
-    if (issue.key === 'mob.tw.err_format_retired' && retired) {
-      return { name: retired.name, version: retired.version };
-    }
-    return issue.params;
-  }
-
   const stepIssues = issuesFor(step);
   // The committee board shows its minimum error, and a disabled Next, on arrival (TournCommitteeMin).
   const stepBlocked =
     view === 'wizard' &&
     stepIssues.length > 0 &&
-    (attempted[step] || Boolean(serverIssue) || step === WIZARD_STEP.committee);
-  const formatKnown = templates.length > 0 && !templatesError;
+    (attempted[step] || Boolean(serverIssue) || step === WIZARD_STEP.committee || step === WIZARD_STEP.registration);
 
   const goNext = (): void => {
     const issues = validateStep(step, state, ctx);
@@ -292,15 +259,9 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   };
 
   // ---- submit -------------------------------------------------------------------------------------------
-  const rejectionContext = (): { minGapHours: number; committeeMax: number; startLabel: string; hardBlockAtOrAfterStart: boolean } => {
+  const rejectionContext = (): { committeeMax: number; startLabel: string } => {
     const starts = toDate(state.startsAt);
-    const hard = toDate(state.hardBlockAt);
-    return {
-      minGapHours: limits.min_gap_hours,
-      committeeMax: limits.committee_max,
-      startLabel: starts ? formatDay(starts) : '',
-      hardBlockAtOrAfterStart: Boolean(starts && hard && hard.getTime() >= starts.getTime()),
-    };
+    return { committeeMax: limits.committee_max, startLabel: starts ? formatDayTime(starts) : '' };
   };
 
   const submit = async (): Promise<void> => {
@@ -308,18 +269,43 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
       return;
     }
     const invalid = firstInvalidStep(state, ctx);
-    if (invalid !== null || !template) {
-      setAttempted(current => ({ ...current, [invalid ?? WIZARD_STEP.format]: true }));
-      setStep(invalid ?? WIZARD_STEP.format);
+    if (invalid !== null) {
+      setAttempted(current => ({ ...current, [invalid]: true }));
+      setStep(invalid);
       return;
     }
     submitLock.current = true;
     setSubmitting(true);
     setSubmitIssue(null);
     try {
-      const body = buildCreateBody(state, template, catalogueEnabled);
-      const { result } = await withCorrelationId(correlationId => createWizardTournament(body, { correlationId }));
+      const body = buildCreateBody(state, catalogueEnabled);
+      // One user action, one correlation id: the create and the two uploads share it (AD-T1). An upload that fails
+      // never undoes the creation: the default shows and the organizer is told on the Created screen.
+      const { result, failedImages } = await withCorrelationId(async correlationId => {
+        const created_ = await createWizardTournament(body, { correlationId });
+        let failed = false;
+        for (const [kind, image] of [
+          ['banner', state.banner],
+          ['logo', state.logo],
+        ] as const) {
+          if (!image) {
+            continue;
+          }
+          try {
+            await uploadTournamentImage(
+              created_.result.id,
+              kind,
+              { uri: image.path, name: image.filename, type: image.mime },
+              { correlationId },
+            );
+          } catch {
+            failed = true;
+          }
+        }
+        return { result: created_.result, failedImages: failed };
+      });
       allowLeave.current = true;
+      setImagesFailed(failedImages);
       setCreated(result);
       setView('created');
     } catch (error) {
@@ -334,12 +320,6 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
           setState(current => ({ ...current, committee: current.committee.filter(person => person.id !== outcome.dropUserId) }));
         }
         setStep(outcome.step);
-      } else if (outcome.kind === 'format_retired') {
-        // Board TournReviewErr: the banner sits on Review; the format is cleared so the next Create sends the
-        // organizer to the Format step (see `submit`), where the list is re-read.
-        setRetired(template ? { name: template.display_name, version: template.version } : null);
-        setState(current => ({ ...current, templateId: null }));
-        loadTemplates();
       } else {
         setSubmitIssue(outcome.issue);
       }
@@ -372,6 +352,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
       <CreatedView
         result={created}
         hasInvitedCommittee={created.committee.some(row => !row.is_organizer)}
+        imagesFailed={imagesFailed}
         onOpen={openTournament}
       />
     );
@@ -382,7 +363,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
       <View style={styles.screen}>
         <WizardHeader
           title={t('mob.tw.title')}
-          currentStep={WIZARD_STEP.committee}
+          currentStep={displayStep(WIZARD_STEP.committee)}
           totalSteps={WIZARD_TOTAL_STEPS}
           onBack={goBack}
         />
@@ -399,7 +380,6 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   const errors = errorsFor(step);
   const windowError = errors.starts_at && errors.starts_at === errors.ends_at ? errors.starts_at : null;
   const venueLabel = catalogueEnabled ? state.venue?.name ?? '' : state.venueName.trim();
-  const retiredMessage = retired ? t('mob.tw.err_format_retired', { name: retired.name, version: retired.version }) : null;
 
   const renderStep = (): React.JSX.Element => {
     switch (step) {
@@ -414,32 +394,8 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
             errors={errors}
           />
         );
-      case WIZARD_STEP.format:
-        return (
-          <FormatStep
-            templates={templates}
-            selectedId={state.templateId}
-            onSelect={selectTemplate}
-            sportLabel={sport?.display_name ?? state.sport}
-            loadError={templatesError}
-            onRetry={loadTemplates}
-            retiredMessage={retiredMessage}
-            error={retiredMessage ? undefined : errors.template_id}
-          />
-        );
       case WIZARD_STEP.participation:
-        return template ? (
-          <ParticipationStep
-            state={state}
-            template={template}
-            onChange={update}
-            errors={stepIssues
-              .filter(issue => attempted[step] || issue.key.endsWith('_order') || issue.key === 'mob.tw.err_overrides')
-              .map(issue => t(issue.key, issue.params))}
-          />
-        ) : (
-          <View />
-        );
+        return <ParticipationStep state={state} onChange={update} />;
       case WIZARD_STEP.when:
         return (
           <WhenWhereStep
@@ -498,9 +454,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
         return (
           <ReviewStep
             state={state}
-            template={template}
             venueLabel={venueLabel}
-            retiredMessage={retiredMessage}
             onEdit={target => {
               setServerIssue(null);
               setStep(target);
@@ -511,13 +465,13 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   };
 
   const isReview = step === WIZARD_STEP.review;
-  const nextDisabled = submitting || stepBlocked || (step === WIZARD_STEP.format && !formatKnown);
+  const nextDisabled = submitting || stepBlocked;
 
   return (
     <View style={styles.screen}>
       <WizardHeader
         title={t('mob.tw.title')}
-        currentStep={step}
+        currentStep={displayStep(step)}
         totalSteps={WIZARD_TOTAL_STEPS}
         onBack={goBack}
       />
