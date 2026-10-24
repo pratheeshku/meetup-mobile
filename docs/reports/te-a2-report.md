@@ -314,3 +314,59 @@ Text mirrors the web key in the last column (te-b4 section 12; the `web.scoring.
 | `mob.tw.images_upload_failed` | That picture could not be uploaded. The tournament keeps its default for now. | `web.tw.images_upload_failed` |
 
 Seeded keys used with their exact seeded text (te-b2, not new): `mob.tournament.closure.comments`, `mob.tournament.closure.err.comments_too_long`, `mob.tournament.closure.err.not_held_extras_not_allowed`, `mob.tournament.closure.err.star_not_attendee`, `mob.tournament.closure.err.third_place_equals_runner_up`, `mob.tournament.closure.err.third_place_equals_winner`, `mob.tournament.closure.err.third_place_not_allowed`, `mob.tournament.closure.err.third_place_not_attendee`, `mob.tournament.closure.star`, `mob.tournament.closure.third_place`, `mob.tournament.media.add_photo`, `mob.tournament.media.empty`, `mob.tournament.media.err.IMAGE_INVALID`, `mob.tournament.media.err.MEDIA_LIMIT_REACHED`, `mob.tournament.media.err.MEDIA_NOT_ALLOWED`, `mob.tournament.media.err.MEDIA_TOO_LARGE`, `mob.tournament.media.err.failed`, `mob.tournament.media.remove`, `mob.tournament.media.remove_confirm`, `mob.tournament.media.title`, `mob.tournament.score.err.MATCH_TIED`, `mob.tournament.score.err.REASON_REQUIRED`, `mob.tournament.score.err.RESULTS_LOCKED`, `mob.tournament.score.impact_downstream`, `mob.tournament.score.impact_needs_approval`, `mob.tournament.score.impact_title`, `mob.tournament.score.reason`.
+
+## Git evidence (literal output, after the code commit and the push)
+PR: https://github.com/pratheeshku/meetup-mobile/pull/57 (not a draft, open, not merged). The code, tests and report are the commit below; this evidence is added in one later commit (report text only).
+```
+$ git log --oneline origin/main..HEAD
+54eb3a7 te-a2: tournament page tab bodies (Participants, Fixtures, score entry, Standings, Approvals, Results and Close form, Media), lifecycle_version, Format and Key dates rows, Add banner
+
+$ git show HEAD --stat --format="%H %s"
+54eb3a734aead7fb242ee7a491511e453e290079 te-a2: tournament page tab bodies (Participants, Fixtures, score entry, Standings, Approvals, Results and Close form, Media), lifecycle_version, Format and Key dates rows, Add banner
+
+ docs/reports/te-a2-raw-output.txt                  | 3599 ++++++++++++++++++++
+ docs/reports/te-a2-report.md                       |  316 ++
+ docs/status/te-a2-status.md                        |   33 +
+ src/api/__tests__/tournamentExperienceApi.test.ts  |    2 +-
+ src/api/tournaments.ts                             |  164 +-
+ src/components/__tests__/keyboardInventory.test.ts |    5 +
+ .../tournament/v2/TournamentDetailV2.tsx           |  202 +-
+ .../tournament/v2/TournamentOverview.tsx           |   84 +-
+ src/components/tournament/v2/tabs/ApprovalsTab.tsx |  259 ++
+ src/components/tournament/v2/tabs/CloseSheet.tsx   |  229 ++
+ src/components/tournament/v2/tabs/FixturesTab.tsx  |  253 ++
+ .../tournament/v2/tabs/KnockoutBracket.tsx         |   97 +
+ src/components/tournament/v2/tabs/MediaTab.tsx     |  174 +
+ .../tournament/v2/tabs/ParticipantsTab.tsx         |  222 ++
+ src/components/tournament/v2/tabs/ResultsTab.tsx   |  214 ++
+ src/components/tournament/v2/tabs/ScoreSheet.tsx   |  424 +++
+ src/components/tournament/v2/tabs/StandingsTab.tsx |   79 +
+ src/components/tournament/v2/tabs/matchLabels.ts   |   47 +
+ src/components/tournament/v2/tabs/parts.tsx        |  100 +
+ .../tournament/v2/tabs/useStandingsBoard.ts        |  102 +
+ src/labels/defaultLabels.ts                        |  203 ++
+ src/screens/TournamentDetailScreen.tsx             |   62 +-
+ src/screens/__tests__/TournamentDetailV2.test.tsx  |   32 +-
+ src/screens/__tests__/TournamentTabBodies.test.tsx |  728 ++++
+ src/types/tournament.ts                            |   32 +-
+ src/types/tournamentScoring.ts                     |    2 +
+ src/types/tournamentTabs.ts                        |  110 +
+ src/utils/__tests__/tournamentExperience.test.ts   |   17 +-
+ .../__tests__/tournamentScoringContract.test.ts    |    3 +-
+ src/utils/__tests__/tournamentTabs.test.ts         |  450 +++
+ src/utils/imagePicker.ts                           |    8 +-
+ src/utils/tournamentExperience.ts                  |   31 +-
+ src/utils/tournamentScoring.ts                     |   13 +-
+ src/utils/tournamentTabs.ts                        |  849 +++++
+ 34 files changed, 9025 insertions(+), 120 deletions(-)
+
+$ git branch -r --contains HEAD
+  origin/claude/te-a2-mobile
+
+$ git rev-parse origin/claude/te-a2-mobile
+54eb3a734aead7fb242ee7a491511e453e290079
+
+$ git status --short
+ M android/version.properties
+ M docs/reports/te-a2-report.md
+```
