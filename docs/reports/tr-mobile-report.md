@@ -286,7 +286,7 @@ check-labels: OK - 305 files scanned, 1775 default labels checked.
 ### tr-mobile-3 diagnosis: does `EventDetailScreen.test.tsx` fail on `origin/main`?
 **Yes. The same 34 tests fail on `origin/main` (071ca51). They are pre-existing; nothing was changed.**
 
-Method: `git worktree add /tmp/mm-base origin/main`, `node_modules` symlinked to this repo's, that one file run once from the worktree, then the worktree and symlink removed (this repo's `node_modules` untouched; `git worktree list` shows only the main tree).
+Method: `git worktree add /tmp/mm-base origin/main`, `node_modules` symlinked to this repo's, that one file run once from the worktree, then the worktree and symlink removed (this repo's `node_modules` untouched; `/tmp/mm-base` is gone from `git worktree list`; the list still shows an older, already-prunable worktree entry `/private/tmp/meetup-mobile-main` that was there before and that I did not touch).
 
 Result on `origin/main`: **34 failed, 22 passed, 56 total.** The sorted list of failing test names is identical to the list from the earlier run on the unchanged `tr-mobile` base (the stash run) and to the failing names on `tr-mobile` with the tr-mobile-3 change (apart from the one `EventDetailGameView` test, which is in another file and was fixed). So neither tr-mobile, tr-mobile-2 nor tr-mobile-3 caused them. They are organiser, cancel, edit, share and layout tests; the first error is "Expected exactly one pressable labelled \"Cancel Event\", found 0".
 ```
