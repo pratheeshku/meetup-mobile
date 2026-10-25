@@ -98,7 +98,7 @@ Decision: (a) `tr-p1-repro` reproduces the organizer failure on the deployed bui
 - **Data.** `tournaments.registration_fee_cents INTEGER NULL` (NULL or 0 means free; no CHECK, no DB validation). `tournament_registrations.fee_cents_at_registration INTEGER NULL`: the fee the player confirmed, written once at registration (P6). Currency is one value, config key `meetup.tournament.fee.currency` (default `SGD`). Validation server-side in the application (P9): whole cents, `0 <= fee <= meetup.tournament.fee.max_cents` (default 100000, set in admin, P1).
 - **Basis [A].** The fee is per entry: per player in individual mode, per team in team mode. The label states which.
 - **Set and edit.** Optional field in the create wizard registration step (the boards `WebCreateReg2` and `WebCreateReg2Err`; OI-10) and on tournament edit by the organizer, until registration closes (the soft block). A change when registrations exist shows the organizer a warning and is logged. Registrations already made keep their snapshot.
-- **Kill switch.** `meetup.tournament.fee.enabled` (admin, default false). The fee control is hidden and any stored fee is ignored while it is false. It is switched on only after the app release is live (old apps cannot send the acknowledgement, AD-5).
+- **Kill switch.** `meetup.tournament.fee.enabled` (admin, default false). The fee control is hidden and any stored fee is ignored while it is false. It is switched on only after the app release is live (old apps cannot send the acknowledgement, AD-5). **Client config (v1.0 wording, 2026-10-25):** clients learn the switch from `GET /config/client`, which gains three additive fields beside `venue_catalogue_enabled`: `tournament_fee_enabled` (boolean), `tournament_fee_currency` (string) and `tournament_fee_max_cents` (integer). Clients hide the fee control when `tournament_fee_enabled` is false; the tournament payload carries a null fee while the flag is off.
 - **Display.** `GET /tournaments` and `GET /tournaments/{id}` return `registration_fee_cents` and `registration_fee_currency` (additive). Clients format the amount and show "Registration fee: S$x per player" or "Free registration" on the tournament view, the registration confirmation and the result pop-up. The organizer and committee, and the registrant for their own row, see `fee_cents_at_registration` on the registrations list. Nobody else does.
 - **Wording [A].** Because the app takes no payment, the confirmation says the fee is applicable and is arranged with the organizer outside the app. It never says "pay now", promises a refund, or shows a payment button.
 
@@ -153,7 +153,7 @@ Decision: (a) `tr-p1-repro` reproduces the organizer failure on the deployed bui
 | Pending for a group tournament | audience groups and `group_memberships`, derived | a stored list |
 | Whether a push registers directly | server `register_mode` | a client guess |
 
-Contract additions (all additive): `registration_fee_cents`, `registration_fee_currency` on the tournament; `accepted_fee_cents` on the registration request; `code` on registration errors; `pending` may be `null`; `register_mode` in push data; `action_state` `registered`.
+Contract additions (all additive): `registration_fee_cents`, `registration_fee_currency` on the tournament; `tournament_fee_enabled`, `tournament_fee_currency`, `tournament_fee_max_cents` on `GET /config/client`; `accepted_fee_cents` on the registration request; `code` on registration errors; `pending` may be `null`; `register_mode` in push data; `action_state` `registered`.
 
 ---
 
@@ -322,4 +322,5 @@ Two separate briefs (one per repo), in chat only, not committed. Each phase ends
 
 | Version | Date | Note |
 |---|---|---|
+| v1.0 wording | 2026-10-25 | Before the build briefs: AD-4 and section 5 add the three fee fields on `GET /config/client` so clients can read the flag (gap found while writing the mobile brief; no scope change). |
 | v1.0 | 2026-10-25 | Drafted after elicitation of 2026-10-25 (8 items, 7 questions), approved by the owner the same day. Findings recorded while drafting: Pending is invitation-only so audience-group members never appear (AD-2); mobile posts the registration with no body (AD-1 E1); the Book button colour cycles per row (AD-8); Media gating and upload rights are changed from tournament-experience (AD-6). |
