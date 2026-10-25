@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-REGISTRATION
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-REGISTRATION
-**Version:** v1.1
+**Version:** v1.2
 **Status:** **APPROVED by the owner, 2026-10-25** (instruction in conversation: "write design addendum, mark it approved & upload to gh", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in section 3. Open items are in section 12.
 **v1.1 amendment (AD-10, TR-17):** approved by the owner 2026-10-25 (instruction "give me instructions", after the gap and the proposed fix were put to the owner). Assumption **[A-10]** (a group added later pushes to its new members only) was the stated default and was not contradicted.
 **Owner:** Pratheesh
@@ -125,7 +125,7 @@ Decision: (a) `tr-p1-repro` reproduces the organizer failure on the deployed bui
 
 **AD-8: Book a court buttons (TR-09).** `CourtBookingBlock` cycles the button colour per row between blue, green and orange (`CourtBookingBlock.tsx:25-29`). All Book buttons use the call-to-action blue (`colors.ctaBlue`) with white text on mobile, and the equivalent token on web. The block is already one component shared by Home and the tournament Overview on mobile (verified: `HomeScreen.tsx`, `TournamentOverview.tsx`); the colour lives in one place. Web is checked in Phase 1 and made a single shared component if the Home block is not already (OI-4). The logo fallback tiles keep their colours; only the buttons change.
 
-**AD-9: Close the tournament view (TR-05, TR-16).** The individual tournament view has an **X** in the header on web and mobile. It returns to the list the person came from with scope (Mine, Public, All), Active or All, sport filter and scroll position kept, without a reload that resets them. With no list behind it (opened from a push, a share link or a deep link) it goes to the Tournaments list at its defaults. The X does not replace the system back gesture.
+**AD-9: Close the tournament view (TR-05, TR-16).** The individual tournament view has an **X** in the header on web and mobile. It returns to the list the person came from with scope (Mine, Public, All), Active or All and sport filter kept. Scroll position is kept on web. On mobile it is NOT kept (v1.2 wording): access-consistency AC-10 requires the list to refetch on every open and never render cached rows, which is an access-safety rule and wins over scroll position. With no list behind it (opened from a push, a share link or a deep link) it goes to the Tournaments list at its defaults. The X does not replace the system back gesture.
 
 **AD-10: Group-audience invitation push (TR-17).** Finding (architect review of `tr-backend-web` Stage A, 2026-10-25): the `tournament_invited` push is enqueued only for a person with an invitation row (`invitations.py` -> `notify_invited`). A tournament open to chosen groups stores audience groups and creates no invitation rows, so group members never received any push, and AD-3's buttons reached no one. This is a gap in v1.0, not an implementation defect.
 - **Recipients:** the live members of an audience group, minus the organizer, minus anyone who already has an invitation row for the tournament (any status), minus anyone registered or with a current decline. Computed at enqueue time (v1.1 wording: the recipient ids are stored in the outbox row, so the list is fixed when the row is written).
@@ -241,6 +241,7 @@ Mobile and web: confirmation sheet and result pop-up for each `code`, X returns 
 | D-5 | Fee displayed, not collected | Owner requirement TR-15; keeps payment regulation out of T1 |
 | D-6 | Registering accepts the invitation | One atomic call; avoids a two-step race in a headless push handler |
 | D-7 | Server selects the push category by `register_mode` | iOS actions cannot vary per notification |
+| D-8 | Mobile X does not keep scroll | AC-10 (access-consistency) forbids rendering cached rows; the list refetches and unmounts. Safety rule wins over a convenience (TR-16 asks only to return to the list) |
 
 | Principle | Element | Status |
 |---|---|---|
@@ -318,6 +319,12 @@ Two separate briefs (one per repo), in chat only, not committed. Each phase ends
 | OI-14 | A group added after registration has closed still pushes its members (AD-10 excludes terminal states only) | 🟢 LOW | Accepted |
 | OI-15 | The admin console must render the new `string` setting type (fee currency) | 🟡 MEDIUM | Assigned to `tr-backend-web` Stage B (admin client check) |
 | OI-16 | Group-audience push has no live in-app nudge (AD-10 specifies the outbox push only) | 🟢 LOW | Accepted |
+| OI-18 | Mobile X does not keep scroll position (AD-9 vs AC-10) | 🟢 LOW | Accepted (D-8). Gate: reopen if the owner finds it a problem; fix would be a refetch-in-place design that never shows another user's or revoked rows |
+| OI-19 | Mobile team-mode registration: no team picker; the app sends no `team_id`, a team tournament ends in `TEAM_REQUIRED` | 🟠 HIGH | Existing limitation, now visible. Own task before team tournaments are offered on mobile |
+| OI-20 | Mobile has no tournament edit screen: the fee can be set only at creation (web edits it) | 🟢 LOW | Accepted |
+| OI-21 | Eight mobile label keys exist only in the app fallbacks (`mob.reg.mode_individual`, `mode_team`, `fee_unknown`, `mob.notif_action_state.registered`, four `mob.tw.fee_*`); the server label `mob.tournament.media.who_note` is now untrue | 🟡 MEDIUM | Owner edits `who_note` in the admin console now; the eight keys are seeded in the next label migration (own task) |
+| OI-22 | Two tests fail identically on main before this change: `test_fixup_registered_branch_team_roster_v2` (404 instead of 200) and `test_fixup_registered_branch_is_in_the_one_view_rule_v2_only_and_aliased` (pins SQL text the view rule no longer produces) | 🟡 MEDIUM | Not caused by this work; own diagnosis task |
+| OI-23 | `AGENTS.md` in both repos names `~/meetup`; on the Mac the backend is `~/Developer/meetup` | 🟢 LOW | Owner edits `AGENTS.md` (project instructions) |
 | OI-17 | Committee-added registrations carry no fee snapshot (the committee cannot acknowledge for someone else) | 🟢 LOW | Accepted |
 
 ---
@@ -338,6 +345,7 @@ Two separate briefs (one per repo), in chat only, not committed. Each phase ends
 
 | Version | Date | Note |
 |---|---|---|
+| v1.2 | 2026-10-25 | Architect review of `tr-mobile` and the backend test run. AD-9 mobile scroll relaxed (AC-10 wins; deviation D-8). OI-18 to OI-23 recorded. Atomic UPDATE in `accept_pending_on_register` accepted (the module forbids row locks). `test_38` change accepted: AD-3 reverses "pending only is 403". Mobile gaps found: in-app invitation banner (AD-3), fee line on the tournament view (AD-4 Display), organizer on the legacy v1 page (TR-06) go to a fix-up task `tr-mobile-2`; the `tr-mobile` M list omitted them (architect brief gap). |
 | v1.1 wording | 2026-10-25 | After the AD-10 review: `pending` absent (not null) for non-privileged viewers to match the built route; idempotency key written with 32-hex UUIDs (VARCHAR(100) limit); OI-1, OI-2, OI-7 statuses updated; OI-13 to OI-17 recorded. |
 | v1.1 wording | 2026-10-25 | AD-10 corrected after the `tr-group-push` Blocked Report (valid finding): recipients are fixed at enqueue time, not send time; the transition is creation and the group-edit PATCH; chunks of 50 ids per outbox row (about 63 fit in 3072 bytes) with the chunk index in the idempotency key; send-time lookup rejected (needs a migration and moves recipient logic into delivery SQL). |
 | v1.1 | 2026-10-25 | AD-10 and TR-17 added after the Stage A review found that audience-group members never received the tournament invitation push. Default [A-10] recorded. No other section changed. |
