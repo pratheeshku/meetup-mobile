@@ -285,6 +285,18 @@ export async function registerForTournament(
   );
 }
 
+/**
+ * `PATCH /tournaments/{id}` with exactly `{ registration_fee_cents }` (tournament-registration AD-4, "Set and edit"): whole cents, or null to clear
+ * the fee. Nothing else is sent. The server refuses with 409 once registration has closed and 422 for a value out of range.
+ */
+export async function updateTournamentFee(
+  id: string,
+  cents: number | null,
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.patch(`/tournaments/${id}`, { registration_fee_cents: cents }, { correlationId: options?.correlationId });
+}
+
 export async function withdrawFromTournament(
   id: string,
   registrationId: string,
