@@ -282,3 +282,52 @@ Tests:       16 passed, 16 total
 check-labels: OK - 305 files scanned, 1775 default labels checked.
 ```
 `npm run lint`: same 31 errors and 1 warning as before; `diff` of the full output against the tr-mobile-2 run shows **no new problem**.
+
+### tr-mobile-3 diagnosis: does `EventDetailScreen.test.tsx` fail on `origin/main`?
+**Yes. The same 34 tests fail on `origin/main` (071ca51). They are pre-existing; nothing was changed.**
+
+Method: `git worktree add /tmp/mm-base origin/main`, `node_modules` symlinked to this repo's, that one file run once from the worktree, then the worktree and symlink removed (this repo's `node_modules` untouched; `git worktree list` shows only the main tree).
+
+Result on `origin/main`: **34 failed, 22 passed, 56 total.** The sorted list of failing test names is identical to the list from the earlier run on the unchanged `tr-mobile` base (the stash run) and to the failing names on `tr-mobile` with the tr-mobile-3 change (apart from the one `EventDetailGameView` test, which is in another file and was fixed). So neither tr-mobile, tr-mobile-2 nor tr-mobile-3 caused them. They are organiser, cancel, edit, share and layout tests; the first error is "Expected exactly one pressable labelled \"Cancel Event\", found 0".
+```
+Test Suites: 1 failed, 1 total
+Tests:       34 failed, 22 passed, 56 total
+```
+Failing names (34):
+```
+BUILD 1: Event Cancel Flow › closes cancel form on Close press
+BUILD 1: Event Cancel Flow › opens cancel form and rejects empty cancellation reason
+BUILD 1: Event Cancel Flow › sends POST /events/{id}/cancel with { reason } and refreshes the event to cancelled
+BUILD 1: Event Cancel Flow › surfaces backend cancel error via getApiErrorMessage
+BUILD 2: Event Edit Flow › closes edit form on Cancel press without saving
+BUILD 2: Event Edit Flow › does not render cost or currency in edit form (hidden per BUILD B)
+BUILD 2: Event Edit Flow › does not render visibility in edit form (immutable post-creation)
+BUILD 2: Event Edit Flow › opens edit form pre-populated with current event values
+BUILD 2: Event Edit Flow › populates sportOptions and allows selecting sport from OptionChips
+BUILD 2: Event Edit Flow › submits PATCH /events/{id} with EventUpdate field set (omits immutable visibility and cost/currency)
+BUILD 2: Event Edit Flow › surfaces 409 conflict when edit is locked after event start
+BUILD 2: Event Edit Flow › surfaces 409 conflict when sport change is locked after participant joined
+BUILD 2: Event Edit Flow › validates client-side constraints on edit fields before submitting
+keyboard avoidance (same class of bug as Create Game — the Edit Event form has TextInputs and previously had no KeyboardAvoidingView wrapper at all) › the Edit Event form (with its TextInputs) renders inside the keyboard-aware scroll view
+keyboard avoidance (same class of bug as Create Game — the Edit Event form has TextInputs and previously had no KeyboardAvoidingView wrapper at all) › wraps the screen in a KeyboardAvoidingView with padding behavior on iOS
+Mobile Artboard Stacked Cards Layout › Event Details Card › renders 👥 Group when visibility is group
+Mobile Artboard Stacked Cards Layout › Event Details Card › renders 🔒 Invite Only when visibility is invite_only
+Mobile Artboard Stacked Cards Layout › Event Details Card › renders Cost row as last row when cost is present
+Mobile Artboard Stacked Cards Layout › Event Details Card › renders heading "Event Details" and row order: Visibility, Skill level, Waitlist
+Mobile Artboard Stacked Cards Layout › renders "About this game" Card with description only
+Mobile Artboard Stacked Cards Layout › renders back navigation button and calls goBack on tap
+Mobile Artboard Stacked Cards Layout › renders Capacity Card with ratio, players going label, and remaining spots
+Mobile Artboard Stacked Cards Layout › renders Participants Card with participant names and roles
+organiser (organizer_id === signed-in user id) › renders the Edit Game button in the standing-rule CTA blue (#1D5FA3), not the accent color
+organiser (organizer_id === signed-in user id) › sees "Edit Game", "Invite Group", "Invite Individual", and "Cancel Event", but not "Join" or "Leave"
+organiser (organizer_id === signed-in user id) › sees organiser actions for an in-progress (active) event
+organiser (organizer_id === signed-in user id) › sees organiser controls and no RSVP control even when they also have an RSVP row (going)
+renders formatted cost with currency when estimated_cost_cents is set
+resolves the sport slug to its display_name from GET /admin/sports/public (BUG-M02)
+RSVP / withdraw contract › shows the join error when the RSVP request fails
+share event flow › copies canonical event link with ?ref= to clipboard and displays toast
+share event flow › opens ShareActionSheet when tapping "Share Event"
+share event flow › triggers generic share with composed message and URL with ?ref=
+share event flow › triggers WhatsApp share with composed message
+```
+The cause of the 34 was not investigated (out of scope: diagnosis only). They need their own task.
