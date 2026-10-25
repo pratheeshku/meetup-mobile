@@ -1734,6 +1734,13 @@ export const DEFAULT_LABELS = {
   'mob.tw.fee_label': 'Registration fee (optional)',
   'mob.tw.fee_hint': 'Amount in {currency}, for example 15.00. Leave empty for a free tournament.',
   'mob.tw.fee_error': 'Enter an amount between 0 and {max}, with at most two decimals.',
+  'mob.tournament.fee_edit_action': 'Registration fee',
+  'mob.tw.fee_edit_title': 'Registration fee',
+  'mob.tw.fee_edit_save': 'Save fee',
+  'mob.tw.fee_edit_warning': 'Players have already registered. Changing the fee does not change what they confirmed. The change is logged.',
+  'mob.tw.fee_edit_closed': 'Registration has closed, so the fee can no longer be changed.',
+  'mob.tw.fee_edit_failed': 'Could not save the fee. Please try again.',
+  'mob.tw.fee_edit_saved': 'Registration fee saved',
   'mob.tw.fee_preview': 'Fee shown to players: {amount}',
 } as const;
 

@@ -91,6 +91,8 @@ import { useCommitteeInvitationResponse } from '../hooks/useCommitteeInvitationR
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
+import FeeEditSheet, { FeeEditRow, type FeeEditConfig } from '../components/tournament/FeeEditSheet';
+import Toast from '../components/Toast';
 import { tournamentCloseButton } from '../components/tournament/TournamentCloseButton';
 import { registrationTargetFor, useTournamentRegistration } from '../hooks/useTournamentRegistration';
 import { committeeAnswerOutcome, type CommitteeAnswerState } from '../utils/committeeInvitation';
@@ -198,13 +200,25 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const lastCommitteeAnswer = useRef<boolean | null>(null);
 
   const [venueCatalogueEnabled, setVenueCatalogueEnabled] = useState(false);
+  // Organizer fee edit (tr-mobile-5): the fee flag and limits come from the same config read; no extra request.
+  const [feeConfig, setFeeConfig] = useState<FeeEditConfig | null>(null);
+  const [feeSheetOpen, setFeeSheetOpen] = useState(false);
+  const [feeToast, setFeeToast] = useState<string | null>(null);
 
   useEffect(() => {
     getClientConfig()
       .then(cfg => {
         setVenueCatalogueEnabled(Boolean(cfg.venue_catalogue_enabled));
+        setFeeConfig(
+          cfg.tournament_fee_enabled === true
+            ? { currency: cfg.tournament_fee_currency ?? null, maxCents: cfg.tournament_fee_max_cents ?? null }
+            : null,
+        );
       })
-      .catch(() => setVenueCatalogueEnabled(false));
+      .catch(() => {
+        setVenueCatalogueEnabled(false);
+        setFeeConfig(null);
+      });
   }, []);
 
   const committeeSummaryRef = useRef<CommitteeInvitationSummary | null>(null);
@@ -693,6 +707,36 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     !isTournamentEnded &&
     !tournament.registration_open &&
     currentUserRegistrationStatus === 'none';
+  // Organizer only, fee flag on, registration open (UX only; the server decides and answers 409 once registration has closed).
+  const canEditFee =
+    isOrganiser && feeConfig !== null && String(tournament.status) === 'registration_open' && tournament.registration_open;
+  const feeEdit =
+    canEditFee || feeToast ? (
+      <>
+        {canEditFee ? (
+          <FeeEditRow
+            storedCents={tournament.registration_fee_cents ?? null}
+            currency={tournament.registration_fee_currency ?? feeConfig?.currency ?? null}
+            onPress={() => setFeeSheetOpen(true)}
+          />
+        ) : null}
+        {canEditFee && feeSheetOpen && feeConfig ? (
+          <FeeEditSheet
+            tournamentId={tournament.id}
+            storedCents={tournament.registration_fee_cents ?? null}
+            config={feeConfig}
+            activeRegistrations={registrations.filter(isActiveRegistration).length}
+            onClose={() => setFeeSheetOpen(false)}
+            onSaved={() => {
+              setFeeSheetOpen(false);
+              setFeeToast(tRef.current('mob.tw.fee_edit_saved'));
+              refreshTournament().catch(() => undefined);
+            }}
+          />
+        ) : null}
+        <Toast message={feeToast} onDismiss={() => setFeeToast(null)} />
+      </>
+    ) : null;
   const canCancel =
     !isTournamentEnded &&
     isOrganiser &&
@@ -745,6 +789,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           <>
             {committeeCard}
             {registrationFlow.element}
+            {feeEdit}
             <TournamentInvitationBanner
               onRegister={handleRegister}
               tournamentId={tournament.id}
@@ -908,6 +953,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       </View>
 
       <TournamentFeeLine tournament={tournament} />
+      {feeEdit}
       {registrationFlow.element}
       {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
       {withdrawError ? <Text style={styles.errorText}>{withdrawError}</Text> : null}
