@@ -12,7 +12,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useT } from '../../labels/LabelsContext';
-import { colors, radius, spacing, typography } from '../../theme/tokens';
+import { borderWidth, colors, radius, sizes, spacing, typography } from '../../theme/tokens';
 import type { RegistrationFailure } from '../../utils/registration';
 import Button from '../Button';
 import BottomSheet from '../skills/BottomSheet';
@@ -27,9 +27,15 @@ export interface RegistrationConfirmSheetProps {
   /** FEE_CHANGED: the fee was updated from the server's answer and the person is asked again. */
   notice: string | null;
   busy: boolean;
+  /** Team mode only (AD-1): the caller's teams for the tournament's sport. Absent in individual mode. */
+  teams?: ReadonlyArray<{ id: string; name: string }>;
+  selectedTeamId?: string | null;
+  onSelectTeam?: (teamId: string) => void;
   onConfirm: () => void;
   onCancel: () => void;
 }
+
+const RADIO_BOX = 24;
 
 export function RegistrationConfirmSheet(props: RegistrationConfirmSheetProps): React.JSX.Element {
   const t = useT();
@@ -46,6 +52,33 @@ export function RegistrationConfirmSheet(props: RegistrationConfirmSheetProps): 
           <Text style={styles.notice} accessibilityRole="alert" testID="registration-notice">
             {props.notice}
           </Text>
+        ) : null}
+        {props.teams ? (
+          <View testID="registration-team-picker" accessibilityRole="radiogroup">
+            <Text style={styles.teamLabel}>{t('mob.reg.team_label')}</Text>
+            {props.teams.map(team => {
+              const selected = team.id === props.selectedTeamId;
+              return (
+                <Pressable
+                  key={team.id}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={team.name}
+                  onPress={() => props.onSelectTeam?.(team.id)}
+                  disabled={props.busy}
+                  style={styles.teamRow}
+                  testID={`registration-team-${team.id}`}
+                >
+                  <View style={[styles.radio, selected ? styles.radioOn : null]}>
+                    {selected ? <View style={styles.radioDot} /> : null}
+                  </View>
+                  <Text style={styles.teamName} numberOfLines={1}>
+                    {team.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         ) : null}
         {props.feeReadable ? (
           <>
@@ -74,7 +107,7 @@ export function RegistrationConfirmSheet(props: RegistrationConfirmSheetProps): 
             label={t('mob.reg.confirm')}
             onPress={props.onConfirm}
             loading={props.busy}
-            disabled={!props.feeReadable}
+            disabled={!props.feeReadable || (Boolean(props.teams) && !props.selectedTeamId)}
             style={styles.button}
             testID="registration-confirm"
           />
@@ -155,6 +188,21 @@ const styles = StyleSheet.create({
   fee: { ...typography.bodyBold, color: colors.textPrimary, marginTop: spacing.md },
   note: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm },
   notice: { ...typography.bodyBold, color: colors.error, marginTop: spacing.md },
+  teamLabel: { ...typography.bodyBold, color: colors.textPrimary, marginTop: spacing.md },
+  teamRow: { flexDirection: 'row', alignItems: 'center', minHeight: sizes.touchTarget },
+  radio: {
+    width: RADIO_BOX,
+    height: RADIO_BOX,
+    borderRadius: RADIO_BOX / 2,
+    borderWidth: borderWidth.medium,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  radioOn: { borderColor: colors.ctaBlue },
+  radioDot: { width: RADIO_BOX / 2, height: RADIO_BOX / 2, borderRadius: RADIO_BOX / 4, backgroundColor: colors.ctaBlue },
+  teamName: { ...typography.body, color: colors.textPrimary, flex: 1 },
   buttons: { flexDirection: 'row', marginTop: spacing.lg },
   button: { flex: 1, marginHorizontal: spacing.xs },
   popupRoot: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg },

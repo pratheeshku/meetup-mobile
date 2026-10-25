@@ -54,6 +54,7 @@ import {
   firstFocusField,
   firstInvalidStep,
   initialWizardState,
+  feeMaxText,
   mapCreateRejection,
   toDate,
   validateStep,
@@ -276,9 +277,9 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   };
 
   // ---- submit -------------------------------------------------------------------------------------------
-  const rejectionContext = (): { committeeMax: number; startLabel: string; feeMaxCents: number | null } => {
+  const rejectionContext = (): { committeeMax: number; startLabel: string; feeMaxText: string } => {
     const starts = toDate(state.startsAt);
-    return { committeeMax: limits.committee_max, startLabel: starts ? formatDayTime(starts) : '', feeMaxCents: fee?.maxCents ?? null };
+    return { committeeMax: limits.committee_max, startLabel: starts ? formatDayTime(starts) : '', feeMaxText: feeMaxText(fee) };
   };
 
   const submit = async (): Promise<void> => {
@@ -446,7 +447,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
             fee={fee}
             onFee={value => {
               setServerIssue(null);
-              setState(current => ({ ...current, feeCents: value.replace(/[^0-9]/g, '') }));
+              setState(current => ({ ...current, feeAmount: value.replace(/[^0-9.]/g, '') }));
             }}
             errors={errors}
             focus={stepFocus}

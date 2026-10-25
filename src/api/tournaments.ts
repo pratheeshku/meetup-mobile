@@ -261,18 +261,26 @@ export async function getTournament(id: string, options?: RequestOptions): Promi
 }
 
 /**
- * `POST /tournaments/{id}/registrations` (tournament-registration AD-1, AD-5). A free tournament posts no body (the server treats an omitted
+ * `POST /tournaments/{id}/registrations` (tournament-registration AD-1, AD-5). A free individual tournament posts no body (the server treats an omitted
  * `user_id` as the caller); a tournament with a fee posts `{ accepted_fee_cents }`, the fee the player saw and confirmed. The server answers 409
  * `FEE_ACK_REQUIRED` or `FEE_CHANGED` (with the current `registration_fee_cents`) when that is missing or stale.
  */
 export async function registerForTournament(
   id: string,
-  options?: RequestOptions & { acceptedFeeCents?: number | null },
+  options?: RequestOptions & { acceptedFeeCents?: number | null; teamId?: string | null },
 ): Promise<void> {
   const fee = options?.acceptedFeeCents;
+  const body: { team_id?: string; accepted_fee_cents?: number } = {};
+  // Team mode names the tournament team; individual mode sends neither team_id nor user_id (the server treats an omitted user_id as the caller).
+  if (options?.teamId) {
+    body.team_id = options.teamId;
+  }
+  if (typeof fee === 'number') {
+    body.accepted_fee_cents = fee;
+  }
   await apiClient.post(
     `/tournaments/${id}/registrations`,
-    typeof fee === 'number' ? { accepted_fee_cents: fee } : undefined,
+    Object.keys(body).length > 0 ? body : undefined,
     { correlationId: options?.correlationId },
   );
 }

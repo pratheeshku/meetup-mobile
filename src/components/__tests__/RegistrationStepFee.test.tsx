@@ -29,18 +29,18 @@ describe('fee field', () => {
     expect(FALLBACK_LIMITS).toBeDefined();
   });
 
-  it('is shown with the flag on, takes whole cents, and previews the amount from cents and currency', () => {
+  it('is shown with the flag on, takes an amount in the currency, and previews it', () => {
     const onFee = jest.fn();
     const root = step({
       fee: { currency: 'SGD', maxCents: 100000 },
       onFee,
-      state: { ...initialWizardState('req-1', 'badminton'), feeCents: '1500' },
+      state: { ...initialWizardState('req-1', 'badminton'), feeAmount: '15.00' },
     });
     const field = byId(root, 'tw-fee')[0];
-    expect(field.props.keyboardType).toBe('number-pad');
-    expect(field.props.value).toBe('1500');
-    act(() => field.props.onChangeText('2500'));
-    expect(onFee).toHaveBeenCalledWith('2500');
+    expect(field.props.keyboardType).toBe('decimal-pad');
+    expect(field.props.value).toBe('15.00');
+    act(() => field.props.onChangeText('25.5'));
+    expect(onFee).toHaveBeenCalledWith('25.5');
     expect(texts(byId(root, 'tw-fee-preview')[0])[0]).toMatch(/^Fee shown to players: .*15\.00$/);
   });
 
@@ -48,10 +48,10 @@ describe('fee field', () => {
     const root = step({
       fee: { currency: 'SGD', maxCents: 100000 },
       onFee: jest.fn(),
-      state: { ...initialWizardState('req-1', 'badminton'), feeCents: '999999' },
-      errors: { registration_fee_cents: 'Enter a whole number of cents between 0 and 100000.' },
+      state: { ...initialWizardState('req-1', 'badminton'), feeAmount: '9999.00' },
+      errors: { registration_fee_cents: 'Enter an amount between 0 and S$1,000.00, with at most two decimals.' },
     });
-    expect(texts(byId(root, 'tw-fee-error')[0])).toEqual(['Enter a whole number of cents between 0 and 100000.']);
+    expect(texts(byId(root, 'tw-fee-error')[0])).toEqual(['Enter an amount between 0 and S$1,000.00, with at most two decimals.']);
     expect(byId(root, 'tw-fee-preview')).toHaveLength(0);
   });
 });

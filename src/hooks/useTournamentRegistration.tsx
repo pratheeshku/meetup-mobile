@@ -11,17 +11,27 @@
 import React, { useCallback, useRef, useState } from 'react';
 
 import { withCorrelationId } from '../api/correlationId';
+import { getMyTeams } from '../api/teams';
 import { registerForTournament } from '../api/tournaments';
 import { RegistrationConfirmSheet, RegistrationResultPopup } from '../components/tournament/RegistrationDialogs';
 import { useT } from '../labels/LabelsContext';
+import type { Team } from '../types/team';
 import type { Tournament, TournamentParticipationMode } from '../types/tournament';
 import { isNotFoundError } from '../utils/apiError';
 import { hasFee } from '../utils/money';
-import { classifyRegistrationError, feeLineFor, type RegistrationFailure } from '../utils/registration';
+import {
+  TEAM_EMPTY_FAILURE,
+  classifyRegistrationError,
+  feeLineFor,
+  teamsForSport,
+  type RegistrationFailure,
+} from '../utils/registration';
 
 export interface RegistrationTarget {
   tournamentId: string;
   name: string;
+  /** The tournament's sport: team mode keeps only the caller's teams for this sport (case-insensitive). */
+  sport: string;
   mode: TournamentParticipationMode | null;
   /** Null or 0 = free. */
   feeCents: number | null;
@@ -37,6 +47,7 @@ export function registrationTargetFor(tournament: Tournament): RegistrationTarge
   return {
     tournamentId: tournament.id,
     name: tournament.name,
+    sport: tournament.sport,
     mode: tournament.participation_mode ?? null,
     feeCents,
     currency,
@@ -69,20 +80,56 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
   const [target, setTarget] = useState<RegistrationTarget | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: 'closed' });
   const [busy, setBusy] = useState(false);
+  // Team mode: the caller's teams for the sport (null = individual mode or not loaded) and the chosen one.
+  const [teams, setTeams] = useState<Team[] | null>(null);
+  const [teamId, setTeamId] = useState<string | null>(null);
   const inFlight = useRef(false);
 
   const close = useCallback(() => {
     setPhase({ kind: 'closed' });
     setTarget(null);
+    setTeams(null);
+    setTeamId(null);
   }, []);
 
-  const start = useCallback((next: RegistrationTarget) => {
-    setTarget(next);
-    setPhase({ kind: 'confirm', notice: null });
-  }, []);
+  const start = useCallback(
+    (next: RegistrationTarget) => {
+      setTarget(next);
+      setTeams(null);
+      setTeamId(null);
+      if (next.mode !== 'team') {
+        setPhase({ kind: 'confirm', notice: null });
+        return;
+      }
+      // Team mode (AD-1, OI-19): read the caller's teams first. No team for this sport: no confirmation, the result pop-up says so.
+      withCorrelationId(correlationId => getMyTeams({ correlationId }))
+        .then(all => {
+          const mine = teamsForSport(all, next.sport);
+          if (mine.length === 0) {
+            setPhase({ kind: 'result', failure: TEAM_EMPTY_FAILURE });
+            return;
+          }
+          setTeams(mine);
+          setTeamId(mine[0].id);
+          setPhase({ kind: 'confirm', notice: null });
+        })
+        .catch(error => {
+          if (isNotFoundError(error)) {
+            close();
+            optionsRef.current.onNotFound();
+            return;
+          }
+          setPhase({ kind: 'result', failure: { ...classifyRegistrationError(error), labelKey: 'mob.reg.err.generic', canRetry: true } });
+        });
+    },
+    [close],
+  );
 
   const submit = useCallback(async (): Promise<void> => {
     if (!target || !target.feeReadable || inFlight.current) {
+      return;
+    }
+    if (target.mode === 'team' && !teamId) {
       return;
     }
     inFlight.current = true;
@@ -92,6 +139,7 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
         await registerForTournament(target.tournamentId, {
           correlationId,
           acceptedFeeCents: hasFee(target.feeCents) ? target.feeCents : null,
+          teamId: target.mode === 'team' ? teamId : null,
         });
         setPhase({ kind: 'result', failure: null });
         try {
@@ -120,7 +168,7 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
       inFlight.current = false;
       setBusy(false);
     }
-  }, [target, close, t]);
+  }, [target, teamId, close, t]);
 
   if (!target || phase.kind === 'closed') {
     return { start, element: null };
@@ -136,6 +184,9 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
         feeReadable={target.feeReadable}
         notice={phase.notice}
         busy={busy}
+        teams={teams ?? undefined}
+        selectedTeamId={teamId}
+        onSelectTeam={setTeamId}
         onConfirm={submit}
         onCancel={close}
       />
@@ -144,7 +195,11 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
         feeLine={feeLine}
         failure={phase.failure}
         onRetry={() => {
-          // A retry is a new user action: back to the sheet's request with a fresh correlation id.
+          // A retry is a new user action with a fresh correlation id. Team mode whose team list never loaded starts over.
+          if (target.mode === 'team' && !teams) {
+            start(target);
+            return;
+          }
           setPhase({ kind: 'confirm', notice: null });
           submit();
         }}

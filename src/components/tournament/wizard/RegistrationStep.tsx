@@ -13,7 +13,7 @@ import DateTimePickerField from '../../DateTimePickerField';
 import TextField from '../../TextField';
 import { CheckIcon, CrossIcon } from '../../icons/ActionIcons';
 import { FieldLabel, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
-import { formatMoney } from '../../../utils/money';
+import { formatMoney, parseAmountToCents } from '../../../utils/money';
 import { registrationRules, toDate, type RuleState, type WizardFeeConfig, type WizardState } from '../../../utils/tournamentWizard';
 
 const RULE_BOX = 22;
@@ -57,6 +57,8 @@ export default function RegistrationStep({
   const starts = toDate(state.startsAt);
   const dash = t('mob.tw.reg_tl_unset');
   const rules = registrationRules(state, now);
+  const parsedFee = parseAmountToCents(state.feeAmount);
+  const previewCents = parsedFee.valid ? parsedFee.cents : null;
   const firstGame = starts ? formatDayTime(starts) : dash;
   const rows: { key: 'future' | 'order' | 'start'; state: RuleState; text: string }[] = [
     { key: 'future', state: rules.future, text: t('mob.tw.dates_rule_future') },
@@ -106,18 +108,18 @@ export default function RegistrationStep({
           <>
             <FieldLabel>{t('mob.tw.fee_label')}</FieldLabel>
             <TextField
-              value={state.feeCents}
+              value={state.feeAmount}
               onChangeText={onFee}
-              keyboardType="number-pad"
+              keyboardType="decimal-pad"
               placeholder="0"
               accessibilityLabel={t('mob.tw.fee_label')}
               style={errors.registration_fee_cents ? styles.invalidField : undefined}
               testID="tw-fee"
             />
-            <Text style={styles.feeHint}>{t('mob.tw.fee_hint')}</Text>
-            {state.feeCents && fee.currency && !errors.registration_fee_cents ? (
+            <Text style={styles.feeHint}>{t('mob.tw.fee_hint', { currency: fee.currency ?? '' })}</Text>
+            {previewCents !== null && fee.currency && !errors.registration_fee_cents ? (
               <Text style={styles.feeHint} testID="tw-fee-preview">
-                {t('mob.tw.fee_preview', { amount: formatMoney(Number(state.feeCents), fee.currency) })}
+                {t('mob.tw.fee_preview', { amount: formatMoney(previewCents, fee.currency) })}
               </Text>
             ) : null}
             {errors.registration_fee_cents ? (

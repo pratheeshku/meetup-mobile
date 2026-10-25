@@ -1727,11 +1727,13 @@ export const DEFAULT_LABELS = {
   // Not seeded: the sheet's mode line, the fee-unknown notice, the history outcome and the wizard fee field.
   'mob.reg.mode_individual': 'Individual registration',
   'mob.reg.mode_team': 'Tournament team registration',
+  'mob.reg.team_label': 'Choose your tournament team',
+  'mob.reg.team_empty': 'You need a tournament team for this sport to register. Create or join one first.',
   'mob.reg.fee_unknown': 'The fee could not be read. Close this and try again.',
   'mob.notif_action_state.registered': 'Registered',
   'mob.tw.fee_label': 'Registration fee (optional)',
-  'mob.tw.fee_hint': 'Whole cents, for example 1500 for 15.00. Leave empty for a free tournament.',
-  'mob.tw.fee_error': 'Enter a whole number of cents between 0 and {max}.',
+  'mob.tw.fee_hint': 'Amount in {currency}, for example 15.00. Leave empty for a free tournament.',
+  'mob.tw.fee_error': 'Enter an amount between 0 and {max}, with at most two decimals.',
   'mob.tw.fee_preview': 'Fee shown to players: {amount}',
 } as const;
 
