@@ -181,3 +181,58 @@ No boards exist for the sheet, pop-up, X, list lines or fee field (INDEX.md: bui
 - Implementation and tests: `1aa3323` (52 files: 13 new, 39 modified).
 - This report: the commit that follows `1aa3323` on the branch (`git log --oneline -3 tr-mobile`).
 - Pushed to `origin/tr-mobile`. Not merged. No pull request opened.
+
+---
+
+## tr-mobile-2 (fix-up: F1, F2, F3)
+Design: addendum v1.2 (header checked: "Version: v1.2"). Branch `tr-mobile`, merged `origin/docs/tournament-registration-v1.0-approved` first. Accepted as is and not touched: X without scroll (D-8), no team picker (OI-19), no edit screen (OI-20), the eight fallback-only labels (OI-21).
+
+### Traceability
+| Task | What changed | Files |
+|---|---|---|
+| F1 | Invitation banner (pending) shows Register + Decline, never Accept; Register opens the same confirmation sheet and result pop-up. The recover-after-decline button (v1 page and the v2 header button) is Register and opens the same sheet. The old accept-only handler was removed. Decline is unchanged. Games untouched. Public tournaments already show Register alone. | `src/components/tournament/TournamentInvitationBanner.tsx`, `src/screens/TournamentDetailScreen.tsx` |
+| F2 | `TournamentFeeLine`: per player / per tournament team / "Free registration" from `registration_fee_cents` and `registration_fee_currency`, via `feeLineFor`; renders nothing while the fee is null or has no currency. On the v2 Overview (after the venue row) and on the legacy page (above the buttons). | `src/components/tournament/TournamentFeeLine.tsx`, `src/components/tournament/v2/TournamentOverview.tsx`, `src/screens/TournamentDetailScreen.tsx` |
+| F3 | Legacy page: `canRegister`, the closed-registration message and the button block no longer exclude the organizer. The organizer sees Register alone (no Decline of their own tournament). No new exemption: skill, capacity and phase are the server's. | `src/screens/TournamentDetailScreen.tsx` |
+
+Also: the page's `isRegistering` state became unused once the sheet owns the busy state, and was removed (the v2 register action now passes `loading: false`).
+
+### Tests (written, then run: only the files below, once)
+Changed: `TournamentRespond.test.tsx` (banner now Register + Decline; Register opens the sheet and registers once, no call to `/invitations/respond`; refused Register shows the code label; recover button; the INVITES_CLOSED and network-error cases now press Decline), `AccessActionNotFound.test.tsx` (the two invitation cases now go Register then Confirm), `TournamentResponses.test.tsx` (the recover test needed Confirm; it was already out of date after tr-mobile and was not in my earlier list), `TournamentDetailV2.test.tsx` (fee on the Overview), `TournamentRegistrationFlow.test.tsx` (fee line cases; organizer on the legacy page: registers, no Decline, no exemption from skill or capacity, hidden once closed).
+
+Result: first run 97 passed, 1 failed. The failure was my own assertion in `TournamentRespond.test.tsx` ("Decline ... banner goes away"): I had changed the original `Accept` check to `Register`, but after a decline the ordinary Register button correctly shows. I restored the original `Accept` assertion and added a check that the banner is gone; I did not weaken anything. Re-ran that one file once: 15 passed.
+
+```
+PASS src/screens/__tests__/TournamentResponses.test.tsx (7.261 s)
+FAIL src/screens/__tests__/TournamentRespond.test.tsx (7.358 s)
+  ● respond › Decline posts { accept: false }, refreshes, and the banner goes away
+PASS src/screens/__tests__/TournamentRegistrationFlow.test.tsx (7.583 s)
+PASS src/screens/__tests__/AccessActionNotFound.test.tsx (7.914 s)
+PASS src/screens/__tests__/TournamentDetailV2.test.tsx (8.212 s)
+Test Suites: 1 failed, 4 passed, 5 total
+Tests:       1 failed, 97 passed, 98 total
+--- re-run of the one failed file ---
+PASS src/screens/__tests__/TournamentRespond.test.tsx
+Tests:       15 passed, 15 total
+```
+
+### Static checks (each once after the last source edit; the one test-only edit after them cannot affect them)
+`npx tsc --noEmit` (exit 0):
+```
+(no output)
+```
+`npm run check:labels` (exit 0):
+```
+
+> MeetupMobile@0.0.1 check:labels
+> node scripts/check-labels.js
+
+check-labels: OK - 305 files scanned, 1775 default labels checked.
+```
+`npm run lint`: exit 1 with the same 31 errors and 1 warning as before; `diff` of the full output against the earlier run shows **no new problem**. Raw tail:
+```
+
+✖ 32 problems (31 errors, 1 warning)
+```
+
+### Not done
+Nothing outside F1–F3. Still unverified on a device: the push buttons. No screenshots.

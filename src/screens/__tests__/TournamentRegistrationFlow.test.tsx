@@ -230,3 +230,61 @@ describe('the X in the header (AD-9)', () => {
     expect(pressable(x, 'tournament-close')!.props.accessibilityLabel).toBe('Close');
   });
 });
+
+describe('fee on the tournament view (AD-4 Display, F2)', () => {
+  const line = (root: Instance): string | null => {
+    const found = byId(root, 'tournament-fee-line')[0];
+    return found ? texts(found).join('') : null;
+  };
+
+  it('shows the per-player fee from cents and currency', async () => {
+    expect(line(await mount({ registration_fee_cents: 1500, registration_fee_currency: 'SGD' }))).toMatch(/^Registration fee: .*15\.00 per player$/);
+  });
+
+  it('shows the per-team fee for a team tournament', async () => {
+    expect(line(await mount({ participation_mode: 'team', registration_fee_cents: 4000, registration_fee_currency: 'SGD' }))).toMatch(/per tournament team$/);
+  });
+
+  it('shows "Free registration" for a fee of 0', async () => {
+    expect(line(await mount({ registration_fee_cents: 0, registration_fee_currency: 'SGD' }))).toBe('Free registration');
+  });
+
+  it('shows nothing while the fee is null (flag off) or has no currency to format with', async () => {
+    expect(line(await mount({ registration_fee_cents: null, registration_fee_currency: null }))).toBeNull();
+    expect(line(await mount({}))).toBeNull();
+    expect(line(await mount({ registration_fee_cents: 1500, registration_fee_currency: null }))).toBeNull();
+  });
+});
+
+describe('legacy page: the organizer registers like everyone else (TR-06, F3)', () => {
+  it('the organizer sees Register (alone, with no Decline) and registers through the same sheet', async () => {
+    const root = await mount({ organizer_id: 'user-me' });
+    expect(byId(root, 'tournament-register-button')).not.toHaveLength(0);
+    expect(byId(root, 'tournament-decline-button')).toHaveLength(0);
+    await press(root, 'tournament-register-button');
+    await press(root, 'registration-confirm');
+    expect(registrationPosts()).toHaveLength(1);
+    expect(byId(root, 'registration-result-success')).toHaveLength(1);
+  });
+
+  it('gets no exemption: a missing skill level is refused with its label, like any player', async () => {
+    const root = await mount({ organizer_id: 'user-me' });
+    await press(root, 'tournament-register-button');
+    mockPost.mockRejectedValueOnce(refusal(409, { code: 'SKILL_LEVEL_REQUIRED' }));
+    await press(root, 'registration-confirm');
+    expect(everyText(byId(root, 'registration-result-message')[0])).toBe('Set your skill level for this sport before you register.');
+  });
+
+  it('a full tournament is refused for the organizer as for anyone', async () => {
+    const root = await mount({ organizer_id: 'user-me' });
+    await press(root, 'tournament-register-button');
+    mockPost.mockRejectedValueOnce(refusal(409, { code: 'TOURNAMENT_FULL' }));
+    await press(root, 'registration-confirm');
+    expect(everyText(byId(root, 'registration-result-message')[0])).toBe('This tournament is full.');
+  });
+
+  it('once registration has closed the organizer sees no Register button, like everyone else', async () => {
+    const root = await mount({ organizer_id: 'user-me', registration_closes_at: '2020-01-01T00:00:00Z' });
+    expect(byId(root, 'tournament-register-button')).toHaveLength(0);
+  });
+});

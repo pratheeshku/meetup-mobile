@@ -50,7 +50,6 @@ import {
   getTournamentResponses,
   getTournamentScoringState,
   putTournamentClosure,
-  respondToTournamentInvitation,
   withdrawFromTournament,
 } from '../api/tournaments';
 import { getClientConfig } from '../api/config';
@@ -67,6 +66,7 @@ import ClosureModal, { type CandidateItem } from '../components/closure/ClosureM
 import VenueRow from '../components/venue/VenueRow';
 import InviteTypeRow from '../components/invite/InviteTypeRow';
 import CommitteeInvitationCard from '../components/tournament/CommitteeInvitationCard';
+import TournamentFeeLine from '../components/tournament/TournamentFeeLine';
 import TournamentInvitationBanner from '../components/tournament/TournamentInvitationBanner';
 import TournamentInvitePanel from '../components/tournament/TournamentInvitePanel';
 import TournamentScoringEntry from '../components/scoring/TournamentScoringEntry';
@@ -153,7 +153,6 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   // `tournament` is still possibly `null` here.
   const sportLabel = useSportDisplayName(tournament?.sport ?? '');
 
-  const [isRegistering, setIsRegistering] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
 
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -503,32 +502,6 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     }
   };
 
-  const handleAcceptInvite = async (): Promise<void> => {
-    setRegisterError(null);
-    setIsRegistering(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        await respondToTournamentInvitation(tournamentId, true, { correlationId });
-        await loadAll(true);
-      });
-    } catch (e: any) {
-      if (isNotFoundError(e)) {
-        unavailable.onNotFound();
-      } else if (
-        e?.response?.status === 409 &&
-        (e?.response?.data?.code === 'game_ended' ||
-          e?.response?.data?.code === 'tournament_ended' ||
-          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
-      ) {
-        setRegisterError(t('mob.closure.game_ended'));
-      } else {
-        setRegisterError(t('mob.tournament.register_error'));
-      }
-    } finally {
-      setIsRegistering(false);
-    }
-  };
-
   const handleDecline = async (): Promise<void> => {
     setWithdrawError(null);
     setIsWithdrawing(true);
@@ -714,14 +687,12 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   const canRegister =
     !isTournamentEnded &&
     tournament.registration_open &&
-    currentUserRegistrationStatus === 'none' &&
-    !isOrganiser;
+    currentUserRegistrationStatus === 'none';
   const canWithdraw = !isTournamentEnded && currentUserRegistrationStatus === 'registered';
   const showRegistrationClosedMessage =
     !isTournamentEnded &&
     !tournament.registration_open &&
-    currentUserRegistrationStatus === 'none' &&
-    !isOrganiser;
+    currentUserRegistrationStatus === 'none';
   const canCancel =
     !isTournamentEnded &&
     isOrganiser &&
@@ -739,15 +710,14 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       registrationOpen &&
       (currentUserRegistrationStatus === 'none' || Boolean(tournament.my_declined)) &&
       tournament.my_invitation_status !== 'pending';
-    const recoverByInvitation = tournament.visibility === 'invite' || tournament.my_invitation_status !== null;
     const register: RegisterAction = canWithdrawNow(currentUserRegistrationStatus, isTournamentEnded)
       ? { kind: 'registered' }
       : canRegisterV2
       ? {
           kind: 'register',
           spotsLeft: Math.max(0, tournament.max_participants - activeCount),
-          loading: isRegistering,
-          onPress: tournament.my_declined && recoverByInvitation ? handleAcceptInvite : handleRegister,
+          loading: false,
+          onPress: handleRegister,
         }
       : null;
     const secondary = canWithdraw
@@ -776,6 +746,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             {committeeCard}
             {registrationFlow.element}
             <TournamentInvitationBanner
+              onRegister={handleRegister}
               tournamentId={tournament.id}
               status={tournament.my_invitation_status}
               onResponded={async result => {
@@ -896,6 +867,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       ) : null}
 
       <TournamentInvitationBanner
+        onRegister={handleRegister}
         tournamentId={tournament.id}
         status={tournament.my_invitation_status}
         onResponded={async result => {
@@ -935,11 +907,12 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         />
       </View>
 
+      <TournamentFeeLine tournament={tournament} />
       {registrationFlow.element}
       {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
       {withdrawError ? <Text style={styles.errorText}>{withdrawError}</Text> : null}
 
-      {!isTournamentEnded && !isOrganiser ? (
+      {!isTournamentEnded ? (
         canWithdraw ? (
           <Button
             label={t('mob.respond.decline')}
@@ -951,28 +924,20 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             testID="tournament-decline-button"
           />
         ) : tournament.my_declined ? (
+          // Registering also clears the decline and accepts the invitation (AD-3): Register for tournaments, never Accept.
           <Button
-            label={
-              tournament.visibility === 'invite' || tournament.my_invitation_status !== null
-                ? t('mob.respond.accept')
-                : t('mob.tournament.register')
-            }
-            onPress={
-              tournament.visibility === 'invite' || tournament.my_invitation_status !== null
-                ? handleAcceptInvite
-                : handleRegister
-            }
-            loading={isRegistering}
+            label={t('mob.reg.register')}
+            onPress={handleRegister}
             style={styles.button}
             testID="tournament-recover-button"
           />
         ) : canRegister && tournament.my_invitation_status !== 'pending' ? (
-          tournament.my_invitation_status === 'accepted' ? (
+          // Accepted already, or the organizer (who has no one to decline for): Register alone.
+          tournament.my_invitation_status === 'accepted' || isOrganiser ? (
             <Button
               label={t('mob.tournament.register')}
               onPress={handleRegister}
-              loading={isRegistering}
-              style={styles.button}
+                style={styles.button}
               testID="tournament-register-button"
             />
           ) : (
@@ -980,8 +945,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
               <Button
                 label={t('mob.tournament.register')}
                 onPress={handleRegister}
-                loading={isRegistering}
-                style={styles.pairButton}
+                    style={styles.pairButton}
                 testID="tournament-register-button"
               />
               <Button

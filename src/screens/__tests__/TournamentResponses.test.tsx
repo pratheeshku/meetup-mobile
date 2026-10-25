@@ -63,6 +63,10 @@ describe('TournamentDetailScreen decline and responses', () => {
     await act(async () => {
       registerBtn.props.onPress();
     });
+    // Register opens the confirmation sheet (tr-mobile); Confirm sends the request.
+    await act(async () => {
+      pressableLabelled(root, 'Confirm').props.onPress();
+    });
 
     expect(mockPost).toHaveBeenCalledWith(
       '/tournaments/t-1/registrations',

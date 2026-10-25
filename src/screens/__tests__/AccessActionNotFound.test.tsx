@@ -377,11 +377,12 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       expect(goneNow()).toBe(true);
     });
 
-    it('accepting an invitation that answers 404: goes back, shows the message', async () => {
+    it('registering from an invitation that answers 404: goes back, shows the message', async () => {
       mockGetTournament.mockResolvedValue({ ...baseTournament, my_invitation_status: 'pending' });
       const root = await mountTournament();
-      (respondToTournamentInvitation as jest.Mock).mockRejectedValueOnce(NOT_FOUND);
-      await press(byLabel(root, 'Accept'));
+      (registerForTournament as jest.Mock).mockRejectedValueOnce(NOT_FOUND);
+      await press(byLabel(root, 'Register'));
+      await press(byLabel(root, 'Confirm'));
       expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
       expect(goneNow()).toBe(true);
     });
@@ -491,11 +492,12 @@ describe('2. the user\'s own successful action never shows "no longer available"
       expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
     });
 
-    it('accepting an invitation whose refetch 404s is NOT the user\'s removal: shows the message', async () => {
+    it('registering from an invitation whose refetch 404s is NOT the user\'s removal: shows the message', async () => {
       mockGetTournament.mockResolvedValue({ ...baseTournament, my_invitation_status: 'pending' });
       const root = await mountTournament();
       mockGetTournament.mockRejectedValue(NOT_FOUND);
-      await press(byLabel(root, 'Accept'));
+      await press(byLabel(root, 'Register'));
+      await press(byLabel(root, 'Confirm'));
       expect(goneNow()).toBe(true);
       expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
       expect(root).toBeDefined();
