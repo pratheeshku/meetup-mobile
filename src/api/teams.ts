@@ -49,3 +49,11 @@ export async function createTeam(
   });
   return mapTeamApiItem(data);
 }
+
+/** `GET /teams/mine`: the caller's tournament teams (existing endpoint; tournament-registration AD-1 team picker). */
+export async function getMyTeams(options?: RequestOptions): Promise<Team[]> {
+  const { data } = await apiClient.get<TeamApiItem[]>('/teams/mine', {
+    correlationId: options?.correlationId,
+  });
+  return Array.isArray(data) ? data.map(mapTeamApiItem) : [];
+}

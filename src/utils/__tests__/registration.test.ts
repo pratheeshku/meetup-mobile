@@ -1,7 +1,7 @@
 /** Registration helpers (tournament-registration AD-1, AD-4, AD-5; brief M2, M3, M4): one label per server code, money from cents. */
 import { currentT } from '../../labels/LabelsContext';
-import { formatMoney, hasFee } from '../money';
-import { classifyRegistrationError, feeLineFor } from '../registration';
+import { centsToAmountText, formatMoney, hasFee, parseAmountToCents } from '../money';
+import { classifyRegistrationError, feeLineFor, teamsForSport } from '../registration';
 
 const body = (status: number, data: Record<string, unknown>) => ({ response: { status, data } });
 
@@ -71,5 +71,52 @@ describe('fee text', () => {
     expect(feeLineFor(t, 1500, 'SGD', 'individual')).toMatch(/^Registration fee: .*15\.00 per player$/);
     expect(feeLineFor(t, 1500, 'SGD', null)).toMatch(/per player$/);
     expect(feeLineFor(t, 1500, 'SGD', 'team')).toMatch(/^Registration fee: .*15\.00 per tournament team$/);
+  });
+});
+
+describe('fee amounts in the currency (brief M3)', () => {
+  it.each([
+    ['15', 1500],
+    ['15.5', 1550],
+    ['15.50', 1550],
+    ['15.05', 1505],
+    ['0', 0],
+    ['0.01', 1],
+    ['  15  ', 1500],
+    ['1000', 100000],
+  ])('%s -> %i cents', (text, cents) => {
+    expect(parseAmountToCents(text)).toEqual({ valid: true, cents });
+  });
+
+  it('an empty field is no fee (null), not zero', () => {
+    expect(parseAmountToCents('')).toEqual({ valid: true, cents: null });
+    expect(parseAmountToCents('   ')).toEqual({ valid: true, cents: null });
+  });
+
+  it.each(['15.005', '-1', '-0.5', '+5', 'abc', '15,50', '1e3', '1 5', '.5', '15.', '15.5.5', '$15'])('%s is rejected', text => {
+    expect(parseAmountToCents(text)).toEqual({ valid: false });
+  });
+
+  it('a number too large to be a safe integer is rejected', () => {
+    expect(parseAmountToCents('9'.repeat(30))).toEqual({ valid: false });
+  });
+
+  it('stored cents come back as an editable amount', () => {
+    expect(centsToAmountText(1500)).toBe('15.00');
+    expect(centsToAmountText(1550)).toBe('15.50');
+    expect(centsToAmountText(1)).toBe('0.01');
+    expect(parseAmountToCents(centsToAmountText(123456))).toEqual({ valid: true, cents: 123456 });
+  });
+});
+
+describe('teamsForSport', () => {
+  it('keeps the teams of the sport, ignoring case and spaces, in order', () => {
+    const teams = [
+      { id: 'a', sport: 'Badminton' },
+      { id: 'b', sport: 'football' },
+      { id: 'c', sport: ' badminton ' },
+    ];
+    expect(teamsForSport(teams, 'BADMINTON').map(x => x.id)).toEqual(['a', 'c']);
+    expect(teamsForSport(teams, 'tennis')).toEqual([]);
   });
 });

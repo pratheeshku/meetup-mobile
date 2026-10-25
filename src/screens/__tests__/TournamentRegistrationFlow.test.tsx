@@ -21,16 +21,19 @@ const REGISTRATIONS_URL = '/tournaments/t-1/registrations';
 async function mount(
   tournament: Record<string, unknown> = {},
   navigation: Record<string, unknown> = {},
+  teams: unknown[] = [],
+  routeParams: Record<string, unknown> = {},
 ): Promise<Instance> {
   const raw = rawTournament({ participation_mode: 'individual', ...tournament });
   mockGet.mockReset().mockImplementation((url: string) => {
     if (url === '/tournaments/t-1') return Promise.resolve({ data: raw });
     if (url === REGISTRATIONS_URL) return Promise.resolve({ data: [] });
+    if (url === '/teams/mine') return Promise.resolve({ data: teams });
     return Promise.resolve({ data: [] });
   });
   mockPost.mockReset().mockResolvedValue({ data: {} });
   const props = {
-    route: { key: 'k', name: 'TournamentDetail', params: { tournamentId: 't-1' } },
+    route: { key: 'k', name: 'TournamentDetail', params: { tournamentId: 't-1', ...routeParams } },
     navigation,
   } as unknown as Props;
   return renderAsync(<TournamentDetailScreen {...props} />);
@@ -82,7 +85,12 @@ describe('Register opens the confirmation sheet (AD-5)', () => {
   });
 
   it('a team tournament reads "per tournament team"', async () => {
-    const root = await mount({ participation_mode: 'team', registration_fee_cents: 4000, registration_fee_currency: 'SGD' });
+    // A team tournament first reads the caller's teams (OI-19); with one for the sport the sheet opens.
+    const root = await mount(
+      { participation_mode: 'team', sport: 'badminton', registration_fee_cents: 4000, registration_fee_currency: 'SGD' },
+      {},
+      [{ id: 'tm-1', name: 'Net Ninjas', sport: 'badminton', visibility: 'public', captain_user_id: 'user-me', created_at: 'x' }],
+    );
     await press(root, 'tournament-register-button');
     expect(everyText(byId(root, 'registration-fee-line')[0])).toMatch(/per tournament team$/);
   });
@@ -286,5 +294,115 @@ describe('legacy page: the organizer registers like everyone else (TR-06, F3)', 
   it('once registration has closed the organizer sees no Register button, like everyone else', async () => {
     const root = await mount({ organizer_id: 'user-me', registration_closes_at: '2020-01-01T00:00:00Z' });
     expect(byId(root, 'tournament-register-button')).toHaveLength(0);
+  });
+});
+
+describe('team picker for a team tournament (OI-19, AD-1; brief M1)', () => {
+  const team = (id: string, name: string, sport: string) => ({
+    id,
+    name,
+    sport,
+    visibility: 'public',
+    captain_user_id: 'user-me',
+    created_at: '2026-01-01T00:00:00Z',
+  });
+  const TEAMS = [team('tm-1', 'Net Ninjas', 'badminton'), team('tm-2', 'Smash Bros', 'Badminton'), team('tm-3', 'Kickers', 'football')];
+  const teamTournament = { participation_mode: 'team', sport: 'badminton' };
+  const selected = (root: Instance, id: string): boolean => byId(root, `registration-team-${id}`)[0]?.props.accessibilityState?.selected === true;
+
+  it('reads GET /teams/mine, keeps the tournament sport (case-insensitive), preselects the first, and shows the label above the fee line', async () => {
+    const root = await mount(teamTournament, {}, TEAMS);
+    await press(root, 'tournament-register-button');
+    expect(mockGet.mock.calls.some(call => call[0] === '/teams/mine')).toBe(true);
+    expect(byId(root, 'registration-team-tm-1')).toHaveLength(1);
+    expect(byId(root, 'registration-team-tm-2')).toHaveLength(1);
+    expect(byId(root, 'registration-team-tm-3')).toHaveLength(0);
+    expect(selected(root, 'tm-1')).toBe(true);
+    expect(selected(root, 'tm-2')).toBe(false);
+    expect(everyText(byId(root, 'registration-team-picker')[0])).toContain('Choose your tournament team');
+    const sheet = byId(root, 'registration-confirm-sheet')[0];
+    const order = sheet.findAll(n => n.props.testID === 'registration-team-picker' || n.props.testID === 'registration-fee-line').map(n => n.props.testID);
+    expect(order.indexOf('registration-team-picker')).toBeLessThan(order.indexOf('registration-fee-line'));
+  });
+
+  it('Confirm posts the chosen team_id (and accepted_fee_cents when there is a fee)', async () => {
+    const root = await mount({ ...teamTournament, registration_fee_cents: 4000, registration_fee_currency: 'SGD' }, {}, TEAMS);
+    await press(root, 'tournament-register-button');
+    await press(root, 'registration-team-tm-2');
+    expect(selected(root, 'tm-2')).toBe(true);
+    await press(root, 'registration-confirm');
+    const posts = registrationPosts();
+    expect(posts).toHaveLength(1);
+    expect(posts[0][1]).toEqual({ team_id: 'tm-2', accepted_fee_cents: 4000 });
+    expect(posts[0][2].correlationId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('a free team tournament posts just the team_id', async () => {
+    const root = await mount(teamTournament, {}, TEAMS);
+    await press(root, 'tournament-register-button');
+    await press(root, 'registration-confirm');
+    expect(registrationPosts()[0][1]).toEqual({ team_id: 'tm-1' });
+  });
+
+  it('FEE_CHANGED re-shows the sheet with the same team still selected', async () => {
+    const root = await mount({ ...teamTournament, registration_fee_cents: 4000, registration_fee_currency: 'SGD' }, {}, TEAMS);
+    await press(root, 'tournament-register-button');
+    await press(root, 'registration-team-tm-2');
+    mockPost.mockRejectedValueOnce(refusal(409, { code: 'FEE_CHANGED', registration_fee_cents: 5000 }));
+    await press(root, 'registration-confirm');
+    expect(selected(root, 'tm-2')).toBe(true);
+    await press(root, 'registration-confirm');
+    expect(registrationPosts()[1][1]).toEqual({ team_id: 'tm-2', accepted_fee_cents: 5000 });
+  });
+
+  it('no team for this sport: no confirmation, the result pop-up says so, nothing is posted', async () => {
+    const root = await mount(teamTournament, {}, [team('tm-3', 'Kickers', 'football')]);
+    await press(root, 'tournament-register-button');
+    expect(byId(root, 'registration-confirm-sheet')).toHaveLength(0);
+    expect(byId(root, 'registration-result-failure')).toHaveLength(1);
+    expect(everyText(byId(root, 'registration-result-message')[0])).toBe(
+      'You need a tournament team for this sport to register. Create or join one first.',
+    );
+    expect(byId(root, 'registration-retry')).toHaveLength(0);
+    expect(registrationPosts()).toHaveLength(0);
+  });
+
+  it('an empty list from the server is the same', async () => {
+    const root = await mount(teamTournament, {}, []);
+    await press(root, 'tournament-register-button');
+    expect(byId(root, 'registration-confirm-sheet')).toHaveLength(0);
+    expect(byId(root, 'registration-result-failure')).toHaveLength(1);
+  });
+
+  it('a failed team list read is the generic label with Try again, which reads the list again', async () => {
+    const root = await mount(teamTournament, {}, TEAMS);
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/teams/mine') return Promise.reject(refusal(500, {}));
+      return Promise.resolve({ data: [] });
+    });
+    await press(root, 'tournament-register-button');
+    expect(everyText(byId(root, 'registration-result-message')[0])).toBe('Could not register. Please try again.');
+    mockGet.mockImplementation((url: string) => Promise.resolve({ data: url === '/teams/mine' ? TEAMS : [] }));
+    await press(root, 'registration-retry');
+    expect(byId(root, 'registration-confirm-sheet')).toHaveLength(1);
+    expect(registrationPosts()).toHaveLength(0);
+  });
+
+  it('the push open_app path (openRegistration) lands on the team selector for a team tournament', async () => {
+    const setParams = jest.fn();
+    const root = await mount(teamTournament, { setParams }, TEAMS, { openRegistration: true });
+    expect(setParams).toHaveBeenCalledWith({ openRegistration: undefined });
+    expect(byId(root, 'registration-confirm-sheet')).toHaveLength(1);
+    expect(byId(root, 'registration-team-picker')).toHaveLength(1);
+    expect(selected(root, 'tm-1')).toBe(true);
+  });
+
+  it('an individual tournament never reads the teams and never sends team_id', async () => {
+    const root = await mount({ participation_mode: 'individual' }, {}, TEAMS);
+    await press(root, 'tournament-register-button');
+    expect(mockGet.mock.calls.some(call => call[0] === '/teams/mine')).toBe(false);
+    expect(byId(root, 'registration-team-picker')).toHaveLength(0);
+    await press(root, 'registration-confirm');
+    expect(registrationPosts()[0][1]).toBeUndefined();
   });
 });

@@ -22,6 +22,7 @@ import type {
   WizardTemplatesResponse,
 } from '../types/tournamentWizard';
 import { localDateTimeToDate } from './localDateTime';
+import { formatMoney, parseAmountToCents } from './money';
 
 export const WIZARD_STEP = {
   basics: 1,
@@ -95,8 +96,8 @@ export interface WizardState {
   hardBlockAt: string;
   /** The hard block follows the closure value until the organizer sets it (AD-20). */
   hardBlockTouched: boolean;
-  /** Optional fee per entry in whole cents, as typed (digits only; empty = none). Used only while the server's fee flag is on. */
-  feeCents: string;
+  /** Optional fee per entry as typed, an amount in the config currency (for example "15.00"; empty = none). Converted to whole cents for the request. Used only while the server's fee flag is on. */
+  feeAmount: string;
   venue: WizardVenue | null;
   /** Catalogue-off venue text. */
   venueName: string;
@@ -124,7 +125,7 @@ export function initialWizardState(clientRequestId: string, sport = ''): WizardS
     closesAt: '',
     hardBlockAt: '',
     hardBlockTouched: false,
-    feeCents: '',
+    feeAmount: '',
     venue: null,
     venueName: '',
     venueAddress: '',
@@ -339,23 +340,26 @@ export interface WizardFeeConfig {
   maxCents: number | null;
 }
 
-/** The fee field: empty is fine (free); otherwise whole cents, 0 up to the server's maximum. The server stays the authority. */
+/** The `{max}` of the fee error: the server's maximum, formatted as an amount in the config currency. */
+export function feeMaxText(fee: WizardFeeConfig | null | undefined): string {
+  return fee && fee.currency && fee.maxCents !== null ? formatMoney(fee.maxCents, fee.currency) : '';
+}
+
+/** The fee field: empty is fine (free); otherwise an amount with at most two decimals, 0 up to the server's maximum. The server stays the authority. */
 export function validateFee(state: WizardState, fee: WizardFeeConfig | null | undefined): WizardIssue | null {
-  if (!fee || state.feeCents.trim() === '') {
+  if (!fee) {
     return null;
   }
-  const text = state.feeCents.trim();
-  const value = Number(text);
-  const max = fee.maxCents;
-  if (!/^\d+$/.test(text) || !Number.isSafeInteger(value) || (max !== null && value > max)) {
-    return {
-      key: 'mob.tw.fee_error',
-      params: { max: max ?? '' },
-      field: 'registration_fee_cents',
-      step: WIZARD_STEP.registration,
-    };
+  const parsed = parseAmountToCents(state.feeAmount);
+  if (parsed.valid && (parsed.cents === null || fee.maxCents === null || parsed.cents <= fee.maxCents)) {
+    return null;
   }
-  return null;
+  return {
+    key: 'mob.tw.fee_error',
+    params: { max: feeMaxText(fee) },
+    field: 'registration_fee_cents',
+    step: WIZARD_STEP.registration,
+  };
 }
 
 /** Registration dates: closure and hard block present and consistent with the window (first failure, the server's order). */
@@ -460,6 +464,12 @@ function isoOf(value: string): string {
   return date.toISOString();
 }
 
+/** `registration_fee_cents` from the typed amount; nothing for an empty or invalid field (validation stops an invalid one earlier). */
+function feeFields(amount: string): { registration_fee_cents?: number } {
+  const parsed = parseAmountToCents(amount);
+  return parsed.valid && parsed.cents !== null ? { registration_fee_cents: parsed.cents } : {};
+}
+
 /**
  * The exact `POST /tournaments/v2/create` body. `template_id` and `overrides` are never sent (AD-T3): the server uses
  * the single default format. Throws only when called on an invalid state (a programming error). */
@@ -493,7 +503,7 @@ export function buildCreateBody(state: WizardState, catalogueEnabled: boolean, f
     ends_at: isoOf(state.endsAt),
     registration_closes_at: isoOf(state.closesAt),
     registration_hard_block_at: isoOf(state.hardBlockAt),
-    ...(feeEnabled && /^\d+$/.test(state.feeCents.trim()) ? { registration_fee_cents: Number(state.feeCents.trim()) } : {}),
+    ...(feeEnabled ? feeFields(state.feeAmount) : {}),
     ...(visibility === 'group' ? { group_ids: [...state.groupIds] } : {}),
     committee_member_ids: state.committee.map(person => person.id),
   };
@@ -536,7 +546,7 @@ const FAILED: WizardIssue = { key: 'mob.tw.err_create_failed', step: WIZARD_STEP
  */
 export function mapCreateRejection(
   error: unknown,
-  ctx: { committeeMax: number; startLabel: string; feeMaxCents?: number | null },
+  ctx: { committeeMax: number; startLabel: string; feeMaxText?: string },
 ): RejectionOutcome {
   const response = (error as ErrorLike | null)?.response;
   const status = response?.status;
@@ -599,7 +609,7 @@ export function mapCreateRejection(
         step: WIZARD_STEP.registration,
         issue: {
           key: 'mob.tw.fee_error',
-          params: { max: ctx.feeMaxCents ?? '' },
+          params: { max: ctx.feeMaxText ?? '' },
           field: 'registration_fee_cents',
           step: WIZARD_STEP.registration,
         },

@@ -36,36 +36,38 @@ function state(over: Partial<WizardState> = {}): WizardState {
 
 describe('validateFee', () => {
   it('empty is free; the flag off ignores whatever is typed', () => {
-    expect(validateFee(state({ feeCents: '' }), FEE)).toBeNull();
-    expect(validateFee(state({ feeCents: 'abc' }), null)).toBeNull();
+    expect(validateFee(state({ feeAmount: '' }), FEE)).toBeNull();
+    expect(validateFee(state({ feeAmount: 'abc' }), null)).toBeNull();
   });
 
-  it.each(['0', '1', '1500', '100000'])('%s is accepted', value => {
-    expect(validateFee(state({ feeCents: value }), FEE)).toBeNull();
+  it.each(['0', '1', '15', '15.5', '15.50', '1000.00'])('%s is accepted', value => {
+    expect(validateFee(state({ feeAmount: value }), FEE)).toBeNull();
   });
 
-  it.each(['100001', '-5', '12.5', '1e3', 'abc', '15,00'])('%s is refused on the registration step, under the fee field', value => {
-    const issue = validateFee(state({ feeCents: value }), FEE);
-    expect(issue).toMatchObject({ key: 'mob.tw.fee_error', field: 'registration_fee_cents', step: WIZARD_STEP.registration, params: { max: 100000 } });
+  it.each(['1000.01', '-5', '15.005', '1e3', 'abc', '15,00', '1 5'])('%s is refused on the registration step, under the fee field, with the maximum as an amount', value => {
+    const issue = validateFee(state({ feeAmount: value }), FEE);
+    expect(issue).toMatchObject({ key: 'mob.tw.fee_error', field: 'registration_fee_cents', step: WIZARD_STEP.registration });
+    expect(String(issue?.params?.max)).toMatch(/1,?000\.00/);
   });
 
   it('is part of the registration step only while the flag is on', () => {
-    const bad = state({ feeCents: '999999' });
+    const bad = state({ feeAmount: '99999' });
     expect(validateStep(WIZARD_STEP.registration, bad, ctx(FEE)).map(i => i.field)).toContain('registration_fee_cents');
     expect(validateStep(WIZARD_STEP.registration, bad, ctx(null)).map(i => i.field)).not.toContain('registration_fee_cents');
   });
 });
 
 describe('request body', () => {
-  it('sends registration_fee_cents as a whole number while the flag is on and a fee is typed', () => {
-    expect(buildCreateBody(state({ feeCents: '1500' }), false, true).registration_fee_cents).toBe(1500);
-    expect(buildCreateBody(state({ feeCents: '0' }), false, true).registration_fee_cents).toBe(0);
+  it('sends the typed amount as whole cents while the flag is on', () => {
+    expect(buildCreateBody(state({ feeAmount: '15' }), false, true).registration_fee_cents).toBe(1500);
+    expect(buildCreateBody(state({ feeAmount: '15.5' }), false, true).registration_fee_cents).toBe(1550);
+    expect(buildCreateBody(state({ feeAmount: '0' }), false, true).registration_fee_cents).toBe(0);
   });
 
   it('omits it when empty, when the flag is off, or by default (an unchanged call keeps its old body)', () => {
-    expect(buildCreateBody(state({ feeCents: '' }), false, true)).not.toHaveProperty('registration_fee_cents');
-    expect(buildCreateBody(state({ feeCents: '1500' }), false, false)).not.toHaveProperty('registration_fee_cents');
-    expect(buildCreateBody(state({ feeCents: '1500' }), false)).not.toHaveProperty('registration_fee_cents');
+    expect(buildCreateBody(state({ feeAmount: '' }), false, true)).not.toHaveProperty('registration_fee_cents');
+    expect(buildCreateBody(state({ feeAmount: '15' }), false, false)).not.toHaveProperty('registration_fee_cents');
+    expect(buildCreateBody(state({ feeAmount: '15' }), false)).not.toHaveProperty('registration_fee_cents');
   });
 });
 
@@ -73,9 +75,9 @@ describe('server refusal and focus', () => {
   it('422 FEE_INVALID goes back to the registration step with the fee error', () => {
     const outcome = mapCreateRejection(
       { response: { status: 422, data: { code: 'FEE_INVALID', field: 'registration_fee_cents', step: 3, detail: 'x' } } },
-      { committeeMax: 10, startLabel: '', feeMaxCents: 100000 },
+      { committeeMax: 10, startLabel: '', feeMaxText: 'S$1,000.00' },
     );
-    expect(outcome).toMatchObject({ kind: 'step', step: WIZARD_STEP.registration, issue: { key: 'mob.tw.fee_error', field: 'registration_fee_cents', params: { max: 100000 } } });
+    expect(outcome).toMatchObject({ kind: 'step', step: WIZARD_STEP.registration, issue: { key: 'mob.tw.fee_error', field: 'registration_fee_cents', params: { max: 'S$1,000.00' } } });
   });
 
   it('focus lands on the fee field when it has the error', () => {

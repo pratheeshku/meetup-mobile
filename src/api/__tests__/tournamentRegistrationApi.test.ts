@@ -5,6 +5,7 @@
 import { normaliseTabs } from '../../utils/tournamentScoring';
 import { apiClient } from '../client';
 import { getClientConfig } from '../config';
+import { getMyTeams } from '../teams';
 import { getTournament, getTournaments, registerForTournament } from '../tournaments';
 
 jest.mock('../client', () => ({ apiClient: { get: jest.fn(), post: jest.fn() } }));
@@ -29,6 +30,30 @@ describe('registerForTournament (M1)', () => {
     await registerForTournament('t-1', { correlationId: 'c-2', acceptedFeeCents: 1500 });
     expect(mockedPost.mock.calls[1][1]).toEqual({ accepted_fee_cents: 1500 });
     expect(mockedPost.mock.calls[1][2]).toEqual({ correlationId: 'c-2' });
+  });
+});
+
+describe('registerForTournament, team mode (OI-19)', () => {
+  it('sends team_id, with accepted_fee_cents when a fee applies; never user_id', async () => {
+    await registerForTournament('t-1', { correlationId: 'c-1', teamId: 'tm-1' });
+    expect(mockedPost.mock.calls[0][1]).toEqual({ team_id: 'tm-1' });
+    await registerForTournament('t-1', { teamId: 'tm-1', acceptedFeeCents: 4000 });
+    expect(mockedPost.mock.calls[1][1]).toEqual({ team_id: 'tm-1', accepted_fee_cents: 4000 });
+    expect(mockedPost.mock.calls[1][1]).not.toHaveProperty('user_id');
+  });
+
+  it('individual mode with a fee sends only accepted_fee_cents (no team_id, no user_id)', async () => {
+    await registerForTournament('t-1', { teamId: null, acceptedFeeCents: 1500 });
+    expect(mockedPost.mock.calls[0][1]).toEqual({ accepted_fee_cents: 1500 });
+  });
+});
+
+describe('getMyTeams', () => {
+  it('reads GET /teams/mine and maps the teams', async () => {
+    mockedGet.mockResolvedValueOnce({ data: [{ id: 'tm-1', name: 'Net Ninjas', sport: 'badminton', visibility: 'public', captain_user_id: 'u-1', created_at: 'x', extra: 1 }] });
+    const teams = await getMyTeams({ correlationId: 'c-1' });
+    expect(mockedGet).toHaveBeenCalledWith('/teams/mine', { correlationId: 'c-1' });
+    expect(teams).toEqual([{ id: 'tm-1', name: 'Net Ninjas', sport: 'badminton', visibility: 'public', captain_user_id: 'u-1', created_at: 'x' }]);
   });
 });
 

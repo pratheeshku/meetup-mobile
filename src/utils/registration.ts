@@ -70,3 +70,18 @@ export function feeLineFor(
   const amount = formatMoney(feeCents, currency);
   return mode === 'team' ? t('mob.reg.fee_per_team', { amount }) : t('mob.reg.fee_per_player', { amount });
 }
+
+/** The caller's teams for one tournament: same sport (case-insensitive), in the server's order. */
+export function teamsForSport<T extends { sport: string }>(teams: readonly T[], sport: string): T[] {
+  const wanted = sport.trim().toLowerCase();
+  return teams.filter(team => team.sport.trim().toLowerCase() === wanted);
+}
+
+/** Shown in the result pop-up when a team tournament is opened by someone with no team for its sport (no request is made). */
+export const TEAM_EMPTY_FAILURE: RegistrationFailure = {
+  code: 'TEAM_EMPTY',
+  labelKey: 'mob.reg.team_empty',
+  currentFeeCents: null,
+  canRetry: false,
+  skillLevelLink: false,
+};
