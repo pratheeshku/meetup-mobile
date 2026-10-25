@@ -1,8 +1,9 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-REGISTRATION
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-REGISTRATION
-**Version:** v1.0
+**Version:** v1.1
 **Status:** **APPROVED by the owner, 2026-10-25** (instruction in conversation: "write design addendum, mark it approved & upload to gh", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in section 3. Open items are in section 12.
+**v1.1 amendment (AD-10, TR-17):** approved by the owner 2026-10-25 (instruction "give me instructions", after the gap and the proposed fix were put to the owner). Assumption **[A-10]** (a group added later pushes to its new members only) was the stated default and was not contradicted.
 **Owner:** Pratheesh
 **Date:** 2026-10-25
 **Scale Tier:** T1
@@ -47,6 +48,7 @@
 | TR-14 | After registering, a pop-up shows registration successful or failed. |
 | TR-15 | The app does not collect payment. The fee applicable to each registration must be known. |
 | TR-16 | An X on the tournament view returns to the full list (TR-05) on web and mobile. |
+| TR-17 | Members of a group a tournament is open to receive the same invitation push as a directly invited person, with **Register** and **Decline** (TR-04, owner item 4). |
 
 ---
 
@@ -74,7 +76,7 @@ Decision: (a) `tr-p1-repro` reproduces the organizer failure on the deployed bui
 - Pending for such a tournament is **derived, never stored** (BP-09): members of the audience groups, minus anyone registered, with a current decline, or with an accepted invitation, plus the existing pending invitation rows. A person appears in exactly one section (existing precedence: Declined, Accepted, Pending).
 - Live membership: someone added to the group after creation becomes Pending; someone who left the group stops being Pending.
 - One batched query, capped at `SECTION_CAP` (200) with the true total (P7). The audience-groups table name is re-verified in Phase 1 (BP-01, OI-2).
-- **Visibility (TR-02):** the Pending section is returned only for the organizer and active committee (`can_read_tournament_responses`, the Declined guard). For any other viewer `pending` is `null`, as `declined` is today. Clients hide a `null` section. Supersedes game-view-redesign v1.1/v1.2 for tournament Pending (D-2).
+- **Visibility (TR-02):** the Pending section is returned only for the organizer and active committee (`can_read_tournament_responses`, the Declined guard). For any other viewer the `pending` key is **absent** from the JSON (v1.1 wording: the route omits null fields, exactly as `declined` is today). Clients hide a missing or null section. Supersedes game-view-redesign v1.1/v1.2 for tournament Pending (D-2).
 - **Public tournament (TR-03):** no Pending and no Declined section is returned or shown.
 
 **AD-3: Invitation actions (TR-04, TR-07).**
@@ -125,6 +127,14 @@ Decision: (a) `tr-p1-repro` reproduces the organizer failure on the deployed bui
 
 **AD-9: Close the tournament view (TR-05, TR-16).** The individual tournament view has an **X** in the header on web and mobile. It returns to the list the person came from with scope (Mine, Public, All), Active or All, sport filter and scroll position kept, without a reload that resets them. With no list behind it (opened from a push, a share link or a deep link) it goes to the Tournaments list at its defaults. The X does not replace the system back gesture.
 
+**AD-10: Group-audience invitation push (TR-17).** Finding (architect review of `tr-backend-web` Stage A, 2026-10-25): the `tournament_invited` push is enqueued only for a person with an invitation row (`invitations.py` -> `notify_invited`). A tournament open to chosen groups stores audience groups and creates no invitation rows, so group members never received any push, and AD-3's buttons reached no one. This is a gap in v1.0, not an implementation defect.
+- **Recipients:** the live members of an audience group, minus the organizer, minus anyone who already has an invitation row for the tournament (any status), minus anyone registered or with a current decline. Computed at enqueue time (v1.1 wording: the recipient ids are stored in the outbox row, so the list is fixed when the row is written).
+- **When:** a lifecycle v2 tournament has no draft or publish step: `create_tournament_wizard` inserts it as `registration_open` and writes the audience groups in the same transaction, so the push is enqueued there (same transaction). Later, and, **[A-10]**, when an organizer adds a group through `_replace_audience_groups` (the PATCH that changes `group_ids`), only the members of the newly added groups (new set minus old set) are notified. Removing a group sends nothing. A cancelled, closed or otherwise terminal tournament sends nothing.
+- **Message and buttons:** the existing `tournament_invited` type, label and URL, with the AD-3 buttons and `register_mode` rules unchanged. Notification preferences and quiet hours apply as they do today.
+- **Idempotency and chunking (v1.1 wording, decided after the `tr-group-push` Blocked Report):** the outbox row carries its recipients in `snapshotted_user_ids`, capped at 3072 bytes (about 63 ids). Recipients are therefore written in **chunks of at most 50 ids**, sorted by user id so a replay produces the same chunks, one `push_fanout` row per chunk, in the same transaction as the create or the group edit. Idempotency key `tournament_invited_group:{tournament_id.hex}:{group_id.hex}:{chunk_index}` (UUIDs as 32 hex digits: the dashed form is 99 characters at a one-digit index and 100 at two, and `job_outbox.idempotency_key` is VARCHAR(100)). No migration. A person in two groups, or already pushed through an invitation row, is notified once (the recipient list is de-duplicated and the invitation-row exclusion above applies). No migration.
+- **Scale:** the fan-out reuses the existing outbox and worker. No group size cap exists today; none is added here. The enqueue logs the recipient count per event (counts only, no ids). Gate to revisit: if any event enqueues more than 20 chunks (1,000 recipients), the owner decides on a group size cap or a send-time lookup (which needs a migration) before more is built.
+- **Privacy:** no new personal data. Group members already see the tournament (view rule).
+
 ---
 
 ## 4. Component and integration design
@@ -132,7 +142,7 @@ Decision: (a) `tr-p1-repro` reproduces the organizer failure on the deployed bui
 | Component | Change |
 |---|---|
 | `tournaments/service.py`, `registration_v2.py`, `router.py` | Omitted `user_id` means caller; stable `code`; fee ack check; accept-and-register in one transaction; fee fields on create, edit, read |
-| `tournaments/decline_service.py` | Derived Pending for audience groups; `pending` null for non-privileged; none for public |
+| `tournaments/decline_service.py` | Derived Pending for audience groups; `pending` absent for non-privileged; none for public |
 | `tournaments/policies.py`, `media_router.py`, `tabs.py` | Upload policy (organizer, committee); media tab always open |
 | `notifications/` | `register_mode`, category selection, `push_actions_version` 2, `action_state` `registered` |
 | `home/` | Config keys via admin; no schema change |
@@ -153,7 +163,7 @@ Decision: (a) `tr-p1-repro` reproduces the organizer failure on the deployed bui
 | Pending for a group tournament | audience groups and `group_memberships`, derived | a stored list |
 | Whether a push registers directly | server `register_mode` | a client guess |
 
-Contract additions (all additive): `registration_fee_cents`, `registration_fee_currency` on the tournament; `tournament_fee_enabled`, `tournament_fee_currency`, `tournament_fee_max_cents` on `GET /config/client`; `accepted_fee_cents` on the registration request; `code` on registration errors; `pending` may be `null`; `register_mode` in push data; `action_state` `registered`.
+Contract additions (all additive): `registration_fee_cents`, `registration_fee_currency` on the tournament; `tournament_fee_enabled`, `tournament_fee_currency`, `tournament_fee_max_cents` on `GET /config/client`; `accepted_fee_cents` on the registration request; `code` on registration errors; `pending` may be absent; `register_mode` in push data; `action_state` `registered`.
 
 ---
 
@@ -161,7 +171,7 @@ Contract additions (all additive): `registration_fee_cents`, `registration_fee_c
 
 | Resource | Allowed | Denied |
 |---|---|---|
-| Pending and Declined sections | organizer, active committee | everyone else: `null` |
+| Pending and Declined sections | organizer, active committee | everyone else: key absent |
 | Media upload | organizer, active committee | participants and viewers: 403 |
 | Media remove | uploader, active committee | others |
 | Fee confirmation | the registrant for their own registration | forged or missing ack: 409 |
@@ -192,7 +202,7 @@ Risk: registration and fee **High**; Pending visibility **High** (disclosure); m
 | TR-T2 | Individual self-registration with no `user_id` registers the caller; a different `user_id` is 403. |
 | TR-T3 | Each refusal returns its stable `code`. |
 | TR-T4 | Group tournament: members of the audience groups with no answer appear in `pending`; registered, declined and accepted people appear once in their own section; a member added later appears; a member who left does not. |
-| TR-T5 | `pending` is `null` for a participant and a stranger; present for organizer and committee. A public tournament returns no Pending or Declined. |
+| TR-T5 | `pending` is absent (or null) for a participant and a stranger; present for organizer and committee. A public tournament returns no Pending or Declined. |
 | TR-T6 | Fee greater than 0: registration without `accepted_fee_cents` is 409 `FEE_ACK_REQUIRED`; with a stale value 409 `FEE_CHANGED` carrying the current fee; with the right value 200 and `fee_cents_at_registration` set. |
 | TR-T7 | Fee null or 0: registration with or without the field succeeds. Flag off: stored fee ignored, no ack needed. |
 | TR-T8 | Fee over `max_cents`, negative or fractional: 422. Edit after registration closes: refused. |
@@ -281,6 +291,7 @@ Mobile and web: confirmation sheet and result pop-up for each `code`, X returns 
 | `tr-p1-repro` | Reproduce the organizer failure (E1-E4), confirm audience-group table, list payload fields, web Home block; a report only, no code | nothing |
 | `tr-backend-web` | AD-1 server and web, AD-2, AD-4, AD-5, AD-6, AD-7, AD-8, AD-9 on web; one migration (human runs it, `alembic upgrade +1`) | `tr-p1-repro` |
 | `tr-mobile` | Same on mobile plus AD-3 push handler | `tr-backend-web` deployed |
+| `tr-group-push` | AD-10 backend only; no migration; no client change (the clients already handle the buttons) | `tr-backend-web` merged (PR #148) |
 | `tr-enable` | Owner switches `meetup.tournament.fee.enabled` on in the admin console | app release live |
 
 Two separate briefs (one per repo), in chat only, not committed. Each phase ends with an implementation report written back here.
@@ -291,18 +302,23 @@ Two separate briefs (one per repo), in chat only, not committed. Each phase ends
 
 | ID | Item | Severity | Status |
 |---|---|---|---|
-| OI-1 | Root cause of the organizer registration failure (E1-E4) | 🔴 CRITICAL | Open; gate `tr-p1-repro` |
-| OI-2 | Re-verify the audience-groups table and columns before the Pending query | 🟡 MEDIUM | Open; Phase 1 |
+| OI-1 | Root cause of the organizer registration failure (E1-E4) | 🔴 CRITICAL | E1-E4 could not be reproduced against the deployed build. E1 (omitted `user_id`) and E2/E3 (stable codes, mapped messages) are fixed in code by `tr-backend-web`; closes only when tester test TR-T1 passes and the owner registers as organizer after deploy |
+| OI-2 | Re-verify the audience-groups table and columns before the Pending query | 🟡 MEDIUM | Closed: names checked against the models in the architect review; first execution is the tester's |
 | OI-3 | What `GET /tournaments` already returns for venue address, coordinates and group names | 🟡 MEDIUM | Open; Phase 1 |
 | OI-4 | Web Home Book a court block: one shared component or a copy | 🟡 MEDIUM | Open; Phase 1 |
 | OI-5 | App-store position on showing a fee for an event arranged outside the app, checked at submission | 🟠 HIGH | Open; before `tr-enable` |
 | OI-6 | Fee editable until registration closes even with registrations made; players keep their snapshot | 🟢 LOW | Assumption **[A]**, approved with this document |
-| OI-7 | Rate limit on `POST /tournaments/{id}/registrations` | 🟡 MEDIUM | Open; Phase 1 |
+| OI-7 | Rate limit on `POST /tournaments/{id}/registrations` | 🟡 MEDIUM | Closed: 30 per minute per user, in `tr-backend-web` |
 | OI-8 | The push-actions client build (`pa-clients-mobile`) must be shipped before the Register category | 🟠 HIGH | Open; sequencing |
 | OI-9 | Existing `via=public` decline rows keep hiding items until the user registers | 🟢 LOW | Accepted |
 | OI-10 | Where the fee field sits in the mobile wizard (the web boards place it in the registration step) | 🟢 LOW | Open; follow the web placement |
 | OI-11 | Public game call to action reads "Register" (owner's word); admin can edit the label | 🟢 LOW | Accepted |
 | OI-12 | The X on a game view for parity with tournaments | 🟢 LOW | Not requested; owner to decide |
+| OI-13 | On a lifecycle v1 tournament the registration route lets a viewer register another `user_id`; v2 refuses with 403. Existed before this change | 🟡 MEDIUM | Deferred, own task. Gate: before any new v1 tournament is created, or at the next security review, whichever is first |
+| OI-14 | A group added after registration has closed still pushes its members (AD-10 excludes terminal states only) | 🟢 LOW | Accepted |
+| OI-15 | The admin console must render the new `string` setting type (fee currency) | 🟡 MEDIUM | Assigned to `tr-backend-web` Stage B (admin client check) |
+| OI-16 | Group-audience push has no live in-app nudge (AD-10 specifies the outbox push only) | 🟢 LOW | Accepted |
+| OI-17 | Committee-added registrations carry no fee snapshot (the committee cannot acknowledge for someone else) | 🟢 LOW | Accepted |
 
 ---
 
@@ -322,5 +338,8 @@ Two separate briefs (one per repo), in chat only, not committed. Each phase ends
 
 | Version | Date | Note |
 |---|---|---|
+| v1.1 wording | 2026-10-25 | After the AD-10 review: `pending` absent (not null) for non-privileged viewers to match the built route; idempotency key written with 32-hex UUIDs (VARCHAR(100) limit); OI-1, OI-2, OI-7 statuses updated; OI-13 to OI-17 recorded. |
+| v1.1 wording | 2026-10-25 | AD-10 corrected after the `tr-group-push` Blocked Report (valid finding): recipients are fixed at enqueue time, not send time; the transition is creation and the group-edit PATCH; chunks of 50 ids per outbox row (about 63 fit in 3072 bytes) with the chunk index in the idempotency key; send-time lookup rejected (needs a migration and moves recipient logic into delivery SQL). |
+| v1.1 | 2026-10-25 | AD-10 and TR-17 added after the Stage A review found that audience-group members never received the tournament invitation push. Default [A-10] recorded. No other section changed. |
 | v1.0 wording | 2026-10-25 | Before the build briefs: AD-4 and section 5 add the three fee fields on `GET /config/client` so clients can read the flag (gap found while writing the mobile brief; no scope change). |
 | v1.0 | 2026-10-25 | Drafted after elicitation of 2026-10-25 (8 items, 7 questions), approved by the owner the same day. Findings recorded while drafting: Pending is invitation-only so audience-group members never appear (AD-2); mobile posts the registration with no body (AD-1 E1); the Book button colour cycles per row (AD-8); Media gating and upload rights are changed from tournament-experience (AD-6). |
