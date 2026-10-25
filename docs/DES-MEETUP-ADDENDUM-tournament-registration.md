@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-REGISTRATION
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-REGISTRATION
-**Version:** v1.2
+**Version:** v1.3
 **Status:** **APPROVED by the owner, 2026-10-25** (instruction in conversation: "write design addendum, mark it approved & upload to gh", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in section 3. Open items are in section 12.
 **v1.1 amendment (AD-10, TR-17):** approved by the owner 2026-10-25 (instruction "give me instructions", after the gap and the proposed fix were put to the owner). Assumption **[A-10]** (a group added later pushes to its new members only) was the stated default and was not contradicted.
 **Owner:** Pratheesh
@@ -133,6 +133,7 @@ Decision: (a) `tr-p1-repro` reproduces the organizer failure on the deployed bui
 - **Message and buttons:** the existing `tournament_invited` type, label and URL, with the AD-3 buttons and `register_mode` rules unchanged. Notification preferences and quiet hours apply as they do today.
 - **Idempotency and chunking (v1.1 wording, decided after the `tr-group-push` Blocked Report):** the outbox row carries its recipients in `snapshotted_user_ids`, capped at 3072 bytes (about 63 ids). Recipients are therefore written in **chunks of at most 50 ids**, sorted by user id so a replay produces the same chunks, one `push_fanout` row per chunk, in the same transaction as the create or the group edit. Idempotency key `tournament_invited_group:{tournament_id.hex}:{group_id.hex}:{chunk_index}` (UUIDs as 32 hex digits: the dashed form is 99 characters at a one-digit index and 100 at two, and `job_outbox.idempotency_key` is VARCHAR(100)). No migration. A person in two groups, or already pushed through an invitation row, is notified once (the recipient list is de-duplicated and the invitation-row exclusion above applies). No migration.
 - **Scale:** the fan-out reuses the existing outbox and worker. No group size cap exists today; none is added here. The enqueue logs the recipient count per event (counts only, no ids). Gate to revisit: if any event enqueues more than 20 chunks (1,000 recipients), the owner decides on a group size cap or a send-time lookup (which needs a migration) before more is built.
+- **Action state (v1.3, found after the Stage A deploy):** `resolve_tournament_invited_action_states` (`tournaments/service.py`) reads only `tournament_invitations`, so a group member with no invitation row resolved to `unavailable`, and the group push showed no actionable state in the notification history. Rule: for a viewer who is a live member of an audience group of the tournament, has no invitation row, is not registered and has no current decline, the state is `pending`, or `closed` when the tournament is not `registration_open`. `registered` and `declined` win as today; an invitation row, when present, decides as today. One batched query for the page, raw SQL, no sibling import. New test TR-T13.
 - **Privacy:** no new personal data. Group members already see the tournament (view rule).
 
 ---
@@ -209,6 +210,7 @@ Risk: registration and fee **High**; Pending visibility **High** (disclosure); m
 | TR-T9 | Registering with a pending invitation sets it `accepted` in the same transaction; failure leaves both unchanged. |
 | TR-T10 | Push: free individual tournament, supported token: `register_mode=direct`, category `invite_tournament_register`; fee greater than 0 or team mode: `open_app`, category `invite_tournament_confirm`; version 1 token: unchanged Accept and Decline. |
 | TR-T11 | Media: participant upload 403; organizer and committee upload 200; tab is open before `starts_at`; read-only when cancelled; remove by uploader and committee only. |
+| TR-T13 | A group member with no invitation row: the history row of the group push reads `pending` (or `closed` once registration is not open), `registered` after registering, `declined` after declining; a non-member of the group reads `unavailable`. |
 | TR-T12 | `fee_cents_at_registration` is visible to the registrant and organizer or committee and to no one else. |
 
 Mobile and web: confirmation sheet and result pop-up for each `code`, X returns with filters and scroll kept, list rows (venue pop-up, group pop-up, "+n"), all Book buttons the same colour, label checks, Register and Decline push actions on a physical Android phone and iPhone.
@@ -345,6 +347,7 @@ Two separate briefs (one per repo), in chat only, not committed. Each phase ends
 
 | Version | Date | Note |
 |---|---|---|
+| v1.3 | 2026-10-25 | Owner asked whether the backend missed anything after the Stage A deploy. Found: AD-10 left `action_state` unresolved for group members without an invitation row (`unavailable`). Added to AD-10 and TR-T13. Task `tr-group-push-2`. Architect miss: the second time AD-10 was specified without tracing the delivered artifact end to end (the notification history state). |
 | v1.2 | 2026-10-25 | Architect review of `tr-mobile` and the backend test run. AD-9 mobile scroll relaxed (AC-10 wins; deviation D-8). OI-18 to OI-23 recorded. Atomic UPDATE in `accept_pending_on_register` accepted (the module forbids row locks). `test_38` change accepted: AD-3 reverses "pending only is 403". Mobile gaps found: in-app invitation banner (AD-3), fee line on the tournament view (AD-4 Display), organizer on the legacy v1 page (TR-06) go to a fix-up task `tr-mobile-2`; the `tr-mobile` M list omitted them (architect brief gap). |
 | v1.1 wording | 2026-10-25 | After the AD-10 review: `pending` absent (not null) for non-privileged viewers to match the built route; idempotency key written with 32-hex UUIDs (VARCHAR(100) limit); OI-1, OI-2, OI-7 statuses updated; OI-13 to OI-17 recorded. |
 | v1.1 wording | 2026-10-25 | AD-10 corrected after the `tr-group-push` Blocked Report (valid finding): recipients are fixed at enqueue time, not send time; the transition is creation and the group-edit PATCH; chunks of 50 ids per outbox row (about 63 fit in 3072 bytes) with the chunk index in the idempotency key; send-time lookup rejected (needs a migration and moves recipient logic into delivery SQL). |
