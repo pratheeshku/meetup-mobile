@@ -98,6 +98,8 @@ export interface PushNotificationPayload {
   entity_id: string;
   title: string;
   body: string;
+  /** Set when a tournament Register button opened the app (`register_mode` "open_app"): the tournament opens on the confirmation sheet. */
+  open_registration?: boolean;
 }
 
 /**

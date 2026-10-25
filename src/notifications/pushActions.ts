@@ -33,6 +33,7 @@ import { perfLog } from '../diagnostics/perfLog';
 import { currentT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/LabelsContext';
 import type { NotificationType, PushNotificationPayload } from '../types/notification';
+import { classifyRegistrationError } from '../utils/registration';
 import { PLAN_CHANNEL_ID } from './channels';
 import { navigateToNotificationTarget, resolveNotificationTarget } from './notificationRouting';
 import { platformNotificationOptions } from './platformOptions';
@@ -56,9 +57,10 @@ export const ACCEPT_ACTION_ID = 'accept';
 export const LEAVE_ACTION_ID = 'leave';
 export const IGNORE_ACTION_ID = 'ignore';
 export const DECLINE_ACTION_ID = 'decline';
+export const REGISTER_ACTION_ID = 'register';
 const DEFAULT_PRESS_ID = 'default';
 
-type PrimaryActionId = typeof ACCEPT_ACTION_ID | typeof LEAVE_ACTION_ID;
+type PrimaryActionId = typeof ACCEPT_ACTION_ID | typeof LEAVE_ACTION_ID | typeof REGISTER_ACTION_ID;
 type SecondaryActionId = typeof DECLINE_ACTION_ID | typeof IGNORE_ACTION_ID;
 
 interface ActionScope {
@@ -97,12 +99,47 @@ export const PUSH_ACTION_SCOPE: Record<PushActionType, ActionScope> = {
   },
 };
 
+/**
+ * Tournament invitation with the Register button (tournament-registration AD-3, D-7). The server decides per notification whether Register
+ * registers at once (`register_mode` "direct": a free, individual-mode tournament) or opens the app on the confirmation sheet ("open_app").
+ * The client never chooses: an absent or unknown mode keeps the Accept and Decline scope above.
+ */
+export const REGISTER_MODE_DIRECT = 'direct';
+export const REGISTER_MODE_OPEN_APP = 'open_app';
+/** iOS categories for the two modes. They come from the server in `aps.category`; the app only registers them. */
+export const IOS_CATEGORY_TOURNAMENT_REGISTER = 'invite_tournament_register';
+export const IOS_CATEGORY_TOURNAMENT_CONFIRM = 'invite_tournament_confirm';
+
+const REGISTER_SCOPE: ActionScope = {
+  primary: REGISTER_ACTION_ID,
+  primaryLabel: 'mob.reg.register',
+  secondary: DECLINE_ACTION_ID,
+  secondaryLabel: 'mob.respond.decline',
+  iosCategory: IOS_CATEGORY_TOURNAMENT_REGISTER,
+};
+
+/** `direct`, `open_app`, or null (absent or unknown). */
+export function registerModeOf(data: Record<string, string>): typeof REGISTER_MODE_DIRECT | typeof REGISTER_MODE_OPEN_APP | null {
+  if (data.notification_type !== 'tournament_invited') {
+    return null;
+  }
+  return data.register_mode === REGISTER_MODE_DIRECT || data.register_mode === REGISTER_MODE_OPEN_APP
+    ? data.register_mode
+    : null;
+}
+
+/** The buttons of one notification: Register + Decline for a tournament invitation with a `register_mode`, else the type's scope. */
+function scopeFor(type: PushActionType, data: Record<string, string>): ActionScope {
+  return registerModeOf(data) ? REGISTER_SCOPE : PUSH_ACTION_SCOPE[type];
+}
+
 export function isPushActionType(value: unknown): value is PushActionType {
   return typeof value === 'string' && (PUSH_ACTION_TYPES as readonly string[]).includes(value);
 }
 
 const KNOWN_PRESS_IDS: readonly string[] = [
   ACCEPT_ACTION_ID,
+  REGISTER_ACTION_ID,
   LEAVE_ACTION_ID,
   IGNORE_ACTION_ID,
   DECLINE_ACTION_ID,
@@ -144,12 +181,12 @@ const inFlight = new Set<string>();
  * the press handler can read `notification_type`, `entity_id` and `delivery_id`.
  */
 export async function displayPushActionNotification(data: Record<string, string>): Promise<void> {
-  const scope = isPushActionType(data.notification_type)
-    ? PUSH_ACTION_SCOPE[data.notification_type]
-    : null;
+  const scope = isPushActionType(data.notification_type) ? scopeFor(data.notification_type, data) : null;
   if (!scope) {
     return;
   }
+  // "open_app": the Register button opens the app on the confirmation sheet; every other button stays in the background.
+  const opensApp = registerModeOf(data) === REGISTER_MODE_OPEN_APP;
   const id = data.tag || data.notification_id || undefined;
 
   await notifee.displayNotification({
@@ -165,7 +202,10 @@ export async function displayPushActionNotification(data: Record<string, string>
       pressAction: { id: DEFAULT_PRESS_ID },
       // No launchActivity on the buttons: they must not open the app.
       actions: [
-        { title: currentT(scope.primaryLabel), pressAction: { id: scope.primary } },
+        {
+          title: currentT(scope.primaryLabel),
+          pressAction: opensApp ? { id: scope.primary, launchActivity: 'default' } : { id: scope.primary },
+        },
         { title: currentT(scope.secondaryLabel), pressAction: { id: scope.secondary } },
       ],
     },
@@ -174,7 +214,7 @@ export async function displayPushActionNotification(data: Record<string, string>
 
 /**
  * iOS: registers the three categories (`invite_game`, `invite_tournament`,
- * `group_added`). Must run at every app launch. The actions run in the
+ * `group_added`) and the two tournament Register categories. Must run at every app launch. The actions run in the
  * background; Accept and Leave group require authentication while
  * `IOS_ACTIONS_REQUIRE_AUTH` is true. No-op on Android.
  */
@@ -201,6 +241,28 @@ export async function registerPushActionCategories(): Promise<void> {
       ],
     };
   });
+  // Tournament invitation categories chosen by the server per notification (AD-3, D-7). Register in "confirm" opens the app.
+  categories.push(
+    {
+      id: IOS_CATEGORY_TOURNAMENT_REGISTER,
+      actions: [
+        {
+          id: REGISTER_ACTION_ID,
+          title: currentT('mob.reg.register'),
+          foreground: false,
+          authenticationRequired: IOS_ACTIONS_REQUIRE_AUTH,
+        },
+        { id: DECLINE_ACTION_ID, title: currentT('mob.respond.decline'), foreground: false },
+      ],
+    },
+    {
+      id: IOS_CATEGORY_TOURNAMENT_CONFIRM,
+      actions: [
+        { id: REGISTER_ACTION_ID, title: currentT('mob.reg.register'), foreground: true },
+        { id: DECLINE_ACTION_ID, title: currentT('mob.respond.decline'), foreground: false },
+      ],
+    },
+  );
   await notifee.setNotificationCategories(categories);
 }
 
@@ -277,6 +339,29 @@ async function acceptTournament(tournamentId: string, ctx: CallContext): Promise
       return currentT('mob.push_action_result.tournament_unavailable');
     }
     return currentT('mob.push_action_result.generic');
+  }
+}
+
+/**
+ * `POST /tournaments/{id}/registrations` with no body (direct mode is a free tournament) → result text. One attempt, no retry. A fee set after
+ * the invitation went out answers FEE_ACK_REQUIRED or FEE_CHANGED: the text then asks to open the app. The raw server detail is never shown.
+ */
+async function registerTournamentDirect(tournamentId: string, ctx: CallContext): Promise<string> {
+  try {
+    await apiClient.post(`/tournaments/${tournamentId}/registrations`, undefined, ctx);
+    return currentT('mob.reg.push.registered_free');
+  } catch (error) {
+    if (statusOf(error) === 404) {
+      return currentT('mob.push_action_result.tournament_unavailable');
+    }
+    const failure = classifyRegistrationError(error);
+    if (failure.code === 'ALREADY_REGISTERED') {
+      return currentT('mob.reg.push.already_registered');
+    }
+    if (failure.code === 'FEE_ACK_REQUIRED' || failure.code === 'FEE_CHANGED') {
+      return currentT('mob.reg.push.open_app');
+    }
+    return currentT(failure.labelKey);
   }
 }
 
@@ -412,6 +497,7 @@ async function runPrimaryAction(
   type: PushActionType,
   notificationId: string,
   entityId: string,
+  registered = false,
 ): Promise<void> {
   const text = await withCorrelationId(async correlationId => {
     try {
@@ -421,7 +507,7 @@ async function runPrimaryAction(
         return await acceptGame(entityId, ctx);
       }
       if (type === 'tournament_invited') {
-        return await acceptTournament(entityId, ctx);
+        return registered ? await registerTournamentDirect(entityId, ctx) : await acceptTournament(entityId, ctx);
       }
       return await leaveGroup(entityId, ctx);
     } catch {
@@ -472,7 +558,7 @@ export async function handlePushActionEvent(event: Event): Promise<void> {
     return;
   }
   const actionType = data.notification_type;
-  const scope = PUSH_ACTION_SCOPE[actionType];
+  const scope = scopeFor(actionType, data);
 
   if (type === EventType.PRESS) {
     navigateToNotificationTarget(resolveNotificationTarget(actionType, data.entity_id ?? ''));
@@ -504,6 +590,13 @@ export async function handlePushActionEvent(event: Event): Promise<void> {
     return;
   }
 
+  // Register in "open_app" mode (fee above 0 or team mode): clear the entry and open the app on the confirmation sheet.
+  if (actionId === REGISTER_ACTION_ID && registerModeOf(data) === REGISTER_MODE_OPEN_APP) {
+    await notifee.cancelNotification(notificationId).catch(() => undefined);
+    navigateToNotificationTarget(resolveNotificationTarget(actionType, data.entity_id ?? '', { openRegistration: true }));
+    return;
+  }
+
   inFlight.add(notificationId);
   try {
     if (actionId === IGNORE_ACTION_ID) {
@@ -511,7 +604,7 @@ export async function handlePushActionEvent(event: Event): Promise<void> {
     } else if (actionId === DECLINE_ACTION_ID && data.entity_id) {
       await runDeclineAction(actionType, notificationId, data.entity_id);
     } else if (data.entity_id) {
-      await runPrimaryAction(actionType, notificationId, data.entity_id);
+      await runPrimaryAction(actionType, notificationId, data.entity_id, actionId === REGISTER_ACTION_ID);
     } else {
       await showResult(notificationId, actionType, '', currentT('mob.push_action_result.generic'));
     }
@@ -531,10 +624,13 @@ export function registerPushActionForegroundHandler(): () => void {
  */
 export async function getInitialPushActionNotification(): Promise<PushNotificationPayload | null> {
   const initial = await notifee.getInitialNotification();
-  if (!initial || initial.pressAction?.id !== DEFAULT_PRESS_ID) {
+  const pressId = initial?.pressAction?.id;
+  const data = dataOf(initial?.notification);
+  // The Register button of an "open_app" notification launches the app (Android `launchActivity`, iOS foreground action): it lands on the sheet.
+  const opensRegistration = pressId === REGISTER_ACTION_ID && registerModeOf(data) === REGISTER_MODE_OPEN_APP;
+  if (!initial || (pressId !== DEFAULT_PRESS_ID && !opensRegistration)) {
     return null;
   }
-  const data = dataOf(initial.notification);
   if (!isPushActionType(data.notification_type)) {
     return null;
   }
@@ -543,5 +639,6 @@ export async function getInitialPushActionNotification(): Promise<PushNotificati
     entity_id: data.entity_id ?? '',
     title: '',
     body: '',
+    ...(opensRegistration ? { open_registration: true } : {}),
   };
 }

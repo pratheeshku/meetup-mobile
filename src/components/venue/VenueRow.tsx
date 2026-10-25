@@ -51,6 +51,8 @@ interface VenueRowProps {
   eventId?: string;
   tournamentId?: string;
   isOrganiser?: boolean;
+  /** List rows (tournament-registration AD-7): the full address shows under the venue name. */
+  showAddress?: boolean;
 }
 
 const ICON_BOX = 32;
@@ -67,6 +69,7 @@ export default function VenueRow({
   eventId,
   tournamentId,
   isOrganiser = false,
+  showAddress = false,
 }: VenueRowProps): React.JSX.Element {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -111,9 +114,20 @@ export default function VenueRow({
         <View style={styles.pinBox}>
           <PinIcon size={18} />
         </View>
-        <Text style={styles.name} numberOfLines={2}>
-          {name}
-        </Text>
+        {showAddress && address ? (
+          <View style={styles.nameColumn}>
+            <Text style={styles.nameInColumn} numberOfLines={1}>
+              {name}
+            </Text>
+            <Text style={styles.address} numberOfLines={2} testID="venue-row-address">
+              {address}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.name} numberOfLines={2}>
+            {name}
+          </Text>
+        )}
         <ChevronRightIcon size={18} color={colors.textMuted} />
       </Pressable>
 
@@ -223,6 +237,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: spacing.sm,
   },
+  nameColumn: { flex: 1, marginRight: spacing.sm },
+  nameInColumn: { ...typography.bodyBold, color: colors.primary },
+  address: { ...typography.caption, color: colors.textSecondary },
   backdrop: {
     flex: 1,
     backgroundColor: colors.scrim,

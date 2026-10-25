@@ -179,4 +179,25 @@ describe('ResponsesSection (game-view-redesign GV-4, GV-P1)', () => {
     expect(sectionOrder(root)).toEqual(['accepted', 'pending']);
     expect(texts(root)).not.toContain('Declined');
   });
+  it('tournament-registration AD-2: an absent `pending` (not the organizer or committee, or a public tournament) hides the section and keeps Accepted', () => {
+    const noPending = { accepted: game.accepted };
+    const root = render(<ResponsesSection responses={noPending as ResponsesResponse} organizerId="u-org" />);
+    expect(sectionOrder(root)).toEqual(['accepted']);
+    expect(texts(root)).not.toContain('Pending');
+    expect(texts(root)).not.toContain('Declined');
+  });
+
+  it('a null `pending` hides the section as well', () => {
+    const nullPending = { accepted: game.accepted, pending: null };
+    const root = render(<ResponsesSection responses={nullPending as unknown as ResponsesResponse} organizerId="u-org" />);
+    expect(sectionOrder(root)).toEqual(['accepted']);
+  });
+
+  it('a tournament listing without `pending` shows the registered groups and no Pending group, and derives nothing', () => {
+    const noPending = { accepted: game.accepted, declined: game.declined };
+    const root = render(
+      <ResponsesSection responses={noPending as ResponsesResponse} organizerId="u-org" entity="tournament" registrations={[]} />,
+    );
+    expect(sectionOrder(root)).not.toContain('pending');
+  });
 });

@@ -50,7 +50,6 @@ import {
   getTournamentResponses,
   getTournamentScoringState,
   putTournamentClosure,
-  registerForTournament,
   respondToTournamentInvitation,
   withdrawFromTournament,
 } from '../api/tournaments';
@@ -92,6 +91,8 @@ import { useCommitteeInvitationResponse } from '../hooks/useCommitteeInvitationR
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
+import { tournamentCloseButton } from '../components/tournament/TournamentCloseButton';
+import { registrationTargetFor, useTournamentRegistration } from '../hooks/useTournamentRegistration';
 import { committeeAnswerOutcome, type CommitteeAnswerState } from '../utils/committeeInvitation';
 import type { LabelKey } from '../labels/fallbackLabels';
 import { isActiveRegistration } from '../utils/responseGroups';
@@ -410,36 +411,58 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     />
   ) : null;
 
-  const handleRegister = async (): Promise<void> => {
-    setRegisterError(null);
-    setIsRegistering(true);
-    try {
-      await withCorrelationId(async correlationId => {
-        await registerForTournament(tournamentId, { correlationId });
-        const [tournamentData, registrationsData] = await Promise.all([
-          getTournament(tournamentId, { correlationId }),
-          getRegistrations(tournamentId, { correlationId }),
-        ]);
-        setTournament(tournamentData);
-        setRegistrations(registrationsData);
-      });
-    } catch (e: any) {
-      if (isNotFoundError(e)) {
-        unavailable.onNotFound();
-      } else if (
-        e?.response?.status === 409 &&
-        (e?.response?.data?.code === 'game_ended' ||
-          e?.response?.data?.code === 'tournament_ended' ||
-          e?.response?.data?.detail === 'This game has ended and can no longer be changed')
-      ) {
-        setRegisterError(t('mob.closure.game_ended'));
-      } else {
-        setRegisterError(t('mob.tournament.register_error'));
-      }
-    } finally {
-      setIsRegistering(false);
+  // Register opens the confirmation sheet (AD-5); Confirm posts with the fee the person saw, the result pop-up reports the outcome.
+  const registrationFlow = useTournamentRegistration({
+    onRegistered: async correlationId => {
+      const [tournamentData, registrationsData] = await Promise.all([
+        getTournament(tournamentId, { correlationId }),
+        getRegistrations(tournamentId, { correlationId }),
+      ]);
+      setTournament(tournamentData);
+      setRegistrations(registrationsData);
+    },
+    onNotFound: unavailable.onNotFound,
+    onOpenSkillLevels: () => {
+      (navigation.getParent() as any)?.navigate('Profile', { screen: 'EditSkillLevels' });
+    },
+  });
+  const startRegistration = registrationFlow.start;
+
+  const handleRegister = (): void => {
+    if (!tournament) {
+      return;
     }
+    setRegisterError(null);
+    startRegistration(registrationTargetFor(tournament));
   };
+
+  // The X (AD-9): back to the list the person came from, which keeps its scope, Active/All and sport filter (the list screen stays mounted
+  // under this one). With no list behind it (push, share link, deep link) it opens Tournaments at its defaults.
+  const closeToList = useCallback((): void => {
+    const state = navigation.getState?.();
+    const previous = state ? state.routes[state.index - 1] : undefined;
+    if (previous?.name === 'TournamentsList' && navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('TournamentsList', { segment: 'tournaments', scope: 'mine', entryKey: Date.now() });
+    }
+  }, [navigation]);
+  useEffect(() => {
+    navigation.setOptions?.({ headerRight: tournamentCloseButton(closeToList) });
+  }, [navigation, closeToList]);
+
+  // A tournament invitation push whose Register needs the app (fee above 0 or team mode) lands on the confirmation sheet, once.
+  const openRegistration = route.params?.openRegistration === true;
+  const handleRegisterRef = useRef(handleRegister);
+  handleRegisterRef.current = handleRegister;
+  const openedRegistration = useRef(false);
+  useEffect(() => {
+    if (openRegistration && tournament && !openedRegistration.current) {
+      openedRegistration.current = true;
+      navigation.setParams({ openRegistration: undefined });
+      handleRegisterRef.current();
+    }
+  }, [openRegistration, tournament, navigation]);
 
   const handleWithdraw = async (): Promise<void> => {
     setWithdrawError(null);
@@ -751,6 +774,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         banners={
           <>
             {committeeCard}
+            {registrationFlow.element}
             <TournamentInvitationBanner
               tournamentId={tournament.id}
               status={tournament.my_invitation_status}
@@ -911,6 +935,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         />
       </View>
 
+      {registrationFlow.element}
       {registerError ? <Text style={styles.errorText}>{registerError}</Text> : null}
       {withdrawError ? <Text style={styles.errorText}>{withdrawError}</Text> : null}
 

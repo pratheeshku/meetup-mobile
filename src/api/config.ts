@@ -10,7 +10,19 @@ export interface GameLimits {
 export interface ClientConfig {
   google_maps_api_key: string | null;
   venue_catalogue_enabled: boolean;
+  /** tournament-registration AD-4: the fee control is hidden while this is false. */
+  tournament_fee_enabled: boolean;
+  tournament_fee_currency: string | null;
+  tournament_fee_max_cents: number | null;
 }
+
+const CLIENT_CONFIG_DEFAULTS: ClientConfig = {
+  google_maps_api_key: null,
+  venue_catalogue_enabled: false,
+  tournament_fee_enabled: false,
+  tournament_fee_currency: null,
+  tournament_fee_max_cents: null,
+};
 
 export async function getGameLimits(): Promise<GameLimits> {
   try {
@@ -27,8 +39,15 @@ export async function getClientConfig(): Promise<ClientConfig> {
     return {
       google_maps_api_key: data?.google_maps_api_key ?? null,
       venue_catalogue_enabled: Boolean(data?.venue_catalogue_enabled),
+      tournament_fee_enabled: data?.tournament_fee_enabled === true,
+      tournament_fee_currency:
+        typeof data?.tournament_fee_currency === 'string' && data.tournament_fee_currency ? data.tournament_fee_currency : null,
+      tournament_fee_max_cents:
+        typeof data?.tournament_fee_max_cents === 'number' && Number.isFinite(data.tournament_fee_max_cents)
+          ? data.tournament_fee_max_cents
+          : null,
     };
   } catch {
-    return { google_maps_api_key: null, venue_catalogue_enabled: false };
+    return { ...CLIENT_CONFIG_DEFAULTS };
   }
 }

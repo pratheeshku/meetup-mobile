@@ -30,6 +30,8 @@ import {
 import { getRolePillColor, ROLE_BADGE_LABEL_KEY } from '../GroupCard';
 import LifecycleStatusChip, { getLifecycleStatusText } from '../LifecycleStatusChip';
 import UserAvatar from '../UserAvatar';
+import { ListInviteTypeRow } from '../invite/InviteTypeRow';
+import VenueRow from '../venue/VenueRow';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
@@ -482,12 +484,21 @@ export function UnifiedTournamentCard({
               {dateFormatted}
             </Text>
           </View>
-          <View style={styles.detailRow}>
-            <MapPinIcon size={16} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {venue}
-            </Text>
-          </View>
+          <VenueRow
+            snapshot={tournament.venue_snapshot}
+            fallbackText={venue}
+            venueName={tournament.venue_name}
+            venueAddress={tournament.venue_address}
+            venueLat={tournament.venue_lat}
+            venueLng={tournament.venue_lng}
+            venuePlaceId={tournament.venue_place_id}
+            showAddress
+          />
+          <ListInviteTypeRow
+            visibility={tournament.visibility}
+            groups={(tournament.audience_groups ?? []).map(group => ({ key: group.id, name: group.name }))}
+            menuContext={{ type: 'tournament', id: tournament.id }}
+          />
           <View style={styles.detailRow}>
             <PeopleGreenIcon size={16} />
             <Text style={styles.metaText} numberOfLines={1}>

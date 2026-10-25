@@ -105,6 +105,8 @@ export interface TournamentTabState {
   unlocks?: TabUnlockCode | string;
   /** Approvals only: requests this viewer can decide. */
   badge?: number;
+  /** Media only (tournament-registration AD-6): `true` on a cancelled or dissolved tournament. The items show, the upload does not. */
+  read_only?: boolean;
 }
 
 /** `approvals` is present only for the organizer and active committee members (the server decides). */

@@ -605,6 +605,45 @@ describe('Results and Close tournament (TV2MobDoneResults, TV2MobClose)', () => 
   });
 });
 
+describe('Media upload rights and read-only (tournament-registration AD-6)', () => {
+  const mediaItems = { items: [{ id: 'm1', kind: 'photo', url: 'https://cdn.example/1.jpg', created_at: 'x', uploaded_by: 'Ravi K.', can_remove: false }], total: 1 };
+  const uploadButtons = (root: Instance) => root.findAll(n => n.props.testID === 'media-upload' && typeof n.props.onPress === 'function');
+
+  it('a registered participant sees the photos but no upload control', async () => {
+    reset({ media: mediaItems });
+    const root = await mount();
+    await press(root, 'tournament-tab-media');
+    expect(byId(root, 'media-m1')).toHaveLength(1);
+    expect(uploadButtons(root)).toHaveLength(0);
+  });
+
+  it('the organizer sees the upload control', async () => {
+    reset({ media: mediaItems, tournament: { organizer_id: 'u-me' } });
+    const root = await mount();
+    await press(root, 'tournament-tab-media');
+    expect(uploadButtons(root)).toHaveLength(1);
+  });
+
+  it('committee members (the server sends tabs.approvals) see the upload control', async () => {
+    reset({ media: mediaItems, state: { tabs: { ...ALL_OPEN, approvals: { state: 'open', badge: 0 } } } });
+    const root = await mount();
+    await press(root, 'tournament-tab-media');
+    expect(uploadButtons(root)).toHaveLength(1);
+  });
+
+  it('a cancelled tournament (media open, read_only) shows the photos and hides the upload control even for the organizer', async () => {
+    reset({
+      media: mediaItems,
+      tournament: { organizer_id: 'u-me' },
+      state: { tabs: { ...ALL_OPEN, media: { state: 'open', read_only: true } } },
+    });
+    const root = await mount();
+    await press(root, 'tournament-tab-media');
+    expect(byId(root, 'media-m1')).toHaveLength(1);
+    expect(uploadButtons(root)).toHaveLength(0);
+  });
+});
+
 describe('Media (TV2MobLiveMedia)', () => {
   const items = { items: [{ id: 'm1', kind: 'photo', url: 'https://cdn.example/1.jpg', created_at: 'x', uploaded_by: 'Ravi K.', can_remove: true }, { id: 'm2', kind: 'photo', url: 'https://cdn.example/2.jpg', created_at: 'x', uploaded_by: 'Alicia Lim', can_remove: false }], total: 2 };
 
@@ -625,7 +664,7 @@ describe('Media (TV2MobLiveMedia)', () => {
 
   it('uploads a picked photo as one multipart field, with no size or count check on the device', async () => {
     const root = await (async () => {
-      reset({ media: items });
+      reset({ media: items, tournament: { organizer_id: 'u-me' } });
       return mount();
     })();
     await press(root, 'tournament-tab-media');
@@ -643,7 +682,7 @@ describe('Media (TV2MobLiveMedia)', () => {
   });
 
   it('shows the server\'s refusal when the limit is reached, and removes a photo after confirming', async () => {
-    reset({ media: items });
+    reset({ media: items, tournament: { organizer_id: 'u-me' } });
     const root = await mount();
     await press(root, 'tournament-tab-media');
     pick.mockResolvedValueOnce({ path: 'file:///p.jpg', filename: 'p.jpg', mime: 'image/jpeg' });

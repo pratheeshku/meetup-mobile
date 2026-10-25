@@ -95,6 +95,8 @@ export interface WizardState {
   hardBlockAt: string;
   /** The hard block follows the closure value until the organizer sets it (AD-20). */
   hardBlockTouched: boolean;
+  /** Optional fee per entry in whole cents, as typed (digits only; empty = none). Used only while the server's fee flag is on. */
+  feeCents: string;
   venue: WizardVenue | null;
   /** Catalogue-off venue text. */
   venueName: string;
@@ -122,6 +124,7 @@ export function initialWizardState(clientRequestId: string, sport = ''): WizardS
     closesAt: '',
     hardBlockAt: '',
     hardBlockTouched: false,
+    feeCents: '',
     venue: null,
     venueName: '',
     venueAddress: '',
@@ -330,15 +333,45 @@ export function validateVenue(state: WizardState, catalogueEnabled: boolean): Wi
   return issues;
 }
 
+/** The fee settings from `GET /config/client`; null while the fee flag is off (the control is hidden and nothing is sent). */
+export interface WizardFeeConfig {
+  currency: string | null;
+  maxCents: number | null;
+}
+
+/** The fee field: empty is fine (free); otherwise whole cents, 0 up to the server's maximum. The server stays the authority. */
+export function validateFee(state: WizardState, fee: WizardFeeConfig | null | undefined): WizardIssue | null {
+  if (!fee || state.feeCents.trim() === '') {
+    return null;
+  }
+  const text = state.feeCents.trim();
+  const value = Number(text);
+  const max = fee.maxCents;
+  if (!/^\d+$/.test(text) || !Number.isSafeInteger(value) || (max !== null && value > max)) {
+    return {
+      key: 'mob.tw.fee_error',
+      params: { max: max ?? '' },
+      field: 'registration_fee_cents',
+      step: WIZARD_STEP.registration,
+    };
+  }
+  return null;
+}
+
 /** Registration dates: closure and hard block present and consistent with the window (first failure, the server's order). */
 export function validateRegistration(
   state: WizardState,
   now: Date,
   formatDayTime: (date: Date) => string,
+  fee?: WizardFeeConfig | null,
 ): WizardIssue[] {
   const closes = toDate(state.closesAt);
   const hard = toDate(state.hardBlockAt);
   const issues: WizardIssue[] = [];
+  const feeIssue = validateFee(state, fee);
+  if (feeIssue) {
+    issues.push(feeIssue);
+  }
   if (!closes) {
     issues.push(requiredIssue('registration_closes_at', WIZARD_STEP.registration));
   }
@@ -384,6 +417,8 @@ export function validateCommittee(state: WizardState, committeeMax: number): Wiz
 }
 
 export interface WizardContext {
+  /** Null while the server's fee flag is off. */
+  fee?: WizardFeeConfig | null;
   limits: WizardLimits;
   catalogueEnabled: boolean;
   now: Date;
@@ -398,7 +433,7 @@ export function validateStep(step: number, state: WizardState, ctx: WizardContex
     case WIZARD_STEP.when:
       return [...validateWindow(state, ctx.now), ...validateVenue(state, ctx.catalogueEnabled)];
     case WIZARD_STEP.registration:
-      return validateRegistration(state, ctx.now, ctx.formatDayTime);
+      return validateRegistration(state, ctx.now, ctx.formatDayTime, ctx.fee);
     case WIZARD_STEP.committee:
       return validateCommittee(state, ctx.limits.committee_max);
     default:
@@ -428,7 +463,7 @@ function isoOf(value: string): string {
 /**
  * The exact `POST /tournaments/v2/create` body. `template_id` and `overrides` are never sent (AD-T3): the server uses
  * the single default format. Throws only when called on an invalid state (a programming error). */
-export function buildCreateBody(state: WizardState, catalogueEnabled: boolean): WizardCreateBody {
+export function buildCreateBody(state: WizardState, catalogueEnabled: boolean, feeEnabled = false): WizardCreateBody {
   const visibility = visibilityOf(state);
   const description = state.description.trim();
   const venue: Partial<WizardCreateBody> = {};
@@ -458,6 +493,7 @@ export function buildCreateBody(state: WizardState, catalogueEnabled: boolean): 
     ends_at: isoOf(state.endsAt),
     registration_closes_at: isoOf(state.closesAt),
     registration_hard_block_at: isoOf(state.hardBlockAt),
+    ...(feeEnabled && /^\d+$/.test(state.feeCents.trim()) ? { registration_fee_cents: Number(state.feeCents.trim()) } : {}),
     ...(visibility === 'group' ? { group_ids: [...state.groupIds] } : {}),
     committee_member_ids: state.committee.map(person => person.id),
   };
@@ -500,7 +536,7 @@ const FAILED: WizardIssue = { key: 'mob.tw.err_create_failed', step: WIZARD_STEP
  */
 export function mapCreateRejection(
   error: unknown,
-  ctx: { committeeMax: number; startLabel: string },
+  ctx: { committeeMax: number; startLabel: string; feeMaxCents?: number | null },
 ): RejectionOutcome {
   const response = (error as ErrorLike | null)?.response;
   const status = response?.status;
@@ -557,6 +593,17 @@ export function mapCreateRejection(
         step: WIZARD_STEP.when,
         issue: { key: 'mob.tw.err_venue_detail_too_long', field: 'venue_detail', step: WIZARD_STEP.when },
       };
+    case 'FEE_INVALID':
+      return {
+        kind: 'step',
+        step: WIZARD_STEP.registration,
+        issue: {
+          key: 'mob.tw.fee_error',
+          params: { max: ctx.feeMaxCents ?? '' },
+          field: 'registration_fee_cents',
+          step: WIZARD_STEP.registration,
+        },
+      };
     case 'VENUE_INVALID':
       return { kind: 'step', step: WIZARD_STEP.when, issue: { key: 'mob.tw.err_venue', field: 'venue', step: WIZARD_STEP.when } };
     default:
@@ -577,7 +624,7 @@ export function firstFocusField(step: number, errors: Record<string, string>): s
   const order: Record<number, string[]> = {
     [WIZARD_STEP.basics]: ['sport', 'title', 'description'],
     [WIZARD_STEP.when]: ['starts_at', 'ends_at', 'venue', 'venue_detail'],
-    [WIZARD_STEP.registration]: ['registration_closes_at', 'registration_hard_block_at'],
+    [WIZARD_STEP.registration]: ['registration_closes_at', 'registration_hard_block_at', 'registration_fee_cents'],
   };
   const first: Record<number, string> = {
     [WIZARD_STEP.basics]: 'title',

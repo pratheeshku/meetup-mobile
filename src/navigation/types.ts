@@ -79,7 +79,8 @@ export type GroupsStackParamList = {
  */
 export type TournamentsStackParamList = {
   TournamentsList: { refreshKey?: number; scope?: GamesScope; entryKey?: number; segment?: 'games' | 'tournaments' } | undefined;
-  TournamentDetail: { tournamentId: string };
+  /** `openRegistration`: opened from a tournament invitation push whose Register button needs the app (fee or team mode). */
+  TournamentDetail: { tournamentId: string; openRegistration?: boolean };
   /** Standings, results and bracket (match-scoring v1.2 read views). */
   TournamentScoring: { tournamentId: string };
 };

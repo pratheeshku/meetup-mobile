@@ -1361,7 +1361,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           photoUrl: person.photo_url ?? null,
           statusLabel: t('mob.respond.via.joined'),
         })),
-        ...responses.pending.items.map(person => ({
+        ...(responses.pending?.items ?? []).map(person => ({
           id: person.user_id ?? person.email ?? person.display_name,
           displayName: person.display_name || person.email || '',
           nickname: null,

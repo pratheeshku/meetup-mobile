@@ -453,7 +453,9 @@ export default function RootNavigator(): React.JSX.Element {
     // routes, which don't exist while `AuthStack` is mounted.
     if (payload && userRef.current && navigationRef.isReady()) {
       navigateToNotificationTarget(
-        resolveNotificationTarget(payload.notification_type, payload.entity_id),
+        resolveNotificationTarget(payload.notification_type, payload.entity_id, {
+          openRegistration: payload.open_registration === true,
+        }),
       );
     }
   }, []);

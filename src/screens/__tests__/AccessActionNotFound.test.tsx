@@ -354,6 +354,7 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       const root = await mountTournament();
       (registerForTournament as jest.Mock).mockRejectedValueOnce(NOT_FOUND);
       await press(byLabel(root, 'Register'));
+      await press(byLabel(root, 'Confirm'));
       expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
       expect(goneNow()).toBe(true);
     });
@@ -362,6 +363,7 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
       const root = await mountTournament();
       (registerForTournament as jest.Mock).mockRejectedValueOnce({ response: { status: 500 } });
       await press(byLabel(root, 'Register'));
+      await press(byLabel(root, 'Confirm'));
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(false);
     });

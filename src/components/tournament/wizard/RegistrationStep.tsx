@@ -10,9 +10,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useT } from '../../../labels/LabelsContext';
 import { borderWidth, colors, radius, spacing, typography } from '../../../theme/tokens';
 import DateTimePickerField from '../../DateTimePickerField';
+import TextField from '../../TextField';
 import { CheckIcon, CrossIcon } from '../../icons/ActionIcons';
 import { FieldLabel, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
-import { registrationRules, toDate, type RuleState, type WizardState } from '../../../utils/tournamentWizard';
+import { formatMoney } from '../../../utils/money';
+import { registrationRules, toDate, type RuleState, type WizardFeeConfig, type WizardState } from '../../../utils/tournamentWizard';
 
 const RULE_BOX = 22;
 
@@ -34,6 +36,8 @@ export default function RegistrationStep({
   now,
   onClosure,
   onHardBlock,
+  fee,
+  onFee,
   errors,
   focus,
 }: {
@@ -41,6 +45,9 @@ export default function RegistrationStep({
   now: Date;
   onClosure: (value: string) => void;
   onHardBlock: (value: string) => void;
+  /** Null while the server's fee flag is off: the fee field is not shown (tournament-registration AD-4, OI-10). */
+  fee?: WizardFeeConfig | null;
+  onFee?: (value: string) => void;
   errors: Record<string, string>;
   focus?: StepFocus;
 }): React.JSX.Element {
@@ -93,6 +100,30 @@ export default function RegistrationStep({
         />
         {errors.registration_hard_block_at ? (
           <FieldProblem message={errors.registration_hard_block_at} testID="tw-hard-error" />
+        ) : null}
+
+        {fee && onFee ? (
+          <>
+            <FieldLabel>{t('mob.tw.fee_label')}</FieldLabel>
+            <TextField
+              value={state.feeCents}
+              onChangeText={onFee}
+              keyboardType="number-pad"
+              placeholder="0"
+              accessibilityLabel={t('mob.tw.fee_label')}
+              style={errors.registration_fee_cents ? styles.invalidField : undefined}
+              testID="tw-fee"
+            />
+            <Text style={styles.feeHint}>{t('mob.tw.fee_hint')}</Text>
+            {state.feeCents && fee.currency && !errors.registration_fee_cents ? (
+              <Text style={styles.feeHint} testID="tw-fee-preview">
+                {t('mob.tw.fee_preview', { amount: formatMoney(Number(state.feeCents), fee.currency) })}
+              </Text>
+            ) : null}
+            {errors.registration_fee_cents ? (
+              <FieldProblem message={errors.registration_fee_cents} testID="tw-fee-error" />
+            ) : null}
+          </>
         ) : null}
 
         <View style={styles.rules} testID="tw-date-rules">
@@ -168,6 +199,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md - 2,
   },
   readonlyText: { ...typography.body, color: colors.textPrimary },
+  invalidField: { borderColor: colors.error },
+  feeHint: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
   problem: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.xs },
   problemGlyph: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center', marginRight: spacing.xs },
   problemText: { ...typography.caption, fontWeight: '600', color: colors.error, flex: 1 },

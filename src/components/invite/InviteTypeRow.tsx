@@ -43,6 +43,70 @@ interface InviteTypeRowProps {
 
 const ICON_BOX = 32;
 
+/**
+ * Invite-type line of a tournament LIST row (DES-MEETUP-ADDENDUM-tournament-registration AD-7): `Public`, the group name (first name and
+ * "+n" for several), or `Invite only`. A group line opens the same Invited sheet as the detail row, groups only; it fetches nothing on its own
+ * (no per-row requests). Public and Invite only are plain text. Renders nothing when the visibility is unknown.
+ */
+export function ListInviteTypeRow({
+  visibility,
+  groups,
+  menuContext,
+}: {
+  visibility: 'public' | 'group' | 'invite' | undefined;
+  groups: readonly InvitedGroup[];
+  menuContext: UserMenuContext;
+}): React.JSX.Element | null {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  if (!visibility) {
+    return null;
+  }
+  const hasGroups = visibility === 'group' && groups.length > 0;
+  const value =
+    visibility === 'public'
+      ? t('mob.gv.invite_type_public')
+      : hasGroups
+      ? groups.length > 1
+        ? `${groups[0].name} ${t('mob.reg.groups_more', { count: groups.length - 1 })}`
+        : groups[0].name
+      : t('mob.reg.invite_only');
+  const content = (
+    <>
+      <View style={styles.iconBox}>
+        <PeopleIcon size={18} />
+      </View>
+      <Text style={[styles.value, styles.listValue, hasGroups ? null : styles.valuePlain]} numberOfLines={1}>
+        {value}
+      </Text>
+      {hasGroups ? <ChevronRightIcon size={18} color={colors.textMuted} /> : null}
+    </>
+  );
+  if (!hasGroups) {
+    return (
+      <View style={styles.row} testID="list-invite-type">
+        {content}
+      </View>
+    );
+  }
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${t('mob.gv.invite_type')}: ${value}`}
+        onPress={() => setOpen(true)}
+        style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+        testID="list-invite-type"
+      >
+        {content}
+      </Pressable>
+      {open ? (
+        <InvitedSheet visible onClose={() => setOpen(false)} groups={groups} people={null} menuContext={menuContext} />
+      ) : null}
+    </>
+  );
+}
+
 export default function InviteTypeRow({
   isPublic,
   groups,
@@ -160,4 +224,5 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   valuePlain: { color: colors.textPrimary, marginRight: 0 },
+  listValue: { textAlign: 'left' },
 });

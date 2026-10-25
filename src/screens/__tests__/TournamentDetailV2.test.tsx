@@ -227,6 +227,8 @@ describe('Register on the banner', () => {
     const root = await mount({ organizer_id: 'user-me', capacity: 32 });
     expect(texts(pressable(root, 'tournament-register-button'))).toEqual(['Register', '14 spots left']);
     await press(root, 'tournament-register-button');
+    // Register opens the confirmation sheet (tournament-registration AD-5); Confirm sends the request.
+    await press(root, 'registration-confirm');
     const post = mockPost.mock.calls.find(call => call[0] === '/tournaments/t-1/registrations');
     expect(post).toBeDefined();
     expect(post![2].correlationId).toMatch(/^[0-9a-f-]{36}$/);

@@ -4,7 +4,8 @@
  * browser. Create game stays on the centre + of the bottom bar (CreateTabButton), not on Home.
  */
 import React from 'react';
-import { Linking } from 'react-native';
+import { Linking, StyleSheet } from 'react-native';
+import { colors } from '../../theme/tokens';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { getCourtBooking } from '../../api/home';
@@ -87,6 +88,24 @@ describe('Home: Create a game card removed, Book a court added', () => {
     expect(all).toContain('Book badminton and tennis courts.');
     expect(all).toContain('Opens in your browser');
     expect(all.filter(x => x === 'Book')).toHaveLength(2);
+  });
+
+  it('tournament-registration AD-8: every Book button is the call-to-action blue with white text, whatever the row', async () => {
+    (getCourtBooking as jest.Mock).mockResolvedValue([
+      ...PROVIDERS,
+      { id: 'p3', name: 'CourtThree', description: 'Third.', booking_url: 'https://three.example', logo_url: null },
+      { id: 'p4', name: 'CourtFour', description: 'Fourth.', booking_url: 'https://four.example', logo_url: null },
+    ]);
+    const root = await mount();
+    const backgrounds = ['p1', 'p2', 'p3', 'p4'].map(id => {
+      const node = root.findAll(n => n.props.testID === `court-book-${id}` && typeof n.props.onPress === 'function')[0];
+      const style = typeof node.props.style === 'function' ? node.props.style({ pressed: false }) : node.props.style;
+      return StyleSheet.flatten(style).backgroundColor;
+    });
+    expect(new Set(backgrounds).size).toBe(1);
+    expect(backgrounds[0]).toBe(colors.ctaBlue);
+    const labels = block(root)[0].findAll(n => (n.type as unknown) === 'Text' && n.props.children === 'Book');
+    labels.forEach(label => expect(StyleSheet.flatten(label.props.style).color).toBe(colors.white));
   });
 
   it('is hidden when the list is empty, and when the call fails', async () => {

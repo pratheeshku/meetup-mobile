@@ -110,8 +110,11 @@ function buildUserAgent(): string {
  * Push actions capability (DES-MEETUP-ADDENDUM-push-actions AD-3): this build
  * can render and handle action buttons, so the server may send the action
  * types data-only (Android) or with a category (iOS) once its flag is on.
+ *
+ * Version 2 (DES-MEETUP-ADDENDUM-tournament-registration AD-3): this build also knows the tournament Register buttons and the
+ * `register_mode` data key. Without it the server keeps Accept and Decline and the Register categories never apply.
  */
-export const PUSH_ACTIONS_VERSION = 1;
+export const PUSH_ACTIONS_VERSION = 2;
 
 /**
  * `POST /notifications/mobile-subscriptions` — body verified against the

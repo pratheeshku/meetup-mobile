@@ -32,6 +32,7 @@ import type {
   ResponsesResponse,
   TournamentClosurePut,
   TournamentClosureResponse,
+  TournamentAudienceGroup,
   TournamentInvitation,
   TournamentImageKind,
   TournamentImages,
@@ -119,6 +120,16 @@ interface TournamentApiItem {
   registration_hard_block_at?: string | null;
   roster_frozen_at?: string | null;
   format_rules?: TournamentFormatRules | null;
+  /** tournament-registration AD-4: whole cents and currency; both null while the fee flag is off and for a free tournament. */
+  registration_fee_cents?: number | null;
+  registration_fee_currency?: string | null;
+  /** AD-7 list-row fields (additive): venue address and map pin, the audience groups `[{id, name}]` and their ids. */
+  venue_address?: string | null;
+  venue_lat?: number | null;
+  venue_lng?: number | null;
+  venue_place_id?: string | null;
+  groups?: Array<{ id?: unknown; name?: unknown }> | null;
+  group_ids?: string[] | null;
 }
 
 const ruleNumber = (value: unknown): number | null =>
@@ -206,7 +217,29 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     registration_hard_block_at: raw.registration_hard_block_at ?? null,
     roster_frozen_at: raw.roster_frozen_at ?? null,
     format_rules: normaliseFormatRules(raw.format_rules),
+    registration_fee_cents: typeof raw.registration_fee_cents === 'number' ? raw.registration_fee_cents : null,
+    registration_fee_currency:
+      typeof raw.registration_fee_currency === 'string' && raw.registration_fee_currency ? raw.registration_fee_currency : null,
+    venue_address: raw.venue_address?.trim() ? raw.venue_address.trim() : null,
+    venue_lat: typeof raw.venue_lat === 'number' ? raw.venue_lat : null,
+    venue_lng: typeof raw.venue_lng === 'number' ? raw.venue_lng : null,
+    venue_place_id: raw.venue_place_id ?? null,
+    audience_groups: normaliseAudienceGroups(raw.groups),
   };
+}
+
+/** `groups` as sent: `[{id, name}]` in selection order. An entry without a text id and name is dropped. */
+function normaliseAudienceGroups(raw: TournamentApiItem['groups']): TournamentAudienceGroup[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out: TournamentAudienceGroup[] = [];
+  for (const entry of raw) {
+    if (typeof entry?.id === 'string' && entry.id && typeof entry?.name === 'string' && entry.name) {
+      out.push({ id: entry.id, name: entry.name });
+    }
+  }
+  return out;
 }
 
 export async function getTournaments(
@@ -228,16 +261,20 @@ export async function getTournament(id: string, options?: RequestOptions): Promi
 }
 
 /**
- * Verified compatible against the live OpenAPI schema:
- * `TournamentRegistrationRequest` (`{ user_id?, team_id? }`) has no
- * `required` fields, so posting with no body is schema-valid — no fix
- * needed here (the backend presumably infers the registering user from
- * the authenticated session when both are omitted).
+ * `POST /tournaments/{id}/registrations` (tournament-registration AD-1, AD-5). A free tournament posts no body (the server treats an omitted
+ * `user_id` as the caller); a tournament with a fee posts `{ accepted_fee_cents }`, the fee the player saw and confirmed. The server answers 409
+ * `FEE_ACK_REQUIRED` or `FEE_CHANGED` (with the current `registration_fee_cents`) when that is missing or stale.
  */
-export async function registerForTournament(id: string, options?: RequestOptions): Promise<void> {
-  await apiClient.post(`/tournaments/${id}/registrations`, undefined, {
-    correlationId: options?.correlationId,
-  });
+export async function registerForTournament(
+  id: string,
+  options?: RequestOptions & { acceptedFeeCents?: number | null },
+): Promise<void> {
+  const fee = options?.acceptedFeeCents;
+  await apiClient.post(
+    `/tournaments/${id}/registrations`,
+    typeof fee === 'number' ? { accepted_fee_cents: fee } : undefined,
+    { correlationId: options?.correlationId },
+  );
 }
 
 export async function withdrawFromTournament(

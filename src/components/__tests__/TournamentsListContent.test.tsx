@@ -139,7 +139,8 @@ describe('tournament card (matches the game card)', () => {
   it('tapping a card opens that tournament', async () => {
     mockGetTournaments.mockResolvedValue(list(TOURNAMENT));
     const root = await renderAsync(element());
-    const card = root.find(n => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function');
+    // The card is the outermost button; its venue and invite-type lines are buttons of their own (tournament-registration AD-7).
+    const card = root.findAll(n => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function')[0];
     await act(async () => card.props.onPress());
     expect(onOpenTournament).toHaveBeenCalledWith('t-1');
   });

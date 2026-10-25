@@ -231,7 +231,7 @@ describe('registration (R-070)', () => {
       deviceToken: TOKEN,
       platform: 'android',
       userAgent: 'MeetupMobile-Android/34',
-      pushActionsVersion: 1,
+      pushActionsVersion: 2,
       deviceId: 'mock-android-id',
     });
     stop();
