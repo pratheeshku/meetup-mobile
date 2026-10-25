@@ -221,7 +221,7 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
     it('Join (RSVP) 404: goes back, shows the message once', async () => {
       const root = await mountEvent();
       mockPost.mockRejectedValueOnce(NOT_FOUND);
-      await press(byLabel(root, 'Join'));
+      await press(byLabel(root, 'Register'));
       expect(nav.navigation.goBack).toHaveBeenCalledTimes(1);
       expect(goneNow()).toBe(true);
     });
@@ -229,7 +229,7 @@ describe('1. a 404 returned by an action closes the screen with the message (exc
     it('Join with another error keeps today\'s handling: the backend text, screen stays', async () => {
       const root = await mountEvent();
       mockPost.mockRejectedValueOnce(CONFLICT);
-      await press(byLabel(root, 'Join'));
+      await press(byLabel(root, 'Register'));
       expect(texts(root)).toContain('Game is full');
       expect(nav.navigation.goBack).not.toHaveBeenCalled();
       expect(goneNow()).toBe(false);

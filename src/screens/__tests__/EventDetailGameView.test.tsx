@@ -198,10 +198,14 @@ describe('non-organizer view (T7/T8, AD-3 v1.1)', () => {
     expect(byId(root, 'player-avatar')).toHaveLength(2);
   });
 
-  it('keeps the Join / Decline actions below the Players block', async () => {
+  it('keeps the action below the Players block: a public game shows Register alone (TR-04), a group game keeps Join / Decline', async () => {
     const root = await mount({ responses: PLAYER_RESPONSES });
-    expect(pressableLabelled(root, 'Join')).toBeDefined();
-    expect(pressableLabelled(root, 'Decline')).toBeDefined();
+    expect(pressableLabelled(root, 'Register')).toBeDefined();
+    expect(root.findAll(n => n.props.accessibilityLabel === 'Decline' && typeof n.props.onPress === 'function')).toHaveLength(0);
+
+    const group = await mount({ responses: PLAYER_RESPONSES, event: { visibility: 'group', group_ids: ['g-1'], group_names: ['Crew'] } });
+    expect(pressableLabelled(group, 'Join')).toBeDefined();
+    expect(pressableLabelled(group, 'Decline')).toBeDefined();
   });
 });
 

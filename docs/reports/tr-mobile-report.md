@@ -236,3 +236,49 @@ check-labels: OK - 305 files scanned, 1775 default labels checked.
 
 ### Not done
 Nothing outside F1–F3. Still unverified on a device: the push buttons. No screenshots.
+
+---
+
+## tr-mobile-3 (public game: Register alone)
+Design: addendum v1.3 (header checked: "Version: v1.3"); read TR-03, TR-04, AD-3 row "Public game", OI-11. Branch `tr-mobile`, merged `origin/docs/tournament-registration-v1.0-approved` first.
+
+### The change (one file of source: `src/screens/EventDetailScreen.tsx`, non-organiser block)
+- Public game (`event.visibility === 'public'`), not joined: ONE button, label `mob.reg.register`, same handler as Join (`handleRsvp`), same test id `join-button`; no Decline.
+- Public game with `my_declined`: Register alone (the existing recover button, label now `mob.reg.register`; same handler).
+- Group and invite-only games: unchanged (Join + Decline; Accept + Decline). A user who has joined keeps the withdraw button (labelled Decline, as before).
+
+### Tests
+Pinned Join/Decline for a public game, updated: `EventDetailGameView.test.tsx` (public: Register present, Decline absent; a group game keeps Join + Decline), and the `'Join'` labels of public-game events renamed to `'Register'` in `EventDetailScreen.test.tsx`, `EventDetailResponses.test.tsx`, `EventDetailRsvpError.test.tsx`, `EventDetailPlayers.test.tsx`, `AccessActionNotFound.test.tsx`. New: in `EventDetailScreen.test.tsx`, "public game: Register alone" (public not joined: Register, no Join, no Decline; group unchanged; invite-only unchanged; declined public: Register alone).
+
+Run once on those six files: 2 suites failed. `EventDetailGameView` had one failure, the pinned Join/Decline test (updated as above, re-run once: 16 passed). `EventDetailScreen.test.tsx` has **34 failing tests that fail identically on the unchanged base**: I stashed my changes and ran that one file on the base for comparison (34 failed, 22 passed), and the list of failing test names is identical apart from the GameView one. They are organiser, cancel, edit, share and layout tests unrelated to this change (for example "Expected exactly one pressable labelled Cancel Event, found 0"). I did not touch them. My new tests in that file are not in the failing list. This pre-existing failure needs an owner decision; it is outside this task.
+Extra runs, stated: one stash/base run of `EventDetailScreen.test.tsx`, and my first jest call passed the six paths as a single argument so ran nothing ("No tests found"); the real run is the one summarised here.
+
+```
+PASS src/screens/__tests__/EventDetailResponses.test.tsx
+PASS src/screens/__tests__/EventDetailPlayers.test.tsx
+FAIL src/screens/__tests__/EventDetailGameView.test.tsx
+PASS src/screens/__tests__/EventDetailRsvpError.test.tsx
+PASS src/screens/__tests__/AccessActionNotFound.test.tsx
+FAIL src/screens/__tests__/EventDetailScreen.test.tsx
+Test Suites: 2 failed, 4 passed, 6 total
+Tests:       35 failed, 93 passed, 128 total
+--- base (stash) run of EventDetailScreen.test.tsx ---
+Test Suites: 1 failed, 1 total
+Tests:       34 failed, 22 passed, 56 total
+--- GameView re-run ---
+PASS src/screens/__tests__/EventDetailGameView.test.tsx
+Tests:       16 passed, 16 total
+```
+
+### Static checks
+`npx tsc --noEmit` after the source edit and after the last test edit (both exit 0):
+```
+(no output)
+```
+`npm run check:labels` (exit 0):
+```
+> node scripts/check-labels.js
+
+check-labels: OK - 305 files scanned, 1775 default labels checked.
+```
+`npm run lint`: same 31 errors and 1 warning as before; `diff` of the full output against the tr-mobile-2 run shows **no new problem**.

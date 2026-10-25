@@ -33,7 +33,7 @@ async function mount(overrides: Record<string, unknown> = {}): Promise<Instance>
 const has = (root: Instance, label: string): boolean => texts(root).includes(label);
 const join = async (root: Instance): Promise<void> => {
   await act(async () => {
-    pressableLabelled(root, 'Join').props.onPress();
+    pressableLabelled(root, 'Register').props.onPress();
   });
 };
 
@@ -87,12 +87,12 @@ describe('Join errors', () => {
 describe('Join button on cancelled games', () => {
   it('is hidden for a cancelled game', async () => {
     const root = await mount({ status: 'cancelled' });
-    expect(root.findAll(n => n.props.accessibilityLabel === 'Join' && typeof n.props.onPress === 'function')).toHaveLength(0);
+    expect(root.findAll(n => n.props.accessibilityLabel === 'Register' && typeof n.props.onPress === 'function')).toHaveLength(0);
   });
 
   it('is shown for an upcoming game', async () => {
     const root = await mount();
-    expect(pressableLabelled(root, 'Join')).toBeDefined();
+    expect(pressableLabelled(root, 'Register')).toBeDefined();
   });
 
   it('hides Decline for a cancelled game the user had joined', async () => {
@@ -114,7 +114,7 @@ describe('Display status on game detail', () => {
       expect(pillIds(root)).toEqual(['game-status-pill-cancelled']);
       expect(banner(root)).toBe(true);
       expect(has(root, 'This game was cancelled')).toBe(true);
-      expect(labelled(root, 'Join')).toHaveLength(0);
+      expect(labelled(root, 'Register')).toHaveLength(0);
       expect(labelled(root, 'Decline')).toHaveLength(0);
     }
   });
@@ -124,7 +124,7 @@ describe('Display status on game detail', () => {
       const root = await mount({ display_status: 'completed', status: 'completed', user_rsvp_status: rsvp });
       expect(pillIds(root)).toEqual(['game-status-pill-completed']);
       expect(banner(root)).toBe(false);
-      expect(labelled(root, 'Join')).toHaveLength(0);
+      expect(labelled(root, 'Register')).toHaveLength(0);
       expect(labelled(root, 'Decline')).toHaveLength(0);
     }
   });
@@ -133,7 +133,7 @@ describe('Display status on game detail', () => {
     const root = await mount({ display_status: 'active' });
     expect(pillIds(root)).toEqual(['game-status-pill-active']);
     expect(banner(root)).toBe(false);
-    expect(labelled(root, 'Join').length).toBeGreaterThan(0);
+    expect(labelled(root, 'Register').length).toBeGreaterThan(0);
     const joined = await mount({ display_status: 'active', user_rsvp_status: 'going' });
     expect(labelled(joined, 'Decline').length).toBeGreaterThan(0);
   });
@@ -155,6 +155,6 @@ describe('Display status on game detail', () => {
     expect(banner(cancelled)).toBe(true);
     const upcoming = await mount({ status: 'upcoming' });
     expect(pillIds(upcoming)).toEqual(['game-status-pill-active']);
-    expect(labelled(upcoming, 'Join').length).toBeGreaterThan(0);
+    expect(labelled(upcoming, 'Register').length).toBeGreaterThan(0);
   });
 });
