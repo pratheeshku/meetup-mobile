@@ -32,6 +32,7 @@ const ACTION_WIDTH = 96;
 const ACTION_STATE_LABELS: Record<string, LabelKey> = {
   going: 'mob.notif_action_state.going',
   waitlisted: 'mob.notif_action_state.waitlisted',
+  registered: 'mob.notif_action_state.registered',
   accepted: 'mob.notif_action_state.accepted',
   declined: 'mob.notif_action_state.declined',
   left: 'mob.notif_action_state.left',

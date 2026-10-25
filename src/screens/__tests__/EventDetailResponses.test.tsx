@@ -127,9 +127,9 @@ describe('EventDetailScreen decline and response states', () => {
     const content = texts(root).join(' ');
 
     expect(content).toContain('Declined');
-    expect(content).toContain('Join');
+    expect(content).toContain('Register');
 
-    const joinBtn = pressableLabelled(root, 'Join');
+    const joinBtn = pressableLabelled(root, 'Register');
     await act(async () => {
       joinBtn.props.onPress();
     });

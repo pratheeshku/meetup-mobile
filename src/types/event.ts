@@ -263,7 +263,11 @@ export interface ResponseSection {
 
 export interface ResponsesResponse {
   accepted: ResponseSection;
-  pending: ResponseSection;
+  /**
+   * Absent (not null) for anyone except the organizer and committee, and for a public tournament (tournament-registration AD-2, v1.1).
+   * Missing or null means "hide the section"; the app never derives a Pending list itself.
+   */
+  pending?: ResponseSection | null;
   /** Absent for a viewer who may not see who declined (not an error, not loading). */
   declined?: ResponseSection;
 }

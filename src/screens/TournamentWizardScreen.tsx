@@ -60,6 +60,7 @@ import {
   withClosure,
   withHardBlock,
   type WizardContext,
+  type WizardFeeConfig,
   type WizardIssue,
   type WizardState,
 } from '../utils/tournamentWizard';
@@ -81,6 +82,8 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupsError, setGroupsError] = useState(false);
   const [catalogueEnabled, setCatalogueEnabled] = useState(false);
+  // Null while the server's fee flag is off: the fee field is hidden and nothing is sent (tournament-registration AD-4).
+  const [fee, setFee] = useState<WizardFeeConfig | null>(null);
   const [mapsApiKey, setMapsApiKey] = useState<string | null>(null);
 
   const [state, setState] = useState<WizardState>(() => initialWizardState(generateCorrelationId()));
@@ -107,8 +110,8 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   const sport = sports.find(item => item.name === state.sport);
 
   const ctx: WizardContext = useMemo(
-    () => ({ limits, catalogueEnabled, now, formatDayTime }),
-    [limits, catalogueEnabled, now],
+    () => ({ limits, catalogueEnabled, now, formatDayTime, fee }),
+    [limits, catalogueEnabled, now, fee],
   );
 
   // ---- loading ------------------------------------------------------------------------------------------
@@ -136,6 +139,11 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
       .then(config => {
         setMapsApiKey(config.google_maps_api_key);
         setCatalogueEnabled(Boolean(config.venue_catalogue_enabled));
+        setFee(
+          config.tournament_fee_enabled
+            ? { currency: config.tournament_fee_currency, maxCents: config.tournament_fee_max_cents }
+            : null,
+        );
       })
       .catch(() => {});
   }, [loadSports, loadGroups]);
@@ -268,9 +276,9 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   };
 
   // ---- submit -------------------------------------------------------------------------------------------
-  const rejectionContext = (): { committeeMax: number; startLabel: string } => {
+  const rejectionContext = (): { committeeMax: number; startLabel: string; feeMaxCents: number | null } => {
     const starts = toDate(state.startsAt);
-    return { committeeMax: limits.committee_max, startLabel: starts ? formatDayTime(starts) : '' };
+    return { committeeMax: limits.committee_max, startLabel: starts ? formatDayTime(starts) : '', feeMaxCents: fee?.maxCents ?? null };
   };
 
   const submit = async (): Promise<void> => {
@@ -288,7 +296,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
     setSubmitting(true);
     setSubmitIssue(null);
     try {
-      const body = buildCreateBody(state, catalogueEnabled);
+      const body = buildCreateBody(state, catalogueEnabled, fee !== null);
       // One user action, one correlation id: the create and the two uploads share it (AD-T1). An upload that fails
       // never undoes the creation: the default shows and the organizer is told on the Created screen.
       const { result, failedImages } = await withCorrelationId(async correlationId => {
@@ -434,6 +442,11 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
             onHardBlock={value => {
               setServerIssue(null);
               setState(current => withHardBlock(current, value));
+            }}
+            fee={fee}
+            onFee={value => {
+              setServerIssue(null);
+              setState(current => ({ ...current, feeCents: value.replace(/[^0-9]/g, '') }));
             }}
             errors={errors}
             focus={stepFocus}

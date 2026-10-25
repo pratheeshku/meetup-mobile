@@ -146,6 +146,16 @@ describe('which page', () => {
   });
 });
 
+describe('fee on the Overview (tournament-registration AD-4 Display)', () => {
+  it('shows the fee line from cents and currency, "Free registration" for 0, and nothing while null', async () => {
+    const fee = await mount({ registration_fee_cents: 2000, registration_fee_currency: 'SGD' });
+    expect(texts(byId(fee, 'tournament-fee-line')[0]).join('')).toMatch(/^Registration fee: .*20\.00 per player$/);
+    const free = await mount({ registration_fee_cents: 0, registration_fee_currency: 'SGD' });
+    expect(texts(byId(free, 'tournament-fee-line')[0]).join('')).toBe('Free registration');
+    expect(byId(await mount({ registration_fee_cents: null, registration_fee_currency: null }), 'tournament-fee-line')).toHaveLength(0);
+  });
+});
+
 describe('court or hall details (te-a4, AD-T13)', () => {
   it('shows venue_detail after the venue name in the header and in the Overview; hidden when there is none', async () => {
     const root = await mount({ venue_detail: 'Court 2' });
@@ -227,6 +237,8 @@ describe('Register on the banner', () => {
     const root = await mount({ organizer_id: 'user-me', capacity: 32 });
     expect(texts(pressable(root, 'tournament-register-button'))).toEqual(['Register', '14 spots left']);
     await press(root, 'tournament-register-button');
+    // Register opens the confirmation sheet (tournament-registration AD-5); Confirm sends the request.
+    await press(root, 'registration-confirm');
     const post = mockPost.mock.calls.find(call => call[0] === '/tournaments/t-1/registrations');
     expect(post).toBeDefined();
     expect(post![2].correlationId).toMatch(/^[0-9a-f-]{36}$/);

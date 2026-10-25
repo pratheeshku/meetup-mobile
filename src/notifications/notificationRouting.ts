@@ -51,7 +51,7 @@ export type NotificationTarget =
   | {
       tab: 'Tournaments';
       screen: 'TournamentDetail';
-      params: { tournamentId: string };
+      params: { tournamentId: string; openRegistration?: boolean };
     };
 
 /**
@@ -65,6 +65,8 @@ export type NotificationTarget =
 export function resolveNotificationTarget(
   notificationType: NotificationType,
   entityId: string,
+  /** `openRegistration`: a tournament invitation's Register button opened the app; the tournament opens on the confirmation sheet. */
+  options?: { openRegistration?: boolean },
 ): NotificationTarget {
   switch (notificationType) {
     case 'global':
@@ -117,6 +119,13 @@ export function resolveNotificationTarget(
     // `tournament_invited` (addendum AD-4): entity_id = the tournament id; opens
     // Tournament Detail, where the invitation banner (Accept / Decline) shows.
     case 'tournament_invited':
+      return {
+        tab: 'Tournaments',
+        screen: 'TournamentDetail',
+        params: options?.openRegistration
+          ? { tournamentId: entityId, openRegistration: true }
+          : { tournamentId: entityId },
+      };
     case 'tournament_match_scheduled':
     case 'tournament_result_posted':
     case 'tournament_cancelled':

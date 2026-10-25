@@ -319,6 +319,7 @@ export function normaliseTabs(raw: unknown): TournamentTabs | null {
         state: entry.state,
         ...(typeof entry.unlocks === 'string' ? { unlocks: entry.unlocks } : {}),
         ...(typeof entry.badge === 'number' ? { badge: entry.badge } : {}),
+        ...(entry.read_only === true ? { read_only: true } : {}),
       };
     }
   }

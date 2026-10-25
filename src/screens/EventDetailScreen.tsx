@@ -1361,7 +1361,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           photoUrl: person.photo_url ?? null,
           statusLabel: t('mob.respond.via.joined'),
         })),
-        ...responses.pending.items.map(person => ({
+        ...(responses.pending?.items ?? []).map(person => ({
           id: person.user_id ?? person.email ?? person.display_name,
           displayName: person.display_name || person.email || '',
           nickname: null,
@@ -1608,6 +1608,8 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                   label={
                     event.visibility === 'invite_only'
                       ? t('mob.respond.accept')
+                      : event.visibility === 'public'
+                      ? t('mob.reg.register')
                       : t('mob.respond.join')
                   }
                   variant="cta"
@@ -1634,6 +1636,15 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                     testID="decline-button"
                   />
                 </View>
+              ) : event.visibility === 'public' ? (
+                // Public game (tournament-registration TR-04, AD-3): Register alone, no Decline.
+                <Button
+                  label={t('mob.reg.register')}
+                  variant="cta"
+                  onPress={handleRsvp}
+                  loading={isActionLoading}
+                  testID="join-button"
+                />
               ) : (
                 <View style={styles.formButtonsRow}>
                   <Button

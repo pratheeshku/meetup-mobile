@@ -1,10 +1,10 @@
 /**
  * Invitation banner for Tournament Detail (addendum AD-4, v1.2.1). Driven only
  * by the server's `my_invitation_status`:
- *   pending  -> "You're invited" prompt with Accept / Decline
+ *   pending  -> "You're invited" prompt with Register / Decline (tournament-registration AD-3; Register opens the
+ *               confirmation sheet and registers and accepts in one call)
  *   accepted -> "You're invited" confirmation, no buttons
  *   null     -> nothing
- * Accepting makes the invitee eligible to register; it does not register them.
  * `409 INVITES_CLOSED` (registration closed) shows the server's text and
  * refreshes. The server decides every response.
  */
@@ -23,6 +23,8 @@ import Card from '../Card';
 
 interface Props {
   tournamentId: string;
+  /** Register: the screen opens the confirmation sheet (the same sheet and result pop-up as every in-app Register). */
+  onRegister: () => void;
   status: TournamentInvitationStatus | null | undefined;
   /** Re-fetches the tournament so `my_invitation_status` reflects the server. */
   onResponded: (result?: { accepted: boolean }) => Promise<void>;
@@ -32,6 +34,7 @@ interface Props {
 
 export default function TournamentInvitationBanner({
   tournamentId,
+  onRegister,
   status,
   onResponded,
   onNotFound,
@@ -97,12 +100,12 @@ export default function TournamentInvitationBanner({
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <View style={styles.row}>
         <Button
-          label={t('mob.tournament.invite_accept')}
+          label={t('mob.reg.register')}
           variant="primary"
-          onPress={() => respond(true)}
-          loading={busy === 'accept'}
+          onPress={onRegister}
           disabled={busy !== null}
           style={styles.rowButton}
+          testID="tournament-invitation-register"
         />
         <Button
           label={t('mob.tournament.invite_decline')}

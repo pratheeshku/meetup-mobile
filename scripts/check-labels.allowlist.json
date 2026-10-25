@@ -28,18 +28,6 @@
     {
       "kind": "banned-term",
       "file": "src/labels/defaultLabels.ts",
-      "match": "mob.tw.committee_member",
-      "reason": "Board copy (TournCommittee, TournCommitteeAdd, TournCommitteeMin, TournCreated): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
-    },
-    {
-      "kind": "banned-term",
-      "file": "src/labels/defaultLabels.ts",
-      "match": "mob.tw.committee_add",
-      "reason": "Board copy (TournCommittee, TournCommitteeAdd, TournCommitteeMin, TournCreated): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
-    },
-    {
-      "kind": "banned-term",
-      "file": "src/labels/defaultLabels.ts",
       "match": "mob.tw.committee_add_one",
       "reason": "Board copy (TournCommittee, TournCommitteeAdd, TournCommitteeMin, TournCreated): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
     },
@@ -52,25 +40,7 @@
     {
       "kind": "banned-term",
       "file": "src/labels/defaultLabels.ts",
-      "match": "mob.tw.committee_info",
-      "reason": "Board copy (TournCommittee, TournCommitteeAdd, TournCommitteeMin, TournCreated): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
-    },
-    {
-      "kind": "banned-term",
-      "file": "src/labels/defaultLabels.ts",
-      "match": "mob.tw.err_committee_few",
-      "reason": "Board copy (TournCommittee, TournCommitteeAdd, TournCommitteeMin, TournCreated): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
-    },
-    {
-      "kind": "banned-term",
-      "file": "src/labels/defaultLabels.ts",
       "match": "mob.tw.err_committee_many",
-      "reason": "Board copy (TournCommittee, TournCommitteeAdd, TournCommitteeMin, TournCreated): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
-    },
-    {
-      "kind": "banned-term",
-      "file": "src/labels/defaultLabels.ts",
-      "match": "mob.tw.err_committee_duplicate",
       "reason": "Board copy (TournCommittee, TournCommitteeAdd, TournCommitteeMin, TournCreated): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
     },
     {
@@ -78,18 +48,6 @@
       "file": "src/labels/defaultLabels.ts",
       "match": "mob.tw.review_accept_note",
       "reason": "Board copy (TournCommittee, TournCommitteeAdd, TournCommitteeMin, TournCreated): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
-    },
-    {
-      "kind": "banned-term",
-      "file": "src/labels/defaultLabels.ts",
-      "match": "mob.tw.created_committee_note",
-      "reason": "Board copy (TournCommittee, TournCommitteeAdd, TournCommitteeMin, TournCreated): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
-    },
-    {
-      "kind": "banned-term",
-      "file": "src/labels/defaultLabels.ts",
-      "match": "mob.committee_invite.body",
-      "reason": "Web card copy (WebCommitteeAccept, web.tca.body): \"committee member\" is the committee role, not a group member. docs/glossary.json has no term for it; owner to decide whether the glossary gains one (tl-c-mobile-2 report, Silent items)."
     },
     {
       "kind": "banned-term",

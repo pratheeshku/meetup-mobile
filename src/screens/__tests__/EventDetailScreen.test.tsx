@@ -173,7 +173,7 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     expect(has(root, 'Invite groups')).toBe(true);
     expect(has(root, 'Invite players')).toBe(true);
     expect(has(root, 'Share Event')).toBe(true);
-    expect(has(root, 'Join')).toBe(false);
+    expect(has(root, 'Register')).toBe(false);
     expect(has(root, 'Decline')).toBe(false);
   });
 
@@ -193,7 +193,7 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     expect(has(root, 'Invite groups')).toBe(true);
     expect(has(root, 'Invite players')).toBe(true);
     expect(has(root, 'Decline')).toBe(false);
-    expect(has(root, 'Join')).toBe(false);
+    expect(has(root, 'Register')).toBe(false);
   });
 
   it('sees organiser actions for an in-progress (active) event', async () => {
@@ -212,15 +212,45 @@ describe('organiser (organizer_id === signed-in user id)', () => {
       expect(has(root, 'Edit Game')).toBe(false);
       expect(has(root, 'Invite Group')).toBe(false);
       expect(has(root, 'Invite Individual')).toBe(false);
-      expect(has(root, 'Join')).toBe(false);
+      expect(has(root, 'Register')).toBe(false);
     },
   );
+});
+
+describe('public game: Register alone (tournament-registration TR-04, AD-3)', () => {
+  const buttons = (root: Instance, id: string): Instance[] =>
+    root.findAll(n => n.props.testID === id && typeof n.props.onPress === 'function');
+
+  it('a user who has not joined sees one Register button and no Decline; group and invite-only games are unchanged', async () => {
+    const pub = await mount(rawEvent({ organizer_id: 'someone-else', visibility: 'public' }));
+    expect(has(pub, 'Register')).toBe(true);
+    expect(has(pub, 'Join')).toBe(false);
+    expect(has(pub, 'Decline')).toBe(false);
+    expect(buttons(pub, 'decline-button')).toHaveLength(0);
+
+    const group = await mount(rawEvent({ organizer_id: 'someone-else', visibility: 'group', group_ids: ['g-1'], group_names: ['Crew'] }));
+    expect(has(group, 'Join')).toBe(true);
+    expect(has(group, 'Decline')).toBe(true);
+    expect(has(group, 'Register')).toBe(false);
+
+    const invite = await mount(rawEvent({ organizer_id: 'someone-else', visibility: 'invite_only' }));
+    expect(has(invite, 'Accept')).toBe(true);
+    expect(has(invite, 'Decline')).toBe(true);
+    expect(has(invite, 'Register')).toBe(false);
+  });
+
+  it('a declined public game shows Register alone', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'someone-else', visibility: 'public', my_declined: true }));
+    expect(has(root, 'Register')).toBe(true);
+    expect(has(root, 'Join')).toBe(false);
+    expect(has(root, 'Decline')).toBe(false);
+  });
 });
 
 describe('non-organiser', () => {
   it('sees "Join" and does NOT see organiser actions', async () => {
     const root = await mount(rawEvent({ organizer_id: 'someone-else' }));
-    expect(has(root, 'Join')).toBe(true);
+    expect(has(root, 'Register')).toBe(true);
     expect(has(root, 'Cancel Event')).toBe(false);
     expect(has(root, 'Edit Game')).toBe(false);
     expect(has(root, 'Invite Group')).toBe(false);
@@ -236,12 +266,12 @@ describe('non-organiser', () => {
     expect(has(root, 'Invite Group')).toBe(false);
     expect(has(root, 'Invite Individual')).toBe(false);
     expect(has(root, 'Share Event')).toBe(false);
-    expect(has(root, 'Join')).toBe(false);
+    expect(has(root, 'Register')).toBe(false);
   });
 
   it.each(['cancelled', 'completed'])('sees no RSVP control on a %s event', async status => {
     const root = await mount(rawEvent({ status }));
-    expect(has(root, 'Join')).toBe(false);
+    expect(has(root, 'Register')).toBe(false);
     expect(has(root, 'Decline')).toBe(false);
     expect(has(root, 'Cancel Event')).toBe(false);
   });
@@ -249,7 +279,7 @@ describe('non-organiser', () => {
   it('is never treated as organiser when there is no signed-in user', async () => {
     mockUser = null;
     const root = await mount(rawEvent({ organizer_id: 'someone-else' }));
-    expect(has(root, 'Join')).toBe(true);
+    expect(has(root, 'Register')).toBe(true);
     expect(has(root, 'Cancel Event')).toBe(false);
   });
 });
@@ -276,7 +306,7 @@ describe('RSVP / withdraw contract', () => {
   it('Join sends POST /events/{id}/rsvp with { action: "going" }', async () => {
     const root = await mount(rawEvent({ user_rsvp_status: null }));
     await act(async () => {
-      pressableLabelled(root, 'Join').props.onPress();
+      pressableLabelled(root, 'Register').props.onPress();
     });
     expect(mockPost).toHaveBeenCalledTimes(1);
     expect(mockPost.mock.calls[0][0]).toBe('/events/evt-1/rsvp');
@@ -297,7 +327,7 @@ describe('RSVP / withdraw contract', () => {
     mockPost.mockRejectedValue(new Error('422'));
     const root = await mount(rawEvent({ user_rsvp_status: null }));
     await act(async () => {
-      pressableLabelled(root, 'Join').props.onPress();
+      pressableLabelled(root, 'Register').props.onPress();
     });
     expect(has(root, 'Could not join this event. Please try again.')).toBe(true);
   });

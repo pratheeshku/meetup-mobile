@@ -32,6 +32,7 @@ import { CameraIcon, CheckIcon, ChevronRightIcon, EditIcon } from '../../icons/A
 import { PersonPlusIcon } from '../../icons/GroupViewIcons';
 import { CalendarIcon, MapPinIcon, PeopleGreenIcon } from '../../icons/HomeV2Icons';
 import { TrophyIcon } from '../../icons/SharedIcons';
+import TournamentFeeLine from '../TournamentFeeLine';
 
 const TILE = 40;
 const GLYPH = 20;
@@ -348,6 +349,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
             </View>
           </View>
         ) : null}
+        <TournamentFeeLine tournament={tournament} />
         {tournament.participation_mode ? (
           <View style={styles.formatRow}>
             <View style={[styles.tile, styles.tileLight]}>

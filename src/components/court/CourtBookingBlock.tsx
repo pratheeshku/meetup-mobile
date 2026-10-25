@@ -22,12 +22,8 @@ const BUTTON_WIDTH = 84;
 const BUTTON_HEIGHT = 44;
 const GLYPH = 16;
 
-/** Button and fallback-tile colour per row, cycling. Tokens only. */
-const ROW_TONES = [
-  { button: colors.ctaBlue, tile: gradientTokens.blue.start },
-  { button: colors.successDark, tile: gradientTokens.green.start },
-  { button: colors.warningDark, tile: gradientTokens.orange.start },
-] as const;
+/** Fallback-tile colour per row, cycling. Tokens only. The Book button is not part of this: it is one colour for every row (AD-8). */
+const TILE_TONES = [gradientTokens.blue.start, gradientTokens.green.start, gradientTokens.orange.start] as const;
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -108,14 +104,14 @@ export default function CourtBookingBlock({
         </View>
       </View>
       {providers.map((provider, index) => {
-        const tone = ROW_TONES[index % ROW_TONES.length];
+        const tone = TILE_TONES[index % TILE_TONES.length];
         return (
           <View
             key={provider.id}
             style={[styles.row, index > 0 ? styles.rowDivider : null]}
             testID={`court-provider-${provider.id}`}
           >
-            <ProviderLogo provider={provider} tone={tone.tile} />
+            <ProviderLogo provider={provider} tone={tone} />
             <View style={styles.rowText}>
               <Text style={styles.name}>{provider.name}</Text>
               {provider.description ? <Text style={styles.description}>{provider.description}</Text> : null}
@@ -126,7 +122,7 @@ export default function CourtBookingBlock({
               onPress={() => {
                 openLink(provider.booking_url, t('mob.home.court_booking.title'));
               }}
-              style={({ pressed }) => [styles.button, { backgroundColor: tone.button }, pressed ? styles.pressed : null]}
+              style={({ pressed }) => [styles.button, styles.buttonCta, pressed ? styles.pressed : null]}
               testID={`court-book-${provider.id}`}
             >
               <Text style={styles.buttonText}>{t('mob.home.court_booking.book')}</Text>
@@ -184,6 +180,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  buttonCta: { backgroundColor: colors.ctaBlue },
   pressed: { opacity: 0.85 },
   buttonText: { ...typography.bodyBold, color: colors.white, marginRight: spacing.xs },
   glyphBox: { width: GLYPH + 4, height: GLYPH + 4, alignItems: 'center', justifyContent: 'center' },

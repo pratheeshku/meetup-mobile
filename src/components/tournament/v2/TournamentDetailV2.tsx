@@ -162,7 +162,6 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'tournament';
-  const hasRegistration = props.registrations.some(r => r.user_id === props.viewerId && r.status === 'registered');
 
   const body = (): React.JSX.Element => {
     if (!current || currentKey === 'overview') {
@@ -244,7 +243,13 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
           />
         );
       case 'media':
-        return <MediaTab tournamentId={tournament.id} canAdd={isCommittee || hasRegistration} />;
+        // AD-6: only the organizer and committee upload (UX only; the server answers 403 to anyone else); read-only on a cancelled tournament.
+        return (
+          <MediaTab
+            tournamentId={tournament.id}
+            canAdd={(props.isOrganiser || isCommittee) && tabs.media?.read_only !== true}
+          />
+        );
       default:
         return <View />;
     }

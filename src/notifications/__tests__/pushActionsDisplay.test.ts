@@ -93,7 +93,7 @@ describe('background message handler', () => {
 });
 
 describe('registration field', () => {
-  it.each(['android', 'ios'] as const)('sends pushActionsVersion: 1 on %s', async os => {
+  it.each(['android', 'ios'] as const)('sends pushActionsVersion: 2 on %s', async os => {
     jest.replaceProperty(Platform, 'OS', os);
     __resetDeviceIdCacheForTests();
     mockPost.mockResolvedValue({ data: {} });
@@ -102,7 +102,7 @@ describe('registration field', () => {
 
     expect(mockPost).toHaveBeenCalledWith(
       '/notifications/mobile-subscriptions',
-      expect.objectContaining({ deviceToken: 'tok', platform: os, pushActionsVersion: 1 }),
+      expect.objectContaining({ deviceToken: 'tok', platform: os, pushActionsVersion: 2 }),
     );
   });
 });

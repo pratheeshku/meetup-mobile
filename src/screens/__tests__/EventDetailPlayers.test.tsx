@@ -108,7 +108,7 @@ describe('refresh after Leave and Join', () => {
     );
     expect(avatars(root)).toHaveLength(1);
     expect(texts(root)).toContain('1 of 12 joined');
-    expect(pressableLabelled(root, 'Join')).toBeDefined();
+    expect(pressableLabelled(root, 'Register')).toBeDefined();
     expect(root.findAll(n => n.props.accessibilityLabel === 'Leave')).toHaveLength(0);
   });
 
@@ -116,7 +116,7 @@ describe('refresh after Leave and Join', () => {
     const root = await mount(rawEvent({ going_count: 1 }), [person('u-2', 'Bob', 'going')]);
     server.event = rawEvent({ going_count: 2, user_rsvp_status: 'going' });
     server.participants = [person('u-2', 'Bob', 'going'), person('user-me', 'Sam', 'going')];
-    await press(root, 'Join');
+    await press(root, 'Register');
     expect(avatars(root)).toHaveLength(2);
     expect(texts(root)).toContain('2 of 12 joined');
     expect(pressableLabelled(root, 'Decline')).toBeDefined();

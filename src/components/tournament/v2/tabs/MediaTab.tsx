@@ -110,7 +110,6 @@ export default function MediaTab({ tournamentId, canAdd }: { tournamentId: strin
           </View>
           <Text style={styles.addTitle}>{t('mob.tournament.media.add_photo')}</Text>
           <Button label={t('mob.tournament.media.upload')} onPress={choose} loading={busy} style={styles.upload} testID="media-upload" />
-          <Text style={styles.note}>{t('mob.tournament.media.who_note')}</Text>
         </TabCard>
       ) : null}
       {message ? (
@@ -122,7 +121,7 @@ export default function MediaTab({ tournamentId, canAdd }: { tournamentId: strin
         <CardHead title={t('mob.tournament.media.gallery_title')} badge={t('mob.tournament.media.items', { count: total })} />
         {status === 'loading' ? <ActivityIndicator color={dash.brand} style={styles.loading} testID="media-loading" /> : null}
         {status === 'error' ? <EmptyLine text={t('mob.tournament.media.err.failed')} /> : null}
-        {status === 'ready' && items.length === 0 ? <EmptyLine text={t('mob.tournament.media.empty')} /> : null}
+        {status === 'ready' && items.length === 0 ? <EmptyLine text={t('mob.reg.media_empty')} /> : null}
         <View style={styles.grid}>
           {items.map(item => (
             <View key={item.id} style={styles.tile} testID={`media-${item.id}`}>
@@ -160,7 +159,6 @@ const styles = StyleSheet.create({
   cameraBox: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   addTitle: { ...typography.h3, color: dash.text, marginTop: spacing.sm },
   upload: { marginTop: spacing.sm, alignSelf: 'stretch' },
-  note: { ...typography.caption, color: dash.textMuted, textAlign: 'center', marginTop: spacing.sm },
   message: { ...typography.bodyBold, marginBottom: spacing.sm },
   ok: { color: colors.successDark },
   bad: { color: colors.error },

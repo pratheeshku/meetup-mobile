@@ -76,6 +76,8 @@ export interface WizardCreateBody {
   ends_at: string;
   registration_closes_at: string;
   registration_hard_block_at: string;
+  /** tournament-registration AD-4: the fee per entry in whole cents. Sent only while the server flag is on and the organizer typed one. */
+  registration_fee_cents?: number;
   group_ids?: string[];
   committee_member_ids: string[];
 }

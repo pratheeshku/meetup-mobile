@@ -77,6 +77,12 @@ export type FixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancell
  *   user's id, unavailable to `api/tournaments.ts` — `'none'`/`false`
  *   from the API layer; `TournamentDetailScreen` recomputes both locally.
  */
+/** One audience group of a tournament row (`groups: [{id, name}]`, AD-7). */
+export interface TournamentAudienceGroup {
+  id: string;
+  name: string;
+}
+
 export interface Tournament {
   id: string;
   name: string;
@@ -147,6 +153,15 @@ export interface Tournament {
   roster_frozen_at?: string | null;
   /** te-b3: the stored rules. A value that is not stored is null; `elimination` and `courts` are always null today. */
   format_rules?: TournamentFormatRules | null;
+  /** AD-4: the fee per entry in whole cents and its currency; null while the server flag is off and for a free tournament. */
+  registration_fee_cents?: number | null;
+  registration_fee_currency?: string | null;
+  /** AD-7 list-row fields: the venue address and map pin for the venue pop-up, and the audience groups in selection order. */
+  venue_address?: string | null;
+  venue_lat?: number | null;
+  venue_lng?: number | null;
+  venue_place_id?: string | null;
+  audience_groups?: TournamentAudienceGroup[];
   /** AD-T6, set by `GET /tournaments/{id}` only. */
   organizer?: TournamentPerson | null;
   /** AD-T6: active committee members other than the organizer. */

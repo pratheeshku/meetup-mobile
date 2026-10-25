@@ -83,9 +83,9 @@ export default function ResponsesSection({
     !responses.accepted ||
     typeof responses.accepted.total !== 'number' ||
     !Array.isArray(responses.accepted.items) ||
-    !responses.pending ||
-    typeof responses.pending.total !== 'number' ||
-    !Array.isArray(responses.pending.items) ||
+    // `pending` may be absent (viewer not allowed to see it, or a public tournament); when present it must be well formed.
+    (responses.pending != null &&
+      (typeof responses.pending.total !== 'number' || !Array.isArray(responses.pending.items))) ||
     // `declined` may be absent (viewer not allowed to see it); when present it must be well formed.
     (responses.declined != null &&
       (typeof responses.declined.total !== 'number' || !Array.isArray(responses.declined.items)))
@@ -125,14 +125,18 @@ export default function ResponsesSection({
             },
           ]
         : []),
-      {
-        key: 'pending',
-        title: t('mob.respond.section.pending'),
-        total: responses.pending.total,
-        items: groups.pending,
-        emptyText: t('mob.respond.empty.pending'),
-        tone: 'pending',
-      },
+      ...(responses.pending
+        ? [
+            {
+              key: 'pending' as const,
+              title: t('mob.respond.section.pending'),
+              total: responses.pending.total,
+              items: groups.pending,
+              emptyText: t('mob.respond.empty.pending'),
+              tone: 'pending' as const,
+            },
+          ]
+        : []),
     );
   } else {
     const groups = groupGameResponses(responses, organizerId);
@@ -157,14 +161,18 @@ export default function ResponsesSection({
             },
           ]
         : []),
-      {
-        key: 'pending',
-        title: t('mob.respond.section.pending'),
-        total: responses.pending.total,
-        items: groups.pending,
-        emptyText: t('mob.respond.empty.pending'),
-        tone: 'pending',
-      },
+      ...(responses.pending
+        ? [
+            {
+              key: 'pending' as const,
+              title: t('mob.respond.section.pending'),
+              total: responses.pending.total,
+              items: groups.pending,
+              emptyText: t('mob.respond.empty.pending'),
+              tone: 'pending' as const,
+            },
+          ]
+        : []),
     );
   }
 
