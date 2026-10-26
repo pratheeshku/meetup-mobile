@@ -730,6 +730,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           <FeeEditSheet
             tournamentId={tournament.id}
             storedCents={tournament.registration_fee_cents ?? null}
+            storedNumber={tournament.payment_contact_number ?? null}
             config={feeConfig}
             activeRegistrations={registrations.filter(isActiveRegistration).length}
             onClose={() => setFeeSheetOpen(false)}

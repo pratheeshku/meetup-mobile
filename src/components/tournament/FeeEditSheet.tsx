@@ -3,8 +3,9 @@
  * screen: one field in the config currency (the M3 field: `parseAmountToCents`, `feeMaxText`, `centsToAmountText`), prefilled with the stored fee.
  *
  * - Warning: shown when players have already registered (active rows, not withdrawn) AND the valid entry differs from the stored fee.
- * - Save: `PATCH /tournaments/{id}` with exactly `{ registration_fee_cents }` (an integer, or null to clear), only when the value changed;
- *   an unchanged value just closes. 409: "Registration has closed"; 422: the field error; anything else: the generic failure.
+ * - Save: `PATCH /tournaments/{id}` with `{ registration_fee_cents }` (an integer, or null to clear) and, for a fee above 0, the PayNow/PayLah number
+ *   (teams-payments AD-7: required with a fee; the stored number is the start, else the organizer's own profile number), only when something
+ *   changed; an unchanged value just closes. A coded refusal shows its own label; 409: "Registration has closed"; 422: the field error.
  * - UX only: who may see this, and every refusal, is decided by the server.
  */
 import React, { useState } from 'react';
@@ -12,6 +13,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { withCorrelationId } from '../../api/correlationId';
 import { updateTournamentFee } from '../../api/tournaments';
+import { classifyRefusal } from '../../utils/refusal';
+import PayeeNumberField from '../PayeeNumberField';
 import { useT } from '../../labels/LabelsContext';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../../theme/tokens';
 import { centsToAmountText, formatMoney, hasFee, parseAmountToCents } from '../../utils/money';
@@ -29,6 +32,8 @@ interface Props {
   tournamentId: string;
   /** The stored fee in whole cents; null or absent = free. */
   storedCents: number | null;
+  /** The stored payee number (E.164) the organizer can read; null when none (the field then starts from the organizer's own profile number). */
+  storedNumber?: string | null;
   config: FeeEditConfig;
   /** Registrations whose status is not "withdrawn". */
   activeRegistrations: number;
@@ -74,20 +79,31 @@ export default function FeeEditSheet(props: Props): React.JSX.Element {
   const [text, setText] = useState(stored === null ? '' : centsToAmountText(stored));
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const storedNumber = props.storedNumber ?? null;
+  const [number, setNumber] = useState<string | null>(storedNumber);
 
   const parsed = parseAmountToCents(text);
   const { maxCents } = props.config;
   const valid = parsed.valid && (parsed.cents === null || maxCents === null || parsed.cents <= maxCents);
   const entered = parsed.valid ? parsed.cents : null;
-  const changed = valid && entered !== stored;
+  // The number is asked for when the fee is set or changed to an amount above 0; an unchanged fee leaves the stored number alone.
+  const needsNumber = valid && hasFee(entered) && entered !== stored;
+  const numberChanged = needsNumber && number !== storedNumber;
+  const missingNumber = needsNumber && !number;
+  const changed = valid && (entered !== stored || numberChanged);
   const fieldError = valid ? null : t('mob.tw.fee_error', { max: feeMaxLabel(props.config) });
   const showWarning = changed && props.activeRegistrations > 0;
+  const numberWarning = numberChanged && storedNumber !== null && props.activeRegistrations > 0;
 
   const save = async (): Promise<void> => {
     if (busy) {
       return;
     }
     if (!valid) {
+      return;
+    }
+    if (missingNumber) {
+      setProblem(t('mob.reg.err.payment_number_required'));
       return;
     }
     if (!changed) {
@@ -97,12 +113,17 @@ export default function FeeEditSheet(props: Props): React.JSX.Element {
     setBusy(true);
     setProblem(null);
     try {
-      await withCorrelationId(correlationId => updateTournamentFee(props.tournamentId, entered, { correlationId }));
+      await withCorrelationId(correlationId =>
+        updateTournamentFee(props.tournamentId, entered, { correlationId, paymentContactNumber: number }),
+      );
       props.onSaved();
     } catch (error) {
-      const status = (error as { response?: { status?: number } } | null)?.response?.status;
+      const refusal = classifyRefusal(error, 'mob.tw.fee_edit_failed');
+      const status = refusal.status;
       setProblem(
-        status === 409
+        refusal.code !== null && refusal.code.startsWith('PAYMENT_NUMBER')
+          ? t(refusal.labelKey)
+          : status === 409
           ? t('mob.tw.fee_edit_closed')
           : status === 422
           ? t('mob.tw.fee_error', { max: feeMaxLabel(props.config) })
@@ -138,9 +159,25 @@ export default function FeeEditSheet(props: Props): React.JSX.Element {
             {fieldError}
           </Text>
         ) : null}
+        {needsNumber ? (
+          <PayeeNumberField
+            kind="tournament"
+            initialValue={storedNumber ?? undefined}
+            onChange={change => {
+              setProblem(null);
+              setNumber(change.e164);
+            }}
+            testID="fee-edit-payee"
+          />
+        ) : null}
         {showWarning ? (
           <Text style={styles.warning} accessibilityRole="alert" testID="fee-edit-warning">
             {t('mob.tw.fee_edit_warning')}
+          </Text>
+        ) : null}
+        {numberWarning ? (
+          <Text style={styles.warning} accessibilityRole="alert" testID="fee-edit-number-warning">
+            {t('mob.pay.number_change_warning')}
           </Text>
         ) : null}
         {problem ? (

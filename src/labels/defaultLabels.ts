@@ -1841,5 +1841,12 @@ export const DEFAULT_LABELS = {
 
   // tp-mobile: board J1 fee hint (new, not seeded: listed in the report).
   'mob.pay.fee_hint': 'Payment is arranged with the organizer. You will see how after you register.',
+
+  // tp-mobile: payee number field (AD-7), shared by the tournament wizard, create game and edit game (new, not seeded: listed in the report).
+  'mob.pay.number_label': 'PayNow / PayLah number',
+  'mob.pay.number_disclosure_tournament': 'Shown to people who register for this tournament.',
+  'mob.pay.number_disclosure_game': 'Shown to people who join this game.',
+  'mob.pay.number_load_error': 'The country list could not be loaded, so the payment number cannot be set now. Try again later.',
+  'mob.pay.number_change_warning': 'People have already registered. They will see the new number. The change is logged.',
 } as const;
 

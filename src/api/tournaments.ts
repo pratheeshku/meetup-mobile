@@ -313,15 +313,20 @@ export async function registerForTournament(
 }
 
 /**
- * `PATCH /tournaments/{id}` with exactly `{ registration_fee_cents }` (tournament-registration AD-4, "Set and edit"): whole cents, or null to clear
- * the fee. Nothing else is sent. The server refuses with 409 once registration has closed and 422 for a value out of range.
+ * `PATCH /tournaments/{id}` with `{ registration_fee_cents }` (tournament-registration AD-4, "Set and edit"): whole cents, or null to clear
+ * the fee, plus `payment_contact_number` for a fee above 0 (teams-payments AD-7). The server refuses with 409 once registration has closed and 422 for a value out of range.
  */
 export async function updateTournamentFee(
   id: string,
   cents: number | null,
-  options?: RequestOptions,
+  options?: RequestOptions & { paymentContactNumber?: string | null },
 ): Promise<void> {
-  await apiClient.patch(`/tournaments/${id}`, { registration_fee_cents: cents }, { correlationId: options?.correlationId });
+  // The payee number (teams-payments AD-7, E.164) goes with a fee above 0 only; the server validates it and never echoes it.
+  const body: { registration_fee_cents: number | null; payment_contact_number?: string } = { registration_fee_cents: cents };
+  if (typeof cents === 'number' && cents > 0 && options?.paymentContactNumber) {
+    body.payment_contact_number = options.paymentContactNumber;
+  }
+  await apiClient.patch(`/tournaments/${id}`, body, { correlationId: options?.correlationId });
 }
 
 /** `DELETE /tournaments/{id}/registrations/{registration_id}`. `wasPaid` is the server's `was_paid` (teams-payments AD-12). */

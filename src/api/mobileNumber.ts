@@ -50,6 +50,17 @@ export async function getCountryCodes(options?: RequestOptions): Promise<Country
   return data.filter(row => row.enabled !== false);
 }
 
+/**
+ * The caller's OWN stored number (`GET /users/me`), to prefill a payee number the organizer then edits (teams-payments AD-7). Null when none or unreadable.
+ * Never logged and never sent anywhere but back to the organizer's own form.
+ */
+export async function getOwnMobileNumber(options?: RequestOptions): Promise<string | null> {
+  const { data } = await apiClient.get<{ mobile_number?: string | null }>('/users/me', {
+    correlationId: options?.correlationId,
+  });
+  return typeof data?.mobile_number === 'string' && data.mobile_number ? data.mobile_number : null;
+}
+
 export interface UpdateMobileNumberPayload {
   /** E.164 string, or `null` to clear. */
   mobile_number: string | null;
