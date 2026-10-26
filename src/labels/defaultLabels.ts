@@ -1848,5 +1848,16 @@ export const DEFAULT_LABELS = {
   'mob.pay.number_disclosure_game': 'Shown to people who join this game.',
   'mob.pay.number_load_error': 'The country list could not be loaded, so the payment number cannot be set now. Try again later.',
   'mob.pay.number_change_warning': 'People have already registered. They will see the new number. The change is logged.',
+
+  // tp-mobile: game fee confirmation (AD-8): the same sheet and pop-up as tournaments, 'per player' (new, not seeded: listed in the report).
+  'mob.game_fee.sheet_title': 'Join {name}',
+  'mob.game_fee.sheet_sub': 'Check the fee, then confirm.',
+  'mob.game_fee.joined_title': 'You\'re in',
+  'mob.game_fee.waitlisted_title': 'You\'re on the waitlist',
+  'mob.game_fee.fee_label': 'Game fee',
+  'mob.game_fee.field_label': 'Game fee (optional)',
+  'mob.game_fee.field_hint': 'Amount in {currency} per player, for example 5.00. Leave empty for a free game.',
+  'mob.game_fee.field_error': 'Enter an amount between 0 and {max}, with at most two decimals.',
+  'mob.game_fee.edit_warning': 'Players have already joined. Changing the fee does not change what they confirmed. The change is logged.',
 } as const;
 

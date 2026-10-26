@@ -133,6 +133,8 @@ export interface RegistrationPaymentInfo {
 }
 
 export interface RegistrationResultPopupProps {
+  /** Success title; absent = "You're registered". A game says "You're in". */
+  title?: string;
   /** Success: "City Open · S$10.00 per player" (or "· Free registration"). Failure: ignored. */
   subtitle: string;
   /** Null = success. */
@@ -162,7 +164,7 @@ export function RegistrationResultPopup(props: RegistrationResultPopupProps): Re
             {failure ? <Text style={styles.cross}>×</Text> : <CheckIcon size={26} color={colors.successDark} />}
           </View>
           <Text style={styles.popupTitle} accessibilityRole="header">
-            {failure ? t('mob.reg.failure_title') : t('mob.reg.success_title')}
+            {failure ? t('mob.reg.failure_title') : props.title ?? t('mob.reg.success_title')}
           </Text>
           {failure ? (
             <Text style={styles.message} accessibilityRole="alert" testID="registration-result-message">
