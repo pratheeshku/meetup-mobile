@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 
 import { GroupsIcon } from '../icons/DashboardIcons';
+import { ShieldIcon } from '../icons/SharedIcons';
 import {
   ClockIcon,
   MapPinIcon,
@@ -37,6 +38,7 @@ import { dash, dashRadius } from '../../theme/dashboardTheme';
 import { colors, radius, spacing, typography } from '../../theme/tokens';
 import type { Event, LifecycleStatus } from '../../types/event';
 import type { Group, GroupRole } from '../../types/group';
+import type { Team } from '../../types/team';
 import type { Tournament, TournamentRegistrationStatus } from '../../types/tournament';
 import { perfImageError, perfImageLoad, perfImageLoadStart } from '../../diagnostics/perfLog';
 import { formatRowDate } from '../../utils/formatGameTime';
@@ -62,7 +64,8 @@ interface UnifiedCardProps {
   moreCount: number;
   countLabel: string | null;
   actionButtonLabel: string;
-  onPress: () => void;
+  /** Absent: the card is read-only (no press, no action button), as the Tournament teams card until its detail screen exists. */
+  onPress?: () => void;
   accessibilityLabel: string;
   badge?: React.ReactNode;
   /** Rendered directly below the count line (e.g. a Join button). */
@@ -89,15 +92,8 @@ export function UnifiedCard({
   // The 22 px avatars: tap only, View Details from the card's own data, no card request (UM-06).
   const menu = useUserMenu({ context: { type: 'none' } });
 
-  return (
-    <>
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
-    >
-      <View style={styles.cardContent}>
+  const content = (
+    <View style={styles.cardContent}>
         {/* (1) Left tile: date block or logo */}
         <View style={styles.leftTileContainer}>{leftTile}</View>
 
@@ -160,12 +156,31 @@ export function UnifiedCard({
             {belowCount}
           </View>
 
-          <View style={styles.actionBtn}>
-            <Text style={styles.actionBtnText}>{actionButtonLabel}</Text>
-          </View>
+          {onPress ? (
+            <View style={styles.actionBtn}>
+              <Text style={styles.actionBtnText}>{actionButtonLabel}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
-    </Pressable>
+  );
+
+  return (
+    <>
+      {onPress ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          onPress={onPress}
+          style={({ pressed }) => [styles.card, pressed ? styles.pressed : null]}
+        >
+          {content}
+        </Pressable>
+      ) : (
+        <View accessible accessibilityLabel={accessibilityLabel} style={styles.card}>
+          {content}
+        </View>
+      )}
     <UserMenuSheet menu={menu} />
     </>
   );
@@ -521,6 +536,56 @@ export function UnifiedTournamentCard({
         .filter(Boolean)
         .join(', ')}
       badge={combinedBadge}
+    />
+  );
+}
+
+/**
+ * Tournament team card (teams-payments AD-4): the tournament-list card layout, read-only. It has no `onPress` and no action button because the
+ * team detail screen does not exist yet (task tp-mobile-teams). Every number and the role come from `GET /teams/mine`; null hides the line.
+ */
+export function UnifiedTeamCard({ team }: { team: Team }): React.JSX.Element {
+  const t = useT();
+  const sportLabel = useSportDisplayName(team.sport);
+  const roleLabel = team.my_role ? t(team.my_role === 'captain' ? 'mob.teams.role_captain' : 'mob.teams.role_player') : null;
+  const visibilityLabel = t(team.visibility === 'private' ? 'mob.teams.visibility_private' : 'mob.teams.visibility_public');
+  const countLabel = typeof team.player_count === 'number' ? t('mob.teams.players_count', { count: team.player_count }) : null;
+
+  return (
+    <UnifiedCard
+      leftTile={
+        <View style={styles.groupLogoFallback}>
+          <ShieldIcon size={24} />
+        </View>
+      }
+      badge={
+        roleLabel ? (
+          <View style={[styles.rolePill, { backgroundColor: getRolePillColor(team.my_role === 'captain' ? 'owner' : 'member') }]}>
+            <Text style={styles.roleText}>{roleLabel}</Text>
+          </View>
+        ) : null
+      }
+      title={team.name}
+      details={
+        <View>
+          <View style={styles.detailRow}>
+            <PeopleGreenIcon size={16} />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {sportLabel}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.metaText} numberOfLines={1}>
+              {visibilityLabel}
+            </Text>
+          </View>
+        </View>
+      }
+      avatars={[]}
+      moreCount={0}
+      countLabel={countLabel}
+      actionButtonLabel=""
+      accessibilityLabel={[team.name, sportLabel, roleLabel, visibilityLabel, countLabel].filter(Boolean).join(', ')}
     />
   );
 }

@@ -95,6 +95,7 @@ import FeeEditSheet, { FeeEditRow, type FeeEditConfig } from '../components/tour
 import Toast from '../components/Toast';
 import { tournamentCloseButton } from '../components/tournament/TournamentCloseButton';
 import { registrationTargetFor, useTournamentRegistration } from '../hooks/useTournamentRegistration';
+import PaymentCard from '../components/tournament/PaymentCard';
 import { committeeAnswerOutcome, type CommitteeAnswerState } from '../utils/committeeInvitation';
 import type { LabelKey } from '../labels/fallbackLabels';
 import { isActiveRegistration } from '../utils/responseGroups';
@@ -433,10 +434,15 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       ]);
       setTournament(tournamentData);
       setRegistrations(registrationsData);
+      return tournamentData;
     },
     onNotFound: unavailable.onNotFound,
     onOpenSkillLevels: () => {
       (navigation.getParent() as any)?.navigate('Profile', { screen: 'EditSkillLevels' });
+    },
+    // "Create a tournament team first" (J5): the Create team form lives in the Groups tab.
+    onCreateTeam: () => {
+      (navigation.getParent() as any)?.navigate('Groups', { screen: 'CreateGroup', params: { kind: 'team' } });
     },
   });
   const startRegistration = registrationFlow.start;
@@ -737,6 +743,19 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         <Toast message={feeToast} onDismiss={() => setFeeToast(null)} />
       </>
     ) : null;
+  // The Payment card (teams-payments AD-7, J7): only for someone who registered, only while a fee applies, from `my_registration`.
+  const myPayment = tournament.my_registration;
+  const paymentCard =
+    myPayment && myPayment.status === 'registered' ? (
+      <PaymentCard
+        feeCents={myPayment.effective_fee_cents ?? myPayment.fee_cents_at_registration}
+        currency={tournament.registration_fee_currency}
+        perTeam={tournament.participation_mode === 'team'}
+        paid={myPayment.payment_received_at !== null}
+        exempt={myPayment.payment_exempt}
+        number={myPayment.payment_contact_number ?? tournament.payment_contact_number}
+      />
+    ) : null;
   const canCancel =
     !isTournamentEnded &&
     isOrganiser &&
@@ -789,6 +808,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           <>
             {committeeCard}
             {registrationFlow.element}
+            {paymentCard}
             {feeEdit}
             <TournamentInvitationBanner
               onRegister={handleRegister}
@@ -910,6 +930,8 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           entityType="tournament"
         />
       ) : null}
+
+      {paymentCard}
 
       <TournamentInvitationBanner
         onRegister={handleRegister}

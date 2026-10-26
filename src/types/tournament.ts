@@ -162,10 +162,33 @@ export interface Tournament {
   venue_lng?: number | null;
   venue_place_id?: string | null;
   audience_groups?: TournamentAudienceGroup[];
+  /**
+   * teams-payments AD-7: the PayNow/PayLah number of THIS tournament (E.164). The server withholds it (null) from everyone who has not registered and
+   * is not the organizer or committee. Shown only on the Payment card and the organizer screens; never logged.
+   */
+  payment_contact_number?: string | null;
+  /** teams-payments AD-9: the caller's own registration, set by `GET /tournaments/{id}` only; null for anyone with no registration. */
+  my_registration?: TournamentMyRegistration | null;
   /** AD-T6, set by `GET /tournaments/{id}` only. */
   organizer?: TournamentPerson | null;
   /** AD-T6: active committee members other than the organizer. */
   committee?: TournamentPerson[];
+}
+
+/** `GET /tournaments/{id}` `my_registration`: what the Payment card needs (teams-payments AD-9). */
+export interface TournamentMyRegistration {
+  registration_id: string;
+  status: string;
+  /** The fee the person confirmed; null on a row with no snapshot (a committee add). */
+  fee_cents_at_registration: number | null;
+  /** The fee that applies to this entrant: the snapshot, else the tournament's current fee. Null while payments are off. */
+  effective_fee_cents: number | null;
+  /** Set when the organizer marked the payment received. */
+  payment_received_at: string | null;
+  /** The organizer's own entry has no payment. */
+  payment_exempt: boolean;
+  /** The payee number; null when the server withholds it or the organizer left it empty. */
+  payment_contact_number: string | null;
 }
 
 export type BannerTone = 'light' | 'dark';
@@ -243,6 +266,53 @@ export interface TournamentRegistration {
    * `TournamentRegistrationResponse.status` field.
    */
   status: TournamentRegistrationStatus;
+  /** Set for a team entry (`user_id` is then null). */
+  team_id?: string | null;
+  /**
+   * teams-payments AD-11. Each is null unless the caller is the organizer or an active committee member (payment state, points, effective fee),
+   * or the entrant for their own row. A team row carries the team name in `nickname`, the player count and the captain's name, never a member's name.
+   */
+  payment_received_at?: string | null;
+  effective_fee_cents?: number | null;
+  /** The points as the server sends them (a decimal string), or null when unrated or withheld. Never parsed for arithmetic. */
+  points?: string | null;
+  payment_exempt?: boolean;
+  team_player_count?: number | null;
+  team_captain_name?: string | null;
+}
+
+/** `GET /tournaments/{id}/registrations/summary` (teams-payments AD-9): every figure is the server's; the client never adds anything. */
+export interface RegistrationSummary {
+  payments_enabled: boolean;
+  registered: number;
+  paid: number;
+  unpaid: number;
+  exempt: number;
+  collected_cents: number;
+  currency: string;
+  fee_cents: number | null;
+  excluded_from_fixtures: number;
+  points_locked: boolean;
+}
+
+/** `PUT .../registrations/{id}/payment`: the entrant's state and the FRESH summary. */
+export interface RegistrationPaymentResult {
+  registration_id: string;
+  payment_received_at: string | null;
+  effective_fee_cents: number | null;
+  summary: RegistrationSummary;
+  draft_exists: boolean;
+}
+
+/** `GET .../registrations/{id}/roster`: names only when the server allows (organizer, committee, roster members, the registrant). */
+export interface RegistrationRoster {
+  registration_id: string;
+  team_id: string | null;
+  team_name: string | null;
+  sport: string;
+  captain_name: string | null;
+  player_count: number;
+  players: Array<{ user_id: string; display_name: string | null; is_captain: boolean }> | null;
 }
 
 export interface TournamentsListResponse {

@@ -53,7 +53,8 @@ export type GroupsStackParamList = {
   GroupsList: { refreshKey?: number; section?: 'groups' | 'teams' } | undefined;
   GroupDetail: { groupId: string };
   EditGroup: { groupId: string };
-  CreateGroup: undefined;
+  /** `kind: 'team'` opens the form on Tournament team (the register flow's "Create a tournament team first" and the Tournament teams list). */
+  CreateGroup: { kind?: 'group' | 'team' } | undefined;
   /** Group creation step 2 (DES-MEETUP-FEEDBACK-001 C4). */
   InviteMembers: { groupId: string };
   TournamentTeams: undefined;

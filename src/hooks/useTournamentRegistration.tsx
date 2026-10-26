@@ -1,8 +1,9 @@
 /**
- * The registration flow of one tournament (DES-MEETUP-ADDENDUM-tournament-registration AD-1, AD-5): `start()` opens the confirmation
- * sheet; Confirm posts the registration with `accepted_fee_cents` when a fee applies, once per user action (one `withCorrelationId()`), and
- * the result pop-up reports success or the label for the server `code`.
+ * The registration flow of one tournament (DES-MEETUP-ADDENDUM-tournament-registration AD-1, AD-5; teams-payments AD-3, AD-7, boards J2-J6):
+ * `start()` opens the confirmation sheet; Confirm posts the registration with `accepted_fee_cents` when a fee applies, once per user action (one
+ * `withCorrelationId()`), and the result pop-up reports success (with the number to pay to, when a fee applies) or the label for the server `code`.
  *
+ * - Team mode with no tournament team for the sport opens the "Create a tournament team first" prompt (J5); its button opens the Create team form.
  * - FEE_CHANGED (409) carries the current `registration_fee_cents`: the sheet takes it and asks again, no result pop-up.
  * - A fee that cannot be read blocks Confirm. The request is never sent without a known fee.
  * - The refetch after a successful registration is best effort: the registration already happened, so a failed refetch is not a failure.
@@ -13,16 +14,20 @@ import React, { useCallback, useRef, useState } from 'react';
 import { withCorrelationId } from '../api/correlationId';
 import { getMyTeams } from '../api/teams';
 import { registerForTournament } from '../api/tournaments';
-import { RegistrationConfirmSheet, RegistrationResultPopup } from '../components/tournament/RegistrationDialogs';
+import {
+  CreateTeamPrompt,
+  RegistrationConfirmSheet,
+  RegistrationResultPopup,
+  type RegistrationPaymentInfo,
+} from '../components/tournament/RegistrationDialogs';
 import { useT } from '../labels/LabelsContext';
 import type { Team } from '../types/team';
 import type { Tournament, TournamentParticipationMode } from '../types/tournament';
 import { isNotFoundError } from '../utils/apiError';
-import { hasFee } from '../utils/money';
+import { formatMoney, hasFee } from '../utils/money';
+import { useSportDisplayName } from '../utils/labels';
 import {
-  TEAM_EMPTY_FAILURE,
   classifyRegistrationError,
-  feeLineFor,
   teamsForSport,
   type RegistrationFailure,
 } from '../utils/registration';
@@ -58,13 +63,19 @@ export function registrationTargetFor(tournament: Tournament): RegistrationTarge
 type Phase =
   | { kind: 'closed' }
   | { kind: 'confirm'; notice: string | null }
-  | { kind: 'result'; failure: RegistrationFailure | null };
+  | { kind: 'noTeam' }
+  | { kind: 'result'; failure: RegistrationFailure | null; payment: RegistrationPaymentInfo | null };
 
 interface Options {
-  /** Runs after a successful registration (refetch the tournament and registrations), under the same correlation id. */
-  onRegistered: (correlationId: string) => Promise<void>;
+  /**
+   * Runs after a successful registration (refetch the tournament and registrations), under the same correlation id. Returns the fresh tournament,
+   * whose `my_registration` and `payment_contact_number` fill the "pay to" box of the result pop-up.
+   */
+  onRegistered: (correlationId: string) => Promise<Tournament | void>;
   onNotFound: () => void;
   onOpenSkillLevels: () => void;
+  /** Opens the Create team form ("Create a tournament team first", J5). */
+  onCreateTeam: () => void;
 }
 
 export interface TournamentRegistration {
@@ -84,6 +95,7 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const inFlight = useRef(false);
+  const sportLabel = useSportDisplayName(target?.sport ?? '');
 
   const close = useCallback(() => {
     setPhase({ kind: 'closed' });
@@ -101,12 +113,13 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
         setPhase({ kind: 'confirm', notice: null });
         return;
       }
-      // Team mode (AD-1, OI-19): read the caller's teams first. No team for this sport: no confirmation, the result pop-up says so.
+      // Team mode (AD-3): read the caller's teams first. No tournament team for this sport: no confirmation, the "Create a tournament team first"
+      // prompt (J5) opens instead. The server stays authoritative (TEAM_REQUIRED).
       withCorrelationId(correlationId => getMyTeams({ correlationId }))
         .then(all => {
           const mine = teamsForSport(all, next.sport);
           if (mine.length === 0) {
-            setPhase({ kind: 'result', failure: TEAM_EMPTY_FAILURE });
+            setPhase({ kind: 'noTeam' });
             return;
           }
           setTeams(mine);
@@ -119,7 +132,7 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
             optionsRef.current.onNotFound();
             return;
           }
-          setPhase({ kind: 'result', failure: classifyRegistrationError(error) });
+          setPhase({ kind: 'result', failure: classifyRegistrationError(error), payment: null });
         });
     },
     [close],
@@ -141,13 +154,31 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
           acceptedFeeCents: hasFee(target.feeCents) ? target.feeCents : null,
           teamId: target.mode === 'team' ? teamId : null,
         });
-        setPhase({ kind: 'result', failure: null });
+        // A free tournament shows the result at once. With a fee the pop-up waits for the refetch, because the payee number only reaches the
+        // person who registered once the server knows they have: it is read from the fresh tournament, never from the registration answer.
+        const feeApplies = hasFee(target.feeCents) && Boolean(target.currency);
+        if (!feeApplies) {
+          setPhase({ kind: 'result', failure: null, payment: null });
+        }
+        let fresh: Tournament | void;
         try {
-          await optionsRef.current.onRegistered(correlationId);
+          fresh = await optionsRef.current.onRegistered(correlationId);
         } catch (error) {
           if (isNotFoundError(error)) {
             optionsRef.current.onNotFound();
           }
+        }
+        if (feeApplies) {
+          const mine = fresh ? fresh.my_registration : null;
+          const cents = mine?.effective_fee_cents ?? mine?.fee_cents_at_registration ?? target.feeCents;
+          setPhase({
+            kind: 'result',
+            failure: null,
+            payment: {
+              amount: formatMoney(hasFee(cents) ? cents : (target.feeCents as number), target.currency as string),
+              number: mine?.payment_contact_number ?? (fresh ? fresh.payment_contact_number ?? null : null),
+            },
+          });
         }
       });
     } catch (error) {
@@ -162,7 +193,7 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
         setTarget(previous => (previous ? { ...previous, feeCents: fee, feeReadable: true } : previous));
         setPhase({ kind: 'confirm', notice: t(failure.labelKey, failure.labelParams) });
       } else {
-        setPhase({ kind: 'result', failure });
+        setPhase({ kind: 'result', failure, payment: null });
       }
     } finally {
       inFlight.current = false;
@@ -174,29 +205,64 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
     return { start, element: null };
   }
 
-  const feeLine = feeLineFor(t, target.feeCents, target.currency, target.mode);
-  const element =
-    phase.kind === 'confirm' ? (
+  const teamMode = target.mode === 'team';
+  const feeValue = !target.feeReadable
+    ? ''
+    : hasFee(target.feeCents) && target.currency
+    ? t(teamMode ? 'mob.pay.per_team' : 'mob.pay.per_player', { amount: formatMoney(target.feeCents, target.currency) })
+    : t('mob.reg.free');
+  const paymentNote =
+    target.feeReadable && hasFee(target.feeCents) ? t(teamMode ? 'mob.pay.sheet_note_team' : 'mob.pay.sheet_note_individual') : null;
+  let element: React.JSX.Element;
+  if (phase.kind === 'noTeam') {
+    element = (
+      <CreateTeamPrompt
+        tournamentName={target.name}
+        sport={sportLabel}
+        onNotNow={close}
+        onCreate={() => {
+          close();
+          optionsRef.current.onCreateTeam();
+        }}
+      />
+    );
+  } else if (phase.kind === 'confirm') {
+    element = (
       <RegistrationConfirmSheet
-        name={target.name}
-        modeLabel={target.mode === 'team' ? t('mob.reg.mode_team') : t('mob.reg.mode_individual')}
-        feeLine={feeLine}
+        title={teamMode ? t('mob.reg.sheet_title_team') : t('mob.reg.sheet_title_individual', { name: target.name })}
+        subtitle={teamMode ? t('mob.reg.sheet_sub_team') : t('mob.reg.sheet_sub_individual')}
+        entryLabel={teamMode ? null : t('mob.reg.entry_individual')}
+        feeValue={feeValue}
+        paymentNote={paymentNote}
         feeReadable={target.feeReadable}
         notice={phase.notice}
         busy={busy}
-        teams={teams ?? undefined}
+        teams={
+          teams
+            ? teams.map(team => ({
+                id: team.id,
+                label:
+                  typeof team.player_count === 'number'
+                    ? t('mob.reg.team_option', { name: team.name, sport: sportLabel, count: team.player_count })
+                    : t('mob.reg.team_option_no_count', { name: team.name, sport: sportLabel }),
+              }))
+            : undefined
+        }
         selectedTeamId={teamId}
         onSelectTeam={setTeamId}
         onConfirm={submit}
         onCancel={close}
       />
-    ) : (
+    );
+  } else {
+    element = (
       <RegistrationResultPopup
-        feeLine={feeLine}
+        subtitle={t('mob.reg.result_sub', { name: target.name, fee: feeValue })}
         failure={phase.failure}
+        payment={phase.payment}
         onRetry={() => {
           // A retry is a new user action with a fresh correlation id. Team mode whose team list never loaded starts over.
-          if (target.mode === 'team' && !teams) {
+          if (teamMode && !teams) {
             start(target);
             return;
           }
@@ -207,8 +273,10 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
           close();
           optionsRef.current.onOpenSkillLevels();
         }}
+        onChooseTeam={() => setPhase({ kind: 'confirm', notice: null })}
         onClose={close}
       />
     );
+  }
   return { start, element };
 }

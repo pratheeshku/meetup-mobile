@@ -20,6 +20,8 @@ import ErrorView from '../components/ErrorView';
 import { headerAddButton } from '../components/HeaderAddButton';
 import { UnifiedGroupCard } from '../components/home/UnifiedCard';
 import LoadingView from '../components/LoadingView';
+import SegmentedSwitch from '../components/SegmentedSwitch';
+import TeamsListContent from '../components/TeamsListContent';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { Group } from '../types/group';
 import type { GroupsStackParamList } from '../navigation/types';
@@ -37,7 +39,7 @@ const FILTER_LABEL_KEYS: Record<GroupFilter, LabelKey> = {
   Member: 'mob.groups.filter_joined',
 };
 
-export default function GroupsScreen({ navigation, route }: Props): React.JSX.Element {
+function GroupsListBody({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
   const tRef = useRef(t);
   tRef.current = t;
@@ -97,12 +99,6 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
       loadGroups(true);
     }
   }, [refreshKey, loadGroups]);
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: headerAddButton(t('mob.groups.create_a11y'), () => navigation.navigate('CreateGroup')),
-    });
-  }, [navigation, t]);
 
   const filteredGroups = useMemo(() => {
     if (activeFilter === 'Organised') {
@@ -216,7 +212,80 @@ export default function GroupsScreen({ navigation, route }: Props): React.JSX.El
   );
 }
 
+type Section = 'groups' | 'teams';
+
+/**
+ * Groups screen: a "Groups | Tournament teams" switch (the Games | Tournaments switch component) over the groups list and the caller's
+ * tournament teams (teams-payments AD-4). Both stay mounted once visited, so switching never reloads what was already read. The header "+" creates
+ * what the selected section lists. `route.params.section` (a team push, AD-15) opens with Tournament teams selected.
+ */
+export default function GroupsScreen(props: Props): React.JSX.Element {
+  const { navigation, route } = props;
+  const t = useT();
+  const requested = route.params?.section;
+  const [section, setSection] = useState<Section>(requested === 'teams' ? 'teams' : 'groups');
+  const [teamsVisited, setTeamsVisited] = useState(section === 'teams');
+  const [teamsReload, setTeamsReload] = useState(0);
+
+  const changeSection = useCallback((next: Section) => {
+    setSection(next);
+    if (next === 'teams') {
+      setTeamsVisited(true);
+      setTeamsReload(value => value + 1);
+    }
+  }, []);
+
+  // A push (or any navigation) that asks for the teams section while the screen is already open.
+  // The request is consumed (param cleared) so a later tap on Groups is not undone by the same param.
+  useEffect(() => {
+    if (requested === 'teams') {
+      if (section !== 'teams') {
+        changeSection('teams');
+      }
+      navigation.setParams?.({ section: undefined });
+    }
+  }, [requested, route.params, section, changeSection, navigation]);
+
+  const openCreateTeam = useCallback(() => navigation.navigate('CreateGroup', { kind: 'team' }), [navigation]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight:
+        section === 'teams'
+          ? headerAddButton(t('mob.teams.create_a11y'), openCreateTeam)
+          : headerAddButton(t('mob.groups.create_a11y'), () => navigation.navigate('CreateGroup')),
+    });
+  }, [navigation, t, section, openCreateTeam]);
+
+  return (
+    <View style={styles.screen}>
+      <View style={styles.switchWrap}>
+        <SegmentedSwitch<Section>
+          options={[
+            { value: 'groups', label: t('mob.groups.switch_groups') },
+            { value: 'teams', label: t('mob.groups.switch_teams') },
+          ]}
+          value={section}
+          onChange={changeSection}
+        />
+      </View>
+      <View style={[styles.flex, section === 'groups' ? null : styles.hidden]}>
+        <GroupsListBody {...props} />
+      </View>
+      {teamsVisited ? (
+        <View style={[styles.flex, section === 'teams' ? null : styles.hidden]}>
+          <TeamsListContent onCreateTeam={openCreateTeam} reloadKey={teamsReload} />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
+  hidden: { display: 'none' },
+  switchWrap: { padding: spacing.md, paddingBottom: spacing.sm },
   listContainer: {
     padding: spacing.md,
     backgroundColor: colors.background,

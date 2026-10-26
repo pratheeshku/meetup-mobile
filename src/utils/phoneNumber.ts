@@ -101,3 +101,8 @@ export function splitE164(e164: string, countries: readonly CountryCode[]): Spli
 export function countryLabel(country: CountryCode): string {
   return `${country.iso2} ${country.dial_code}`;
 }
+
+/** An E.164 payee number for display ("+65 9123 4567"); the stored text when it cannot be parsed. Never logged. */
+export function formatPayeeNumber(e164: string): string {
+  return safeParse(e164)?.formatInternational() ?? e164;
+}
