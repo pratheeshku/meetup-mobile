@@ -1,11 +1,11 @@
 /**
- * Fixtures setup for the committee, before publication (AD-T12; boards TV2MobSetupPoints, TV2MobSetupPointsErr,
- * TV2MobSetupDraw, TV2MobSetupSubmit; web reference `cnDownload`, `cnUpload`, `cnGenerate`, `cnSubmit`). Four steps:
- * (1) download the points template to the system share sheet; (2) pick the filled .xlsx from Files and upload it
- * (all or nothing: a 422 lists the rows and says nothing was saved); (3) choose the number of groups and how many
- * advance (only values the server allows, read from the draw options) and generate; the draft is shown with its groups,
- * seeds, match counts and version, and replacing an open draft is confirmed; (4) submit for review, with the waiting
- * state read from the server's request list, never from local state alone.
+ * Fixtures setup for the committee, before publication (AD-T12; boards TV2MobSetupDraw, TV2MobSetupSubmit; web reference `cnGenerate`,
+ * `cnSubmit`). Three steps: (1) the points on file: they are edited per entrant on the Participants tab, which replaced the points Excel
+ * (teams-payments AD-13: the template download and the upload are gone from the app); (2) choose the number of groups and how many advance (only
+ * values the server allows, read from the draw options) and generate: with a fee, the count of unpaid entrants left out comes first (the server's
+ * `excluded_from_fixtures`; a failed read hides Generate, never a guessed count); the draft is shown with its groups, seeds, match counts and
+ * version, and replacing an open draft is confirmed; (3) submit for review, with the waiting state read from the server's request list, never from
+ * local state alone.
  *
  * The draw, the seeds and the draft are the server's: nothing here builds, ranks or seeds. Registration ids of the draft
  * are shown as names from the participants the page already loads; an id is never shown. Role checks are UX only.
@@ -18,16 +18,16 @@ import {
   generateFixtureDraft,
   getCommitteeActions,
   getFixtureDraft,
+  getRegistrationSummary,
   submitFixturePublication,
-  uploadPoints,
 } from '../../../../api/tournaments';
 import { useT } from '../../../../labels/LabelsContext';
 import type { LabelKey } from '../../../../labels/fallbackLabels';
 import { dash } from '../../../../theme/dashboardTheme';
 import { borderWidth, colors, radius, spacing, typography } from '../../../../theme/tokens';
 import type { CommitteeSetup } from '../../../../types/tournamentScoring';
+import type { RegistrationSummary } from '../../../../types/tournament';
 import type { DraftDetail, UploadRefusal } from '../../../../types/tournamentTabs';
-import { discardPicked, downloadAndShare, pickWorkbook, XLSX_MIME, type PickedWorkbook } from '../../../../utils/fileTransfer';
 import {
   drawChoice,
   errLabelKey,
@@ -39,7 +39,7 @@ import Button from '../../../Button';
 import { CheckIcon } from '../../../icons/ActionIcons';
 import RefusalList from './RefusalList';
 import { CardHead, Chip, CommitteeNote, TabCard } from './parts';
-import WorkbookPicker from './WorkbookPicker';
+import { UnpaidWarning } from '../../participants/parts';
 
 const STEP = 28;
 
@@ -47,6 +47,8 @@ export interface FixturesSetupProps {
   tournamentId: string;
   /** File name stem for downloads, from the tournament's title (never an id). */
   fileStem: string;
+  /** A team tournament: the excluded count reads "tournament teams". */
+  teamMode?: boolean;
   /** The server's `committee` block of `scoring/state` (points, latest draft, draw options). */
   setup: CommitteeSetup | null;
   /** `registration_phase`: the template, the upload and the draw need `frozen`. */
@@ -111,13 +113,12 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
   const latest = setup?.latest_draft ?? null;
   const openDraft = latest && latest.status === 'draft' ? latest : null;
 
-  const [file, setFile] = useState<PickedWorkbook | null>(null);
-  const [pointsNote, setPointsNote] = useState<Note>(null);
-  const [downloadNote, setDownloadNote] = useState<string | null>(null);
+  // The server's summary: the unpaid entrants a generation would leave out. `undefined` = loading, `null` = the read failed.
+  const [summary, setSummary] = useState<RegistrationSummary | null | undefined>(undefined);
   const [pick, setPick] = useState<{ groupCount: number | null; advance: number | null }>({ groupCount: null, advance: null });
   const [generateNote, setGenerateNote] = useState<Note>(null);
   const [submitNote, setSubmitNote] = useState<Note>(null);
-  const [busy, setBusy] = useState<'download' | 'upload' | 'generate' | 'submit' | null>(null);
+  const [busy, setBusy] = useState<'generate' | 'submit' | null>(null);
   const [draft, setDraft] = useState<DraftDetail | null>(null);
   const [pending, setPending] = useState<{ pending: boolean; createdAt: string | null }>({ pending: false, createdAt: null });
 
@@ -155,56 +156,16 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
     return refusal.status === 0 ? { ok: false, text: t('mob.scoring.error.generic') } : { ok: false, refusal };
   };
 
-  const download = async (): Promise<void> => {
-    setBusy('download');
-    setDownloadNote(null);
-    try {
-      await withCorrelationId(correlationId =>
-        downloadAndShare(`/tournaments/${tournamentId}/points/template`, `${props.fileStem}-points.xlsx`, correlationId),
-      );
-    } catch {
-      setDownloadNote(t('mob.scoring.download.failed'));
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const choose = async (): Promise<void> => {
-    try {
-      const picked = await pickWorkbook();
-      if (picked) {
-        if (file) {
-          await discardPicked(file.uri);
-        }
-        setFile(picked);
-        setPointsNote(null);
-      }
-    } catch {
-      setPointsNote({ ok: false, text: t('mob.scoring.error.generic') });
-    }
-  };
-
-  const upload = async (): Promise<void> => {
-    if (!file) {
-      setPointsNote({ ok: false, text: t('mob.scoring.draw.choose_file') });
-      return;
-    }
-    setBusy('upload');
-    setPointsNote(null);
-    try {
-      const accepted = await withCorrelationId(correlationId =>
-        uploadPoints(tournamentId, { uri: file.uri, name: file.name, type: XLSX_MIME }, { correlationId }),
-      );
-      setPointsNote({ ok: true, text: t('mob.scoring.draw.upload_ok', { ...accepted }) });
-      await discardPicked(file.uri);
-      setFile(null);
-      props.onChanged();
-    } catch (e) {
-      setPointsNote(refusalNote(e));
-    } finally {
-      setBusy(null);
-    }
-  };
+  // Read when the setup opens and whenever the server's state changes (a draft, the points): the count is never kept or guessed locally.
+  useEffect(() => {
+    let active = true;
+    withCorrelationId(correlationId => getRegistrationSummary(tournamentId, { correlationId }))
+      .then(next => active && setSummary(next))
+      .catch(() => active && setSummary(null));
+    return () => {
+      active = false;
+    };
+  }, [tournamentId, draftId, points?.entrants, points?.rated]);
 
   const runGenerate = async (): Promise<void> => {
     if (choice.advance === null) {
@@ -214,10 +175,15 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
     setGenerateNote(null);
     setSubmitNote(null);
     try {
-      await withCorrelationId(correlationId =>
+      const generated = await withCorrelationId(correlationId =>
         generateFixtureDraft(tournamentId, { group_count: choice.groupCount, advance_per_group: choice.advance as number }, { correlationId }),
       );
-      setGenerateNote({ ok: true, text: t('mob.scoring.draw.generated_ok') });
+      // `excluded_unpaid` is the number actually left out at generation time (a toggle between view and generate cannot be misreported).
+      const excluded = generated?.excludedUnpaid ?? 0;
+      setGenerateNote({
+        ok: true,
+        text: excluded > 0 ? `${t('mob.scoring.draw.generated_ok')} ${t('mob.scoring.draw.excluded_line', { count: excluded })}` : t('mob.scoring.draw.generated_ok'),
+      });
       props.onChanged();
     } catch (e) {
       setGenerateNote(refusalNote(e));
@@ -282,7 +248,9 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
       ? errLabelKey('POINTS_REQUIRED')
       : choice.groupCounts.length === 0 || choice.advanceOptions.length === 0
         ? 'mob.scoring.draw.blocked.no_options'
-        : null;
+        : summary === null
+          ? 'mob.scoring.draw.summary_failed_generate'
+          : null;
   const pointsLocked = Boolean(points?.locked);
 
   return (
@@ -296,17 +264,8 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
 
       <TabCard testID="setup-points">
         <Step n={1} done={Boolean(points)} title={t('mob.scoring.draw.step_points')} />
-        <Text style={styles.body}>{t('mob.scoring.draw.points_intro')}</Text>
-        <Button
-          label={t('mob.scoring.draw.download_template')}
-          onPress={download}
-          loading={busy === 'download'}
-          disabled={!frozen}
-          style={styles.button}
-          testID="setup-download"
-        />
-        {downloadNote ? <Text style={[styles.note, styles.noteBad]}>{downloadNote}</Text> : null}
-        <Text style={styles.body}>
+        <Text style={styles.body}>{t('mob.scoring.draw.points_moved')}</Text>
+        <Text style={styles.body} testID="setup-points-status">
           {points
             ? t('mob.scoring.draw.points_on_file', {
                 entrants: points.entrants,
@@ -317,19 +276,6 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
             : t('mob.scoring.draw.points_none')}
         </Text>
         {pointsLocked ? <Text style={styles.body}>{t('mob.scoring.err.POINTS_LOCKED')}</Text> : null}
-        {!pointsLocked ? (
-          <>
-            {file ? (
-              <WorkbookPicker file={file} onChange={choose} testID="setup-file" />
-            ) : (
-              <Button label={t('mob.scoring.draw.upload_label')} variant="secondary" onPress={choose} disabled={!frozen} style={styles.button} testID="setup-choose" />
-            )}
-            {file ? (
-              <Button label={t('mob.scoring.draw.upload')} onPress={upload} loading={busy === 'upload'} style={styles.button} testID="setup-upload" />
-            ) : null}
-          </>
-        ) : null}
-        {noteView(pointsNote)}
       </TabCard>
 
       <TabCard testID="setup-draw">
@@ -337,6 +283,9 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
         {generateBlocked ? <Text style={styles.body}>{t(generateBlocked)}</Text> : null}
         {!generateBlocked ? (
           <>
+            {summary && summary.payments_enabled ? (
+              <UnpaidWarning count={summary.excluded_from_fixtures} teamMode={props.teamMode === true} />
+            ) : null}
             <Text style={styles.label}>{t('mob.scoring.draw.group_count')}</Text>
             <Choice
               options={choice.groupCounts}

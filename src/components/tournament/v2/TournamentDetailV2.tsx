@@ -206,6 +206,7 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
             registrations={props.registrations}
             isCommittee={isCommittee}
             phase={scoring?.registration_phase ?? null}
+            pointsApplicable={Boolean(scoring?.enabled && scoring?.applicable)}
             responses={props.responses}
             onChanged={props.onChanged}
           />
@@ -223,6 +224,7 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
             phase={scoring?.registration_phase ?? null}
             names={names}
             fileStem={fileStem}
+            teamMode={tournament.participation_mode === 'team'}
             onChanged={props.onChanged}
           />
         );

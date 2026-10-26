@@ -929,7 +929,11 @@ async function postWorkbook<T>(path: string, file: UploadFile, options?: Request
   return data;
 }
 
-/** `POST /tournaments/{id}/points` (all or nothing): 422 lists the row errors and nothing is saved. */
+/**
+ * `POST /tournaments/{id}/points` (all or nothing): 422 lists the row errors and nothing is saved.
+ * Deprecated (teams-payments AD-13): the app no longer calls it. Points are edited per entrant (`setRegistrationPoints`); the server keeps the route
+ * for older apps until the sunset.
+ */
 export async function uploadPoints(id: string, file: UploadFile, options?: RequestOptions): Promise<PointsAccepted> {
   const data = await postWorkbook<Partial<PointsAccepted>>(`/tournaments/${id}/points`, file, options);
   return { entrants: data.entrants ?? 0, rated: data.rated ?? 0, unrated: data.unrated ?? 0 };

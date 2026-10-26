@@ -220,7 +220,10 @@ describe('Participants (TV2MobOpenParticipants)', () => {
     await press(root, 'tournament-tab-participants');
     expect(everyText(root)).toContain('Add or remove players until the roster is frozen on');
     await press(root, 'participant-remove-r2');
-    await alertPress('Remove player');
+    await alertPress('Remove from tournament');
+    // teams-payments AD-12: the row menu leads to "Are you sure?"; nothing is deleted until Yes.
+    expect(del).not.toHaveBeenCalled();
+    await press(root, 'remove-yes');
     expect(del.mock.calls[0][0]).toBe('/tournaments/t-1/registrations/r2');
     expect(del.mock.calls[0][1].correlationId).toEqual(expect.any(String));
 

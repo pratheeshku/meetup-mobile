@@ -59,6 +59,8 @@ export interface FixturesTabProps {
   phase: string | null;
   names: ReadonlyMap<string, string>;
   fileStem: string;
+  /** A team tournament (the excluded count reads "tournament teams"). */
+  teamMode?: boolean;
   /** Something changed on the server that the page's scoring state shows: the host reads it again. */
   onChanged: () => void;
 }
@@ -99,6 +101,7 @@ export default function FixturesTab(props: FixturesTabProps): React.JSX.Element 
       <FixturesSetup
         tournamentId={props.tournamentId}
         fileStem={props.fileStem}
+        teamMode={props.teamMode}
         setup={props.setup}
         phase={props.phase}
         names={props.names}

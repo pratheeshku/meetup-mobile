@@ -1,6 +1,6 @@
 /**
  * Fixtures setup, Review fixtures and the results file on the version 2 tournament page (te-a3, AD-T12; boards
- * TV2MobSetupPoints, TV2MobSetupPointsErr, TV2MobSetupDraw, TV2MobSetupSubmit, TV2MobSetupResultsFile,
+ * TV2MobSetupDraw, TV2MobSetupSubmit, TV2MobSetupResultsFile,
  * TV2MobReviewFixtures). The real screen, tabs and API layer run; the HTTP client, the document picker, the file store
  * and the native alert are doubles. Checks the four steps, the server-driven options and waiting state, names for ids,
  * the refusal lists, and that Reject sends no reason.
@@ -133,86 +133,79 @@ beforeEach(() => {
 });
 afterEach(() => jest.restoreAllMocks());
 
-describe('Step 1: the points template', () => {
-  it('before registration is frozen it says so and the template cannot be downloaded', async () => {
+describe('Step 1: the points (the points Excel is retired, teams-payments AD-13)', () => {
+  it('has no template download and no upload: points are entered on the Participants tab', async () => {
+    const root = await open();
+    expect(byId(root, 'setup-download')).toHaveLength(0);
+    expect(byId(root, 'setup-choose')).toHaveLength(0);
+    expect(byId(root, 'setup-upload')).toHaveLength(0);
+    expect(all(byId(root, 'setup-points')[0])).toContain('Points are entered on the Participants tab');
+    expect(get.mock.calls.some(c => String(c[0]).endsWith('/points/template'))).toBe(false);
+  });
+
+  it('before registration is frozen it says so', async () => {
     reset({ phase: 'committee_only' });
     const root = await open();
     expect(all(byId(root, 'fixtures-setup')[0])).toContain('Registration has not closed yet.');
-    expect(node(root, 'setup-download').props.disabled).toBe(true);
-    expect(node(root, 'setup-choose').props.disabled).toBe(true);
   });
 
-  it('downloads through the client with one correlation id and hands the file to the share sheet', async () => {
+  it('keeps the setup note and shows the points on file from the server', async () => {
+    reset({ committee: { points: { entrants: 6, rated: 5, unrated: 1, locked: true, uploaded_at: null }, latest_draft: null, group_options: null } });
     const root = await open();
     expect(all(byId(root, 'fixtures-setup')[0])).toContain('Players cannot see these fixtures until a second committee member approves.');
-    await press(root, 'setup-download');
-    const call = get.mock.calls.find(c => c[0] === '/tournaments/t-1/points/template')!;
-    expect(call[1]).toMatchObject({ responseType: 'arraybuffer', correlationId: expect.any(String) });
-    expect(ReactNativeBlobUtil.fs.writeFile).toHaveBeenCalledWith('/cache/punggol-open-2026-points.xlsx', 'AQID', 'base64');
-    expect(ReactNativeBlobUtil.ios.presentOptionsMenu).toHaveBeenCalledWith('/cache/punggol-open-2026-points.xlsx');
-  });
-
-  it('a failed download says so', async () => {
-    const root = await open();
-    get.mockRejectedValueOnce(new Error('x'));
-    await press(root, 'setup-download');
-    expect(all(root)).toContain('The file could not be downloaded.');
+    expect(all(byId(root, 'setup-points-status')[0])).toContain('6 entries, 5 rated, 1 unrated');
+    expect(all(byId(root, 'setup-points')[0])).toContain('locked');
   });
 });
 
-describe('Step 2: upload the filled file', () => {
-  it('picks from Files, uploads one multipart file, reports the counts, deletes its copy and refreshes the state', async () => {
-    const root = await open();
-    (pick as jest.Mock).mockResolvedValueOnce([picked]);
-    await press(root, 'setup-choose');
-    expect(all(byId(root, 'setup-file')[0])).toContain('points.xlsx');
-    expect(all(byId(root, 'setup-file')[0])).toContain('18 KB');
-    post.mockResolvedValueOnce({ data: { entrants: 24, rated: 20, unrated: 4 } });
-    const before = get.mock.calls.filter(c => c[0] === '/tournaments/t-1/scoring/state').length;
-    await press(root, 'setup-upload');
-    const [url, form, config] = post.mock.calls[0];
-    expect(url).toBe('/tournaments/t-1/points');
-    expect(form).toBeInstanceOf(FormData);
-    expect(config.headers['Content-Type']).toBe('multipart/form-data');
-    expect(config.correlationId).toEqual(expect.any(String));
-    expect(all(root)).toContain('Points accepted: 24 entries, 20 rated, 4 unrated.');
-    expect(ReactNativeBlobUtil.fs.unlink).toHaveBeenCalledWith('/tmp/points.xlsx');
-    expect(byId(root, 'setup-file')).toHaveLength(0);
-    expect(get.mock.calls.filter(c => c[0] === '/tournaments/t-1/scoring/state').length).toBeGreaterThan(before);
+describe('unpaid entrants left out of the draw (teams-payments AD-10)', () => {
+  const withPoints = { points: { entrants: 4, rated: 4, unrated: 0, locked: false, uploaded_at: null }, latest_draft: null, group_options: { suggested: 2, allowed: [2], advance_per_group_allowed: [1] } };
+  const summary = (over: Record<string, unknown> = {}) => ({
+    payments_enabled: true, registered: 6, paid: 4, unpaid: 2, exempt: 0, collected_cents: 4000, currency: 'SGD', fee_cents: 1000, excluded_from_fixtures: 2, points_locked: false, ...over,
+  });
+  const withSummary = (data: unknown): void => {
+    const previous = get.getMockImplementation()!;
+    get.mockImplementation((url: string) => (url === '/tournaments/t-1/registrations/summary' ? (data instanceof Error ? Promise.reject(data) : Promise.resolve({ data })) : previous(url)));
+  };
+  const openWith = async (data: unknown): Promise<Instance> => {
+    reset({ committee: withPoints });
+    const root = await mount();
+    withSummary(data);
+    await press(root, 'tournament-tab-fixtures');
+    return root;
+  };
+
+  it('shows the server\'s excluded count before the draw controls, as unpaid players', async () => {
+    reset({ committee: withPoints });
+    const previous = get;
+    const root = await (async () => {
+      const r = await mount();
+      withSummary(summary());
+      await press(r, 'tournament-tab-fixtures');
+      return r;
+    })();
+    expect(previous).toBe(get);
+    expect(all(byId(root, 'participants-warning')[0])).toContain('2 unpaid players will be left out of fixtures.');
   });
 
-  it('on 422 lists the rows with their reasons and says nothing was saved (TV2MobSetupPointsErr)', async () => {
-    const root = await open();
-    (pick as jest.Mock).mockResolvedValueOnce([picked]);
-    await press(root, 'setup-choose');
-    post.mockRejectedValueOnce(
-      refusal(422, { detail: 'The file was not accepted; nothing was stored', code: 'POINTS_UPLOAD_INVALID', error_count: 3, errors: [{ row: 7, column: 'Points', code: 'POINTS_NOT_NUMERIC' }, { row: 12, column: 'Registration', code: 'UNKNOWN_REGISTRATION' }, { row: 19, column: 'Points', code: 'POINTS_NEGATIVE' }] }),
-    );
-    await press(root, 'setup-upload');
-    const text = all(byId(root, 'upload-refusal')[0]);
-    expect(text).toContain('The points file was not accepted. Nothing was saved.');
-    expect(text).toContain('Row 7, Points: Points must be a number or left blank.');
-    expect(text).toContain('Row 12, Registration: This entry is not registered in the tournament.');
-    expect(text).toContain('Row 19, Points: Points cannot be negative.');
-    // the picked file stays so it can be replaced
-    expect(byId(root, 'setup-file')).toHaveLength(1);
+  it('shows nothing about payment when the tournament is free (payments off)', async () => {
+    const root = await openWith(summary({ payments_enabled: false, fee_cents: null, excluded_from_fixtures: 0, paid: 0, unpaid: 0 }));
+    expect(byId(root, 'participants-warning')).toHaveLength(0);
+    expect(byId(root, 'setup-generate')).not.toHaveLength(0);
   });
 
-  it('a file that is too large shows the server\'s refusal, not a device limit', async () => {
-    const root = await open();
-    (pick as jest.Mock).mockResolvedValueOnce([picked]);
-    await press(root, 'setup-choose');
-    post.mockRejectedValueOnce(refusal(422, { code: 'FILE_TOO_LARGE', error_count: 1, errors: [{ row: null, column: null, code: 'FILE_TOO_LARGE' }] }));
-    await press(root, 'setup-upload');
-    expect(all(byId(root, 'upload-refusal')[0])).toContain('The file is too large.');
+  it('a failed summary read hides Generate and says why, never a guessed count', async () => {
+    const root = await openWith(new Error('down'));
+    expect(byId(root, 'setup-generate')).toHaveLength(0);
+    expect(byId(root, 'participants-warning')).toHaveLength(0);
+    expect(all(byId(root, 'setup-draw')[0])).toContain('Generating is unavailable until the payment totals can be read.');
   });
 
-  it('a cancelled picker changes nothing', async () => {
-    const root = await open();
-    (pick as jest.Mock).mockRejectedValueOnce({ code: 'OPERATION_CANCELED' });
-    await press(root, 'setup-choose');
-    expect(byId(root, 'setup-file')).toHaveLength(0);
-    expect(post).not.toHaveBeenCalled();
+  it('the generate answer reports the number actually left out', async () => {
+    const root = await openWith(summary());
+    post.mockResolvedValueOnce({ data: { ...draftRaw, excluded_unpaid: 2 } });
+    await press(root, 'setup-generate');
+    expect(all(root)).toContain('2 unpaid left out of the draft.');
   });
 });
 
@@ -221,7 +214,7 @@ describe('Step 3: the draw', () => {
 
   it('needs the points first', async () => {
     const root = await open();
-    expect(all(byId(root, 'setup-draw')[0])).toContain('Upload the points before generating the fixture.');
+    expect(all(byId(root, 'setup-draw')[0])).toContain('Enter points for at least one entrant');
     expect(byId(root, 'setup-generate')).toHaveLength(0);
   });
 
