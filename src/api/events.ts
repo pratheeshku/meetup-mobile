@@ -16,6 +16,7 @@
  * fallback.
  */
 import { apiClient } from './client';
+import type { RegistrationSummary } from '../types/tournament';
 import type { UserCardOut } from '../types/userMenu';
 import type {
   ClosureResponse,
@@ -515,6 +516,44 @@ export async function respondToEventInvitation(
     { correlationId: options?.correlationId },
   );
   return data;
+}
+
+function gameSummary(raw: Partial<RegistrationSummary> | null | undefined): RegistrationSummary {
+  const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  return {
+    payments_enabled: raw?.payments_enabled === true,
+    registered: n(raw?.registered),
+    paid: n(raw?.paid),
+    unpaid: n(raw?.unpaid),
+    exempt: n(raw?.exempt),
+    collected_cents: n(raw?.collected_cents),
+    currency: typeof raw?.currency === 'string' ? raw.currency : '',
+    fee_cents: typeof raw?.fee_cents === 'number' ? raw.fee_cents : null,
+    // Tournament-only figures; a game has no fixtures.
+    excluded_from_fixtures: 0,
+    points_locked: false,
+  };
+}
+
+/** `GET /events/{id}/payments/summary` (organizer only): every figure is the server's (teams-payments AD-9, v1.2 game panel). */
+export async function getGamePaymentSummary(id: string, options?: RequestOptions): Promise<RegistrationSummary> {
+  const { data } = await apiClient.get<Partial<RegistrationSummary>>(`/events/${id}/payments/summary`, { correlationId: options?.correlationId });
+  return gameSummary(data);
+}
+
+/** `PUT /events/{id}/participants/{user_id}/payment` `{received}`: idempotent set; the answer carries the fresh summary. */
+export async function setGameParticipantPayment(
+  id: string,
+  userId: string,
+  received: boolean,
+  options?: RequestOptions,
+): Promise<{ payment_received_at: string | null; summary: RegistrationSummary }> {
+  const { data } = await apiClient.put<{ payment_received_at?: string | null; summary?: Partial<RegistrationSummary> }>(
+    `/events/${id}/participants/${userId}/payment`,
+    { received },
+    { correlationId: options?.correlationId },
+  );
+  return { payment_received_at: data?.payment_received_at ?? null, summary: gameSummary(data?.summary) };
 }
 
 /** `POST /events/{id}/decline` (DES-MEETUP-ADDENDUM-decline-response AD-3). */

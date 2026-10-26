@@ -46,6 +46,7 @@ import {
 import { getClientConfig, getGameLimits } from '../api/config';
 import { getMyGroups } from '../api/groups';
 import GameFeeFields, { parseGameFee, type GameFeeConfig } from '../components/GameFeeFields';
+import GamePaymentsPanel from '../components/GamePaymentsPanel';
 import PaymentCard from '../components/tournament/PaymentCard';
 import { gameFeeTarget, useGameFeeJoin } from '../hooks/useGameFeeJoin';
 import { centsToAmountText, hasFee } from '../utils/money';
@@ -1695,6 +1696,10 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           ) : null}
 
           {feeJoin.element}
+          {/* Organizer payments panel (teams-payments v1.2): only while the game fee is on and above 0. */}
+          {isOrganiser && gameFee !== null && hasFee(event.registration_fee_cents) ? (
+            <GamePaymentsPanel eventId={eventId} eventTitle={event.title} organizerId={event.organiser_id} participants={participants} />
+          ) : null}
           {/* Payment card (teams-payments AD-7, J7 for games): a participant who is going and owes a fee. */}
           {event.my_participation?.status === 'going' ? (
             <PaymentCard

@@ -1912,5 +1912,15 @@ export const DEFAULT_LABELS = {
   'mob.scoring.draw.points_moved': 'Points are entered on the Participants tab, one number per player or tournament team. They lock when the first draft is generated.',
   'mob.scoring.draw.excluded_line': '{count} unpaid left out of the draft.',
   'mob.scoring.draw.summary_failed_generate': 'Generating is unavailable until the payment totals can be read. Try again.',
+
+  // tp-mobile: game payments panel (v1.2) (new, not seeded: listed in the report).
+  'mob.pay.err.payment_not_applicable': 'Only a player who is going can have a payment.',
+  'mob.pay.err.event_not_active': 'This game is cancelled, so payments can no longer be changed.',
+  'mob.pay.err.participant_not_found': 'This player could not be found. They may have left the game.',
+  'mob.part.game_title': 'Payments',
+  'mob.part.game_subtitle': '{name} · {fee}',
+  'mob.part.game_warn_one': '1 player has not paid yet.',
+  'mob.part.game_warn_other': '{count} players have not paid yet.',
+  'mob.part.game_empty': 'No players have joined yet.',
 } as const;
 

@@ -178,6 +178,11 @@ export interface EventParticipant {
   /** `user_photo_url` from `GET /events/{id}/participants`; initials are shown when null. */
   user_photo_url?: string | null;
   is_checked_in?: boolean;
+  /** teams-payments AD-9: set by `GET /events/{id}/participants` for the organizer (every row); null for everyone else. */
+  payment_received_at?: string | null;
+  effective_fee_cents?: number | null;
+  /** The organizer's own row: no payment, no Paid switch. */
+  payment_exempt?: boolean;
 }
 
 /**

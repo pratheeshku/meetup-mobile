@@ -42,6 +42,10 @@ const CODE_LABELS = {
   REGISTRATION_NOT_FOUND: 'mob.reg.err.registration_not_found',
   NOT_AUTHORIZED: 'mob.reg.err.not_authorized',
   NO_FEE: 'mob.reg.err.no_fee',
+  // Game payments (v1.2 game panel): not in the M1 seed, so `mob.pay.err.*` (listed in the report).
+  PAYMENT_NOT_APPLICABLE: 'mob.pay.err.payment_not_applicable',
+  EVENT_NOT_ACTIVE: 'mob.pay.err.event_not_active',
+  PARTICIPANT_NOT_FOUND: 'mob.pay.err.participant_not_found',
   FEE_INVALID: 'mob.reg.err.fee_invalid',
   PAYMENT_NUMBER_REQUIRED: 'mob.reg.err.payment_number_required',
   PAYMENT_NUMBER_INVALID: 'mob.reg.err.payment_number_invalid',
