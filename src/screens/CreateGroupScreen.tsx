@@ -3,7 +3,7 @@
  * REQ-MEETUP Addendum B R-200–R-207 for the Team entity).
  *
  * Single screen with a Players Group / Tournament Team toggle at top
- * (default: Players Group). Toggle changes the visible field set and
+ * (default: Players Group; `route.params.kind === 'team'` opens on Tournament Team). Toggle changes the visible field set and
  * submit target within the same screen — not a screen navigation.
  *
  * Both forms' state is declared unconditionally at this component's top
@@ -34,7 +34,7 @@ import OptionChips from '../components/OptionChips';
 import type { ChipOption } from '../components/OptionChips';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import TextField from '../components/TextField';
-import { getLabel, useLabels, useT } from '../labels/LabelsContext';
+import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
 import { useFieldChain } from '../hooks/useFieldChain';
 import { colors, spacing, typography } from '../theme/tokens';
@@ -43,6 +43,7 @@ import type { TeamVisibility } from '../types/team';
 import { rememberGroupCreateDraft } from '../navigation/groupCreateDraft';
 import { showCompletion } from '../navigation/showCompletion';
 import { getApiErrorMessage } from '../utils/apiError';
+import { refusalText } from '../utils/refusal';
 import { isPickerCancelled, pickImage, type PickedImage } from '../utils/imagePicker';
 import type { GroupsStackParamList } from '../navigation/types';
 
@@ -52,8 +53,7 @@ type GroupKind = 'group' | 'team';
 
 const NAME_MAX_LENGTH = 100;
 
-export default function CreateGroupScreen({ navigation }: Props): React.JSX.Element {
-  const labels = useLabels();
+export default function CreateGroupScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
   const tRef = useRef(t);
   tRef.current = t;
@@ -61,7 +61,8 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
     { value: 'group', label: t('mob.create_group.mode_group'), icon: <GroupsIcon size={18} /> },
     { value: 'team', label: t('mob.create_group.mode_team'), icon: <ShieldIcon size={18} /> },
   ];
-  const [mode, setMode] = useState<GroupKind>('group');
+  // `kind: 'team'` (the "Create a tournament team first" prompt, the Tournament teams list) opens the form on Tournament team.
+  const [mode, setMode] = useState<GroupKind>(route.params?.kind === 'team' ? 'team' : 'group');
 
   // Sports loading — only needed for Tournament Team mode, but loaded
   // on mount (same as CreateGameScreen) so the dropdown is ready when
@@ -211,7 +212,7 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
         );
       });
       const visibilityKey: LabelKey =
-        tVisibility === 'private' ? 'team_visibility.private' : 'team_visibility.public';
+        tVisibility === 'private' ? 'mob.teams.visibility_private' : 'mob.teams.visibility_public';
       const sportName = sports.find(item => item.name === tSport)?.display_name ?? tSport;
       showCompletion({
         flow: 'team_created',
@@ -223,7 +224,8 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
         primary: 'dashboard',
       });
     } catch (e) {
-      setError(getApiErrorMessage(e, t('mob.create_group.err_team_create')));
+      // TEAM_NAME_TAKEN (409) and the other coded refusals show their own label; a server detail is never shown (teams-payments AD-1).
+      setError(refusalText(e, t, 'mob.create_group.err_team_create'));
       setIsSubmitting(false);
     }
   };
@@ -245,14 +247,14 @@ export default function CreateGroupScreen({ navigation }: Props): React.JSX.Elem
    * Team visibility — `public` or `private` only.
    *
    * ⚠️ Distinct enum from Event visibility (public/invite_only/group)
-   * and Tournament visibility (public/invite/group). Words sourced from
-   * `GET /api/labels` (`team_visibility.*`) — its own key prefix, not
-   * aliased to either existing visibility lookup, and never
+   * and Tournament visibility (public/invite/group). Words are the
+   * `mob.teams.visibility_*` labels (teams-payments AD-4: "Open to join requests" / "Invite only") — its own
+   * keys, not aliased to either existing visibility lookup, and never
    * `group_visibility` (the real backend field is `teams.visibility`).
    */
   const TEAM_VISIBILITY_OPTIONS: ChipOption<TeamVisibility>[] = [
-    { value: 'public', label: getLabel(labels, 'team_visibility.public') },
-    { value: 'private', label: getLabel(labels, 'team_visibility.private') },
+    { value: 'public', label: t('mob.teams.visibility_public') },
+    { value: 'private', label: t('mob.teams.visibility_private') },
   ];
 
   return (

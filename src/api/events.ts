@@ -16,6 +16,7 @@
  * fallback.
  */
 import { apiClient } from './client';
+import type { RegistrationSummary } from '../types/tournament';
 import type { UserCardOut } from '../types/userMenu';
 import type {
   ClosureResponse,
@@ -24,6 +25,7 @@ import type {
   Event,
   EventClosurePut,
   EventInvitation,
+  EventMyParticipation,
   EventsListResponse,
   EventSkillLevel,
   EventVisibility,
@@ -112,6 +114,27 @@ export interface EventApiItem {
   group_ids?: string[] | null;
   group_names?: string[] | null;
   my_declined?: boolean | null;
+  /** teams-payments AD-8, AD-7, AD-9. */
+  registration_fee_cents?: number | null;
+  registration_fee_currency?: string | null;
+  payment_contact_number?: string | null;
+  my_participation?: Partial<EventMyParticipation> | null;
+}
+
+function normaliseMyParticipation(raw: Partial<EventMyParticipation> | null | undefined): EventMyParticipation | null {
+  if (!raw || typeof raw.status !== 'string') {
+    return null;
+  }
+  const number = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+  return {
+    status: raw.status,
+    fee_cents_at_join: number(raw.fee_cents_at_join),
+    effective_fee_cents: number(raw.effective_fee_cents),
+    payment_received_at: typeof raw.payment_received_at === 'string' ? raw.payment_received_at : null,
+    payment_exempt: raw.payment_exempt === true,
+    payment_contact_number:
+      typeof raw.payment_contact_number === 'string' && raw.payment_contact_number.trim() ? raw.payment_contact_number.trim() : null,
+  };
 }
 
 /**
@@ -206,6 +229,11 @@ export function mapEventApiItem(raw: EventApiItem): Event {
     lifecycle_status: resolveLifecycleStatus(raw),
     closure_outcome: raw.closure_outcome ?? null,
     my_declined: Boolean(raw.my_declined),
+    registration_fee_cents: typeof raw.registration_fee_cents === 'number' ? raw.registration_fee_cents : null,
+    registration_fee_currency:
+      typeof raw.registration_fee_currency === 'string' && raw.registration_fee_currency ? raw.registration_fee_currency : null,
+    payment_contact_number: raw.payment_contact_number?.trim() ? raw.payment_contact_number.trim() : null,
+    my_participation: normaliseMyParticipation(raw.my_participation),
   };
 }
 
@@ -259,10 +287,15 @@ export async function createEvent(
  * - Join  -> `{ action: "going" }`
  * - Leave -> `{ action: "withdrawn" }`
  */
-export async function rsvpEvent(id: string, options?: RequestOptions): Promise<void> {
+export async function rsvpEvent(
+  id: string,
+  options?: RequestOptions & { acceptedFeeCents?: number | null },
+): Promise<void> {
+  // teams-payments AD-8: a game with a fee needs the fee the person saw and confirmed; a free game sends none (old apps keep working).
+  const fee = options?.acceptedFeeCents;
   await apiClient.post(
     `/events/${id}/rsvp`,
-    { action: 'going' },
+    typeof fee === 'number' ? { action: 'going', accepted_fee_cents: fee } : { action: 'going' },
     { correlationId: options?.correlationId },
   );
 }
@@ -325,6 +358,12 @@ export async function updateEvent(
   }
   if (input.estimated_cost_currency !== undefined) {
     payload.estimated_cost_currency = input.estimated_cost_currency;
+  }
+  if (input.registration_fee_cents !== undefined) {
+    payload.registration_fee_cents = input.registration_fee_cents;
+  }
+  if (input.payment_contact_number !== undefined) {
+    payload.payment_contact_number = input.payment_contact_number;
   }
 
   const { data } = await apiClient.patch<EventApiItem>(`/events/${id}`, payload, {
@@ -468,14 +507,53 @@ export async function putEventClosure(
 export async function respondToEventInvitation(
   id: string,
   accept: boolean,
-  options?: RequestOptions,
+  options?: RequestOptions & { acceptedFeeCents?: number | null },
 ): Promise<{ participation_status?: string | null }> {
+  const fee = options?.acceptedFeeCents;
   const { data } = await apiClient.post<{ participation_status?: string | null }>(
     `/events/${id}/invitations/respond`,
-    { accept },
+    accept && typeof fee === 'number' ? { accept, accepted_fee_cents: fee } : { accept },
     { correlationId: options?.correlationId },
   );
   return data;
+}
+
+function gameSummary(raw: Partial<RegistrationSummary> | null | undefined): RegistrationSummary {
+  const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  return {
+    payments_enabled: raw?.payments_enabled === true,
+    registered: n(raw?.registered),
+    paid: n(raw?.paid),
+    unpaid: n(raw?.unpaid),
+    exempt: n(raw?.exempt),
+    collected_cents: n(raw?.collected_cents),
+    currency: typeof raw?.currency === 'string' ? raw.currency : '',
+    fee_cents: typeof raw?.fee_cents === 'number' ? raw.fee_cents : null,
+    // Tournament-only figures; a game has no fixtures.
+    excluded_from_fixtures: 0,
+    points_locked: false,
+  };
+}
+
+/** `GET /events/{id}/payments/summary` (organizer only): every figure is the server's (teams-payments AD-9, v1.2 game panel). */
+export async function getGamePaymentSummary(id: string, options?: RequestOptions): Promise<RegistrationSummary> {
+  const { data } = await apiClient.get<Partial<RegistrationSummary>>(`/events/${id}/payments/summary`, { correlationId: options?.correlationId });
+  return gameSummary(data);
+}
+
+/** `PUT /events/{id}/participants/{user_id}/payment` `{received}`: idempotent set; the answer carries the fresh summary. */
+export async function setGameParticipantPayment(
+  id: string,
+  userId: string,
+  received: boolean,
+  options?: RequestOptions,
+): Promise<{ payment_received_at: string | null; summary: RegistrationSummary }> {
+  const { data } = await apiClient.put<{ payment_received_at?: string | null; summary?: Partial<RegistrationSummary> }>(
+    `/events/${id}/participants/${userId}/payment`,
+    { received },
+    { correlationId: options?.correlationId },
+  );
+  return { payment_received_at: data?.payment_received_at ?? null, summary: gameSummary(data?.summary) };
 }
 
 /** `POST /events/{id}/decline` (DES-MEETUP-ADDENDUM-decline-response AD-3). */

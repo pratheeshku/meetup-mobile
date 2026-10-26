@@ -23,6 +23,8 @@ interface TeamApiItem {
   visibility: string;
   captain_user_id: string;
   created_at: string;
+  player_count?: number | null;
+  my_role?: string | null;
 }
 
 function mapTeamApiItem(raw: TeamApiItem): Team {
@@ -33,6 +35,8 @@ function mapTeamApiItem(raw: TeamApiItem): Team {
     visibility: raw.visibility,
     captain_user_id: raw.captain_user_id,
     created_at: raw.created_at,
+    player_count: typeof raw.player_count === 'number' ? raw.player_count : null,
+    my_role: raw.my_role === 'captain' || raw.my_role === 'player' ? raw.my_role : null,
   };
 }
 

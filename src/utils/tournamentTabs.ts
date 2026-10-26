@@ -548,7 +548,19 @@ export type ParticipantRole = 'organizer' | 'committee' | null;
 export function participantRows(registrations: TournamentRegistration[]): ParticipantRow[] {
   return registrations
     .filter(r => r.status === 'registered')
-    .map(r => ({ id: r.id, user_id: r.user_id, name: r.nickname, registered_at: r.registered_at }))
+    .map(r => ({
+      id: r.id,
+      user_id: r.user_id,
+      name: r.nickname,
+      registered_at: r.registered_at,
+      team_id: r.team_id ?? null,
+      payment_received_at: r.payment_received_at ?? null,
+      effective_fee_cents: r.effective_fee_cents ?? null,
+      points: r.points ?? null,
+      payment_exempt: r.payment_exempt === true,
+      team_player_count: r.team_player_count ?? null,
+      team_captain_name: r.team_captain_name ?? null,
+    }))
     .sort((a, b) => a.registered_at.localeCompare(b.registered_at));
 }
 

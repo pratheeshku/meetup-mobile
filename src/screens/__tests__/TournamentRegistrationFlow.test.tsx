@@ -75,10 +75,13 @@ describe('Register opens the confirmation sheet (AD-5)', () => {
     const root = await mount({ registration_fee_cents: 1500, registration_fee_currency: 'SGD' });
     await press(root, 'tournament-register-button');
     const line = everyText(byId(root, 'registration-fee-line')[0]);
-    expect(line).toMatch(/^Registration fee: .*15\.00 per player$/);
-    expect(everyText(byId(root, 'registration-fee-note')[0])).toContain('arranged with the organizer outside the app');
-    // No payment control anywhere on the sheet.
-    expect(everyText(byId(root, 'registration-confirm-sheet')[0]).toLowerCase()).not.toMatch(/\bpay\b|\bpay now\b/);
+    expect(line).toMatch(/15\.00 per player$/);
+    // Board J2: the note says the app takes no payment and that the organizer's number is shown after registering.
+    expect(everyText(byId(root, 'registration-fee-note')[0])).toContain('The app does not take payment');
+    // No payment control anywhere on the sheet: the only buttons are Cancel and Confirm.
+    const sheet = byId(root, 'registration-confirm-sheet')[0];
+    const buttons = sheet.findAll(n => typeof n.props.onPress === 'function' && Boolean(n.props.testID)).map(n => n.props.testID);
+    expect([...new Set(buttons)]).toEqual(['registration-cancel', 'registration-confirm']);
 
     await press(root, 'registration-confirm');
     expect(registrationPosts()[0][1]).toEqual({ accepted_fee_cents: 1500 });
@@ -93,6 +96,7 @@ describe('Register opens the confirmation sheet (AD-5)', () => {
     );
     await press(root, 'tournament-register-button');
     expect(everyText(byId(root, 'registration-fee-line')[0])).toMatch(/per tournament team$/);
+    expect(everyText(byId(root, 'registration-fee-note')[0])).toContain('One fee per tournament team');
   });
 
   it('Cancel closes the sheet and sends nothing', async () => {
@@ -297,39 +301,53 @@ describe('legacy page: the organizer registers like everyone else (TR-06, F3)', 
   });
 });
 
-describe('team picker for a team tournament (OI-19, AD-1; brief M1)', () => {
-  const team = (id: string, name: string, sport: string) => ({
+describe('team picker for a team tournament (teams-payments AD-3, board J3)', () => {
+  const team = (id: string, name: string, sport: string, player_count: number | null = 4) => ({
     id,
     name,
     sport,
     visibility: 'public',
     captain_user_id: 'user-me',
     created_at: '2026-01-01T00:00:00Z',
+    player_count,
+    my_role: 'captain',
   });
-  const TEAMS = [team('tm-1', 'Net Ninjas', 'badminton'), team('tm-2', 'Smash Bros', 'Badminton'), team('tm-3', 'Kickers', 'football')];
+  const TEAMS = [team('tm-1', 'Net Ninjas', 'badminton', 3), team('tm-2', 'Smash Bros', 'Badminton'), team('tm-3', 'Kickers', 'football')];
   const teamTournament = { participation_mode: 'team', sport: 'badminton' };
-  const selected = (root: Instance, id: string): boolean => byId(root, `registration-team-${id}`)[0]?.props.accessibilityState?.selected === true;
+  const dropdownTrigger = (root: Instance): Instance | undefined =>
+    root.findAll(n => n.props.accessibilityLabel === 'Choose your tournament team' && typeof n.props.onPress === 'function')[0];
+  const triggerText = (root: Instance): string => texts(dropdownTrigger(root)!).join(' ');
+  const choose = async (root: Instance, name: string): Promise<void> => {
+    await act(async () => {
+      dropdownTrigger(root)!.props.onPress();
+    });
+    const option = root.findAll(n => typeof n.props.onPress === 'function' && String(n.props.accessibilityLabel).startsWith(name))[0];
+    await act(async () => {
+      option.props.onPress();
+    });
+  };
 
-  it('reads GET /teams/mine, keeps the tournament sport (case-insensitive), preselects the first, and shows the label above the fee line', async () => {
+  it('reads GET /teams/mine, keeps the tournament sport (case-insensitive), preselects the first, and shows the dropdown above the fee line', async () => {
     const root = await mount(teamTournament, {}, TEAMS);
     await press(root, 'tournament-register-button');
     expect(mockGet.mock.calls.some(call => call[0] === '/teams/mine')).toBe(true);
-    expect(byId(root, 'registration-team-tm-1')).toHaveLength(1);
-    expect(byId(root, 'registration-team-tm-2')).toHaveLength(1);
-    expect(byId(root, 'registration-team-tm-3')).toHaveLength(0);
-    expect(selected(root, 'tm-1')).toBe(true);
-    expect(selected(root, 'tm-2')).toBe(false);
-    expect(everyText(byId(root, 'registration-team-picker')[0])).toContain('Choose your tournament team');
+    expect(byId(root, 'registration-team-picker')).toHaveLength(1);
+    // "Team · Sport · players", the first team preselected; the football team is not offered.
+    expect(triggerText(root)).toContain('Net Ninjas');
+    expect(triggerText(root)).toContain('3 team players');
+    expect(everyText(root)).not.toContain('Kickers');
+    expect(everyText(byId(root, 'registration-team-picker')[0])).toContain('Tournament team');
     const sheet = byId(root, 'registration-confirm-sheet')[0];
     const order = sheet.findAll(n => n.props.testID === 'registration-team-picker' || n.props.testID === 'registration-fee-line').map(n => n.props.testID);
     expect(order.indexOf('registration-team-picker')).toBeLessThan(order.indexOf('registration-fee-line'));
+    expect(everyText(sheet)).toContain('Register a tournament team');
   });
 
   it('Confirm posts the chosen team_id (and accepted_fee_cents when there is a fee)', async () => {
     const root = await mount({ ...teamTournament, registration_fee_cents: 4000, registration_fee_currency: 'SGD' }, {}, TEAMS);
     await press(root, 'tournament-register-button');
-    await press(root, 'registration-team-tm-2');
-    expect(selected(root, 'tm-2')).toBe(true);
+    await choose(root, 'Smash Bros');
+    expect(triggerText(root)).toContain('Smash Bros');
     await press(root, 'registration-confirm');
     const posts = registrationPosts();
     expect(posts).toHaveLength(1);
@@ -347,31 +365,39 @@ describe('team picker for a team tournament (OI-19, AD-1; brief M1)', () => {
   it('FEE_CHANGED re-shows the sheet with the same team still selected', async () => {
     const root = await mount({ ...teamTournament, registration_fee_cents: 4000, registration_fee_currency: 'SGD' }, {}, TEAMS);
     await press(root, 'tournament-register-button');
-    await press(root, 'registration-team-tm-2');
+    await choose(root, 'Smash Bros');
     mockPost.mockRejectedValueOnce(refusal(409, { code: 'FEE_CHANGED', registration_fee_cents: 5000 }));
     await press(root, 'registration-confirm');
-    expect(selected(root, 'tm-2')).toBe(true);
+    expect(triggerText(root)).toContain('Smash Bros');
     await press(root, 'registration-confirm');
     expect(registrationPosts()[1][1]).toEqual({ team_id: 'tm-2', accepted_fee_cents: 5000 });
   });
 
-  it('no team for this sport: no confirmation, the result pop-up says so, nothing is posted', async () => {
+  it('no tournament team for this sport (AD-3, J5): no confirmation, the "Create a tournament team first" prompt opens, nothing is posted', async () => {
     const root = await mount(teamTournament, {}, [team('tm-3', 'Kickers', 'football')]);
     await press(root, 'tournament-register-button');
     expect(byId(root, 'registration-confirm-sheet')).toHaveLength(0);
-    expect(byId(root, 'registration-result-failure')).toHaveLength(1);
-    expect(everyText(byId(root, 'registration-result-message')[0])).toBe(
-      'You need a tournament team for this sport to register. Create or join one first.',
-    );
-    expect(byId(root, 'registration-retry')).toHaveLength(0);
+    expect(byId(root, 'registration-create-team-prompt')).toHaveLength(1);
+    expect(everyText(byId(root, 'registration-create-team-prompt')[0])).toContain('Create a tournament team first');
+    expect(everyText(byId(root, 'registration-create-team-message')[0])).toContain('You are not on a');
     expect(registrationPosts()).toHaveLength(0);
   });
 
-  it('an empty list from the server is the same', async () => {
+  it('an empty list from the server opens the same prompt, and Not now closes it', async () => {
     const root = await mount(teamTournament, {}, []);
     await press(root, 'tournament-register-button');
-    expect(byId(root, 'registration-confirm-sheet')).toHaveLength(0);
-    expect(byId(root, 'registration-result-failure')).toHaveLength(1);
+    expect(byId(root, 'registration-create-team-prompt')).toHaveLength(1);
+    await press(root, 'registration-create-team-not-now');
+    expect(byId(root, 'registration-create-team-prompt')).toHaveLength(0);
+  });
+
+  it('the prompt button opens the Create team form (Groups tab, Tournament team selected)', async () => {
+    const navigate = jest.fn();
+    const root = await mount(teamTournament, { getParent: () => ({ navigate }) }, []);
+    await press(root, 'tournament-register-button');
+    await press(root, 'registration-create-team-create');
+    expect(navigate).toHaveBeenCalledWith('Groups', { screen: 'CreateGroup', params: { kind: 'team' } });
+    expect(byId(root, 'registration-create-team-prompt')).toHaveLength(0);
   });
 
   it('a failed team list read is the generic label with Try again, which reads the list again', async () => {
@@ -394,7 +420,7 @@ describe('team picker for a team tournament (OI-19, AD-1; brief M1)', () => {
     expect(setParams).toHaveBeenCalledWith({ openRegistration: undefined });
     expect(byId(root, 'registration-confirm-sheet')).toHaveLength(1);
     expect(byId(root, 'registration-team-picker')).toHaveLength(1);
-    expect(selected(root, 'tm-1')).toBe(true);
+    expect(triggerText(root)).toContain('Net Ninjas');
   });
 
   it('an individual tournament never reads the teams and never sends team_id', async () => {
@@ -404,5 +430,91 @@ describe('team picker for a team tournament (OI-19, AD-1; brief M1)', () => {
     expect(byId(root, 'registration-team-picker')).toHaveLength(0);
     await press(root, 'registration-confirm');
     expect(registrationPosts()[0][1]).toBeUndefined();
+  });
+
+  it('NOT_TEAM_MEMBER (J6) shows its own message with Choose tournament team, which returns to the picker', async () => {
+    const root = await mount(teamTournament, {}, TEAMS);
+    await press(root, 'tournament-register-button');
+    mockPost.mockRejectedValueOnce(refusal(403, { detail: 'Not authorized', code: 'NOT_TEAM_MEMBER' }));
+    await press(root, 'registration-confirm');
+    expect(everyText(byId(root, 'registration-result-message')[0])).toContain('You are not a player on this tournament team');
+    expect(byId(root, 'registration-retry')).toHaveLength(0);
+    await press(root, 'registration-choose-team');
+    expect(byId(root, 'registration-confirm-sheet')).toHaveLength(1);
+  });
+});
+
+describe('result pop-up and Payment card (teams-payments AD-7; boards J4, J7)', () => {
+  const paidTournament = { registration_fee_cents: 1000, registration_fee_currency: 'SGD' };
+  const registered = (extra: Record<string, unknown> = {}) => ({
+    registration_id: 'reg-1',
+    status: 'registered',
+    fee_cents_at_registration: 1000,
+    effective_fee_cents: 1000,
+    payment_received_at: null,
+    payment_exempt: false,
+    payment_contact_number: '+6591234567',
+    ...extra,
+  });
+
+  it('J4: with a fee the pop-up shows the number to pay to, read from the fresh tournament, and the Payment pending chip', async () => {
+    const root = await mount(paidTournament);
+    await press(root, 'tournament-register-button');
+    mockGet.mockImplementation((url: string) => {
+      if (url === '/tournaments/t-1') {
+        return Promise.resolve({ data: rawTournament({ participation_mode: 'individual', ...paidTournament, my_registration: registered(), payment_contact_number: '+6591234567' }) });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    await press(root, 'registration-confirm');
+    const popup = byId(root, 'registration-result-success')[0];
+    expect(everyText(popup)).toContain("You're registered");
+    expect(everyText(byId(root, 'registration-result-number')[0])).toContain('+65');
+    expect(everyText(popup)).toContain('Payment pending');
+    expect(everyText(popup)).toContain('The organizer confirms once received.');
+  });
+
+  it('J4: with a fee and no number from the API it says to ask the organizer, and shows no number', async () => {
+    const root = await mount(paidTournament);
+    await press(root, 'tournament-register-button');
+    await press(root, 'registration-confirm');
+    expect(byId(root, 'registration-result-number')).toHaveLength(0);
+    expect(everyText(byId(root, 'registration-result-payment')[0])).toContain('Ask the organizer how to pay.');
+  });
+
+  it('J4: a free tournament shows no payment box', async () => {
+    const root = await mount();
+    await press(root, 'tournament-register-button');
+    await press(root, 'registration-confirm');
+    expect(byId(root, 'registration-result-success')).toHaveLength(1);
+    expect(byId(root, 'registration-result-payment')).toHaveLength(0);
+  });
+
+  it('J7: a registered player sees the Payment card with amount, number, Payment pending and Copy number', async () => {
+    const root = await mount({ ...paidTournament, my_registration_status: 'registered', my_registration: registered(), payment_contact_number: '+6591234567' });
+    const card = byId(root, 'payment-card')[0];
+    expect(card).toBeDefined();
+    expect(everyText(card)).toContain('Payment pending');
+    expect(everyText(byId(root, 'payment-amount')[0])).toMatch(/10\.00 per player$/);
+    expect(everyText(byId(root, 'payment-number')[0])).toContain('+65');
+    expect(pressable(root, 'payment-copy')).toBeDefined();
+  });
+
+  it('J7: the chip is Paid once the organizer confirmed', async () => {
+    const root = await mount({ ...paidTournament, my_registration_status: 'registered', my_registration: registered({ payment_received_at: '2026-11-01T10:00:00Z' }) });
+    expect(everyText(byId(root, 'payment-status-chip')[0])).toBe('Paid');
+  });
+
+  it('J7: a fee and no number from the API says to ask the organizer, and shows no number or Copy button', async () => {
+    const root = await mount({ ...paidTournament, my_registration_status: 'registered', my_registration: registered({ payment_contact_number: null }) });
+    expect(byId(root, 'payment-no-number')).toHaveLength(1);
+    expect(byId(root, 'payment-number')).toHaveLength(0);
+    expect(pressable(root, 'payment-copy')).toBeUndefined();
+  });
+
+  it('no Payment card for a viewer with no registration, a free tournament, or the organizer own entry', async () => {
+    expect(byId(await mount(paidTournament), 'payment-card')).toHaveLength(0);
+    expect(byId(await mount({ my_registration_status: 'registered', my_registration: registered({ effective_fee_cents: null, fee_cents_at_registration: 0 }) }), 'payment-card')).toHaveLength(0);
+    expect(byId(await mount({ ...paidTournament, my_registration_status: 'registered', my_registration: registered({ payment_exempt: true }) }), 'payment-card')).toHaveLength(0);
   });
 });

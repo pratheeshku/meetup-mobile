@@ -23,6 +23,7 @@ import Geolocation from '@react-native-community/geolocation';
 import { getClientConfig, getGameLimits, type GameLimits } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
 import { createEvent, inviteEmailToEvent } from '../api/events';
+import GameFeeFields, { parseGameFee, type GameFeeConfig } from '../components/GameFeeFields';
 import { getMyGroups } from '../api/groups';
 import {
   fetchPlaceDetails,
@@ -95,6 +96,7 @@ import type {
 } from '../types/tournament';
 import type { UserSearchResult } from '../types/user';
 import { getApiErrorMessage } from '../utils/apiError';
+import { refusalText } from '../utils/refusal';
 import UserSearchPicker from '../components/UserSearchPicker';
 import UserAvatar from '../components/UserAvatar';
 import PersonNames from '../components/PersonNames';
@@ -192,6 +194,11 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   const [capacity, setCapacity] = useState<number>(4);
   const [isCapacityValid, setIsCapacityValid] = useState<boolean>(true);
   const [skillLevel, setSkillLevel] = useState<EventSkillLevel>(DEFAULT_SKILL_REQUIREMENT);
+  // Game fee (teams-payments AD-8): null while the client-config switch is off, and then nothing about a fee is shown or sent.
+  const [gameFee, setGameFee] = useState<GameFeeConfig | null>(null);
+  const [feeText, setFeeText] = useState('');
+  const [payeeNumber, setPayeeNumber] = useState<string | null>(null);
+  const [payeeError, setPayeeError] = useState<string | null>(null);
 
   // Step 6: Invites & Review
   const [invitedPlayers, setInvitedPlayers] = useState<UserSearchResult[]>([]);
@@ -216,6 +223,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     getClientConfig().then(cfg => {
       setMapsApiKey(cfg.google_maps_api_key);
       setVenueCatalogueEnabled(Boolean(cfg.venue_catalogue_enabled));
+      setGameFee(cfg.game_fee_enabled ? { currency: cfg.game_fee_currency, maxCents: cfg.game_fee_max_cents } : null);
     }).catch(() => {});
     getSports()
       .then(list => {
@@ -433,6 +441,17 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       if (!isCapacityValid || capacity < gameLimits.players_min) {
         return;
       }
+      if (mode === 'game' && gameFee) {
+        const fee = parseGameFee(feeText, gameFee);
+        if (!fee.valid) {
+          return;
+        }
+        // A fee above 0 needs the payment number (the server answers 422 PAYMENT_NUMBER_REQUIRED); the label is the server seed.
+        if (fee.cents !== null && fee.cents > 0 && !payeeNumber) {
+          setPayeeError(t('mob.reg.err.payment_number_required'));
+          return;
+        }
+      }
       setStep(6);
       return;
     }
@@ -487,6 +506,13 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       };
 
       if (mode === 'game') {
+        // The fee and its payee number travel together, only while the switch is on and a fee above 0 is typed.
+        const gameFeeFields = (): Pick<CreateEventInput, 'registration_fee_cents' | 'payment_contact_number'> => {
+          const fee = parseGameFee(feeText, gameFee);
+          return gameFee && fee.valid && fee.cents !== null && fee.cents > 0
+            ? { registration_fee_cents: fee.cents, ...(payeeNumber ? { payment_contact_number: payeeNumber } : {}) }
+            : {};
+        };
         const input: CreateEventInput = {
           title: gTitle.trim(),
           sport: gSport,
@@ -496,6 +522,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             ? { invite_user_ids: invitedPlayers.map(p => p.id) }
             : {}),
           skill_level_requirement: skillLevel,
+          ...gameFeeFields(),
           capacity: capacity,
           starts_at: startsAtIso,
           ends_at: endsAtIso,
@@ -606,6 +633,10 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       const detail = (e as any)?.response?.data?.detail;
       if (code === 'start_in_past' || detail === "Start time can't be in the past") {
         setError(t('mob.closure.start_in_past'));
+      } else if (typeof code === 'string' && (code.startsWith('PAYMENT_') || code === 'FEE_INVALID')) {
+        // The game fee and its number: a coded refusal shows its own label (teams-payments AD-1), never the server text.
+        setError(refusalText(e, t, 'mob.create_game.err_game_create'));
+        setStep(5);
       } else {
         setError(getApiErrorMessage(e, t('mob.create_game.err_game_create')));
       }
@@ -1096,6 +1127,24 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           <Text style={styles.inputCardLabel}>{t('mob.create_game.skill_level_label')}</Text>
           <SkillRequirementPicker value={skillLevel} onChange={setSkillLevel} />
         </View>
+
+        {mode === 'game' && gameFee ? (
+          <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
+            <GameFeeFields
+              config={gameFee}
+              amount={feeText}
+              onAmount={text => {
+                setFeeText(text);
+                setPayeeError(null);
+              }}
+              onNumber={e164 => {
+                setPayeeNumber(e164);
+                setPayeeError(null);
+              }}
+              numberError={payeeError}
+            />
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -1276,7 +1325,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   };
 
   const isStep4Disabled = step === 4 && gVisibility === 'group' && selectedGroupIds.length === 0;
-  const isStep5Disabled = step === 5 && (!isCapacityValid || capacity < gameLimits.players_min);
+  const isStep5Disabled =
+    step === 5 &&
+    (!isCapacityValid || capacity < gameLimits.players_min || (mode === 'game' && gameFee !== null && !parseGameFee(feeText, gameFee).valid));
 
   return (
     <View style={styles.screen}>

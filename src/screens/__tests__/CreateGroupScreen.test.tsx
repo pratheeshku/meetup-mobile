@@ -221,7 +221,7 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
       rows: [
         { label: 'Name', value: 'Test FC' },
         { label: 'Sport', value: 'Football' },
-        { label: 'Visibility', value: 'Public' },
+        { label: 'Visibility', value: 'Open to join requests' },
       ],
       primary: 'dashboard',
     });
@@ -235,7 +235,7 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
     selectChip(root, 'Tournament team');
     type(root, 'e.g. Real Madrid FC', 'Test FC');
     selectChip(root, 'Football');
-    selectChip(root, 'Private');
+    selectChip(root, 'Invite only');
     await submitTeam(root);
 
     expect(mockCreateTeam).toHaveBeenCalledWith(
@@ -244,9 +244,9 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
     );
   });
 
-  it('shows the server message inline on team creation failure', async () => {
+  it('TEAM_NAME_TAKEN (409) shows its own message, never the server detail (teams-payments AD-1)', async () => {
     mockCreateTeam.mockRejectedValueOnce({
-      response: { status: 400, data: { detail: 'Sport does not exist' } },
+      response: { status: 409, data: { detail: 'duplicate key value violates unique constraint', code: 'TEAM_NAME_TAKEN' } },
     });
     const root = await mount();
     selectChip(root, 'Tournament team');
@@ -254,7 +254,23 @@ describe('CreateGroupScreen — Tournament Team mode', () => {
     selectChip(root, 'Football');
     await submitTeam(root);
 
-    expect(texts(root)).toContain('Sport does not exist');
+    expect(texts(root)).toContain('A tournament team with this name already exists for this sport. Choose another name.');
+    expect(texts(root).join(' ')).not.toContain('duplicate key');
+    expect(mockGoToDashboard).not.toHaveBeenCalled();
+  });
+
+  it('any other failure shows the generic create-team message, never the server detail', async () => {
+    mockCreateTeam.mockRejectedValueOnce({
+      response: { status: 500, data: { detail: 'Sport does not exist' } },
+    });
+    const root = await mount();
+    selectChip(root, 'Tournament team');
+    type(root, 'e.g. Real Madrid FC', 'Test');
+    selectChip(root, 'Football');
+    await submitTeam(root);
+
+    expect(texts(root)).toContain('Could not create the tournament team. Please try again.');
+    expect(texts(root)).not.toContain('Sport does not exist');
     expect(mockGoToDashboard).not.toHaveBeenCalled();
   });
 

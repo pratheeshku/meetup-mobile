@@ -14,7 +14,8 @@ import TextField from '../../TextField';
 import { CheckIcon, CrossIcon } from '../../icons/ActionIcons';
 import { FieldLabel, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
 import { formatMoney, parseAmountToCents } from '../../../utils/money';
-import { registrationRules, toDate, type RuleState, type WizardFeeConfig, type WizardState } from '../../../utils/tournamentWizard';
+import PayeeNumberField from '../../PayeeNumberField';
+import { needsPayeeNumber, registrationRules, toDate, type RuleState, type WizardFeeConfig, type WizardState } from '../../../utils/tournamentWizard';
 
 const RULE_BOX = 22;
 
@@ -38,6 +39,7 @@ export default function RegistrationStep({
   onHardBlock,
   fee,
   onFee,
+  onPayee,
   errors,
   focus,
 }: {
@@ -48,6 +50,8 @@ export default function RegistrationStep({
   /** Null while the server's fee flag is off: the fee field is not shown (tournament-registration AD-4, OI-10). */
   fee?: WizardFeeConfig | null;
   onFee?: (value: string) => void;
+  /** The payee number (E.164 or null) as edited; the field shows only while a fee above 0 is typed (teams-payments AD-7). */
+  onPayee?: (e164: string | null) => void;
   errors: Record<string, string>;
   focus?: StepFocus;
 }): React.JSX.Element {
@@ -124,6 +128,19 @@ export default function RegistrationStep({
             ) : null}
             {errors.registration_fee_cents ? (
               <FieldProblem message={errors.registration_fee_cents} testID="tw-fee-error" />
+            ) : null}
+            {onPayee && needsPayeeNumber(state, fee) ? (
+              <>
+                <PayeeNumberField
+                  kind="tournament"
+                  initialValue={state.payeeNumber ?? undefined}
+                  onChange={change => onPayee(change.e164)}
+                  testID="tw-payee"
+                />
+                {errors.payment_contact_number ? (
+                  <FieldProblem message={errors.payment_contact_number} testID="tw-payee-error" />
+                ) : null}
+              </>
             ) : null}
           </>
         ) : null}

@@ -53,7 +53,22 @@ describe('getMyTeams', () => {
     mockedGet.mockResolvedValueOnce({ data: [{ id: 'tm-1', name: 'Net Ninjas', sport: 'badminton', visibility: 'public', captain_user_id: 'u-1', created_at: 'x', extra: 1 }] });
     const teams = await getMyTeams({ correlationId: 'c-1' });
     expect(mockedGet).toHaveBeenCalledWith('/teams/mine', { correlationId: 'c-1' });
-    expect(teams).toEqual([{ id: 'tm-1', name: 'Net Ninjas', sport: 'badminton', visibility: 'public', captain_user_id: 'u-1', created_at: 'x' }]);
+    // player_count and my_role (teams-payments AD-4) are null when the server does not send them.
+    expect(teams).toEqual([
+      { id: 'tm-1', name: 'Net Ninjas', sport: 'badminton', visibility: 'public', captain_user_id: 'u-1', created_at: 'x', player_count: null, my_role: null },
+    ]);
+  });
+
+  it('carries the card fields of GET /teams/mine: the active player count and the caller\'s role (AD-4)', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: [
+        { id: 'tm-1', name: 'A', sport: 'badminton', visibility: 'public', captain_user_id: 'u-1', created_at: 'x', player_count: 4, my_role: 'captain' },
+        { id: 'tm-2', name: 'B', sport: 'badminton', visibility: 'private', captain_user_id: 'u-2', created_at: 'x', player_count: 3, my_role: 'player' },
+        { id: 'tm-3', name: 'C', sport: 'badminton', visibility: 'private', captain_user_id: 'u-2', created_at: 'x', player_count: 'many', my_role: 'owner' },
+      ],
+    });
+    const teams = await getMyTeams();
+    expect(teams.map(team => [team.player_count, team.my_role])).toEqual([[4, 'captain'], [3, 'player'], [null, null]]);
   });
 });
 

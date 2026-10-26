@@ -105,8 +105,20 @@ export interface MediaPage {
 export interface ParticipantRow {
   id: string;
   user_id: string | null;
+  /** A player's name, or the tournament team's name for a team entry (never a member's name, teams-payments AD-11). */
   name: string;
   registered_at: string;
+  /** Set for a team entry. */
+  team_id?: string | null;
+  /** teams-payments AD-9, AD-11: the server's payment and points facts for the organizer and committee (null for everyone else). */
+  payment_received_at?: string | null;
+  effective_fee_cents?: number | null;
+  /** The points as the server sends them (a decimal string); null = unrated or withheld. */
+  points?: string | null;
+  /** The organizer's own entry: no payment, no Paid switch. */
+  payment_exempt?: boolean;
+  team_player_count?: number | null;
+  team_captain_name?: string | null;
 }
 
 /** A coded refusal of an upload (422 `POINTS_UPLOAD_INVALID`, `RESULTS_UPLOAD_INVALID`, file codes) or of a setup call. */
@@ -170,4 +182,6 @@ export interface DraftDetail {
   groupMatches: number;
   knockoutMatches: number;
   matches: DraftMatch[];
+  /** The generate answer only (teams-payments AD-10): the unpaid entrants left out as actually applied at generation; null on a read of a draft. */
+  excludedUnpaid: number | null;
 }

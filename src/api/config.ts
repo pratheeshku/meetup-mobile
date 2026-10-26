@@ -14,6 +14,10 @@ export interface ClientConfig {
   tournament_fee_enabled: boolean;
   tournament_fee_currency: string | null;
   tournament_fee_max_cents: number | null;
+  /** teams-payments AD-8: the game fee control and the fee/payment UI of a game are hidden while this is false. */
+  game_fee_enabled: boolean;
+  game_fee_currency: string | null;
+  game_fee_max_cents: number | null;
 }
 
 const CLIENT_CONFIG_DEFAULTS: ClientConfig = {
@@ -22,6 +26,9 @@ const CLIENT_CONFIG_DEFAULTS: ClientConfig = {
   tournament_fee_enabled: false,
   tournament_fee_currency: null,
   tournament_fee_max_cents: null,
+  game_fee_enabled: false,
+  game_fee_currency: null,
+  game_fee_max_cents: null,
 };
 
 export async function getGameLimits(): Promise<GameLimits> {
@@ -46,6 +53,10 @@ export async function getClientConfig(): Promise<ClientConfig> {
         typeof data?.tournament_fee_max_cents === 'number' && Number.isFinite(data.tournament_fee_max_cents)
           ? data.tournament_fee_max_cents
           : null,
+      game_fee_enabled: data?.game_fee_enabled === true,
+      game_fee_currency: typeof data?.game_fee_currency === 'string' && data.game_fee_currency ? data.game_fee_currency : null,
+      game_fee_max_cents:
+        typeof data?.game_fee_max_cents === 'number' && Number.isFinite(data.game_fee_max_cents) ? data.game_fee_max_cents : null,
     };
   } catch {
     return { ...CLIENT_CONFIG_DEFAULTS };

@@ -6,7 +6,9 @@ import {
   firstFocusField,
   initialWizardState,
   mapCreateRejection,
+  needsPayeeNumber,
   validateFee,
+  validatePayee,
   validateStep,
   type WizardContext,
   type WizardState,
@@ -82,5 +84,42 @@ describe('server refusal and focus', () => {
 
   it('focus lands on the fee field when it has the error', () => {
     expect(firstFocusField(WIZARD_STEP.registration, { registration_fee_cents: 'x' })).toBe('registration_fee_cents');
+  });
+});
+
+describe('payee number (teams-payments AD-7)', () => {
+  const withFee = (over: Partial<WizardState> = {}): WizardState => state({ feeAmount: '15', ...over });
+
+  it('is asked for only while the flag is on and a fee above 0 is typed', () => {
+    expect(needsPayeeNumber(withFee(), FEE)).toBe(true);
+    expect(needsPayeeNumber(withFee({ feeAmount: '0' }), FEE)).toBe(false);
+    expect(needsPayeeNumber(withFee({ feeAmount: '' }), FEE)).toBe(false);
+    expect(needsPayeeNumber(withFee(), null)).toBe(false);
+  });
+
+  it('a fee above 0 without a number is refused on the registration step with the server label, under the number field', () => {
+    expect(validatePayee(withFee(), FEE)).toMatchObject({ key: 'mob.reg.err.payment_number_required', field: 'payment_contact_number', step: WIZARD_STEP.registration });
+    expect(validateStep(WIZARD_STEP.registration, withFee(), ctx(FEE)).map(i => i.field)).toContain('payment_contact_number');
+  });
+
+  it('is satisfied by a number, and never asked of a free tournament or with the flag off', () => {
+    expect(validatePayee(withFee({ payeeNumber: '+6591234567' }), FEE)).toBeNull();
+    expect(validatePayee(withFee({ feeAmount: '' }), FEE)).toBeNull();
+    expect(validatePayee(withFee(), null)).toBeNull();
+  });
+
+  it('is sent with a fee above 0 and nothing else', () => {
+    expect(buildCreateBody(withFee({ payeeNumber: '+6591234567' }), false, true)).toMatchObject({
+      registration_fee_cents: 1500,
+      payment_contact_number: '+6591234567',
+    });
+    expect(buildCreateBody(withFee({ feeAmount: '0', payeeNumber: '+6591234567' }), false, true)).not.toHaveProperty('payment_contact_number');
+    expect(buildCreateBody(withFee({ feeAmount: '', payeeNumber: '+6591234567' }), false, true)).not.toHaveProperty('payment_contact_number');
+    expect(buildCreateBody(withFee({ payeeNumber: '+6591234567' }), false, false)).not.toHaveProperty('payment_contact_number');
+  });
+
+  it.each(['PAYMENT_NUMBER_REQUIRED', 'PAYMENT_NUMBER_INVALID'])('422 %s goes back to the registration step under the number field', code => {
+    const outcome = mapCreateRejection({ response: { status: 422, data: { code, detail: 'x' } } }, { committeeMax: 10, startLabel: '' });
+    expect(outcome).toMatchObject({ kind: 'step', step: WIZARD_STEP.registration, issue: { field: 'payment_contact_number' } });
   });
 });

@@ -53,7 +53,17 @@ const BADGE_TEXT = {
   neutral: { color: colors.textSecondary },
 } as const;
 
-export default function UserMenuSheet({ menu }: { menu: UserMenuApi }): React.JSX.Element | null {
+export default function UserMenuSheet({
+  menu,
+  extras,
+}: {
+  menu: UserMenuApi;
+  /**
+   * Extra rows between the identity and the server's actions: the organizer section of the participants pop-up (fee, payment received, points,
+   * remove; teams-payments AD-11). Absent for every other host, which renders exactly as before.
+   */
+  extras?: React.ReactNode;
+}): React.JSX.Element | null {
   const t = useT();
   const { person, card } = menu;
 
@@ -99,6 +109,7 @@ export default function UserMenuSheet({ menu }: { menu: UserMenuApi }): React.JS
     <>
       <View style={styles.grabber} />
       {identity}
+      {extras}
       {menu.cardStatus === 'loading' ? (
         <View style={styles.loadingRow} testID="user-menu-loading">
           <ActivityIndicator size="small" color={colors.primary} />

@@ -41,4 +41,11 @@ export interface Team {
   visibility: string;
   captain_user_id: string;
   created_at: string;
+  /** `GET /teams/mine` only (teams-payments AD-4): the active player count; null elsewhere. */
+  player_count?: number | null;
+  /** `GET /teams/mine` only: the caller's role on the team; null elsewhere. */
+  my_role?: TeamRole | null;
 }
+
+/** The caller's role on a tournament team (`GET /teams/mine` `my_role`). */
+export type TeamRole = 'captain' | 'player';

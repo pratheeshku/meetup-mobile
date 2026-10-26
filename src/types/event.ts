@@ -100,6 +100,26 @@ export interface Event {
   closure_outcome?: string | null;
   /** DES-MEETUP-ADDENDUM-decline-response AD-4: true when caller has a current decline row */
   my_declined?: boolean;
+  /**
+   * teams-payments AD-8: the game fee per player in whole cents and its currency; both null while the game fee switch is off and for a free game
+   * (a stored fee is ignored while the switch is off). A separate field from `estimated_cost_cents`.
+   */
+  registration_fee_cents?: number | null;
+  registration_fee_currency?: string | null;
+  /** teams-payments AD-7: the payee number of this game; null unless the server allows (organizer, a participant who is going). Never logged. */
+  payment_contact_number?: string | null;
+  /** teams-payments AD-9: the caller's own participant row (the Payment card); null for anyone who is not going or waitlisted. */
+  my_participation?: EventMyParticipation | null;
+}
+
+/** `GET /events/{id}` `my_participation`. */
+export interface EventMyParticipation {
+  status: string;
+  fee_cents_at_join: number | null;
+  effective_fee_cents: number | null;
+  payment_received_at: string | null;
+  payment_exempt: boolean;
+  payment_contact_number: string | null;
 }
 
 export interface UpdateEventInput {
@@ -119,6 +139,9 @@ export interface UpdateEventInput {
   allow_waitlist?: boolean;
   estimated_cost_cents?: number | null;
   estimated_cost_currency?: string | null;
+  /** teams-payments AD-8, AD-7: the game fee (whole cents, or null to clear) and the payee number (E.164); sent only while the game fee switch is on. */
+  registration_fee_cents?: number | null;
+  payment_contact_number?: string | null;
   venue_place_id?: string | null;
   venue_lat?: number | null;
   venue_lng?: number | null;
@@ -155,6 +178,11 @@ export interface EventParticipant {
   /** `user_photo_url` from `GET /events/{id}/participants`; initials are shown when null. */
   user_photo_url?: string | null;
   is_checked_in?: boolean;
+  /** teams-payments AD-9: set by `GET /events/{id}/participants` for the organizer (every row); null for everyone else. */
+  payment_received_at?: string | null;
+  effective_fee_cents?: number | null;
+  /** The organizer's own row: no payment, no Paid switch. */
+  payment_exempt?: boolean;
 }
 
 /**
@@ -214,6 +242,9 @@ export interface CreateEventInput {
    * BUILD B, before that field was hidden on Edit only).
    */
   estimated_cost_currency?: string | null;
+  /** teams-payments AD-8, AD-7: optional game fee in whole cents (a fee above 0 needs `payment_contact_number`, E.164). Sent only while the game fee switch is on. */
+  registration_fee_cents?: number | null;
+  payment_contact_number?: string | null;
 }
 
 export interface ClosurePerson {

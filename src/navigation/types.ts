@@ -49,10 +49,12 @@ export type HomeStackParamList = {
  * `popTo`) so the list re-fetches; any new value triggers one refresh.
  */
 export type GroupsStackParamList = {
-  GroupsList: { refreshKey?: number } | undefined;
+  /** `section: 'teams'`: opens with the Tournament teams list selected (teams-payments AD-4, AD-15). */
+  GroupsList: { refreshKey?: number; section?: 'groups' | 'teams' } | undefined;
   GroupDetail: { groupId: string };
   EditGroup: { groupId: string };
-  CreateGroup: undefined;
+  /** `kind: 'team'` opens the form on Tournament team (the register flow's "Create a tournament team first" and the Tournament teams list). */
+  CreateGroup: { kind?: 'group' | 'team' } | undefined;
   /** Group creation step 2 (DES-MEETUP-FEEDBACK-001 C4). */
   InviteMembers: { groupId: string };
   TournamentTeams: undefined;

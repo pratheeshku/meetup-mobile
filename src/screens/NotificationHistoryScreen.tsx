@@ -72,27 +72,34 @@ function isKnownType(value: string): value is NotificationType {
   return (NOTIFICATION_TYPES as string[]).includes(value);
 }
 
+/** The absolute `https`/app-scheme URL of a row, or null when it has none or is a web-relative path (teams-payments: `/#team-detail/<id>`). */
+function absoluteUrlOf(url: string | null | undefined): URL | null {
+  if (!url) {
+    return null;
+  }
+  try {
+    return new URL(url);
+  } catch {
+    return null;
+  }
+}
+
 function openNotification(item: NotificationHistoryItem): void {
   const url = item.payload?.display?.url;
-  if (url) {
-    try {
-      const parsedUrl = new URL(url);
-      const isApiOrWebHost = parsedUrl.protocol === 'https:' && parsedUrl.hostname === 'meetups.duckdns.org';
-      const isAppScheme = parsedUrl.protocol === 'shuttlr:' || parsedUrl.protocol === 'meetup:';
-      
-      if (isApiOrWebHost || isAppScheme) {
-        Linking.openURL(url).catch(() => {
-          Alert.alert(currentT('mob.errors.open_link_failed'), currentT('mob.errors.try_later'));
-        });
-      } else {
+  const parsedUrl = absoluteUrlOf(url);
+  // A web-relative url (a team notification) is not a link the app can open: the row routes by its type below instead of showing an error.
+  if (url && parsedUrl) {
+    const isApiOrWebHost = parsedUrl.protocol === 'https:' && parsedUrl.hostname === 'meetups.duckdns.org';
+    const isAppScheme = parsedUrl.protocol === 'shuttlr:' || parsedUrl.protocol === 'meetup:';
+    if (isApiOrWebHost || isAppScheme) {
+      Linking.openURL(url).catch(() => {
         Alert.alert(currentT('mob.errors.open_link_failed'), currentT('mob.errors.try_later'));
-      }
-    } catch {
+      });
+    } else {
       Alert.alert(currentT('mob.errors.open_link_failed'), currentT('mob.errors.try_later'));
     }
     return;
   }
-
 
   if (!isKnownType(item.notification_type)) {
     return;

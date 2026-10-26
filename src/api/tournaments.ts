@@ -43,6 +43,10 @@ import type {
   TournamentPerson,
   Tournament,
   TournamentFixture,
+  TournamentMyRegistration,
+  RegistrationPaymentResult,
+  RegistrationRoster,
+  RegistrationSummary,
   TournamentRegistration,
   TournamentRegistrationStatus,
   TournamentsListResponse,
@@ -123,6 +127,9 @@ interface TournamentApiItem {
   /** tournament-registration AD-4: whole cents and currency; both null while the fee flag is off and for a free tournament. */
   registration_fee_cents?: number | null;
   registration_fee_currency?: string | null;
+  /** teams-payments AD-7, AD-9: the payee number (null unless the server allows) and the caller's own registration (`GET /tournaments/{id}` only). */
+  payment_contact_number?: string | null;
+  my_registration?: Partial<TournamentMyRegistration> | null;
   /** AD-7 list-row fields (additive): venue address and map pin, the audience groups `[{id, name}]` and their ids. */
   venue_address?: string | null;
   venue_lat?: number | null;
@@ -220,11 +227,31 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     registration_fee_cents: typeof raw.registration_fee_cents === 'number' ? raw.registration_fee_cents : null,
     registration_fee_currency:
       typeof raw.registration_fee_currency === 'string' && raw.registration_fee_currency ? raw.registration_fee_currency : null,
+    payment_contact_number: raw.payment_contact_number?.trim() ? raw.payment_contact_number.trim() : null,
+    my_registration: normaliseMyRegistration(raw.my_registration),
     venue_address: raw.venue_address?.trim() ? raw.venue_address.trim() : null,
     venue_lat: typeof raw.venue_lat === 'number' ? raw.venue_lat : null,
     venue_lng: typeof raw.venue_lng === 'number' ? raw.venue_lng : null,
     venue_place_id: raw.venue_place_id ?? null,
     audience_groups: normaliseAudienceGroups(raw.groups),
+  };
+}
+
+/** `my_registration` as sent; null when absent or without a registration id. A missing field is null/false, never invented. */
+function normaliseMyRegistration(raw: Partial<TournamentMyRegistration> | null | undefined): TournamentMyRegistration | null {
+  if (!raw || typeof raw.registration_id !== 'string' || !raw.registration_id) {
+    return null;
+  }
+  const number = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+  return {
+    registration_id: raw.registration_id,
+    status: typeof raw.status === 'string' ? raw.status : '',
+    fee_cents_at_registration: number(raw.fee_cents_at_registration),
+    effective_fee_cents: number(raw.effective_fee_cents),
+    payment_received_at: typeof raw.payment_received_at === 'string' ? raw.payment_received_at : null,
+    payment_exempt: raw.payment_exempt === true,
+    payment_contact_number:
+      typeof raw.payment_contact_number === 'string' && raw.payment_contact_number.trim() ? raw.payment_contact_number.trim() : null,
   };
 }
 
@@ -286,25 +313,113 @@ export async function registerForTournament(
 }
 
 /**
- * `PATCH /tournaments/{id}` with exactly `{ registration_fee_cents }` (tournament-registration AD-4, "Set and edit"): whole cents, or null to clear
- * the fee. Nothing else is sent. The server refuses with 409 once registration has closed and 422 for a value out of range.
+ * `PATCH /tournaments/{id}` with `{ registration_fee_cents }` (tournament-registration AD-4, "Set and edit"): whole cents, or null to clear
+ * the fee, plus `payment_contact_number` for a fee above 0 (teams-payments AD-7). The server refuses with 409 once registration has closed and 422 for a value out of range.
  */
 export async function updateTournamentFee(
   id: string,
   cents: number | null,
-  options?: RequestOptions,
+  options?: RequestOptions & { paymentContactNumber?: string | null },
 ): Promise<void> {
-  await apiClient.patch(`/tournaments/${id}`, { registration_fee_cents: cents }, { correlationId: options?.correlationId });
+  // The payee number (teams-payments AD-7, E.164) goes with a fee above 0 only; the server validates it and never echoes it.
+  const body: { registration_fee_cents: number | null; payment_contact_number?: string } = { registration_fee_cents: cents };
+  if (typeof cents === 'number' && cents > 0 && options?.paymentContactNumber) {
+    body.payment_contact_number = options.paymentContactNumber;
+  }
+  await apiClient.patch(`/tournaments/${id}`, body, { correlationId: options?.correlationId });
 }
 
+/** `DELETE /tournaments/{id}/registrations/{registration_id}`. `wasPaid` is the server's `was_paid` (teams-payments AD-12). */
 export async function withdrawFromTournament(
   id: string,
   registrationId: string,
   options?: RequestOptions,
-): Promise<void> {
-  await apiClient.delete(`/tournaments/${id}/registrations/${registrationId}`, {
+): Promise<{ wasPaid: boolean }> {
+  const { data } = await apiClient.delete<{ was_paid?: boolean } | undefined>(`/tournaments/${id}/registrations/${registrationId}`, {
     correlationId: options?.correlationId,
   });
+  return { wasPaid: data?.was_paid === true };
+}
+
+const summaryNumber = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+
+function normaliseSummary(raw: Partial<RegistrationSummary> | null | undefined): RegistrationSummary {
+  return {
+    payments_enabled: raw?.payments_enabled === true,
+    registered: summaryNumber(raw?.registered),
+    paid: summaryNumber(raw?.paid),
+    unpaid: summaryNumber(raw?.unpaid),
+    exempt: summaryNumber(raw?.exempt),
+    collected_cents: summaryNumber(raw?.collected_cents),
+    currency: typeof raw?.currency === 'string' && raw.currency ? raw.currency : '',
+    fee_cents: typeof raw?.fee_cents === 'number' ? raw.fee_cents : null,
+    excluded_from_fixtures: summaryNumber(raw?.excluded_from_fixtures),
+    points_locked: raw?.points_locked === true,
+  };
+}
+
+/** `GET /tournaments/{id}/registrations/summary`: organizer and active committee (403 otherwise). Every figure is the server's. */
+export async function getRegistrationSummary(id: string, options?: RequestOptions): Promise<RegistrationSummary> {
+  const { data } = await apiClient.get<Partial<RegistrationSummary>>(`/tournaments/${id}/registrations/summary`, {
+    correlationId: options?.correlationId,
+  });
+  return normaliseSummary(data);
+}
+
+/**
+ * `PUT /tournaments/{id}/registrations/{registration_id}/payment` `{received}`: an idempotent set, not a toggle (teams-payments AD-9). The answer carries
+ * the entrant's state and the fresh summary, so the screen takes both from it and never adds numbers.
+ */
+export async function setRegistrationPayment(
+  id: string,
+  registrationId: string,
+  received: boolean,
+  options?: RequestOptions,
+): Promise<RegistrationPaymentResult> {
+  const { data } = await apiClient.put<Partial<RegistrationPaymentResult>>(
+    `/tournaments/${id}/registrations/${registrationId}/payment`,
+    { received },
+    { correlationId: options?.correlationId },
+  );
+  return {
+    registration_id: data?.registration_id ?? registrationId,
+    payment_received_at: data?.payment_received_at ?? null,
+    effective_fee_cents: typeof data?.effective_fee_cents === 'number' ? data.effective_fee_cents : null,
+    summary: normaliseSummary(data?.summary),
+    draft_exists: data?.draft_exists === true,
+  };
+}
+
+/** `PUT /tournaments/{id}/registrations/{registration_id}/points` `{points}`: a number, or null for unrated (teams-payments AD-13). */
+export async function setRegistrationPoints(
+  id: string,
+  registrationId: string,
+  points: number | null,
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.put(`/tournaments/${id}/registrations/${registrationId}/points`, { points }, { correlationId: options?.correlationId });
+}
+
+/** `GET /tournaments/{id}/registrations/{registration_id}/roster`: the team details sheet. `players` is null unless the server allows names. */
+export async function getRegistrationRoster(id: string, registrationId: string, options?: RequestOptions): Promise<RegistrationRoster> {
+  const { data } = await apiClient.get<Partial<RegistrationRoster>>(`/tournaments/${id}/registrations/${registrationId}/roster`, {
+    correlationId: options?.correlationId,
+  });
+  return {
+    registration_id: data?.registration_id ?? registrationId,
+    team_id: data?.team_id ?? null,
+    team_name: data?.team_name ?? null,
+    sport: data?.sport ?? '',
+    captain_name: data?.captain_name ?? null,
+    player_count: typeof data?.player_count === 'number' ? data.player_count : 0,
+    players: Array.isArray(data?.players)
+      ? data.players.map(player => ({
+          user_id: player.user_id,
+          display_name: player.display_name ?? null,
+          is_captain: player.is_captain === true,
+        }))
+      : null,
+  };
 }
 
 /**
@@ -349,9 +464,16 @@ export async function getFixtures(
 interface TournamentRegistrationApiItem {
   id: string;
   user_id: string | null;
+  team_id?: string | null;
   registered_at: string;
   participant_name: string | null;
   status: string;
+  payment_received_at?: string | null;
+  effective_fee_cents?: number | null;
+  points?: string | number | null;
+  payment_exempt?: boolean | null;
+  team_player_count?: number | null;
+  team_captain_name?: string | null;
 }
 
 function mapTournamentRegistration(raw: TournamentRegistrationApiItem): TournamentRegistration {
@@ -361,6 +483,13 @@ function mapTournamentRegistration(raw: TournamentRegistrationApiItem): Tourname
     nickname: raw.participant_name ?? '',
     registered_at: raw.registered_at,
     status: raw.status as TournamentRegistrationStatus,
+    team_id: raw.team_id ?? null,
+    payment_received_at: raw.payment_received_at ?? null,
+    effective_fee_cents: typeof raw.effective_fee_cents === 'number' ? raw.effective_fee_cents : null,
+    points: raw.points === null || raw.points === undefined ? null : String(raw.points),
+    payment_exempt: raw.payment_exempt === true,
+    team_player_count: typeof raw.team_player_count === 'number' ? raw.team_player_count : null,
+    team_captain_name: raw.team_captain_name ?? null,
   };
 }
 
@@ -800,7 +929,11 @@ async function postWorkbook<T>(path: string, file: UploadFile, options?: Request
   return data;
 }
 
-/** `POST /tournaments/{id}/points` (all or nothing): 422 lists the row errors and nothing is saved. */
+/**
+ * `POST /tournaments/{id}/points` (all or nothing): 422 lists the row errors and nothing is saved.
+ * Deprecated (teams-payments AD-13): the app no longer calls it. Points are edited per entrant (`setRegistrationPoints`); the server keeps the route
+ * for older apps until the sunset.
+ */
 export async function uploadPoints(id: string, file: UploadFile, options?: RequestOptions): Promise<PointsAccepted> {
   const data = await postWorkbook<Partial<PointsAccepted>>(`/tournaments/${id}/points`, file, options);
   return { entrants: data.entrants ?? 0, rated: data.rated ?? 0, unrated: data.unrated ?? 0 };

@@ -31,6 +31,7 @@ async function mount(
     registration_closes_at: '2999-01-01T00:00:00Z',
     registration_fee_cents: 1500,
     registration_fee_currency: 'SGD',
+    payment_contact_number: '+6591234567',
     ...tournament,
   });
   mockGet.mockReset().mockImplementation((url: string) => {
@@ -170,8 +171,9 @@ describe('Save (PATCH /tournaments/{id})', () => {
     expect(mockPatch).toHaveBeenCalledTimes(1);
     const [url, body, config] = mockPatch.mock.calls[0];
     expect(url).toBe('/tournaments/t-1');
-    expect(body).toEqual({ registration_fee_cents: 2050 });
-    expect(Object.keys(body)).toEqual(['registration_fee_cents']);
+    // teams-payments AD-7: a fee above 0 travels with the payee number (here the stored one, unchanged).
+    expect(body).toEqual({ registration_fee_cents: 2050, payment_contact_number: '+6591234567' });
+    expect(Object.keys(body)).toEqual(['registration_fee_cents', 'payment_contact_number']);
     expect(config.correlationId).toMatch(/^[0-9a-f-]{36}$/);
     expect(byId(root, 'fee-edit-sheet')).toHaveLength(0);
     expect(everyText(root)).toContain('Registration fee saved');
@@ -242,5 +244,35 @@ describe('errors', () => {
     const root = await failWith({ response: { status: 500 } });
     await type(root, '21');
     expect(byId(root, 'fee-edit-error')).toHaveLength(0);
+  });
+});
+
+describe('payee number (teams-payments AD-7)', () => {
+  it('setting a fee on a tournament with no stored number needs one: Save is refused with the server label and nothing is sent', async () => {
+    const root = await mount({ registration_fee_cents: null, registration_fee_currency: null, payment_contact_number: null });
+    await open(root);
+    await type(root, '10');
+    expect(byId(root, 'fee-edit-payee')).toHaveLength(1);
+    await press(root, 'fee-edit-save');
+    expect(mockPatch).not.toHaveBeenCalled();
+    expect(text(root, 'fee-edit-error')).toBe('Enter a payment number: this tournament or game has a fee.');
+  });
+
+  it('an unchanged fee shows no number field and sends nothing', async () => {
+    const root = await mount();
+    await open(root);
+    expect(byId(root, 'fee-edit-payee')).toHaveLength(0);
+    await press(root, 'fee-edit-save');
+    expect(mockPatch).not.toHaveBeenCalled();
+  });
+
+  it('PAYMENT_NUMBER_INVALID from the server shows its own label', async () => {
+    const root = await mount();
+    mockPatch.mockRejectedValueOnce({ response: { status: 422, data: { code: 'PAYMENT_NUMBER_INVALID', detail: 'bad +6591234567' } } });
+    await open(root);
+    await type(root, '20');
+    await press(root, 'fee-edit-save');
+    expect(text(root, 'fee-edit-error')).toBe('That payment number is not valid. Check the country code and the number.');
+    expect(everyText(root)).not.toContain('+6591234567');
   });
 });

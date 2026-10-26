@@ -58,6 +58,12 @@ describe('getClientConfig & getGameLimits', () => {
     expect(config).toEqual({
       google_maps_api_key: null,
       venue_catalogue_enabled: false,
+      tournament_fee_enabled: false,
+      tournament_fee_currency: null,
+      tournament_fee_max_cents: null,
+      game_fee_enabled: false,
+      game_fee_currency: null,
+      game_fee_max_cents: null,
     });
   });
 
@@ -73,5 +79,14 @@ describe('getClientConfig & getGameLimits', () => {
 
     const limits = await getGameLimits();
     expect(limits).toEqual({ players_min: 4, players_max: 50 });
+  });
+
+  it('reads the game fee switch, currency and cap (teams-payments AD-8); off and null when absent', async () => {
+    mockedGet.mockResolvedValueOnce({ data: { game_fee_enabled: true, game_fee_currency: 'SGD', game_fee_max_cents: 100000 } });
+    expect(await getClientConfig()).toMatchObject({ game_fee_enabled: true, game_fee_currency: 'SGD', game_fee_max_cents: 100000 });
+    mockedGet.mockResolvedValueOnce({ data: {} });
+    expect(await getClientConfig()).toMatchObject({ game_fee_enabled: false, game_fee_currency: null, game_fee_max_cents: null });
+    mockedGet.mockResolvedValueOnce({ data: { game_fee_enabled: 'true' } });
+    expect((await getClientConfig()).game_fee_enabled).toBe(false);
   });
 });

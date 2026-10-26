@@ -45,6 +45,12 @@ import {
 } from '../api/places';
 import { getClientConfig, getGameLimits } from '../api/config';
 import { getMyGroups } from '../api/groups';
+import GameFeeFields, { parseGameFee, type GameFeeConfig } from '../components/GameFeeFields';
+import GamePaymentsPanel from '../components/GamePaymentsPanel';
+import PaymentCard from '../components/tournament/PaymentCard';
+import { gameFeeTarget, useGameFeeJoin } from '../hooks/useGameFeeJoin';
+import { centsToAmountText, hasFee } from '../utils/money';
+import { refusalText } from '../utils/refusal';
 import { withCorrelationId } from '../api/correlationId';
 import { useAuth } from '../auth/AuthContext';
 import Button from '../components/Button';
@@ -140,6 +146,12 @@ function getInitials(name: string): string {
   return (name.trim().slice(0, 2) || '?').toUpperCase();
 }
 
+/** True when the typed fee differs from the stored one (null and 0 are both "free"): the edit form then warns when players have joined. */
+function feeChanged(stored: number | null | undefined, text: string, config: GameFeeConfig): boolean {
+  const parsed = parseGameFee(text, config);
+  return parsed.valid && (parsed.cents ?? 0) !== (stored ?? 0);
+}
+
 export default function EventDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const { eventId } = route.params;
   const { user } = useAuth();
@@ -220,6 +232,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [editGroupIds, setEditGroupIds] = useState<string[]>([]);
   const [editGroupOptions, setEditGroupOptions] = useState<Group[]>([]);
   const [maxGroups, setMaxGroups] = useState(maxGroupsFor(null));
+  // Game fee (teams-payments AD-8, AD-7): null while the client-config switch is off; then nothing about a fee is shown or sent.
+  const [gameFee, setGameFee] = useState<GameFeeConfig | null>(null);
+  const [editFeeText, setEditFeeText] = useState('');
+  const [editPayee, setEditPayee] = useState<string | null>(null);
+  const [editPayeeError, setEditPayeeError] = useState<string | null>(null);
 
   /**
    * Loads the game AND its participants together. `silent` (after Join/Leave)
@@ -305,6 +322,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     getClientConfig().then(cfg => {
       setMapsApiKey(cfg.google_maps_api_key);
       setVenueCatalogueEnabled(Boolean(cfg.venue_catalogue_enabled));
+      setGameFee(cfg.game_fee_enabled ? { currency: cfg.game_fee_currency, maxCents: cfg.game_fee_max_cents } : null);
     }).catch(() => {});
   }, []);
 
@@ -412,6 +430,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         })
         .catch(() => {});
     }
+    setEditFeeText(hasFee(event.registration_fee_cents) ? centsToAmountText(event.registration_fee_cents) : '');
+    setEditPayee(event.payment_contact_number ?? null);
+    setEditPayeeError(null);
     setEditStep(1);
     setEditError(null);
     setIsEditing(true);
@@ -562,6 +583,17 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       if (!isCapacityValid || editCapacity < Math.max(2, event?.participant_count ?? 0)) {
         return;
       }
+      if (gameFee) {
+        const fee = parseGameFee(editFeeText, gameFee);
+        if (!fee.valid) {
+          return;
+        }
+        // A fee above 0 needs the payment number (the server answers 422 PAYMENT_NUMBER_REQUIRED); the label is the server seed.
+        if (fee.cents !== null && fee.cents > 0 && !editPayee) {
+          setEditPayeeError(t('mob.reg.err.payment_number_required'));
+          return;
+        }
+      }
       setEditStep(4);
       return;
     }
@@ -589,11 +621,24 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         fullVenueName !== (event.venue_name || event.location || '') ||
         editSelectedVenue.address !== (event.venue_address || '');
 
+      // The game fee and its payee number, only while the switch is on: a fee above 0 sends both, an emptied or zero fee clears the stored fee.
+      const editFeeFields = (): Pick<UpdateEventInput, 'registration_fee_cents' | 'payment_contact_number'> => {
+        const fee = parseGameFee(editFeeText, gameFee);
+        if (!gameFee || !fee.valid) {
+          return {};
+        }
+        if (fee.cents !== null && fee.cents > 0) {
+          return { registration_fee_cents: fee.cents, ...(editPayee ? { payment_contact_number: editPayee } : {}) };
+        }
+        return hasFee(event.registration_fee_cents) ? { registration_fee_cents: null } : {};
+      };
+
       const payload: UpdateEventInput = {
         title: editTitle.trim(),
         skill_level_requirement: editSkillLevel,
         capacity: editCapacity,
         starts_at: editDateValue.toISOString(),
+        ...editFeeFields(),
         // The full list replaces the game's groups.
         ...(event.visibility === 'group' ? { group_ids: editGroupIds } : {}),
         ...(venueCatalogueEnabled && editCatalogueVenue
@@ -666,6 +711,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           e?.response?.data?.detail === 'This game has ended and can no longer be changed')
       ) {
         setEditError(t('mob.closure.game_ended'));
+      } else if (typeof e?.response?.data?.code === 'string' && (e.response.data.code.startsWith('PAYMENT_') || e.response.data.code.startsWith('FEE_'))) {
+        // The game fee and its number: a coded refusal shows its own label, never the server text (teams-payments AD-1).
+        setEditError(refusalText(e, t, 'mob.game_detail.edit_error'));
       } else {
         setEditError(getApiErrorMessage(e, t('mob.game_detail.edit_error')));
       }
@@ -711,7 +759,36 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     }
   };
 
+  // A game with a fee (teams-payments AD-8): Join and invitation Accept open the fee confirmation first; a free game joins directly as before.
+  const joinKind = useRef<'rsvp' | 'accept'>('rsvp');
+  const feeJoin = useGameFeeJoin({
+    join: (acceptedFeeCents, correlationId) =>
+      joinKind.current === 'accept'
+        ? respondToEventInvitation(eventId, true, { correlationId, acceptedFeeCents }).then(() => undefined)
+        : rsvpEvent(eventId, { correlationId, acceptedFeeCents }),
+    reload: async correlationId => {
+      const fresh = await getEvent(eventId, { correlationId });
+      setEvent(fresh);
+      loadEvent(true);
+      return fresh;
+    },
+    onNotFound: unavailable.onNotFound,
+  });
+  const startFeeJoin = (kind: 'rsvp' | 'accept'): boolean => {
+    const target = event ? gameFeeTarget(event) : null;
+    if (!target) {
+      return false;
+    }
+    joinKind.current = kind;
+    setActionError(null);
+    feeJoin.begin(target);
+    return true;
+  };
+
   const handleRsvp = async () => {
+    if (startFeeJoin('rsvp')) {
+      return;
+    }
     setActionError(null);
     setIsActionLoading(true);
     try {
@@ -767,6 +844,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   };
 
   const handleAcceptInvite = async () => {
+    if (startFeeJoin('accept')) {
+      return;
+    }
     setActionError(null);
     setIsActionLoading(true);
     try {
@@ -1219,6 +1299,30 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 <Text style={styles.inputCardLabel}>{t('mob.create_game.skill_level_label')}</Text>
                 <SkillRequirementPicker value={editSkillLevel} onChange={setEditSkillLevel} />
               </View>
+
+              {gameFee ? (
+                <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
+                  <GameFeeFields
+                    config={gameFee}
+                    amount={editFeeText}
+                    onAmount={text => {
+                      setEditFeeText(text);
+                      setEditPayeeError(null);
+                    }}
+                    initialNumber={event.payment_contact_number ?? undefined}
+                    onNumber={e164 => {
+                      setEditPayee(e164);
+                      setEditPayeeError(null);
+                    }}
+                    numberError={editPayeeError}
+                    warning={
+                      event.participant_count > 0 && feeChanged(event.registration_fee_cents, editFeeText, gameFee)
+                        ? t('mob.game_fee.edit_warning')
+                        : null
+                    }
+                  />
+                </View>
+              ) : null}
             </View>
           )}
 
@@ -1588,6 +1692,23 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                   </View>
                 </Pressable>
               }
+            />
+          ) : null}
+
+          {feeJoin.element}
+          {/* Organizer payments panel (teams-payments v1.2): only while the game fee is on and above 0. */}
+          {isOrganiser && gameFee !== null && hasFee(event.registration_fee_cents) ? (
+            <GamePaymentsPanel eventId={eventId} eventTitle={event.title} organizerId={event.organiser_id} participants={participants} />
+          ) : null}
+          {/* Payment card (teams-payments AD-7, J7 for games): a participant who is going and owes a fee. */}
+          {event.my_participation?.status === 'going' ? (
+            <PaymentCard
+              feeCents={event.my_participation.effective_fee_cents ?? event.my_participation.fee_cents_at_join}
+              currency={event.registration_fee_currency}
+              paid={event.my_participation.payment_received_at !== null}
+              exempt={event.my_participation.payment_exempt}
+              number={event.my_participation.payment_contact_number ?? event.payment_contact_number}
+              game
             />
           ) : null}
 

@@ -449,6 +449,10 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
               setServerIssue(null);
               setState(current => ({ ...current, feeAmount: value.replace(/[^0-9.]/g, '') }));
             }}
+            onPayee={e164 => {
+              setServerIssue(null);
+              setState(current => (current.payeeNumber === e164 ? current : { ...current, payeeNumber: e164 }));
+            }}
             errors={errors}
             focus={stepFocus}
           />

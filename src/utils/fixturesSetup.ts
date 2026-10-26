@@ -196,6 +196,7 @@ export function normaliseDraft(raw: unknown): DraftDetail | null {
     groupMatches: matches.filter(m => !m.knockout).length,
     knockoutMatches: matches.filter(m => m.knockout).length,
     matches,
+    excludedUnpaid: typeof raw.excluded_unpaid === 'number' ? raw.excluded_unpaid : null,
   };
 }
 

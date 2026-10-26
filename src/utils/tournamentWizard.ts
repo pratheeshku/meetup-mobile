@@ -98,6 +98,11 @@ export interface WizardState {
   hardBlockTouched: boolean;
   /** Optional fee per entry as typed, an amount in the config currency (for example "15.00"; empty = none). Converted to whole cents for the request. Used only while the server's fee flag is on. */
   feeAmount: string;
+  /**
+   * The PayNow/PayLah number of this tournament in E.164 (teams-payments AD-7), prefilled from the organizer's own profile number and editable.
+   * Asked only while the fee flag is on and a fee above 0 is typed; sent only then.
+   */
+  payeeNumber: string | null;
   venue: WizardVenue | null;
   /** Catalogue-off venue text. */
   venueName: string;
@@ -126,6 +131,7 @@ export function initialWizardState(clientRequestId: string, sport = ''): WizardS
     hardBlockAt: '',
     hardBlockTouched: false,
     feeAmount: '',
+    payeeNumber: null,
     venue: null,
     venueName: '',
     venueAddress: '',
@@ -362,6 +368,23 @@ export function validateFee(state: WizardState, fee: WizardFeeConfig | null | un
   };
 }
 
+/** True when the typed fee is above 0 while the server's fee flag is on: the payee number is then asked for and required. */
+export function needsPayeeNumber(state: WizardState, fee: WizardFeeConfig | null | undefined): boolean {
+  if (!fee) {
+    return false;
+  }
+  const parsed = parseAmountToCents(state.feeAmount);
+  return parsed.valid && parsed.cents !== null && parsed.cents > 0;
+}
+
+/** A fee above 0 needs a payment number (the server answers 422 PAYMENT_NUMBER_REQUIRED); the label is the server seed. */
+export function validatePayee(state: WizardState, fee: WizardFeeConfig | null | undefined): WizardIssue | null {
+  if (!needsPayeeNumber(state, fee) || state.payeeNumber) {
+    return null;
+  }
+  return { key: 'mob.reg.err.payment_number_required', field: 'payment_contact_number', step: WIZARD_STEP.registration };
+}
+
 /** Registration dates: closure and hard block present and consistent with the window (first failure, the server's order). */
 export function validateRegistration(
   state: WizardState,
@@ -375,6 +398,10 @@ export function validateRegistration(
   const feeIssue = validateFee(state, fee);
   if (feeIssue) {
     issues.push(feeIssue);
+  }
+  const payeeIssue = validatePayee(state, fee);
+  if (payeeIssue) {
+    issues.push(payeeIssue);
   }
   if (!closes) {
     issues.push(requiredIssue('registration_closes_at', WIZARD_STEP.registration));
@@ -465,9 +492,13 @@ function isoOf(value: string): string {
 }
 
 /** `registration_fee_cents` from the typed amount; nothing for an empty or invalid field (validation stops an invalid one earlier). */
-function feeFields(amount: string): { registration_fee_cents?: number } {
-  const parsed = parseAmountToCents(amount);
-  return parsed.valid && parsed.cents !== null ? { registration_fee_cents: parsed.cents } : {};
+function feeFields(state: WizardState): { registration_fee_cents?: number; payment_contact_number?: string } {
+  const parsed = parseAmountToCents(state.feeAmount);
+  if (!parsed.valid || parsed.cents === null) {
+    return {};
+  }
+  // The payee number goes with a fee above 0 only (teams-payments AD-7); a free tournament sends none.
+  return { registration_fee_cents: parsed.cents, ...(parsed.cents > 0 && state.payeeNumber ? { payment_contact_number: state.payeeNumber } : {}) };
 }
 
 /**
@@ -503,7 +534,7 @@ export function buildCreateBody(state: WizardState, catalogueEnabled: boolean, f
     ends_at: isoOf(state.endsAt),
     registration_closes_at: isoOf(state.closesAt),
     registration_hard_block_at: isoOf(state.hardBlockAt),
-    ...(feeEnabled ? feeFields(state.feeAmount) : {}),
+    ...(feeEnabled ? feeFields(state) : {}),
     ...(visibility === 'group' ? { group_ids: [...state.groupIds] } : {}),
     committee_member_ids: state.committee.map(person => person.id),
   };
@@ -614,6 +645,17 @@ export function mapCreateRejection(
           step: WIZARD_STEP.registration,
         },
       };
+    case 'PAYMENT_NUMBER_REQUIRED':
+    case 'PAYMENT_NUMBER_INVALID':
+      return {
+        kind: 'step',
+        step: WIZARD_STEP.registration,
+        issue: {
+          key: data.code === 'PAYMENT_NUMBER_REQUIRED' ? 'mob.reg.err.payment_number_required' : 'mob.reg.err.payment_number_invalid',
+          field: 'payment_contact_number',
+          step: WIZARD_STEP.registration,
+        },
+      };
     case 'VENUE_INVALID':
       return { kind: 'step', step: WIZARD_STEP.when, issue: { key: 'mob.tw.err_venue', field: 'venue', step: WIZARD_STEP.when } };
     default:
@@ -634,7 +676,7 @@ export function firstFocusField(step: number, errors: Record<string, string>): s
   const order: Record<number, string[]> = {
     [WIZARD_STEP.basics]: ['sport', 'title', 'description'],
     [WIZARD_STEP.when]: ['starts_at', 'ends_at', 'venue', 'venue_detail'],
-    [WIZARD_STEP.registration]: ['registration_closes_at', 'registration_hard_block_at', 'registration_fee_cents'],
+    [WIZARD_STEP.registration]: ['registration_closes_at', 'registration_hard_block_at', 'registration_fee_cents', 'payment_contact_number'],
   };
   const first: Record<number, string> = {
     [WIZARD_STEP.basics]: 'title',
