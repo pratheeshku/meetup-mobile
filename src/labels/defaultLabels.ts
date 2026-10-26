@@ -1838,5 +1838,8 @@ export const DEFAULT_LABELS = {
   'mob.reg.noteam_not_now': 'Not now',
   'mob.reg.noteam_create': 'Create tournament team',
   'mob.reg.choose_team': 'Choose tournament team',
+
+  // tp-mobile: board J1 fee hint (new, not seeded: listed in the report).
+  'mob.pay.fee_hint': 'Payment is arranged with the organizer. You will see how after you register.',
 } as const;
 

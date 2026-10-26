@@ -19,13 +19,23 @@ export default function TournamentFeeLine({ tournament }: { tournament: Tourname
   if (typeof cents !== 'number' || (hasFee(cents) && !currency)) {
     return null;
   }
+  // Board J1: under a fee, before registering, the line says how payment works. Nothing once registered (the Payment card takes over).
+  const showHint = hasFee(cents) && !tournament.my_registration;
   return (
-    <Text style={styles.line} testID="tournament-fee-line">
-      {feeLineFor(t, cents, currency, tournament.participation_mode)}
-    </Text>
+    <>
+      <Text style={styles.line} testID="tournament-fee-line">
+        {feeLineFor(t, cents, currency, tournament.participation_mode)}
+      </Text>
+      {showHint ? (
+        <Text style={styles.hint} testID="tournament-fee-hint">
+          {t('mob.pay.fee_hint')}
+        </Text>
+      ) : null}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   line: { ...typography.bodyBold, color: colors.textPrimary, marginTop: spacing.sm },
+  hint: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.xs },
 });

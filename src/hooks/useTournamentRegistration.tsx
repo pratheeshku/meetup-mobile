@@ -160,9 +160,10 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
         if (!feeApplies) {
           setPhase({ kind: 'result', failure: null, payment: null });
         }
-        let fresh: Tournament | void;
+        let fresh: Tournament | undefined;
         try {
-          fresh = await optionsRef.current.onRegistered(correlationId);
+          const result = await optionsRef.current.onRegistered(correlationId);
+          fresh = result ? result : undefined;
         } catch (error) {
           if (isNotFoundError(error)) {
             optionsRef.current.onNotFound();
@@ -176,7 +177,7 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
             failure: null,
             payment: {
               amount: formatMoney(hasFee(cents) ? cents : (target.feeCents as number), target.currency as string),
-              number: mine?.payment_contact_number ?? (fresh ? fresh.payment_contact_number ?? null : null),
+              number: mine?.payment_contact_number ?? fresh?.payment_contact_number ?? null,
             },
           });
         }

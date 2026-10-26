@@ -34,7 +34,10 @@ import {
   uploadCover,
 } from '../api/profile';
 import { getSports } from '../api/sports';
-import { updateMobileNumber } from '../api/mobileNumber';
+import { classifyMobileNumberError, updateMobileNumber } from '../api/mobileNumber';
+import MobileNumberInput from '../components/MobileNumberInput';
+import type { MobileNumberChange } from '../components/MobileNumberInput';
+import { useMobileNumberConfig } from '../hooks/useMobileNumberConfig';
 import { BannerBackground, SportIcon } from '../components/icons/DashboardIcons';
 import { BackArrowIcon, CameraIcon } from '../components/icons/ActionIcons';
 import ErrorView from '../components/ErrorView';
@@ -116,7 +119,11 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
 
   // Form states
   const [displayName, setDisplayName] = useState('');
-  const [mobileNumber, setMobileNumber] = useState('');
+  // Mobile number (teams-payments AD-6): the country dropdown (default +65) and the number are two fields, `MobileNumberInput`. `null` = not edited;
+  // the stored number is E.164 and unchanged by the split. Hidden while the country list or consent text is unavailable (profile-onboarding §7).
+  const mobileConfig = useMobileNumberConfig();
+  const [mobileChange, setMobileChange] = useState<MobileNumberChange | null>(null);
+  const [mobileError, setMobileError] = useState<string | null>(null);
 
   // Cover image states
   const [coverAction, setCoverAction] = useState<'keep' | 'new' | 'default'>('keep');
@@ -141,7 +148,6 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
       const data = await getProfile();
       setProfile(data);
       setDisplayName(data.display_name || '');
-      setMobileNumber(data.mobile_number || '');
       setSavedSkills(data.skill_levels ?? []);
     } catch {
       setLoadError(t('mob.profile.load_error'));
@@ -288,9 +294,39 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
         await deleteAvatar();
       }
 
-      // 4. Mobile number
-      if (mobileNumber.trim() !== (profile.mobile_number ?? '')) {
-        await updateMobileNumber({ mobile_number: mobileNumber.trim() || null });
+      // 4. Mobile number (only when it was edited): clear when emptied, else set with the current consent version (the server needs it to set).
+      const storedMobile = profile.mobile_number ?? '';
+      let savedMobile: string | null = null;
+      let mobileCleared = false;
+      if (mobileChange && mobileConfig.status === 'ready') {
+        setMobileError(null);
+        if (mobileChange.isEmpty) {
+          if (storedMobile !== '') {
+            await updateMobileNumber({ mobile_number: null });
+            mobileCleared = true;
+          }
+        } else if (mobileChange.e164 === null) {
+          setMobileError(t('mob.mobile_number.invalid'));
+          return;
+        } else if (mobileChange.e164 !== storedMobile) {
+          try {
+            await updateMobileNumber({
+              mobile_number: mobileChange.e164,
+              mobile_consent_version: mobileConfig.consent.version,
+            });
+            savedMobile = mobileChange.e164;
+          } catch (failure) {
+            // Fixed texts only: the number is never echoed and a server detail is never shown.
+            const kind = classifyMobileNumberError(failure);
+            if (kind === 'consent_version_stale') {
+              await mobileConfig.reloadConsent();
+              setMobileError(t('mob.mobile_number.reconfirm'));
+            } else {
+              setMobileError(t(kind === 'invalid_number' ? 'mob.mobile_number.invalid' : 'mob.mobile_number.save_failed'));
+            }
+            return;
+          }
+        }
       }
 
       const rows: CompletionRow[] = [];
@@ -308,12 +344,10 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
       } else if (coverAction === 'default' && profile.cover_url) {
         rows.push({ label: t('mob.done.f_cover'), value: t('mob.done.v_removed') });
       }
-      const nextMobile = mobileNumber.trim();
-      if (nextMobile !== (profile.mobile_number ?? '')) {
-        rows.push({
-          label: t('mob.done.f_mobile'),
-          value: nextMobile ? maskMobileLast4(nextMobile) : t('mob.done.v_removed'),
-        });
+      if (savedMobile !== null) {
+        rows.push({ label: t('mob.done.f_mobile'), value: maskMobileLast4(savedMobile) });
+      } else if (mobileCleared) {
+        rows.push({ label: t('mob.done.f_mobile'), value: t('mob.done.v_removed') });
       }
       if (rows.length === 0) {
         navigation.goBack();
@@ -475,18 +509,22 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
             </View>
           </View>
 
-          <View style={styles.inputFieldGroup}>
-            <Text style={styles.inputLabel}>{t('mob.profile.mobile_optional')}</Text>
-            <TextInput
-              style={styles.textInput}
-              value={mobileNumber}
-              onChangeText={setMobileNumber}
-              placeholder={t('mob.mobile_number.number_placeholder')}
-              placeholderTextColor={colors.textMuted}
-              keyboardType="phone-pad"
-            />
-            <Text style={styles.inputHelperText}>{t('mob.profile.mobile_visible_admins')}</Text>
-          </View>
+          {mobileConfig.status === 'ready' ? (
+            <View style={styles.inputFieldGroup} testID="edit-profile-mobile">
+              <Text style={styles.inputLabel}>{t('mob.profile.mobile_optional')}</Text>
+              <MobileNumberInput
+                countries={mobileConfig.countries}
+                consentText={mobileConfig.consent.text}
+                initialValue={profile.mobile_number}
+                error={mobileError}
+                onChange={change => {
+                  setMobileChange(change);
+                  setMobileError(null);
+                }}
+              />
+              <Text style={styles.inputHelperText}>{t('mob.profile.mobile_visible_admins')}</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.card}>
