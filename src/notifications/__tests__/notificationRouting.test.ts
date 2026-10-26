@@ -26,13 +26,15 @@ const ADDED_TYPES = [
   'tournament_invited',
   'tournament_advanced',
   'tournament_result_corrected',
+  'team_join_request',
+  'tournament_registration_removed',
 ] as const;
 
 describe('type list', () => {
-  it('contains the added types alongside the original 12 (21 total, no duplicates)', () => {
+  it('contains the added types alongside the original 12 (23 total, no duplicates)', () => {
     expect(NOTIFICATION_TYPES).toEqual(expect.arrayContaining([...ADDED_TYPES]));
-    expect(NOTIFICATION_TYPES).toHaveLength(21);
-    expect(new Set(NOTIFICATION_TYPES).size).toBe(21);
+    expect(NOTIFICATION_TYPES).toHaveLength(23);
+    expect(new Set(NOTIFICATION_TYPES).size).toBe(23);
   });
 
   it('resolves every listed type without throwing (list and switch cannot drift)', () => {
@@ -168,5 +170,27 @@ describe('tournament_invited', () => {
 
   it('is a known notification type (so the push payload is accepted)', () => {
     expect(NOTIFICATION_TYPES).toContain('tournament_invited');
+  });
+});
+
+describe('teams-payments AD-15 routing', () => {
+  it.each(['team_invite', 'team_join_request'] as const)('%s opens Groups with Tournament teams selected, never a group detail', type => {
+    expect(resolveNotificationTarget(type, 'team-9')).toEqual({ tab: 'Groups', screen: 'GroupsList', params: { section: 'teams' } });
+  });
+
+  it('tournament_registration_removed opens the tournament', () => {
+    expect(resolveNotificationTarget('tournament_registration_removed', 'tour-3')).toEqual({
+      tab: 'Tournaments',
+      screen: 'TournamentDetail',
+      params: { tournamentId: 'tour-3' },
+    });
+  });
+
+  it('navigates to Groups with the teams section param', () => {
+    jest.spyOn(navigationRef, 'isReady').mockReturnValue(true);
+    const navigate = jest.spyOn(navigationRef, 'navigate').mockImplementation(() => {});
+    navigateToNotificationTarget(resolveNotificationTarget('team_invite', 'team-9'));
+    expect(navigate).toHaveBeenCalledWith('Groups', { screen: 'GroupsList', params: { section: 'teams' } });
+    jest.restoreAllMocks();
   });
 });

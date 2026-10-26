@@ -12,6 +12,8 @@
  * - event_participant_removed: player-removed (orange)
  * - group_ownership_transferred: owner (amber)
  * - group_deleted: delete (red)
+ * - tournament_registration_removed: player-removed (orange)
+ * - team_join_request: players (green)
  * - Fallback / Unknown types: notifications (amber)
  */
 import React from 'react';
@@ -29,6 +31,8 @@ export const NOTIFICATION_TYPE_MAP: Record<string, RegistryIconName> = {
   event_participant_removed: 'player-removed',
   group_ownership_transferred: 'owner',
   group_deleted: 'delete',
+  tournament_registration_removed: 'player-removed',
+  team_join_request: 'players',
 };
 
 export interface NotificationIconProps {

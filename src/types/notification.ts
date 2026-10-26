@@ -43,10 +43,12 @@ export type NotificationType =
   | 'tournament_advanced'
   | 'tournament_result_corrected'
   | 'team_invite'
+  | 'team_join_request'
+  | 'tournament_registration_removed'
   | 'group_deleted'
   | 'group_ownership_transferred';
 
-/** All 21 known notification types (match-scoring v1.2 AD-S8 added `tournament_advanced`, `tournament_result_corrected`). */
+/** All 23 known notification types (match-scoring v1.2 AD-S8 added `tournament_advanced`, `tournament_result_corrected`; teams-payments AD-12, AD-14 added `tournament_registration_removed`, `team_join_request`). */
 export const NOTIFICATION_TYPES: NotificationType[] = [
   'global',
   'event_invite',
@@ -67,6 +69,8 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   'tournament_advanced',
   'tournament_result_corrected',
   'team_invite',
+  'team_join_request',
+  'tournament_registration_removed',
   'group_deleted',
   'group_ownership_transferred',
 ];

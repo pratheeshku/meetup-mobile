@@ -119,7 +119,7 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
             optionsRef.current.onNotFound();
             return;
           }
-          setPhase({ kind: 'result', failure: { ...classifyRegistrationError(error), labelKey: 'mob.reg.err.generic', canRetry: true } });
+          setPhase({ kind: 'result', failure: classifyRegistrationError(error) });
         });
     },
     [close],
@@ -160,7 +160,7 @@ export function useTournamentRegistration(options: Options): TournamentRegistrat
       if (failure.code === 'FEE_CHANGED' && failure.currentFeeCents !== null) {
         const fee = failure.currentFeeCents;
         setTarget(previous => (previous ? { ...previous, feeCents: fee, feeReadable: true } : previous));
-        setPhase({ kind: 'confirm', notice: t(failure.labelKey) });
+        setPhase({ kind: 'confirm', notice: t(failure.labelKey, failure.labelParams) });
       } else {
         setPhase({ kind: 'result', failure });
       }

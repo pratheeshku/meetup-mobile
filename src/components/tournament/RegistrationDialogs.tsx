@@ -145,7 +145,7 @@ export function RegistrationResultPopup(props: RegistrationResultPopupProps): Re
           </Text>
           {failure ? (
             <Text style={styles.message} accessibilityRole="alert" testID="registration-result-message">
-              {t(failure.labelKey)}
+              {t(failure.labelKey, failure.labelParams)}
             </Text>
           ) : (
             <Text style={styles.message} testID="registration-result-fee">

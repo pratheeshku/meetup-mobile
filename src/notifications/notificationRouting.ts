@@ -6,31 +6,12 @@
  * open", shared by the foreground banner's tap handler
  * (`NotificationBanner.tsx`) and the background/quit-state tap handler
  * (`fcm.ts`'s `onNotificationOpenedApp`/`getInitialNotification` wiring in
- * `RootNavigator.tsx`) — kept in one place so the 12-type mapping is never
+ * `RootNavigator.tsx`) — kept in one place so the type mapping is never
  * duplicated (and never silently drifts) between the two call sites, per
- * the task brief's "All 12 notification types must be handled in
- * routing — no unhandled types" rule.
+ * the task brief's "no unhandled types" rule.
  *
- * Deviation (recorded for the Implementation Report, needs architect
- * ratification): DES-MEETUP-MOBILE.md §4.8's own mapping table routes
- * `team_invite` to a **Team Detail** screen, backed by the design's
- * separate `/teams/*` API family (§4.4, §7.3). No Team module (screen,
- * API client, or route) has been built anywhere in this codebase — only
- * Groups exists (`GroupDetailScreen`, `src/api/groups.ts`, `GET
- * /groups/{id}`). Building a full Team Detail screen is outside this
- * task's stated scope (its own step list only adds
- * `NotificationPreferencesScreen`). Per the task brief's explicit,
- * literal instruction, `team_invite` routes to `GroupDetailScreen`
- * below, passing `entity_id` as `groupId`. This is a real functional
- * risk, not a cosmetic one: if a `team_invite`'s `entity_id` is actually
- * a team id (not a group id), `GroupDetailScreen`'s `GET /groups/{id}`
- * fetch will fail against a real backend. Flagged here, in the
- * Implementation Report, and in `GroupDetailScreen`'s own load-error
- * path (already shows a generic "could not load" retry state, so this
- * fails safely rather than crashing) — needs architect resolution: either
- * confirm `team_invite`'s `entity_id` is in fact a group id in the
- * ratified backend contract, or approve building a Team Detail screen in
- * a follow-up task.
+ * `team_invite` and `team_join_request` (teams-payments AD-15) open Groups with the Tournament teams list selected, because the team detail
+ * screen does not exist yet (task tp-mobile-teams). They used to open `GroupDetailScreen` with a team id, which could never load.
  */
 import { createNavigationContainerRef } from '@react-navigation/native';
 
@@ -46,7 +27,7 @@ import type { AppTabParamList } from '../navigation/types';
 export type NotificationTarget =
   | { tab: 'Home'; screen: 'EventsList' }
   | { tab: 'Home'; screen: 'EventDetail'; params: { eventId: string } }
-  | { tab: 'Groups'; screen: 'GroupsList' }
+  | { tab: 'Groups'; screen: 'GroupsList'; params?: { section: 'teams' } }
   | { tab: 'Groups'; screen: 'GroupDetail'; params: { groupId: string } }
   | {
       tab: 'Tournaments';
@@ -139,14 +120,22 @@ export function resolveNotificationTarget(
         params: { tournamentId: entityId },
       };
 
-    // Deviation — see file header: routed to Group Detail per the task
-    // brief's literal instruction; design §4.8 names a Team Detail screen
-    // tags that does not exist in this codebase.
+    // teams-payments AD-15: there is no team detail screen yet (task tp-mobile-teams), so a team invitation and a join request open Groups with
+    // the Tournament teams list selected. `entity_id` (a team id) is not used: it is never read as a group id.
     case 'team_invite':
+    case 'team_join_request':
       return {
         tab: 'Groups',
-        screen: 'GroupDetail',
-        params: { groupId: entityId },
+        screen: 'GroupsList',
+        params: { section: 'teams' },
+      };
+
+    // teams-payments AD-12: the removed entrant is told; the push opens the tournament (entity_id = the tournament id).
+    case 'tournament_registration_removed':
+      return {
+        tab: 'Tournaments',
+        screen: 'TournamentDetail',
+        params: { tournamentId: entityId },
       };
 
     case 'group_deleted':
@@ -217,7 +206,7 @@ export function navigateToNotificationTarget(target: NotificationTarget): void {
       params: target.params,
     });
   } else if (target.tab === 'Groups' && target.screen === 'GroupsList') {
-    navigationRef.navigate('Groups', { screen: 'GroupsList' });
+    navigationRef.navigate('Groups', target.params ? { screen: 'GroupsList', params: target.params } : { screen: 'GroupsList' });
   } else if (target.tab === 'Groups' && target.screen === 'GroupDetail') {
     navigationRef.navigate('Groups', {
       screen: 'GroupDetail',
