@@ -68,6 +68,11 @@ export interface ParticipantsTabProps {
    * points boxes (teams-payments AD-13, OI-9).
    */
   pointsApplicable?: boolean;
+  /**
+   * The invite actions (Invite groups, Invite players, Share), built by the host from `TournamentInvitePanel`: inviting is the primary way to bring
+   * people in, for individual and team tournaments alike. The server's `my_invite_access` decides what the panel shows.
+   */
+  invitePanel?: React.ReactNode;
   /** The Responses block, built by the host (it owns the people pop-up). */
   responses: React.ReactNode;
   /** Re-reads the tournament page after a change. */
@@ -97,6 +102,8 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
   const [roster, setRoster] = useState<{ id: string; status: 'loading' | 'ready' | 'failed'; data: RegistrationRoster | null } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ParticipantRow | null>(null);
   const [removing, setRemoving] = useState(false);
+  // Register a player (committee-add) is for individual tournaments only, and only while the server allows it: not once registration is frozen.
+  const registerOpen = props.isCommittee && !teamMode && props.phase !== 'frozen';
   const menu = useUserMenu({ context: { type: 'none' } });
   const mounted = useRef(true);
   useEffect(() => {
@@ -493,9 +500,18 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
             <Text style={styles.showAllText}>{t('mob.tournament.participants.show_all', { count: filtered.length })}</Text>
           </Pressable>
         ) : null}
-        {props.isCommittee && !teamMode ? (
+        {props.isCommittee && props.invitePanel ? (
+          <View style={styles.invite} testID="participants-invite">
+            <Text style={styles.inviteTitle} accessibilityRole="header">
+              {t('mob.part.invite_title')}
+            </Text>
+            <Text style={styles.note}>{t('mob.part.invite_hint')}</Text>
+            {props.invitePanel}
+          </View>
+        ) : null}
+        {registerOpen ? (
           <Button
-            label={t('mob.tournament.participants.add_player')}
+            label={t('mob.part.register_player')}
             variant="secondary"
             onPress={() => setAdding(true)}
             style={styles.addButton}
@@ -535,11 +551,18 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
         <View style={styles.backdrop}>
           <View style={styles.sheet} testID="participants-add-sheet">
             <View style={styles.sheetHead}>
-              <Text style={styles.sheetTitle}>{t('mob.tournament.participants.add_player')}</Text>
+              <Text style={styles.sheetTitle}>{t('mob.part.register_player')}</Text>
               <Button label={t('mob.tournament.close.cancel')} variant="secondary" size="sm" onPress={() => setAdding(false)} />
             </View>
+            <Text style={styles.note}>{t('mob.part.register_hint')}</Text>
             <UserSearchPicker
               onSelect={user => add(user.id)}
+              immediateRow={{
+                actionLabel: name => t('mob.part.register_a11y', { name }),
+                sentLabel: t('mob.part.registered_chip'),
+                // committee-add and its refusals (COMMITTEE_ADD_CLOSED, INDIVIDUAL_ONLY, ALREADY_REGISTERED, LIFECYCLE_V2_ONLY, COMMITTEE_ONLY): their own label.
+                errorText: error => refusalText(error, t, 'mob.add_remove.error'),
+              }}
               selectionMode="immediate"
               excludeUserIds={rows.map(r => r.user_id).filter((id): id is string => Boolean(id))}
               suggestionContext="players"
@@ -553,6 +576,8 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
 }
 
 const styles = StyleSheet.create({
+  invite: { marginTop: spacing.md },
+  inviteTitle: { ...typography.bodyBold, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: dash.textMuted, marginBottom: spacing.sm },
   note: { ...typography.caption, color: colors.textSecondary, marginVertical: spacing.sm },
   noticeText: { ...typography.caption, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.sm },

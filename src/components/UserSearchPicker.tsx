@@ -98,6 +98,8 @@ interface UserSearchPickerProps {
   onUnstage?: (user: UserSearchResult) => void;
   /** Invite picker (GV-5): people already in the game, listed under `heading` (filtered by the typed text). */
   alreadyIn?: { heading: string; people: readonly AlreadyInPerson[] };
+  /** Immediate mode, a host whose action is not an invitation (Register a player): the row's accessible name, the chip after success and the text of a refusal. */
+  immediateRow?: { actionLabel: (name: string) => string; sentLabel: string; errorText: (error: unknown) => string | null };
   /** Invite variant: one flat "Available" heading above all result rows instead of the group sections. */
   availableHeading?: string;
 }
@@ -105,6 +107,7 @@ interface UserSearchPickerProps {
 export default function UserSearchPicker({
   onSelect,
   onSelectEmail,
+  immediateRow,
   entityLabel,
   excludeGroupId,
   excludeEventId,
@@ -319,6 +322,9 @@ export default function UserSearchPicker({
         mode="immediate"
         name={user.display_name}
         onSend={() => sendImmediate(user)}
+        {...(immediateRow
+          ? { actionLabel: immediateRow.actionLabel(user.display_name), sentLabel: immediateRow.sentLabel, errorText: immediateRow.errorText }
+          : {})}
         disabled={locked}
         testID="user-search-row"
       />

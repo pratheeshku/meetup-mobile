@@ -56,6 +56,10 @@ export type AddRemoveControlProps = CommonProps &
         onSend: () => Promise<unknown>;
         /** Chip text after a confirmed send. Defaults to the "Invited" label. */
         sentLabel?: string;
+        /** Accessible name of the button ("Register Mei Lin"); defaults to the invite wording. */
+        actionLabel?: string;
+        /** The text under the row for a refusal of THIS row; defaults to the generic "Could not send the invitation" text. */
+        errorText?: (error: unknown) => string | null;
       }
   );
 
@@ -63,7 +67,7 @@ export default function AddRemoveControl(props: AddRemoveControlProps): React.JS
   const t = useT();
   const { name, disabled = false, testID, sentStatus, accessibilityLabelOverride } = props;
   const [phase, setPhase] = useState<'idle' | 'sending' | 'sent'>('idle');
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | boolean>(false);
   const inFlight = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {
@@ -121,10 +125,10 @@ export default function AddRemoveControl(props: AddRemoveControlProps): React.JS
           setPhase('sent');
         }
       },
-      () => {
+      reason => {
         inFlight.current = false;
         if (mounted.current) {
-          setFailed(true);
+          setFailed((props.mode === 'immediate' && props.errorText?.(reason)) || true);
           setPhase('idle');
         }
       },
@@ -135,6 +139,8 @@ export default function AddRemoveControl(props: AddRemoveControlProps): React.JS
     ? accessibilityLabelOverride
     : sending
     ? t('mob.add_remove.sending_a11y', { name })
+    : props.mode === 'immediate' && props.actionLabel
+    ? props.actionLabel
     : t(isRemove ? 'mob.add_remove.remove_a11y' : 'mob.add_remove.invite_a11y', { name });
 
   return (
@@ -160,7 +166,7 @@ export default function AddRemoveControl(props: AddRemoveControlProps): React.JS
       </Pressable>
       {failed ? (
         <Text style={styles.errorText} accessibilityRole="alert" testID="add-remove-error">
-          {t('mob.add_remove.error')}
+          {typeof failed === 'string' ? failed : t('mob.add_remove.error')}
         </Text>
       ) : null}
     </View>
