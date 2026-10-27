@@ -207,6 +207,7 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
             isCommittee={isCommittee}
             phase={scoring?.registration_phase ?? null}
             pointsApplicable={Boolean(scoring?.enabled && scoring?.applicable)}
+            invitePanel={props.invitePanel}
             responses={props.responses}
             onChanged={props.onChanged}
           />

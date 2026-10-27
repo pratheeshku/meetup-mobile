@@ -1922,5 +1922,21 @@ export const DEFAULT_LABELS = {
   'mob.part.game_warn_one': '1 player has not paid yet.',
   'mob.part.game_warn_other': '{count} players have not paid yet.',
   'mob.part.game_empty': 'No players have joined yet.',
+
+  // tp-mobile: tournament invitations and Register a player (tp-mobile-invite) (new, not seeded: listed in the report).
+  'mob.invite.err.organizer': 'The organizer is already in this tournament and cannot be invited.',
+  'mob.invite.err.user_not_found': 'This player could not be found.',
+  'mob.invite.err.already_invited': 'This player is already invited to this tournament.',
+  'mob.invite.err.email_already_invited': 'This e-mail address is already invited to this tournament.',
+  'mob.invite.err.group_not_found': 'This group could not be found.',
+  'mob.invite.err.group_cap_reached': 'This group has more people than can be invited at once. Invite a smaller group or invite players one by one.',
+  'mob.invite.err.limit_reached': 'You have reached the invitation limit for this tournament.',
+  'mob.invite.err.invalid': 'Enter a valid e-mail address.',
+  'mob.part.invite_title': 'Invite people',
+  'mob.part.invite_hint': 'Invited people can register themselves. For a tournament with tournament teams, they register through their tournament team.',
+  'mob.part.register_player': 'Register a player',
+  'mob.part.register_hint': 'Registers the player in this tournament now. To ask people to join and register themselves, use Invite players.',
+  'mob.part.register_a11y': 'Register {name}',
+  'mob.part.registered_chip': 'Registered',
 } as const;
 

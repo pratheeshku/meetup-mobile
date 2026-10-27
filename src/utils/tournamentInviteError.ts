@@ -4,6 +4,9 @@
  * `detail`, a 422 array, or an object carrying `code` and a message. Nothing
  * here logs, and request payloads (emails) are never read.
  */
+import type { LabelKey } from '../labels/fallbackLabels';
+import { classifyRefusal } from './refusal';
+
 export interface TournamentInviteError {
   status: number | null;
   /** e.g. `INVITES_CLOSED`, when the server names one. */
@@ -63,4 +66,45 @@ export function readTournamentInviteError(error: unknown): TournamentInviteError
 
 export function isInvitesClosed(error: TournamentInviteError): boolean {
   return error.status === 409 && error.code === 'INVITES_CLOSED';
+}
+
+const INVITE_TEXT_LABELS: Array<[RegExp, LabelKey]> = [
+  [/^the organizer cannot be invited/i, 'mob.invite.err.organizer'],
+  [/^user not found/i, 'mob.invite.err.user_not_found'],
+  [/^user is already invited/i, 'mob.invite.err.already_invited'],
+  [/e-mail address is already invited/i, 'mob.invite.err.email_already_invited'],
+  [/^group not found/i, 'mob.invite.err.group_not_found'],
+  [/^tournament not found/i, 'mob.reg.err.tournament_not_found'],
+];
+
+const INVITE_CODE_LABELS: Record<string, LabelKey> = {
+  INVITES_CLOSED: 'mob.tournament.invites_closed',
+  GROUP_CAP_REACHED: 'mob.invite.err.group_cap_reached',
+  INVITE_LIMIT_REACHED: 'mob.invite.err.limit_reached',
+  tournament_ended: 'mob.reg.err.tournament_ended',
+};
+
+/**
+ * The label for a refused invite-user / invite-group / invite-email call (teams-payments AD-1: every refusal says why). The invite routes send a bare
+ * code or a fixed sentence as `detail`, so the known ones are matched exactly; a 401/403/404/429 gets its status label, a 422 the e-mail label, and
+ * the generic text is left for a fault. The server text itself is never shown. `featureOff` is the 404 "Not found" of a switched-off invitation flag.
+ */
+export function inviteRefusal(error: unknown): { labelKey: LabelKey; featureOff: boolean } {
+  const info = readTournamentInviteError(error);
+  const data = (error as ErrorLike | null)?.response?.data;
+  const rawCode = typeof data?.code === 'string' ? data.code : info.code;
+  if (info.status === 404 && info.message?.toLowerCase() === 'not found') {
+    return { labelKey: 'mob.reg.err.not_found', featureOff: true };
+  }
+  if (rawCode && INVITE_CODE_LABELS[rawCode]) {
+    return { labelKey: INVITE_CODE_LABELS[rawCode], featureOff: false };
+  }
+  const byText = info.message ? INVITE_TEXT_LABELS.find(([pattern]) => pattern.test(info.message as string)) : undefined;
+  if (byText) {
+    return { labelKey: byText[1], featureOff: false };
+  }
+  if (info.status === 422) {
+    return { labelKey: 'mob.invite.err.invalid', featureOff: false };
+  }
+  return { labelKey: classifyRefusal(error, 'mob.add_remove.error').labelKey, featureOff: false };
 }

@@ -27,7 +27,7 @@ import { useAppShare } from '../../hooks/useAppShare';
 import { useT } from '../../labels/LabelsContext';
 import { borderWidth, colors, radius, sizes, spacing, typography } from '../../theme/tokens';
 import type { ResponsesResponse, TournamentInviteAccess } from '../../types/tournament';
-import { isInvitesClosed, readTournamentInviteError } from '../../utils/tournamentInviteError';
+import { inviteRefusal } from '../../utils/tournamentInviteError';
 import { stripIconGlyphs } from '../../utils/labels';
 import { LinkIcon } from '../icons/SharedIcons';
 import InviteCard from '../invite/InviteCard';
@@ -80,18 +80,15 @@ export default function TournamentInvitePanel({
     return null;
   }
 
-  /** Server text for 4xx; 404 means the feature is off: hide the invite actions. */
+  /** The label of the refusal (teams-payments AD-1), never the server text; the flag-off 404 hides the invite actions. */
   const failureDetail = (e: unknown): string | null => {
-    const info = readTournamentInviteError(e);
-    if (info.status === 404) {
+    const refusal = inviteRefusal(e);
+    if (refusal.featureOff) {
       setUnavailable(true);
       setPickerTab(null);
       return null;
     }
-    if (info.message) {
-      return info.message;
-    }
-    return isInvitesClosed(info) ? t('mob.tournament.invites_closed') : null;
+    return t(refusal.labelKey);
   };
 
   const alreadyInPeople: AlreadyInPerson[] = responses

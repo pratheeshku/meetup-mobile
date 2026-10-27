@@ -159,26 +159,33 @@ describe('errors', () => {
     await press(root, 'Send 1 invites');
   };
 
-  it('shows the server text for a 409 duplicate and keeps working', async () => {
+  it('shows the label for a duplicate invitation (never the server text) and keeps working', async () => {
     const root = await mountTournament({ my_invite_access: 'individuals' });
     mockPost.mockRejectedValueOnce(httpError(409, 'User is already invited'));
     await sendUser(root);
     expect(shown(root)).toContain('Could not invite: Alex C');
-    expect(shown(root)).toContain('User is already invited');
+    expect(shown(root)).toContain('This player is already invited to this tournament.');
+    expect(shown(root)).not.toContain('User is already invited');
     expect(has(root, 'Invite players')).toBe(true);
   });
 
+  // tp-mobile-invite (teams-payments AD-1): every refusal shows its own label, never the server text.
   it.each([
-    ['string detail', httpError(409, 'Invitations are closed for this tournament (INVITES_CLOSED)'), 'Invitations are closed for this tournament (INVITES_CLOSED)'],
-    ['object detail', httpError(409, { code: 'INVITES_CLOSED', message: 'Registration has closed.' }), 'Registration has closed.'],
+    ['string detail with the code', httpError(409, 'Invitations are closed for this tournament (INVITES_CLOSED)'), 'Invitations are closed for this tournament.'],
+    ['object detail', httpError(409, { code: 'INVITES_CLOSED', message: 'Registration has closed.' }), 'Invitations are closed for this tournament.'],
     ['bare code', httpError(409, 'INVITES_CLOSED'), 'Invitations are closed for this tournament.'],
-    ['422 list', httpError(422, [{ loc: ['body', 'email'], msg: 'value is not a valid email address' }]), 'value is not a valid email address'],
-    ['403 not allowed', httpError(403, 'You cannot invite to this tournament'), 'You cannot invite to this tournament'],
-  ])('shows the server message for %s', async (_name, error, expected) => {
+    ['422 list', httpError(422, [{ loc: ['body', 'email'], msg: 'value is not a valid email address' }]), 'Enter a valid e-mail address.'],
+    ['403 not allowed', httpError(403, 'You cannot invite to this tournament'), 'You cannot do this.'],
+    ['the organizer', httpError(400, 'The organizer cannot be invited'), 'The organizer is already in this tournament and cannot be invited.'],
+    ['group cap', httpError(409, 'GROUP_CAP_REACHED'), 'This group has more people than can be invited at once. Invite a smaller group or invite players one by one.'],
+    ['per-user limit', httpError(409, 'INVITE_LIMIT_REACHED'), 'You have reached the invitation limit for this tournament.'],
+  ])('shows the label for %s', async (_name, error, expected) => {
     const root = await mountTournament({ my_invite_access: 'individuals' });
     mockPost.mockRejectedValueOnce(error);
     await sendUser(root);
     expect(shown(root)).toContain(expected);
+    expect(shown(root)).not.toContain('Registration has closed.');
+    expect(shown(root)).not.toContain('You cannot invite to this tournament');
   });
 
   it('backend body {"detail":"INVITES_CLOSED"} (409) shows the label and never the raw code', async () => {
