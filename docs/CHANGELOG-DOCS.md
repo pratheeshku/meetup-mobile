@@ -7,6 +7,9 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 ## Amendments by DES-MEETUP-ADDENDUM-decline-response (2026-10-20, owner approved)
 - closure-report v1.0 AD-4: decline is a locked game write, responses stay readable. dashboard v1.9 AD-20/21: declined items leave the default Games list and Public scope. invitation-response v1.0 AD-8 (new): decline is also recorded. Wording only on the approved versions; versions not bumped.
 
+## DES-MEETUP-ADDENDUM-tournament-edit-recurring.md
+- v1.0 (2026-10-27): approved by the owner. Mobile scope: Repeat weekly and series actions, tournament count and Full chip, key dates by `registration_open`, Edit tournament, committee add and remove after the closure, Shuffle again, push routing for `tournament_updated` and `tournament_registration_added`. Full text and amendments: `~/meetup/docs/DES-MEETUP-ADDENDUM-tournament-edit-recurring.md`.
+
 ## DES-MEETUP-ADDENDUM-decline-response.md
 - v1.0 wording (2026-10-20, owner answers): OI-1 closed (no boards, existing components only), OI-2 and OI-4 confirmed, OI-6 notes the flag is a `platform_config` key editable in admin. No scope change.
 - v1.0 (2026-10-20): approved by the owner; no content change from v0.1. Copy of the backend repo's document; the backend copy is the one the owner updates.
