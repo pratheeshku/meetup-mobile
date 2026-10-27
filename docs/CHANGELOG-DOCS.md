@@ -8,6 +8,7 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - closure-report v1.0 AD-4: decline is a locked game write, responses stay readable. dashboard v1.9 AD-20/21: declined items leave the default Games list and Public scope. invitation-response v1.0 AD-8 (new): decline is also recorded. Wording only on the approved versions; versions not bumped.
 
 ## DES-MEETUP-ADDENDUM-tournament-edit-recurring.md
+- v1.1 (2026-10-27): architect amendment after the er-p1-verify report (meetup PR #158). Mobile-relevant rulings: GET /scoring/state registration_phase reads open/closed for non-privileged viewers (mobile reading checked in step 3.0); hard block and roster_frozen_at absent for non-committee viewers on every route; the addendum is the board of record for the five new screens. Full text: this file's copy and ~/meetup/docs/CHANGELOG-DOCS.md.
 - v1.0 (2026-10-27): approved by the owner. Mobile scope: Repeat weekly and series actions, tournament count and Full chip, key dates by `registration_open`, Edit tournament, committee add and remove after the closure, Shuffle again, push routing for `tournament_updated` and `tournament_registration_added`. Full text and amendments: `~/meetup/docs/DES-MEETUP-ADDENDUM-tournament-edit-recurring.md`.
 
 ## DES-MEETUP-ADDENDUM-decline-response.md
