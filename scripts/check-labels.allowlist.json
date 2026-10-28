@@ -60,6 +60,24 @@
       "file": "src/labels/defaultLabels.ts",
       "match": "mob.tw.group_row_many",
       "reason": "AD-T13 (tournament-experience addendum, approved): a group row in the wizard's audience list reads \"Group name (10 members)\"; these are group members, not tournament participants, and the addendum states \"Members is correct here\". The word sits in the row text, not in a label naming tournament people."
+    },
+    {
+      "kind": "banned-term",
+      "file": "src/labels/defaultLabels.ts",
+      "match": "web.tournament.participants.add_team",
+      "reason": "Seeded wording of the M3 label migration (er-config-labels-report: 'Add team', 'Add a team', 'Search teams'); the addendum requires the bundled default to carry the seeded text exactly. Says 'team' for a tournament team on a tournament screen. Owner to decide whether the seed or the glossary changes (er-m-committee report, drift)."
+    },
+    {
+      "kind": "banned-term",
+      "file": "src/labels/defaultLabels.ts",
+      "match": "web.tournament.participants.add_team_title",
+      "reason": "Seeded wording of the M3 label migration (er-config-labels-report: 'Add team', 'Add a team', 'Search teams'); the addendum requires the bundled default to carry the seeded text exactly. Says 'team' for a tournament team on a tournament screen. Owner to decide whether the seed or the glossary changes (er-m-committee report, drift)."
+    },
+    {
+      "kind": "banned-term",
+      "file": "src/labels/defaultLabels.ts",
+      "match": "web.tournament.participants.search_teams",
+      "reason": "Seeded wording of the M3 label migration (er-config-labels-report: 'Add team', 'Add a team', 'Search teams'); the addendum requires the bundled default to carry the seeded text exactly. Says 'team' for a tournament team on a tournament screen. Owner to decide whether the seed or the glossary changes (er-m-committee report, drift)."
     }
   ]
 }

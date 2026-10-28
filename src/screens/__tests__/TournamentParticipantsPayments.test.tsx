@@ -352,7 +352,7 @@ describe('team tournament (P2, P4)', () => {
   const team = (id: string, name: string, over: Record<string, unknown> = {}) =>
     reg(id, name, { user_id: null, team_id: `team-${id}`, effective_fee_cents: 4000, team_player_count: 4, team_captain_name: 'Mei Lin', ...over });
 
-  it('rows carry the team name, "n team players · Capt. name", never a member name; Add player is replaced by a note', async () => {
+  it('rows carry the team name, "n team players · Capt. name", never a member name; Add player is replaced by Add team (AD-2)', async () => {
     reset({ mode: 'team', registrations: [team('t1', 'Team Smashers', { payment_received_at: '2026-10-25T00:00:00Z' }), team('t2', 'Net Ninjas')], summary: summary({ registered: 2, paid: 1, unpaid: 1, fee_cents: 4000, collected_cents: 4000, excluded_from_fixtures: 1 }) });
     const root = await mount();
     const row = all(hostById(root, 'participant-t1')[0]);
@@ -362,7 +362,8 @@ describe('team tournament (P2, P4)', () => {
     expect(of(root, 'participants-warning')).toContain('1 unpaid tournament team will be left out of fixtures.');
     expect(of(root, 'participants-subtitle')).toContain('Tournament teams');
     expect(byId(root, 'participants-add')).toHaveLength(0);
-    expect(all(root)).toContain('A tournament team registers itself.');
+    expect(hostById(root, 'participants-add-team')).toHaveLength(1);
+    expect(all(root)).not.toContain('adds individual players only');
   });
 
   it('tapping a team opens the team details with the roster from the frozen roster route, the captain marked, and the organizer section', async () => {

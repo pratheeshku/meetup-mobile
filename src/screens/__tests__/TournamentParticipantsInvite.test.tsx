@@ -175,10 +175,10 @@ describe('what the organizer sees', () => {
     expect(byId(await mount(), 'participants-add')).toHaveLength(0);
   });
 
-  it('frozen roster: no Register a player, invitations stay (the server answers INVITES_CLOSED)', async () => {
+  it('frozen roster: Register a player stays for the committee (AD-5), invitations stay (the server answers INVITES_CLOSED)', async () => {
     reset({ phase: 'frozen', registrations: [] });
     const root = await mount();
-    expect(byId(root, 'participants-add')).toHaveLength(0);
+    expect(byId(root, 'participants-add').length).toBeGreaterThan(0);
     expect(hostById(root, 'participants-invite')).toHaveLength(1);
   });
 
