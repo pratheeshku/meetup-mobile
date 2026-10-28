@@ -395,3 +395,93 @@ describe('Results file after publication (TV2MobSetupResultsFile)', () => {
     expect(text).not.toContain('G1');
   });
 });
+
+describe('Shuffle again (er-m-shuffle, AD-7, A38 board of record)', () => {
+  const committee = { points: { entrants: 4, rated: 4, unrated: 0, locked: true, uploaded_at: '2026-11-13T00:00:00Z' }, latest_draft: latest, group_options: { suggested: 2, allowed: [2], advance_per_group_allowed: [1, 2] } };
+  // The next draw: the same four entrants in swapped groups, as the server answers it (draft plus `shuffle {index, total}`).
+  const shuffled = (extra: Record<string, unknown> = {}) => ({
+    ...draftRaw,
+    draft_id: 'draft-2',
+    version: 2,
+    payload: {
+      ...draftRaw.payload,
+      fixture: {
+        ...draftRaw.payload.fixture,
+        stages: [
+          { stage_id: 'sA', kind: 'group', group_key: 'A', entrant_ids: ['r3', 'r2'] },
+          { stage_id: 'sB', kind: 'group', group_key: 'B', entrant_ids: ['r1', 'r4'] },
+          { stage_id: 'sK', kind: 'knockout' },
+        ],
+      },
+    },
+    ...extra,
+  });
+  const shuffleCalls = (): unknown[][] => post.mock.calls.filter(c => c[0] === '/tournaments/t-1/fixtures/shuffle');
+
+  it('is offered on an open draft to the committee, calls the route with no body and one correlation id, and shows the new groups', async () => {
+    reset({ committee });
+    const root = await open();
+    expect(all(byId(root, 'setup-shuffle')[0])).toContain('Shows the next balanced draw.');
+    expect(all(byId(root, 'setup-draft')[0])).toContain('Ravi K.');
+    post.mockResolvedValueOnce({ data: { ...shuffled(), shuffle: { index: 1, total: 28 } } });
+    await press(root, 'setup-shuffle-button');
+    const call = shuffleCalls()[0];
+    expect(call[1]).toBeUndefined();
+    expect((call[2] as { correlationId: string }).correlationId).toEqual(expect.any(String));
+    expect(all(byId(root, 'setup-shuffle')[0])).toContain('Draw 2 of 28.');
+    const groupA = all(byId(root, 'setup-group-A')[0]);
+    expect(groupA).toContain('Priya Nair');
+    expect(groupA).not.toContain('Ravi K.');
+  });
+
+  it('shows no "n of N" when the answer carries no shuffle block, and the button waits while the request runs', async () => {
+    reset({ committee });
+    const root = await open();
+    let release: (value: unknown) => void = () => undefined;
+    post.mockReturnValueOnce(new Promise(resolve => { release = resolve; }));
+    await act(async () => {
+      node(root, 'setup-shuffle-button').props.onPress();
+    });
+    expect(node(root, 'setup-shuffle-button').props.disabled).toBe(true);
+    await act(async () => {
+      node(root, 'setup-shuffle-button').props.onPress();
+    });
+    expect(shuffleCalls()).toHaveLength(1);
+    await act(async () => release({ data: shuffled() }));
+    const text = all(byId(root, 'setup-shuffle')[0]);
+    expect(text).toContain('Draft created.');
+    expect(text).not.toMatch(/Draw \d+ of/);
+  });
+
+  it.each([
+    [409, { code: 'SHUFFLE_UNAVAILABLE', reason: 'single_draw', detail: 'raw server text' }, 'There is no other balanced draw to show, or the draft can no longer be shuffled.'],
+    [429, { error: 'Rate limit exceeded: raw server text' }, 'rate'],
+    [409, { code: 'FIXTURE_FROZEN', detail: 'raw server text' }, 'result'],
+  ])('a %s refusal shows its labelled message, never the server text', async (status, data, expected) => {
+    reset({ committee });
+    const root = await open();
+    post.mockRejectedValueOnce(refusal(status, data));
+    await press(root, 'setup-shuffle-button');
+    const text = all(byId(root, 'setup-shuffle')[0]);
+    expect(text.toLowerCase()).toContain(expected.toLowerCase());
+    expect(text).not.toContain('raw server text');
+    expect(node(root, 'setup-shuffle-button').props.disabled).toBeFalsy();
+  });
+
+  it('a draft that says it has a single balanced draw disables the button and says why', async () => {
+    reset({ committee });
+    const single = { ...draftRaw, payload: { ...draftRaw.payload, shuffle_index: 0, shuffle_total: 1 } };
+    const previous = get.getMockImplementation();
+    const root = await mount();
+    get.mockImplementation((url: string, c?: unknown) => (url === '/tournaments/t-1/drafts/draft-1' ? Promise.resolve({ data: single }) : (previous ?? (() => Promise.resolve({ data: [] })))(url, c)));
+    await press(root, 'tournament-tab-fixtures');
+    expect(all(byId(root, 'setup-shuffle')[0])).toContain('This is the only balanced draw for this tournament.');
+    expect(node(root, 'setup-shuffle-button').props.disabled).toBe(true);
+  });
+
+  it('is not offered when there is no open draft (a published draft has no Shuffle again)', async () => {
+    reset({ committee: { ...committee, latest_draft: { ...latest, status: 'published' } } });
+    const root = await open();
+    expect(byId(root, 'setup-shuffle')).toHaveLength(0);
+  });
+});
