@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
-**Version:** v1.7
+**Version:** v1.8
 **Status:** **APPROVED by the owner, 2026-10-27** (instruction in conversation: "prepare design & mark it approved. Push to gh repo", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in sections 3 and 5. Open items are in section 12.
 **v1.1 amendment (2026-10-27):** architect amendment after the `er-p1-verify` (step 1.0) report, PR #158. Each 1.0 finding is classified and resolved in the paragraphs marked **[v1.1]** (rulings B-1 to B-8). Issued under the owner's 2026-10-27 instruction "go ahead with step 1"; an objection before the 1.1 build starts reverses the affected ruling.
 **v1.2 amendment (2026-10-28):** architect amendment after the `er-bw-tournament` (step 1.1) report, PR #160, merged 2026-10-28. Accepted judgement calls are written back in the paragraphs marked **[v1.2]**; no requirement changed.
@@ -364,7 +364,7 @@ Negative API tests (P13, P15) are ER-T4, ER-T7, ER-T8 and ER-T13 plus one per se
 
 ### Steps and progress tracking (owner's four steps)
 
-**Progress: Step 1 of 4 done (1.0 to 1.7) · overall 8 of 27 (30%). Next: 2.0 backup and rollback tag (owner, AWS).** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
+**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.0 of 7 done · overall 12 of 27 (44%). Next: 3.1 `er-m-tournament-view`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
 
 Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 27 (p%)`, updated after every step; the end state is all 27 steps done. Machines: Cloud (a Claude or Cursor cloud agent), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
@@ -540,5 +540,17 @@ No requirement changed.
 | A35 | PWA version 185 in all four constants; admin bundle rebuilt and committed with its source | A25 |
 | A36 | Known failures carried to the step 2 owner run: the four on main (`te_b4` head pin, `s_t2`, `s_t3`, settings-editor key-set pin) plus `test_user_menu_label_seed_migrations`, `test_version_policy`, `test_tr_web` | §11 |
 | A37 | Step 1.7 (architect review and merge of all PRs) recorded done; step 1 closed, 8 of 27 | §11 |
+
+No requirement changed.
+
+**v1.8 (2026-10-28), architect amendment after the `er-p1-verify-mobile` report (mobile PR #73).** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A38 | Boards: none exists for the new mobile screens. Ruling: this addendum is the board of record for them (same as B-1 for web); the mobile "no board, stop and ask" rule is answered by this ruling. The `CMAddTeam` board (committee cannot add teams) is superseded by AD-2 and AD-5 and added to the superseded list | §10 |
+| A39 | `scoring/state` gives non-committee viewers `open` or `closed`; mobile reads those two values for participants and the three values for the committee. Mobile reads `registration_open` and the closure date from the API wherever returned and never recomputes them. "Registration closes" is the participant label for the soft block; the Key dates card shows block dates to the committee only | AD-1, AD-4 |
+| A40 | Contract gaps accepted, no backend change: the withdrawal-locked flag is absent (OI-15), so the participant notice is the labelled 409 `WITHDRAWAL_LOCKED` on the withdraw attempt; recurrence bounds are absent (OI-16), so the server refusals are the behaviour; a fresh draft carries no `shuffle_total`, so mobile shows no "n of N" unless the response returns it; "Add team" uses `GET /teams` exactly as the web does (web report D-6) | OI-15, OI-16 |
+| A41 | Mobile bundles default texts for the new `mob.*` label keys with the seeded wording (M3 is run on production); push and history routing for the two new tournament types is step 3.4 | §11 |
+| A42 | Step 3.0 recorded done, progress 12 of 27 | §11 |
 
 No requirement changed.
