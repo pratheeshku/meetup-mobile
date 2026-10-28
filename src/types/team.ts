@@ -49,3 +49,24 @@ export interface Team {
 
 /** The caller's role on a tournament team (`GET /teams/mine` `my_role`). */
 export type TeamRole = 'captain' | 'player';
+
+/** `TeamMembership.status` (DES-MEETUP-ADDENDUM-team-screens-remarks section 4). */
+export type TeamMembershipStatus = 'invited' | 'requested' | 'active' | 'rejected' | 'removed' | 'left';
+
+/** One row of `GET /teams/{id}/members` (`TeamMembershipResponse`). `role` is `captain` or `member` on the wire. */
+export interface TeamMembership {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: string;
+  status: string;
+  created_at: string;
+  user_display_name: string | null;
+  user_nickname: string | null;
+}
+
+/** `PATCH /teams/{id}` body (`TeamUpdate`): changed fields only; the server forbids any other key. */
+export interface UpdateTeamInput {
+  name?: string;
+  visibility?: TeamVisibility;
+}
