@@ -198,14 +198,16 @@ const committeeState = (): void =>
   reset({ state: { tabs: { ...ALL_OPEN, approvals: { state: 'open', badge: 1 } } }, tournament: { organizer_id: 'u-me', my_invite_access: 'full' } });
 
 describe('Participants (TV2MobOpenParticipants)', () => {
-  it('lists the players by name with Organizer and Committee marks; a player has no Add and no Remove', async () => {
+  it('lists the players by name with Organizer and Committee marks; a player has no Add and no Remove, and sees the server count without the cap (AD-1)', async () => {
+    reset({ tournament: { registered_count: 3 } });
     const root = await mount();
     await press(root, 'tournament-tab-participants');
     const body = everyText(byId(root, 'tournament-participants')[0]);
     expect(body).toContain('Ravi K.');
     expect(body).toContain('Organizer');
     expect(body).toContain('Committee');
-    expect(body).toContain('3 of 32');
+    expect(body).toContain('3 registered');
+    expect(body).not.toMatch(/3 of 32/);
     expect(byId(root, 'participants-add')).toHaveLength(0);
     expect(byId(root, 'participant-remove-r1')).toHaveLength(0);
     expect(body).not.toMatch(/u-org|u-alicia|r1\b/);
@@ -713,6 +715,8 @@ describe('Overview additions (A2, A3)', () => {
   it('draws Format and Key dates rows only for values the server sent; never a hard-coded elimination or court row', async () => {
     reset({
       tournament: {
+        organizer_id: 'u-me',
+        my_invite_access: 'full',
         registration_opened_at: '2026-09-01T10:00:00Z',
         registration_hard_block_at: '2026-11-01T10:00:00Z',
         roster_frozen_at: '2026-11-01T10:00:00Z',

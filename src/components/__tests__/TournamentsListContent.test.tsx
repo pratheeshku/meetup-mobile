@@ -97,7 +97,7 @@ describe('tournament card (matches the game card)', () => {
         'Summer Smash',
         'Bishan Hall',
         'table_tennis · knockout',
-        '4/8 registered',
+        '4 registered',
         'View tournament',
         'Registered',
       ]),
@@ -126,7 +126,17 @@ describe('tournament card (matches the game card)', () => {
 
   it('shows a real zero count when the backend sends 0', async () => {
     mockGetTournaments.mockResolvedValue(list({ ...TOURNAMENT, participant_count: 0 }));
-    expect(texts(await renderAsync(element()))).toContain('0/8 registered');
+    expect(texts(await renderAsync(element()))).toContain('0 registered');
+  });
+
+  it('shows the Full chip when the API says is_full, and never the cap (AD-1)', async () => {
+    mockGetTournaments.mockResolvedValue(list({ ...TOURNAMENT, participant_count: 8, is_full: true }));
+    const all = texts(await renderAsync(element()));
+    expect(all).toContain('8 registered');
+    expect(all).toContain('Full');
+    expect(all.join(' | ')).not.toMatch(/8\/8|of 8/);
+    mockGetTournaments.mockResolvedValue(list({ ...TOURNAMENT, participant_count: 7, is_full: false }));
+    expect(texts(await renderAsync(element()))).not.toContain('Full');
   });
 
   it('falls back to Location TBC with no venue and omits avatars', async () => {
