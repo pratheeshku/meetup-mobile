@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
-**Version:** v1.4
+**Version:** v1.5
 **Status:** **APPROVED by the owner, 2026-10-27** (instruction in conversation: "prepare design & mark it approved. Push to gh repo", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in sections 3 and 5. Open items are in section 12.
 **v1.1 amendment (2026-10-27):** architect amendment after the `er-p1-verify` (step 1.0) report, PR #158. Each 1.0 finding is classified and resolved in the paragraphs marked **[v1.1]** (rulings B-1 to B-8). Issued under the owner's 2026-10-27 instruction "go ahead with step 1"; an objection before the 1.1 build starts reverses the affected ruling.
 **v1.2 amendment (2026-10-28):** architect amendment after the `er-bw-tournament` (step 1.1) report, PR #160, merged 2026-10-28. Accepted judgement calls are written back in the paragraphs marked **[v1.2]**; no requirement changed.
@@ -364,7 +364,7 @@ Negative API tests (P13, P15) are ER-T4, ER-T7, ER-T8 and ER-T13 plus one per se
 
 ### Steps and progress tracking (owner's four steps)
 
-**Progress: Step 1.3 of 8 done · overall 4 of 27 (15%). Next: 1.4 `er-web-tournament`.** (1.0 done 2026-10-27, PR #158; 1.1 PR #160; 1.2 PR #162; 1.3 PR #164, all 2026-10-28.)
+**Progress: Step 1.4 of 8 done · overall 5 of 27 (19%). Next: 1.5 `er-web-series`.** (1.0 done 2026-10-27, PR #158; 1.1 PR #160; 1.2 PR #162; 1.3 PR #164; 1.4 PR #166, all 2026-10-28.)
 
 Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 27 (p%)`, updated after every step; the end state is all 27 steps done. Machines: Cloud (a Claude or Cursor cloud agent), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
@@ -506,5 +506,16 @@ No requirement changed. The rule "balanced = spread within the canonical spread 
 | A22 | Series notification: one outbox row per recipient, 96-character key, snapshot branch in the fan-out | AD-8 |
 | A23 | `occurrence_limit` counts every game of the rule; legacy rolling rules also expand at create; `invite_user_ids` invites on the first game | AD-8 |
 | A24 | Step 1.3 recorded done, progress 4 of 27 | §11 |
+
+No requirement changed.
+
+**v1.5 (2026-10-28), architect amendment after the `er-web-tournament` report (PR #166).** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A25 | PWA version bump (blocked in 1.4): the four constants `APP_VERSION` (`core/config.py`), `CLIENT_VERSION` (`frontend/app.js`), `CACHE_VERSION` (`frontend/service-worker.js`) and `ADMIN_CLIENT_VERSION` move together from `184` to `185`, once, in step 1.6 (the last step that touches web and backend, so the deploy carries one bump). Steps 1.4 and 1.5 do not bump | §11 |
+| A26 | Web label keys picked by the agent stand until the 1.6 seed; 1.6 seeds exactly the keys the web code uses (report lists them) | §11 |
+| A27 | Drift accepted: the withdrawal-choice checkbox always starts checked because `registrant_withdrawal_locked` is not in the tournament response; the edit form keeps the existing UTC date boxes. Both are carried to OI-15 (backend exposes the stored flag; local-time date inputs), not fixed in this release | OI-15 |
+| A28 | Step 1.4 recorded done, progress 5 of 27 | §11 |
 
 No requirement changed.
