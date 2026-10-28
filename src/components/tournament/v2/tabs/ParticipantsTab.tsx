@@ -33,8 +33,10 @@ import { formatMoney, hasFee } from '../../../../utils/money';
 import { filterByPayment, paymentStateOf, type PaymentFilter } from '../../../../utils/participants';
 import { refusalText } from '../../../../utils/refusal';
 import { useSportDisplayName } from '../../../../utils/labels';
+import { fixturesExist } from '../../../../utils/tournamentEdit';
 import { formatDayShort } from '../../../../utils/tournamentExperience';
 import { filterParticipants, participantRole, participantRows } from '../../../../utils/tournamentTabs';
+import AddTeamSheet from '../../participants/AddTeamSheet';
 import Badge from '../../../Badge';
 import Button from '../../../Button';
 import TextField from '../../../TextField';
@@ -103,8 +105,12 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
   const [roster, setRoster] = useState<{ id: string; status: 'loading' | 'ready' | 'failed'; data: RegistrationRoster | null } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<ParticipantRow | null>(null);
   const [removing, setRemoving] = useState(false);
-  // Register a player (committee-add) is for individual tournaments only, and only while the server allows it: not once registration is frozen.
-  const registerOpen = props.isCommittee && !teamMode && props.phase !== 'frozen';
+  // AD-5: the organizer and the committee add and remove in every registration phase; the server ends it (409 ROSTER_LOCKED, labelled). UX only.
+  const registerOpen = props.isCommittee && !teamMode;
+  const addTeamOpen = props.isCommittee && teamMode;
+  const [addingTeam, setAddingTeam] = useState(false);
+  // The generated fixtures exist: an add or a removal resets them (AD-5, AD-6), so the screen warns first.
+  const warnReset = fixturesExist(tournament);
   const menu = useUserMenu({ context: { type: 'none' } });
   const mounted = useRef(true);
   useEffect(() => {
@@ -527,7 +533,15 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
             testID="participants-add"
           />
         ) : null}
-        {props.isCommittee && teamMode ? <Text style={styles.note}>{t('mob.part.add_team_note')}</Text> : null}
+        {addTeamOpen ? (
+          <Button
+            label={t('web.tournament.participants.add_team')}
+            variant="secondary"
+            onPress={() => setAddingTeam(true)}
+            style={styles.addButton}
+            testID="participants-add-team"
+          />
+        ) : null}
       </TabCard>
       {props.responses}
       <UserMenuSheet menu={menu} extras={props.isCommittee && playerDetailRow ? organizerSectionFor(playerDetailRow) : undefined} />
@@ -546,14 +560,27 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
       ) : null}
       {removeTarget ? (
         <RemoveConfirmDialog
-          body={t(removeTarget.team_id ? 'mob.part.remove_body_team' : 'mob.part.remove_body_player', {
-            name: removeTarget.name,
-            tournament: tournament.name,
-          })}
+          body={
+            t(removeTarget.team_id ? 'mob.part.remove_body_team' : 'mob.part.remove_body_player', {
+              name: removeTarget.name,
+              tournament: tournament.name,
+            }) + (warnReset ? `\n\n${t('web.tournament_edit.reset_confirm_roster')}` : '')
+          }
           paid={paymentStateOf(removeTarget) === 'paid'}
           busy={removing}
           onCancel={() => setRemoveTarget(null)}
           onYes={confirmRemove}
+        />
+      ) : null}
+      {addTeamOpen ? (
+        <AddTeamSheet
+          visible={addingTeam}
+          tournamentId={tournament.id}
+          sport={tournament.sport}
+          enteredTeamIds={rows.map(r => r.team_id).filter((id): id is string => Boolean(id))}
+          warnReset={warnReset}
+          onClose={() => setAddingTeam(false)}
+          onAdded={props.onChanged}
         />
       ) : null}
       <Modal visible={adding} animationType="slide" transparent onRequestClose={() => setAdding(false)}>
@@ -564,6 +591,11 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
               <Button label={t('mob.tournament.close.cancel')} variant="secondary" size="sm" onPress={() => setAdding(false)} />
             </View>
             <Text style={styles.note}>{t('mob.part.register_hint')}</Text>
+            {warnReset ? (
+              <Text style={styles.resetWarning} testID="participants-add-reset-warning">
+                {t('web.tournament_edit.reset_confirm_roster')}
+              </Text>
+            ) : null}
             <UserSearchPicker
               onSelect={user => add(user.id)}
               immediateRow={{
@@ -589,6 +621,7 @@ const styles = StyleSheet.create({
   inviteTitle: { ...typography.bodyBold, color: colors.textPrimary },
   subtitle: { ...typography.caption, color: dash.textMuted, marginBottom: spacing.sm },
   note: { ...typography.caption, color: colors.textSecondary, marginVertical: spacing.sm },
+  resetWarning: { ...typography.caption, color: colors.warningDark, marginBottom: spacing.sm },
   noticeText: { ...typography.caption, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.sm },
   filters: { flexDirection: 'row', marginBottom: spacing.sm },
   filter: {
