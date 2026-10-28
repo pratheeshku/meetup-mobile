@@ -189,7 +189,7 @@ describe('Edit tournament', () => {
 });
 
 describe('Remarks label (team-screens-remarks AD-4, TS-12)', () => {
-  it('the description field of the edit screen reads Remarks and still sends `description` when changed', async () => {
+  it('the description field of the edit screen reads Remarks (same key, same stored value)', async () => {
     const root = await mount();
     expect(texts(root)).toContain('Remarks');
     expect(texts(root)).not.toContain('Description (optional)');
