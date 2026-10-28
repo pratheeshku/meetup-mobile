@@ -33,9 +33,32 @@ export interface StripModel {
 export interface StripInput {
   lifecycle: string | undefined;
   closureOutcome?: string | null;
-  /** `registration_phase` of the scoring state: `open`, `committee_only` or `frozen`; null when unknown. */
+  /**
+   * `registration_phase` of the scoring state: `open` or `closed` for a participant (A39), `open`, `committee_only` or `frozen`
+   * for the committee; null when it could not be read. Any other value is read through `registrationOpen`.
+   */
   phase: string | null;
   fixturesPublished: boolean;
+  /** `registration_open` as the API returned it (never recomputed here); used when `phase` is null or not one of the known values. */
+  registrationOpen?: boolean | null;
+}
+
+/**
+ * `open` or `closed` from the server's phase (A39). A phase this build does not know falls back to the API's
+ * `registration_open`, and to `closed` when that is absent too, so the page never draws an empty status block. Null only
+ * when the phase is null and `registration_open` was not given.
+ */
+export function registrationStage(phase: string | null, registrationOpen?: boolean | null): 'open' | 'closed' | null {
+  if (phase === 'open') {
+    return 'open';
+  }
+  if (phase === 'closed' || phase === 'committee_only' || phase === 'frozen') {
+    return 'closed';
+  }
+  if (typeof registrationOpen === 'boolean') {
+    return registrationOpen ? 'open' : 'closed';
+  }
+  return phase === null ? null : 'closed';
 }
 
 function stages(done: StageKey[], current: StageKey | null): Record<StageKey, StageState> {
@@ -75,10 +98,11 @@ export function stripModel(input: StripInput): StripModel {
       stages: stages(['registration', 'fixtures'], 'play'),
     };
   }
-  if (input.phase === 'open') {
+  const stage = registrationStage(input.phase, input.registrationOpen);
+  if (stage === 'open') {
     return { pill: 'mob.tournament.v2.pill_registration_open', dot: 'open', chip: null, stages: stages([], 'registration') };
   }
-  if (input.phase === 'committee_only' || input.phase === 'frozen') {
+  if (stage === 'closed') {
     return {
       pill: 'mob.tournament.v2.pill_registration_closed',
       dot: 'closed',
@@ -111,13 +135,8 @@ export function overviewKind(input: StripInput): OverviewKind {
   if (input.fixturesPublished) {
     return 'live';
   }
-  if (input.phase === 'open') {
-    return 'open';
-  }
-  if (input.phase === 'committee_only' || input.phase === 'frozen') {
-    return 'closed';
-  }
-  return 'unknown';
+  const stage = registrationStage(input.phase, input.registrationOpen);
+  return stage ?? 'unknown';
 }
 
 export interface KeyDateStates {

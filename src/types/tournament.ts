@@ -68,11 +68,7 @@ export type FixtureStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancell
  *   field at all, and no `GET /users/{id}` lookup endpoint exists to
  *   resolve `organizer_id` — unreconcilable without a backend change.
  *   Always `''` from the API layer.
- * - `participant_count`: not on `TournamentResponse`; would need an extra
- *   `GET /tournaments/{id}/registrations` call per tournament in the list
- *   view (N+1) — flagged, not implemented. `0` from the API layer for
- *   list items; `TournamentDetailScreen` uses its own already-fetched
- *   `registrations.length` instead of this field.
+ * - `participant_count`: the API's `registered_count`, which the server now sets on every route (AD-1); `null` when it is absent.
  * - `current_user_registration_status`, `is_organiser`: need the current
  *   user's id, unavailable to `api/tournaments.ts` — `'none'`/`false`
  *   from the API layer; `TournamentDetailScreen` recomputes both locally.
@@ -95,9 +91,12 @@ export interface Tournament {
    * not a closed enum) — kept as a free-form string. */
   format: string;
   status: TournamentStatus;
+  /** The API's `registration_open` (self-registration is possible now); the client never recomputes it where the API returns it (A39). */
   registration_open: boolean;
-  /** `GET /tournaments` list only (`registered_count`). `null` = unknown: hide the count, never show 0. */
+  /** The API's `registered_count` (AD-1, on every route that returns a tournament). `null` = unknown: hide the count, never show 0. */
   participant_count: number | null;
+  /** The API's `is_full` (AD-1): the server's word that the cap is reached; clients never compute fullness. Absent = not full. */
+  is_full?: boolean;
   max_participants: number;
   starts_at: string;
   ends_at?: string | null;

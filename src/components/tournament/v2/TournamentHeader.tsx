@@ -17,6 +17,7 @@ import { toHttpsUrl } from '../../../utils/httpsUrl';
 import { committeeNames, type StripModel } from '../../../utils/tournamentExperience';
 import { CheckIcon, ChevronRightIcon, PlusIcon } from '../../icons/ActionIcons';
 import { TrophyIcon } from '../../icons/SharedIcons';
+import Badge from '../../Badge';
 import UserAvatar from '../../UserAvatar';
 import StatusStrip from './StatusStrip';
 
@@ -28,7 +29,7 @@ const CHEVRON_BOX = 20;
 const MAX_CHIP_AVATARS = 3;
 
 export type RegisterAction =
-  | { kind: 'register'; spotsLeft: number | null; loading: boolean; onPress: () => void }
+  | { kind: 'register'; loading: boolean; onPress: () => void }
   | { kind: 'registered' }
   | null;
 
@@ -53,6 +54,7 @@ export default function TournamentHeader({
   tone,
   scrim,
   strip,
+  full,
   register,
   organizer,
   committee,
@@ -66,6 +68,8 @@ export default function TournamentHeader({
   tone: BannerTone;
   scrim: number;
   strip: StripModel;
+  /** The API's `is_full` (AD-1): shows the Full chip; the cap itself is never shown here. */
+  full: boolean;
   register: RegisterAction;
   organizer: TournamentPerson | null | undefined;
   committee: readonly TournamentPerson[];
@@ -96,11 +100,6 @@ export default function TournamentHeader({
                   </View>
                   <Text style={styles.registerText}>{t('mob.tournament.register')}</Text>
                 </View>
-                {register.spotsLeft !== null ? (
-                  <Text style={styles.registerSub}>
-                    {t('mob.tournament.v2.register_spots_left', { count: register.spotsLeft })}
-                  </Text>
-                ) : null}
               </Pressable>
             ) : (
               <View style={[styles.registerButton, styles.registeredButton]} testID="tournament-registered-badge">
@@ -139,6 +138,7 @@ export default function TournamentHeader({
               {title}
             </Text>
             <Text style={styles.meta}>{metaLine}</Text>
+            {full ? <Badge label={t('web.tournament.full_chip')} variant="warning" style={styles.fullChip} /> : null}
           </View>
         </View>
 
@@ -215,7 +215,6 @@ const styles = StyleSheet.create({
   registerLine: { flexDirection: 'row', alignItems: 'center' },
   registerGlyph: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center', marginRight: spacing.xs },
   registerText: { ...typography.button, fontWeight: '800', color: colors.white },
-  registerSub: { fontSize: 11, fontWeight: '600', color: colors.white },
   body: { paddingHorizontal: spacing.md, paddingTop: spacing.sm + 4 },
   titleRow: { flexDirection: 'row', alignItems: 'center' },
   logo: {
@@ -233,6 +232,7 @@ const styles = StyleSheet.create({
   titleText: { flex: 1, minWidth: 0, marginLeft: spacing.md - 2 },
   title: { fontSize: 21, fontWeight: '800', lineHeight: 25, color: dash.text },
   meta: { ...typography.caption, color: dash.textMuted, marginTop: 3 },
+  fullChip: { alignSelf: 'flex-start', marginTop: spacing.xs },
   chips: { flexDirection: 'row', marginTop: spacing.sm + 4 },
   chip: {
     flex: 1,

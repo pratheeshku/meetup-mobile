@@ -29,6 +29,7 @@ import {
   PeopleGreenIcon,
 } from '../icons/HomeV2Icons';
 import { getRolePillColor, ROLE_BADGE_LABEL_KEY } from '../GroupCard';
+import Badge from '../Badge';
 import LifecycleStatusChip, { getLifecycleStatusText } from '../LifecycleStatusChip';
 import UserAvatar from '../UserAvatar';
 import { ListInviteTypeRow } from '../invite/InviteTypeRow';
@@ -461,10 +462,7 @@ export function UnifiedTournamentCard({
 
   const countLabel =
     tournament.participant_count != null
-      ? t('mob.tournament.registered_line', {
-          count: tournament.participant_count,
-          max: tournament.max_participants,
-        })
+      ? t('web.tournament.registered_count', { count: tournament.participant_count })
       : null;
 
   const badgeNode =
@@ -484,6 +482,11 @@ export function UnifiedTournamentCard({
       <View style={badgeNode ? styles.statusPillGap : undefined}>
         {statusChip}
       </View>
+      {tournament.is_full === true ? (
+        <View style={styles.statusPillGap}>
+          <Badge label={t('web.tournament.full_chip')} variant="warning" />
+        </View>
+      ) : null}
     </>
   );
 

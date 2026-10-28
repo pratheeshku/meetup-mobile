@@ -7,11 +7,12 @@ import React from 'react';
 import { Linking } from 'react-native';
 
 import TournamentDetailScreen from '../TournamentDetailScreen';
+import { apiClient } from '../../api/client';
 import { act, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import { mockGet, mockPost, rawTournament } from '../../test-utils/tournamentDetailHarness';
 
-jest.mock('../../api/client', () => ({ apiClient: { get: jest.fn(), post: jest.fn() } }));
+jest.mock('../../api/client', () => ({ apiClient: { get: jest.fn(), post: jest.fn(), delete: jest.fn() } }));
 jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn().mockResolvedValue({ items: [] }) }));
 jest.mock('../../api/users', () => ({ searchUsers: jest.fn().mockResolvedValue([]) }));
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-me' } }) }));
@@ -67,6 +68,7 @@ async function mount(
   server.tournament = rawTournament({
     organizer_id: 'organiser-1',
     registration_closes_at: '2026-10-30T15:59:00Z',
+    registration_open: true,
     ends_at: '2999-10-02T10:00:00Z',
     participation_mode: 'individual',
     venue_name: 'Punggol Sports Hall',
@@ -233,9 +235,9 @@ describe('header (AD-T6)', () => {
 });
 
 describe('Register on the banner', () => {
-  it('is shown to the organizer too while registration is open, with the spots left, and registers with one correlation id', async () => {
+  it('is shown to the organizer too while registration is open, with no spots-left line (AD-1), and registers with one correlation id', async () => {
     const root = await mount({ organizer_id: 'user-me', capacity: 32 });
-    expect(texts(pressable(root, 'tournament-register-button'))).toEqual(['Register', '14 spots left']);
+    expect(texts(pressable(root, 'tournament-register-button'))).toEqual(['Register']);
     await press(root, 'tournament-register-button');
     // Register opens the confirmation sheet (tournament-registration AD-5); Confirm sends the request.
     await press(root, 'registration-confirm');
@@ -247,7 +249,7 @@ describe('Register on the banner', () => {
   });
 
   it('is not shown once registration is closed, and a registered viewer sees "You\'re registered" instead', async () => {
-    const closed = await mount({}, stateOf({ registration_phase: 'committee_only' }));
+    const closed = await mount({ registration_open: false }, stateOf({ registration_phase: 'committee_only' }));
     expect(byId(closed, 'tournament-register-button')).toHaveLength(0);
     expect(byId(closed, 'tournament-registered-badge')).toHaveLength(0);
 
@@ -316,13 +318,15 @@ describe('tabs (AD-T5): server object only', () => {
 });
 
 describe('Overview per status', () => {
-  it('open (TV2MobOpen): status card with the count, spots and soft block; Format and Key dates; Book a court last', async () => {
-    const root = await mount({ capacity: 32 });
+  it('open (TV2MobOpen, A38): status card with the server count and no cap for a participant; Format and Key dates; Book a court last', async () => {
+    const root = await mount({ capacity: 32, registered_count: 18, is_full: false });
     const status = byId(root, 'overview-status-open')[0];
     const inCard = texts(status);
     expect(inCard).toContain('Registration is open');
     expect(inCard.join(' ')).toContain('Self-registration closes');
-    expect(inCard).toContain('18 of 32');
+    expect(inCard).toContain('18 registered');
+    expect(inCard.join(' ')).not.toMatch(/of 32|spots left/);
+    expect(byId(root, 'overview-progress')).toHaveLength(0);
     expect(inCard).toContain('Organizers can register for their own tournament.');
     expect(texts(byId(root, 'overview-format')[0])).toContain('Punggol Sports Hall');
     expect(texts(byId(root, 'overview-format')[0])).toContain('Individuals');
@@ -399,5 +403,75 @@ describe('organizer tools: only what has a working target', () => {
 
     const player = await mount();
     expect(byId(player, 'overview-tools')).toHaveLength(0);
+  });
+});
+
+describe('count, Full chip and phase (er-m-tournament-view, AD-1, AD-4, A38, A39)', () => {
+  it('a participant sees the server count and a Full chip, no cap, no Register; the API flags are not recomputed', async () => {
+    const root = await mount({ capacity: 32, registered_count: 32, is_full: true });
+    const all = everyText(root);
+    expect(all).toContain('Full');
+    expect(texts(byId(root, 'overview-status-open')[0])).toContain('32 registered');
+    expect(all).not.toMatch(/32 of 32|spots left/);
+    expect(byId(root, 'tournament-register-button')).toHaveLength(0);
+    const notFull = await mount({ capacity: 32, registered_count: 31, is_full: false });
+    expect(everyText(notFull)).not.toContain('Full');
+    expect(byId(notFull, 'tournament-register-button').length).toBeGreaterThan(0);
+  });
+
+  it('registration_open from the API decides Register, whatever the closing date says', async () => {
+    const root = await mount({ registration_closes_at: '2999-01-01T00:00:00Z', registration_open: false });
+    expect(byId(root, 'tournament-register-button')).toHaveLength(0);
+  });
+
+  it('a participant phase "closed" draws the closed status card; an unknown phase never leaves the status block empty', async () => {
+    const closed = await mount({ registration_open: false }, stateOf({ registration_phase: 'closed' }));
+    expect(texts(byId(closed, 'status-pill')[0])).toEqual(['Registration closed']);
+    expect(byId(closed, 'overview-status-closed')).toHaveLength(1);
+    const odd = await mount({ registration_open: false }, stateOf({ registration_phase: 'something_new' }));
+    expect(byId(odd, 'overview-status-closed')).toHaveLength(1);
+    const oddOpen = await mount({ registration_open: true }, stateOf({ registration_phase: 'something_new' }));
+    expect(byId(oddOpen, 'overview-status-open')).toHaveLength(1);
+  });
+
+  it('a participant sees "Registration closes" and no Soft block or Hard block row; nothing is inferred', async () => {
+    const root = await mount();
+    const dates = everyText(byId(root, 'overview-key-dates')[0]);
+    expect(dates).toContain('Registration closes');
+    expect(dates).not.toMatch(/Soft block|Hard block|roster frozen/);
+  });
+
+  it('the organizer sees the Soft block row, and the Hard block row only when the API returned the field', async () => {
+    const withHard = await mount({ organizer_id: 'user-me', registration_hard_block_at: '2026-11-03T15:59:00Z' });
+    const dates = everyText(byId(withHard, 'overview-key-dates')[0]);
+    expect(dates).toContain('Soft block');
+    expect(dates).toContain('Hard block');
+    expect(dates).not.toContain('Registration closes');
+    const without = await mount({ organizer_id: 'user-me' });
+    const datesWithout = everyText(byId(without, 'overview-key-dates')[0]);
+    expect(datesWithout).toContain('Soft block');
+    expect(datesWithout).not.toContain('Hard block');
+  });
+
+  it('the organizer keeps "{count} of {max}" and a participant is not shown the cap in the Format card', async () => {
+    const organizer = await mount({ organizer_id: 'user-me', capacity: 32 });
+    expect(texts(byId(organizer, 'overview-status-open')[0])).toContain('18 of 32');
+    const participant = await mount({ capacity: 32, registered_count: 18 });
+    expect(texts(byId(participant, 'overview-format')[0]).join(' ')).not.toMatch(/Max 32|max 32/);
+  });
+});
+
+describe('withdrawal locked (A40)', () => {
+  it('a 409 WITHDRAWAL_LOCKED on the withdraw attempt shows its labelled message, not the server text', async () => {
+    const root = await mount({}, stateOf(), {
+      registrations: [{ id: 'mine', user_id: 'user-me', registered_at: '2026-10-20T00:00:00Z', participant_name: 'Me', status: 'registered' }],
+    });
+    (apiClient.delete as jest.Mock).mockReset().mockRejectedValue({
+      response: { status: 409, data: { code: 'WITHDRAWAL_LOCKED', detail: 'raw server text' } },
+    });
+    await press(root, 'tournament-decline-button');
+    const all = everyText(root);
+    expect(all).toContain('The organizer has switched off withdrawals for this tournament.');
+    expect(all).not.toContain('raw server text');
   });
 });

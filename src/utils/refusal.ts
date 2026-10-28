@@ -34,6 +34,7 @@ const CODE_LABELS = {
   INDIVIDUAL_ONLY: 'mob.reg.err.individual_only',
   LIFECYCLE_V2_ONLY: 'mob.reg.err.lifecycle_v2_only',
   WITHDRAWAL_CLOSED: 'mob.reg.err.withdrawal_closed',
+  WITHDRAWAL_LOCKED: 'mob.reg.err.withdrawal_locked',
   WITHDRAWAL_AFTER_SCHEDULE: 'mob.reg.err.withdrawal_after_schedule',
   WITHDRAWAL_AFTER_CLOSE: 'mob.reg.err.withdrawal_after_close',
   ROSTER_FROZEN: 'mob.reg.err.roster_frozen',

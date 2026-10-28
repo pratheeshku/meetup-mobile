@@ -93,8 +93,11 @@ interface TournamentApiItem {
   starts_at: string;
   status: string;
   created_at: string;
-  /** List endpoint only; null/absent = unknown. */
+  /** AD-1: set on every route that returns a tournament; null/absent = unknown. */
   registered_count?: number | null;
+  /** AD-1, AD-4: read-only booleans set by the server. */
+  is_full?: boolean | null;
+  registration_open?: boolean | null;
   my_registration_status?: TournamentRegistrationStatus | null;
   my_invite_access?: string | null;
   group_name?: string | null;
@@ -181,9 +184,13 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
     organiser_nickname: '',
     format: raw.format,
     status: raw.status as TournamentStatus,
+    // The API's word wins (A39); only a server that does not send it (older build) falls back to the closing date.
     registration_open:
-      raw.registration_closes_at === null || Date.parse(raw.registration_closes_at) > Date.now(),
+      typeof raw.registration_open === 'boolean'
+        ? raw.registration_open
+        : raw.registration_closes_at === null || Date.parse(raw.registration_closes_at) > Date.now(),
     participant_count: raw.registered_count ?? null,
+    is_full: raw.is_full === true,
     max_participants: raw.capacity,
     starts_at: raw.starts_at,
     registration_closes_at: raw.registration_closes_at,
