@@ -2,7 +2,7 @@
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TEAM-SCREENS-REMARKS
 **Version:** v1.0
-**Status:** **DRAFT for owner review (2026-10-28).** Requested by the owner in conversation on 2026-10-28 ("we need the screen for this, if not the purpose is lost. can you build this", then "go ahead" to draft). Not yet approved: no brief is written and no step starts until the owner approves.
+**Status:** **APPROVED by the owner, 2026-10-28** (instruction in conversation: "for any amendments, you prepare the document as approved. upload it to gh & generate one instruction for backend/web & another for app", given after the draft of the same day). Approval covers sections 2 to 12 as drafted, including the architect decisions listed in section 13. Requested by the owner on 2026-10-28 ("we need the screen for this, if not the purpose is lost. can you build this").
 **Owner:** Pratheesh
 **Date:** 2026-10-28
 **Scale Tier:** T1
@@ -168,15 +168,16 @@ Risk: the viewing rule **High** (authorization); remarks bound **Medium**; scree
 
 ## 10. Steps and progress tracking
 
-Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 19 (p%)`, updated after every step. Machines: Cloud (an agent session), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
+Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 14 (p%)`, updated after every step. Machines: Cloud (an agent session), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
-**Step 1: Instruction execution for meetup (backend and web), 3 steps**
+**[Approval amendment, 2026-10-28]** The owner asked for one instruction per repo, so the work is two tasks, not six. Each task runs its stages in order inside one agent session and one pull request; the architect reviews each task's report.
+
+**Step 1: Instruction execution for meetup (backend and web), 2 steps**
 
 | # | Task ID | Content |
 |---|---|---|
-| 1.1 | `tm-bw-teams-remarks` | `can_view_team` invited clause, description bound on games and tournaments, tests TS-T1 to TS-T8 |
-| 1.2 | `tm-web-remarks-labels` | Web remarks placement and wording, M1 (label seeds, existing description label rewording), TS-T14 |
-| 1.3 | `tm-bw-review-merge` | Reports reviewed and merged by the architect |
+| 1.1 | `tm-bw-web` | `can_view_team` invited clause, description bound on games and tournaments, tests TS-T1 to TS-T8; web remarks placement and wording, TS-T14; M1 (label seeds and existing description label rewording, written not run); PWA version 186 in the four constants |
+| 1.2 | `tm-bw-review-merge` | Report reviewed and merged by the architect |
 
 **Step 2: Build for meetup (owner, AWS), 5 steps**
 
@@ -185,19 +186,17 @@ Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported 
 | 2.0 | Backup and rollback tag recorded |
 | 2.1 | `git pull --ff-only`, build `api worker` |
 | 2.2 | Run M1 (`alembic upgrade +1`) |
-| 2.3 | Restart `api` and `worker`, health and version check |
+| 2.3 | Restart `api` and `worker`, health and version check (186) |
 | 2.4 | Browser verification: remarks on game and tournament create, view, edit and recurring copy; the invited-viewer rule through the API |
 
-**Step 3: Instruction execution for meetup-mobile, 6 steps**
+**Step 3: Instruction execution for meetup-mobile, 2 steps**
 
 | # | Task ID | Content |
 |---|---|---|
-| 3.1 | `tm-m-team-detail` | Team API clients, `TeamDetailScreen` with the four viewer states, tappable Mine cards, push routing (AD-1, AD-5) |
-| 3.2 | `tm-m-discover-join` | Mine / Discover switch, Discover list, request to join, invite response (AD-2) |
-| 3.3 | `tm-m-captain` | Approve or reject requests, invite player, make captain, remove, edit, leave with replacement captain |
-| 3.4 | `tm-m-remarks-venue` | Remarks on game step 6 and tournament wizard, Remarks section on the game view, venue row width (AD-4, AD-6) |
-| 3.5 | `tm-m-report` | `check:labels`, type-check, scoped tests, label audit against M1, consolidated report |
-| 3.6 | `tm-m-review-merge` | Reports reviewed and merged by the architect |
+| 3.1 | `tm-m-teams-remarks` | Stage A team API clients, `TeamDetailScreen`, tappable Mine cards, push routing (AD-1, AD-5); stage B Mine / Discover, request to join, invite response (AD-2); stage C captain tools; stage D remarks and venue row (AD-4, AD-6); `check:labels`, type-check, scoped tests, label audit against M1, one report |
+| 3.2 | `tm-m-review-merge` | Report reviewed and merged by the architect |
+
+Starts only after step 2 is complete (the invited-viewer rule and the label seeds are deployed).
 
 **Step 4: Build the mobile app (owner), 5 steps**
 
@@ -209,7 +208,9 @@ Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported 
 | 4.3 | Device test: tap a tournament team, discover and join, invite response, captain tools, remarks, venue address |
 | 4.4 | Release to Play internal testing and TestFlight |
 
-**Totals: 3 + 5 + 6 + 5 = 19 steps.** Order: strictly sequential within a step; step 2 starts after 1.3; step 3 starts after step 2 (the viewing rule is deployed); step 4 starts after 3.6. Every step produces a report; the architect rates it and either accepts it or sends a fix brief. Agents never self-certify, never choose versions and never edit governance documents.
+**Totals: 2 + 5 + 2 + 5 = 14 steps.** Order: strictly sequential; step 2 starts after 1.2, step 3 after step 2, step 4 after 3.2. Every step produces a report; the architect rates it and either accepts it or sends a fix brief. Agents never self-certify, never choose versions (the architect assigns 186 for the PWA) and never edit governance documents.
+
+**Progress: Step 0 of 14 done · overall 0 of 14 (0%). Next: 1.1 `tm-bw-web`.**
 
 ## 11. Risks and mitigations
 
@@ -225,7 +226,7 @@ Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported 
 
 | ID | Item | Severity | Gate or status |
 |---|---|---|---|
-| OI-1 | Owner approval of this draft | 🟠 HIGH | Blocks step 1 |
+| OI-1 | Owner approval of this draft | 🟠 HIGH | Closed 2026-10-28 (approved) |
 | OI-2 | `GET /teams` has no search or paging; Discover filters on the client | 🟡 MEDIUM | Reopen when the visible public teams exceed 300, or the list response p95 exceeds 500 ms over 7 days: add `q`, `sport`, `limit` and `offset` additively |
 | OI-3 | Discover cards have no player count (`player_count` only from `/teams/mine`) | 🟢 LOW | Add the field to `GET /teams` additively if the owner asks |
 | OI-4 | Existing descriptions now display as "Remarks" | 🟢 LOW | Accepted; label revert is an admin edit |
@@ -236,4 +237,4 @@ Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported 
 
 ## 13. Approval record
 
-**v1.0 DRAFT, 2026-10-28.** Awaiting the owner's approval (OI-1). Decisions taken from the owner's words: discovery and request to join are in scope; remarks are optional and visible to everyone who can see the game or tournament. Decisions taken by the architect and open to the owner's objection: remarks reuse `description` with the label "Remarks" (AD-4, D-2); bound of 5000 (D-1); Discover as a Mine / Discover switch (AD-2); mirror of the web team actions (AD-1, TS-06, TS-07).
+**v1.0 APPROVED by the owner, 2026-10-28.** Decisions taken from the owner's words: discovery and request to join are in scope; remarks are optional and visible to everyone who can see the game or tournament. Decisions taken by the architect and approved with the document: remarks reuse `description` with the label "Remarks" (AD-4, D-2); bound of 5000 (D-1); Discover as a Mine / Discover switch (AD-2); mirror of the web team actions (AD-1, TS-06, TS-07).
