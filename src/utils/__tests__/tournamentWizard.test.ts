@@ -15,6 +15,7 @@ import {
   registrationRules,
   validateBasics,
   validateCommittee,
+  validateRemarks,
   validateRegistration,
   validateStep,
   validateVenue,
@@ -78,6 +79,16 @@ describe('step validation', () => {
     expect(validateBasics({ ...validState(), sport: '' }).map(i => i.key)).toEqual(['mob.tw.err_sport']);
     expect(validateBasics({ ...validState(), title: 'x'.repeat(151) }).map(i => i.key)).toEqual(['mob.tw.err_title_long']);
     expect(validateBasics(validState())).toEqual([]);
+  });
+
+  it('Remarks (D-2) are checked on the last input step, after trimming; basics no longer checks them', () => {
+    const long = 'x'.repeat(5001);
+    expect(validateBasics({ ...validState(), description: long })).toEqual([]);
+    expect(validateRemarks({ ...validState(), description: long }).map(i => [i.key, i.field, i.step])).toEqual([
+      ['mob.tw.err_description_long', 'description', WIZARD_STEP.committee],
+    ]);
+    expect(validateRemarks({ ...validState(), description: `  ${'x'.repeat(5000)}  ` })).toEqual([]);
+    expect(validateRemarks({ ...validState(), description: '' })).toEqual([]);
   });
 
   it('committee: at least one besides the organizer, at most committee_max - 1', () => {
@@ -334,7 +345,10 @@ describe('venue_detail and focus (te-a4, AD-T13)', () => {
   it('focus goes to the first field of each step, or to the first field with an error', () => {
     expect(firstFocusField(WIZARD_STEP.basics, {})).toBe('title');
     expect(firstFocusField(WIZARD_STEP.basics, { description: 'x', title: 'y' })).toBe('title');
-    expect(firstFocusField(WIZARD_STEP.basics, { description: 'x' })).toBe('description');
+    // Remarks moved to the last input step (team-screens-remarks D-2): a Remarks error focuses its field there, not on step 1.
+    expect(firstFocusField(WIZARD_STEP.basics, { description: 'x' })).toBe('title');
+    expect(firstFocusField(WIZARD_STEP.committee, { description: 'x' })).toBe('description');
+    expect(firstFocusField(WIZARD_STEP.committee, { committee_member_ids: 'x' })).toBe('committee_add');
     expect(firstFocusField(WIZARD_STEP.participation, {})).toBe('participation');
     expect(firstFocusField(WIZARD_STEP.when, {})).toBe('starts_at');
     expect(firstFocusField(WIZARD_STEP.when, { venue: 'v', ends_at: 'e' })).toBe('ends_at');

@@ -480,9 +480,15 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
               setState(current => ({ ...current, committee: current.committee.filter(person => person.id !== userId) }));
             }}
             onOpenPicker={() => setView('committee-picker')}
-            errorMessage={stepIssues[0] ? t(stepIssues[0].key, stepIssues[0].params) : null}
+            // The banner is for the committee rules (and a server refusal); the Remarks length message sits under its own field.
+            errorMessage={(() => {
+              const issue = stepIssues.find(item => item.field !== 'description');
+              return issue ? t(issue.key, issue.params) : null;
+            })()}
             max={limits.committee_max - 1 - state.committee.length}
             focus={stepFocus}
+            onChange={update}
+            remarksError={errors.description}
           />
         );
       default:
