@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
-**Version:** v1.8
+**Version:** v1.9
 **Status:** **APPROVED by the owner, 2026-10-27** (instruction in conversation: "prepare design & mark it approved. Push to gh repo", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in sections 3 and 5. Open items are in section 12.
 **v1.1 amendment (2026-10-27):** architect amendment after the `er-p1-verify` (step 1.0) report, PR #158. Each 1.0 finding is classified and resolved in the paragraphs marked **[v1.1]** (rulings B-1 to B-8). Issued under the owner's 2026-10-27 instruction "go ahead with step 1"; an objection before the 1.1 build starts reverses the affected ruling.
 **v1.2 amendment (2026-10-28):** architect amendment after the `er-bw-tournament` (step 1.1) report, PR #160, merged 2026-10-28. Accepted judgement calls are written back in the paragraphs marked **[v1.2]**; no requirement changed.
@@ -364,7 +364,7 @@ Negative API tests (P13, P15) are ER-T4, ER-T7, ER-T8 and ER-T13 plus one per se
 
 ### Steps and progress tracking (owner's four steps)
 
-**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.0 of 7 done · overall 12 of 27 (44%). Next: 3.1 `er-m-tournament-view`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
+**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.1 of 7 done (mobile PR #75) · overall 13 of 27 (48%). Next: 3.2 `er-m-committee`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
 
 Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 27 (p%)`, updated after every step; the end state is all 27 steps done. Machines: Cloud (a Claude or Cursor cloud agent), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
@@ -552,5 +552,16 @@ No requirement changed.
 | A40 | Contract gaps accepted, no backend change: the withdrawal-locked flag is absent (OI-15), so the participant notice is the labelled 409 `WITHDRAWAL_LOCKED` on the withdraw attempt; recurrence bounds are absent (OI-16), so the server refusals are the behaviour; a fresh draft carries no `shuffle_total`, so mobile shows no "n of N" unless the response returns it; "Add team" uses `GET /teams` exactly as the web does (web report D-6) | OI-15, OI-16 |
 | A41 | Mobile bundles default texts for the new `mob.*` label keys with the seeded wording (M3 is run on production); push and history routing for the two new tournament types is step 3.4 | §11 |
 | A42 | Step 3.0 recorded done, progress 12 of 27 | §11 |
+
+No requirement changed.
+
+**v1.9 (2026-10-28), architect amendment after the `er-m-tournament-view` report (mobile PR #75).** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A43 | Mobile uses the seeded `web.tournament.*` label keys for the count, Full chip and "Registration closes" (no `mob.*` copies are seeded); bundled defaults carry the seeded wording. Whether an admin edit of a `web.*` key reaches mobile depends on the label loader and is not verified: OI-17 (low), checked at the 4.3 device test | OI-17 |
+| A44 | Accepted calls beyond the step list: the cap is hidden from participants in the Format card (AD-1); Register is hidden while `is_full` (the server still refuses with `TOURNAMENT_FULL`); a missing `registered_count` hides the count line, never shows 0; a missing `registration_open` falls back to the closing-date derivation | AD-1 |
+| A45 | Screenshots could not be taken in the cloud session (no emulator). They are taken on the Mac at the 4.3 device test and attached to the 3.6 review; the code is accepted without them | §11 |
+| A46 | Step 3.1 recorded done, progress 13 of 27 | §11 |
 
 No requirement changed.
