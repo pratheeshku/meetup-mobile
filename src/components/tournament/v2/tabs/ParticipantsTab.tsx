@@ -35,6 +35,7 @@ import { refusalText } from '../../../../utils/refusal';
 import { useSportDisplayName } from '../../../../utils/labels';
 import { formatDayShort } from '../../../../utils/tournamentExperience';
 import { filterParticipants, participantRole, participantRows } from '../../../../utils/tournamentTabs';
+import Badge from '../../../Badge';
 import Button from '../../../Button';
 import TextField from '../../../TextField';
 import UserAvatar from '../../../UserAvatar';
@@ -389,16 +390,24 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
             testID="participants-search"
           />
         </View>
-        {!paymentsOn ? (
-          <>
-            <View style={styles.countRow}>
-              <Text style={styles.countText}>{t('mob.tournament.participants.registered_of', { count: rows.length, max: tournament.max_participants })}</Text>
-              <Text style={styles.countMuted}>{t('mob.tournament.participants.registered_label')}</Text>
-            </View>
-            <View style={styles.track}>
-              <View style={[styles.fill, { width: `${Math.round(share * 100)}%` }]} />
-            </View>
-          </>
+        {props.isCommittee ? (
+          !paymentsOn ? (
+            <>
+              <View style={styles.countRow}>
+                <Text style={styles.countText}>{t('mob.tournament.participants.registered_of', { count: rows.length, max: tournament.max_participants })}</Text>
+                <Text style={styles.countMuted}>{t('mob.tournament.participants.registered_label')}</Text>
+              </View>
+              <View style={styles.track}>
+                <View style={[styles.fill, { width: `${Math.round(share * 100)}%` }]} />
+              </View>
+            </>
+          ) : null
+        ) : tournament.participant_count !== null ? (
+          // AD-1 (A38): a participant sees the server's count and the Full chip, never the cap, a progress bar or spots left.
+          <View style={styles.countRow} testID="participants-registered-count">
+            <Text style={styles.countText}>{t('web.tournament.registered_count', { count: tournament.participant_count })}</Text>
+            {tournament.is_full === true ? <Badge label={t('web.tournament.full_chip')} variant="warning" style={styles.fullChip} /> : null}
+          </View>
         ) : null}
         {props.isCommittee && (pointsOn || paymentsOn) ? columns : null}
         {visible.length === 0 ? <EmptyLine text={t('mob.tournament.participants.empty')} /> : null}
@@ -598,6 +607,7 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   search: { flex: 1 },
   addButton: { marginTop: spacing.md },
+  fullChip: { marginLeft: spacing.sm },
   countRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs },
   countText: { ...typography.bodyBold, color: dash.text },
   countMuted: { ...typography.caption, color: dash.textMuted },

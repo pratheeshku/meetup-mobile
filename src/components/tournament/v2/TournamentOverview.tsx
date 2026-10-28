@@ -46,6 +46,19 @@ function Block({ children, testID, style }: { children: React.ReactNode; testID?
   );
 }
 
+/** Participant view (AD-1): the server's count and no cap, no spots left, no bar. Hidden while the count is unknown. */
+function RegisteredCount({ count }: { count: number | null }): React.JSX.Element | null {
+  const t = useT();
+  if (count === null) {
+    return null;
+  }
+  return (
+    <Text style={styles.progressText} testID="overview-registered-count">
+      {t('web.tournament.registered_count', { count })}
+    </Text>
+  );
+}
+
 function Progress({ count, max }: { count: number; max: number }): React.JSX.Element {
   const t = useT();
   const share = max > 0 ? Math.min(1, count / max) : 0;
@@ -105,7 +118,11 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
                 date: tournament.registration_closes_at ? formatDayShort(tournament.registration_closes_at) : '–',
               })}
             </Text>
-            <Progress count={props.registeredCount} max={max} />
+            {props.isCommittee ? (
+              <Progress count={props.registeredCount} max={max} />
+            ) : (
+              <RegisteredCount count={tournament.participant_count} />
+            )}
             <View style={styles.note}>
               <Text style={styles.noteText}>{t('mob.tournament.v2.ov_organizer_note')}</Text>
             </View>
@@ -116,7 +133,11 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
           <Block testID="overview-status-closed">
             <Text style={styles.cardTitle}>{t('mob.tournament.v2.ov_closed_title')}</Text>
             <Text style={styles.body}>{t('mob.tournament.v2.ov_closed_body', { count: props.registeredCount })}</Text>
-            <Progress count={props.registeredCount} max={max} />
+            {props.isCommittee ? (
+              <Progress count={props.registeredCount} max={max} />
+            ) : (
+              <RegisteredCount count={tournament.participant_count} />
+            )}
             {tournament.roster_frozen_at ? (
               <Text style={styles.frozen} testID="overview-roster-frozen">
                 {t('mob.tournament.v2.ov_roster_frozen', { date: formatDayShort(tournament.roster_frozen_at) })}
@@ -241,15 +262,22 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
       state: states.opened,
     });
   }
+  // AD-4, A39: the Soft block and Hard block rows are for the organizer, the committee and an admin (the API sends the hard block to them
+  // only; its presence is what shows an admin who is not on the committee). A participant sees "Registration closes" and nothing else of the
+  // block dates. A hard block the API did not return is never inferred.
+  const seesBlockDates = props.isCommittee || Boolean(tournament.registration_hard_block_at);
+  const closesAt = tournament.registration_closes_at ? formatDayShort(tournament.registration_closes_at) : '–';
   keyRows.push({
     key: 'soft',
-    title: t('mob.tournament.v2.kd_soft'),
-    sub: tournament.registration_closes_at
-      ? t('mob.tournament.v2.kd_soft_sub', { date: formatDayShort(tournament.registration_closes_at) })
-      : '–',
+    title: seesBlockDates ? t('mob.tournament.v2.kd_soft') : t('web.tournament.v2.kd_registration_closes'),
+    sub: !tournament.registration_closes_at
+      ? '–'
+      : seesBlockDates
+      ? t('mob.tournament.v2.kd_soft_sub', { date: closesAt })
+      : closesAt,
     state: states.soft,
   });
-  if (tournament.registration_hard_block_at) {
+  if (seesBlockDates && tournament.registration_hard_block_at) {
     keyRows.push({
       key: 'hard',
       title: t('mob.tournament.v2.kd_hard'),
@@ -361,9 +389,11 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
                   ? t('mob.tournament.v2.format_teams')
                   : t('mob.tournament.v2.format_individuals')}
               </Text>
-              <Text style={styles.rowSub}>
-                {entrants ? t(entrants.labelKey, entrants.params) : t('mob.tournament.v2.format_max', { max })}
-              </Text>
+              {props.isCommittee ? (
+                <Text style={styles.rowSub}>
+                  {entrants ? t(entrants.labelKey, entrants.params) : t('mob.tournament.v2.format_max', { max })}
+                </Text>
+              ) : null}
             </View>
           </View>
         ) : null}

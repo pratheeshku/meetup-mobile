@@ -104,6 +104,7 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
     closureOutcome: tournament.closure_outcome,
     phase: scoring?.registration_phase ?? null,
     fixturesPublished: published,
+    registrationOpen: tournament.registration_open,
   };
   const strip = stripModel(facts);
   const kind = overviewKind(facts);
@@ -268,6 +269,7 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
         tone={tone}
         scrim={scrim}
         strip={strip}
+        full={tournament.is_full === true}
         register={props.register}
         organizer={tournament.organizer}
         committee={committee}

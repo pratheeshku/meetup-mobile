@@ -53,6 +53,7 @@ import {
   withdrawFromTournament,
 } from '../api/tournaments';
 import { getClientConfig } from '../api/config';
+import Badge from '../components/Badge';
 import Button from '../components/Button';
 import UserAvatar from '../components/UserAvatar';
 import UserMenuSheet from '../components/user/UserMenuSheet';
@@ -513,6 +514,9 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           e?.response?.data?.detail === 'This game has ended and can no longer be changed')
       ) {
         setWithdrawError(t('mob.closure.game_ended'));
+      } else if (e?.response?.status === 409 && e?.response?.data?.code === 'WITHDRAWAL_LOCKED') {
+        // A40: the flag is not in the response, so the notice is the labelled refusal on the attempt.
+        setWithdrawError(t('mob.reg.err.withdrawal_locked'));
       } else {
         const reason = e?.response?.data?.detail || e?.response?.data?.reason;
         setWithdrawError(reason ?? t('mob.tournament.withdraw_error'));
@@ -768,10 +772,12 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   // header, tabs and tab bodies of the tournament-experience design. Version 1 keeps the page below unchanged.
   if (usesV2Page(tournament, scoring)) {
     const activeCount = registrations.filter(isActiveRegistration).length;
-    const registrationOpen = scoring?.registration_phase === 'open';
+    // A39: the API's `registration_open` and `is_full`, never recomputed on the device.
+    const registrationOpen = tournament.registration_open;
     const canRegisterV2 =
       !isTournamentEnded &&
       registrationOpen &&
+      tournament.is_full !== true &&
       (currentUserRegistrationStatus === 'none' || Boolean(tournament.my_declined)) &&
       tournament.my_invitation_status !== 'pending';
     const register: RegisterAction = canWithdrawNow(currentUserRegistrationStatus, isTournamentEnded)
@@ -779,7 +785,6 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       : canRegisterV2
       ? {
           kind: 'register',
-          spotsLeft: Math.max(0, tournament.max_participants - activeCount),
           loading: false,
           onPress: handleRegister,
         }
@@ -884,16 +889,13 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         <Text style={styles.meta}>
           {t('mob.tournament.starts', { when: formatDateTime(tournament.starts_at) })}
         </Text>
-        {/* `registrations.length` used instead of `tournament.participant_count` —
-            the real backend has no such field; this screen already fetches
-            the registrations list, so this is exact rather than a
-            placeholder (see the audit report / mapTournamentApiItem). */}
-        <Text style={styles.meta}>
-          {t('mob.tournament.registered_line', {
-            count: registrations.length,
-            max: tournament.max_participants,
-          })}
-        </Text>
+        {/* AD-1 (A38): the server's `registered_count` and `is_full`, no cap shown to a participant. */}
+        {tournament.participant_count != null ? (
+          <View style={styles.countRow} testID="tournament-registered-count">
+            <Text style={styles.meta}>{t('web.tournament.registered_count', { count: tournament.participant_count })}</Text>
+            {tournament.is_full === true ? <Badge label={t('web.tournament.full_chip')} variant="warning" style={styles.fullChip} /> : null}
+          </View>
+        ) : null}
         <Text style={styles.description}>{tournament.description}</Text>
         {venueCatalogueEnabled ? (
           <VenueRow
@@ -1197,6 +1199,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   meta: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xs },
+  countRow: { flexDirection: 'row', alignItems: 'center' },
+  fullChip: { marginLeft: spacing.sm, marginBottom: spacing.xs },
   description: { ...typography.body, color: colors.textPrimary, marginTop: spacing.sm },
   closedNotice: {
     ...typography.body,
