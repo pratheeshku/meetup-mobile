@@ -6,24 +6,36 @@
  * notice. A failed read shows a retry state, never a stale detail. Role checks here are UX only: the server is the authority.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
-import { getTeam, getTeamMembers, requestToJoinTeam, respondToTeamInvite } from '../api/teams';
+import {
+  getTeam,
+  getTeamMembers,
+  inviteToTeam,
+  removeTeamMember,
+  requestToJoinTeam,
+  respondToTeamInvite,
+  respondToTeamRequest,
+  updateTeam,
+} from '../api/teams';
 import { useAuth } from '../auth/AuthContext';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import ErrorView from '../components/ErrorView';
 import InlineError from '../components/InlineError';
 import LoadingView from '../components/LoadingView';
+import OptionChips from '../components/OptionChips';
+import TextField from '../components/TextField';
 import Toast from '../components/Toast';
+import UserSearchPicker from '../components/UserSearchPicker';
 import UserAvatar from '../components/UserAvatar';
 import { useSportDisplayName } from '../utils/labels';
 import { useT } from '../labels/LabelsContext';
 import type { GroupsStackParamList } from '../navigation/types';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
-import type { Team, TeamMembership } from '../types/team';
+import type { Team, TeamMembership, TeamVisibility } from '../types/team';
 import { refusalText } from '../utils/refusal';
 import { memberName, viewerStateFromRoster } from '../utils/teamViewer';
 
@@ -38,7 +50,7 @@ function statusOf(error: unknown): number | null {
   return typeof status === 'number' ? status : null;
 }
 
-export default function TeamDetailScreen({ route }: Props): React.JSX.Element {
+export default function TeamDetailScreen({ navigation, route }: Props): React.JSX.Element {
   const { teamId } = route.params;
   const t = useT();
   const { user } = useAuth();
@@ -98,7 +110,7 @@ export default function TeamDetailScreen({ route }: Props): React.JSX.Element {
   if (state.kind === 'failed') {
     return <ErrorView message={t('mob.team.action_failed')} onRetry={() => load()} />;
   }
-  return <TeamDetailBody team={state.team} roster={state.roster} userId={user?.id} reload={reload} />;
+  return <TeamDetailBody team={state.team} roster={state.roster} userId={user?.id} reload={reload} onLeft={navigation.goBack} />;
 }
 
 interface BodyProps {
@@ -107,22 +119,31 @@ interface BodyProps {
   userId?: string;
   /** Reads the team again without the loading state; false when the read failed. */
   reload: () => Promise<boolean>;
+  /** The caller left the team: the detail has nothing more to show them. */
+  onLeft: () => void;
 }
 
-function TeamDetailBody({ team, roster, userId, reload }: BodyProps): React.JSX.Element {
+const NAME_MAX_LENGTH = 100;
+
+function TeamDetailBody({ team, roster, userId, reload, onLeft }: BodyProps): React.JSX.Element {
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const dismissNotice = useCallback(() => setNotice(null), []);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState(team.name);
+  const [editVisibility, setEditVisibility] = useState<TeamVisibility>(team.visibility === 'private' ? 'private' : 'public');
+  const [inviting, setInviting] = useState(false);
 
   /**
    * One user action: one correlation id for the call, then a re-read. A refusal keeps the screen as it was and shows its label, never the
-   * server's text (a coded refusal has its own label; anything else is "That did not work. Please try again.").
+   * server's text (a coded refusal has its own label; anything else is "That did not work. Please try again."). Resolves true when the
+   * server accepted the action.
    */
-  const run = async (action: (correlationId: string) => Promise<void>, success?: string): Promise<void> => {
+  const run = async (action: (correlationId: string) => Promise<void>, success?: string): Promise<boolean> => {
     if (busy) {
-      return;
+      return false;
     }
     setBusy(true);
     setError(null);
@@ -131,7 +152,7 @@ function TeamDetailBody({ team, roster, userId, reload }: BodyProps): React.JSX.
     } catch (e) {
       setError(refusalText(e, t, 'mob.team.action_failed'));
       setBusy(false);
-      return;
+      return false;
     }
     if (success) {
       setNotice(success);
@@ -140,12 +161,37 @@ function TeamDetailBody({ team, roster, userId, reload }: BodyProps): React.JSX.
       setError(t('mob.team.action_failed'));
     }
     setBusy(false);
+    return true;
   };
 
   const sportLabel = useSportDisplayName(team.sport);
   const viewer = viewerStateFromRoster(roster, userId);
   const players = (roster ?? []).filter(row => row.status === 'active');
   const visibilityLabel = t(team.visibility === 'private' ? 'mob.teams.visibility_private' : 'mob.teams.visibility_public');
+
+  // UX only: the server decides every one of these (policies.py); a refusal is shown as a label.
+  const isCaptain = viewer === 'active' && team.captain_user_id === userId;
+  const requests = (roster ?? []).filter(row => row.status === 'requested');
+
+  const confirm = (label: string, onConfirm: () => void): void => {
+    Alert.alert(label, undefined, [
+      { text: t('mob.common.cancel'), style: 'cancel' },
+      { text: label, style: 'destructive', onPress: onConfirm },
+    ]);
+  };
+
+  const saveEdit = async (): Promise<void> => {
+    const name = editName.trim();
+    // Changed fields only (TeamUpdate forbids anything else; an unchanged form just closes).
+    const body = { ...(name !== team.name ? { name } : {}), ...(editVisibility !== team.visibility ? { visibility: editVisibility } : {}) };
+    if (name === '' || Object.keys(body).length === 0) {
+      setEditing(false);
+      return;
+    }
+    if (await run(correlationId => updateTeam(team.id, body, { correlationId }).then(() => undefined))) {
+      setEditing(false);
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -195,6 +241,89 @@ function TeamDetailBody({ team, roster, userId, reload }: BodyProps): React.JSX.
           </View>
         ) : null}
 
+        {isCaptain && !editing ? (
+          <View style={styles.actions}>
+            <Button
+              label={t('mob.team.edit')}
+              variant="secondary"
+              onPress={() => {
+                setEditName(team.name);
+                setEditVisibility(team.visibility === 'private' ? 'private' : 'public');
+                setEditing(true);
+              }}
+              testID="team-edit"
+            />
+          </View>
+        ) : null}
+        {isCaptain && editing ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('mob.create_group.team_name')}</Text>
+            <TextField
+              value={editName}
+              onChangeText={setEditName}
+              maxLength={NAME_MAX_LENGTH}
+              accessibilityLabel={t('mob.create_group.team_name')}
+              testID="team-edit-name"
+            />
+            <View style={styles.chips}>
+              <OptionChips<TeamVisibility>
+                options={[
+                  { value: 'public', label: t('mob.teams.visibility_public') },
+                  { value: 'private', label: t('mob.teams.visibility_private') },
+                ]}
+                value={editVisibility}
+                onChange={setEditVisibility}
+                disabled={busy}
+              />
+            </View>
+            <View style={styles.actionRow}>
+              <Button label={t('mob.common.save')} style={styles.actionRowItem} loading={busy} onPress={saveEdit} testID="team-edit-save" />
+              <Button
+                label={t('mob.common.cancel')}
+                variant="secondary"
+                style={styles.actionRowItem}
+                disabled={busy}
+                onPress={() => setEditing(false)}
+                testID="team-edit-cancel"
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {isCaptain && requests.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle} accessibilityRole="header">
+              {t('mob.team.requests_title')}
+            </Text>
+            {requests.map(row => (
+              <View key={row.id} style={styles.requestRow} testID="team-request-row">
+                <View style={styles.avatarBox}>
+                  <UserAvatar name={memberName(row)} size={AVATAR_BOX} />
+                </View>
+                <Text style={styles.playerName} numberOfLines={1}>
+                  {memberName(row)}
+                </Text>
+                <Button
+                  label={t('mob.team.approve')}
+                  size="sm"
+                  disabled={busy}
+                  onPress={() => run(correlationId => respondToTeamRequest(team.id, row.user_id, true, { correlationId }))}
+                  testID={`team-approve-${row.user_id}`}
+                />
+                <Button
+                  label={t('mob.team.reject')}
+                  size="sm"
+                  variant="secondary"
+                  style={styles.rowGap}
+                  disabled={busy}
+                  onPress={() => run(correlationId => respondToTeamRequest(team.id, row.user_id, false, { correlationId }))}
+                  testID={`team-reject-${row.user_id}`}
+                />
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {roster ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle} accessibilityRole="header">
@@ -209,8 +338,70 @@ function TeamDetailBody({ team, roster, userId, reload }: BodyProps): React.JSX.
                   {memberName(row)}
                 </Text>
                 {row.user_id === team.captain_user_id ? <Badge label={t('mob.team.captain_badge')} variant="primary" /> : null}
+                {isCaptain && row.user_id !== team.captain_user_id ? (
+                  <Button
+                    label={t('mob.team.remove_player')}
+                    size="sm"
+                    variant="destructive"
+                    style={styles.rowGap}
+                    disabled={busy}
+                    accessibilityLabel={`${t('mob.team.remove_player')}: ${memberName(row)}`}
+                    onPress={() =>
+                      confirm(t('mob.team.remove_player'), () => run(correlationId => removeTeamMember(team.id, row.user_id, { correlationId })))
+                    }
+                    testID={`team-remove-${row.user_id}`}
+                  />
+                ) : null}
               </View>
             ))}
+          </View>
+        ) : null}
+
+        {viewer === 'active' ? (
+          <View style={styles.section}>
+            <Button
+              label={t('mob.team.invite_player')}
+              variant="secondary"
+              onPress={() => setInviting(open => !open)}
+              testID="team-invite-toggle"
+            />
+            {inviting ? (
+              <View style={styles.inviteBox}>
+                <UserSearchPicker
+                  selectionMode="immediate"
+                  suggestionContext="team_players"
+                  entityLabel={t('mob.team.section_players')}
+                  placeholder={t('mob.team.invite_search_placeholder')}
+                  excludeTeamId={team.id}
+                  excludeUserIds={(roster ?? []).map(row => row.user_id)}
+                  immediateRow={{
+                    actionLabel: name => `${t('mob.team.invite_player')}: ${name}`,
+                    sentLabel: t('mob.team.invite_sent'),
+                    errorText: e => refusalText(e, t, 'mob.team.action_failed'),
+                  }}
+                  onSelect={user => withCorrelationId(correlationId => inviteToTeam(team.id, user.id, { correlationId }))}
+                />
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* A captain cannot leave: the server refuses it (teams/service.py remove_member) and offers no route to hand the captaincy over. */}
+        {viewer === 'active' && !isCaptain ? (
+          <View style={styles.actions}>
+            <Button
+              label={t('mob.team.leave')}
+              variant="destructive"
+              disabled={busy}
+              onPress={() =>
+                confirm(t('mob.team.leave'), async () => {
+                  if (userId && (await run(correlationId => removeTeamMember(team.id, userId, { correlationId })))) {
+                    onLeft();
+                  }
+                })
+              }
+              testID="team-leave"
+            />
           </View>
         ) : null}
       </ScrollView>
@@ -239,6 +430,15 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   actionRowItem: { flex: 1 },
   section: { marginTop: spacing.md },
+  chips: { marginTop: spacing.sm },
+  inviteBox: { marginTop: spacing.sm },
+  rowGap: { marginLeft: spacing.xs },
+  requestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: AVATAR_BOX + spacing.sm,
+    paddingVertical: spacing.xs,
+  },
   sectionTitle: { ...typography.bodyBold, color: colors.textPrimary, marginBottom: spacing.sm },
   playerRow: {
     flexDirection: 'row',
