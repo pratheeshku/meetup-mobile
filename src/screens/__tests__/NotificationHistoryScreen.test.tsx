@@ -188,6 +188,15 @@ describe('tapping an unread item', () => {
   });
 });
 
+it.each(['tournament_updated', 'tournament_registration_added'])('a %s row opens the tournament (er-m-series)', async type => {
+  mockHistory.mockResolvedValue({ items: [makeItem({ id: 'tn-1', notification_type: type, title: 'Tournament news', entity_id: 't-9' })] });
+  const root = await renderAsync(<NotificationHistoryScreen />);
+
+  await act(async () => pressableWithText(root, 'Tournament news').props.onPress());
+
+  expect(mockNavigate).toHaveBeenCalledWith({ tab: 'Tournaments', screen: 'TournamentDetail', params: { tournamentId: 't-9' } });
+});
+
 it('does not call markNotificationRead for an already-read item, but still routes', async () => {
   mockHistory.mockResolvedValue({ items: [makeItem({ read_at: '2026-09-21T10:00:00Z' })] });
   const root = await renderAsync(<NotificationHistoryScreen />);

@@ -131,6 +131,10 @@ export function resolveNotificationTarget(
       };
 
     // teams-payments AD-12: the removed entrant is told; the push opens the tournament (entity_id = the tournament id).
+    // tournament-edit-recurring AD-9 (A41): a changed start, end, venue or closing date, and a committee add of an entrant. Both open the tournament
+    // (entity_id = the tournament id). Series actions reuse event_changed and event_cancelled above, which already open the game.
+    case 'tournament_updated':
+    case 'tournament_registration_added':
     case 'tournament_registration_removed':
       return {
         tab: 'Tournaments',

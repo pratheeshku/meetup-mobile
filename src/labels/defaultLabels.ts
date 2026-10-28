@@ -1814,6 +1814,8 @@ export const DEFAULT_LABELS = {
   'mob.reg.err.registration_dates_required': "Set a new registration closing date in the future to change the start, the end or the venue.",
   'mob.notif_pref.type_team_join_request': "Requests to join your tournament team",
   'mob.notif_pref.type_tournament_registration_removed': "Removed from a tournament",
+  'mob.notif_pref.type_tournament_updated': "Tournament dates or venue changed",
+  'mob.notif_pref.type_tournament_registration_added': "Added to a tournament",
 
   // tp-mobile: Groups | Tournament teams (AD-4) (new, not seeded: listed in the report).
   'mob.groups.switch_groups': 'Groups',

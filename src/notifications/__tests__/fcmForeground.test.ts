@@ -126,6 +126,12 @@ it('still shows the banner (and never notify-kit) for every other known type —
   expect(mockDisplayNotification).not.toHaveBeenCalled();
 });
 
+it.each(['tournament_updated', 'tournament_registration_added'])('%s is no longer dropped: the foreground banner shows it (er-m-series)', type => {
+  deliver({ messageId: 'm8', notification: { title: 't', body: 'b' }, data: { notification_type: type, entity_id: 't-9', title: 't', body: 'b' } });
+
+  expect(getBannerState()).toEqual({ notification_type: type, entity_id: 't-9', title: 't', body: 'b' });
+});
+
 it('does not throw or surface an unhandled rejection when the local display fails', async () => {
   mockDisplayNotification.mockRejectedValueOnce(new Error('notification permission denied'));
 
