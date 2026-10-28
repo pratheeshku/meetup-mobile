@@ -28,7 +28,9 @@ const GROUP = { id: 'g-1', name: 'Sunday Footballers', description: '', owner_id
 const hasSearch = (root: Instance): boolean =>
   root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Search users').length > 0;
 const hasRows = (root: Instance): boolean => root.findAll(n => n.props.testID === 'user-search-row').length > 0;
-const textInputs = (root: Instance): number => root.findAll(n => (n.type as unknown) === 'TextInput').length;
+/** The people-search inputs: the optional Remarks field (team-screens-remarks) is not one of them. */
+const textInputs = (root: Instance): number =>
+  root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.testID !== 'game-remarks').length;
 const chips = (root: Instance): string[] => {
   const list = root.findAll(n => n.props.testID === 'invitee-list' && typeof n.type === 'string')[0];
   return list ? texts(list) : [];

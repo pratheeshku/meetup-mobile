@@ -103,6 +103,7 @@ import { refusalText } from '../utils/refusal';
 import UserSearchPicker from '../components/UserSearchPicker';
 import UserAvatar from '../components/UserAvatar';
 import PersonNames from '../components/PersonNames';
+import TextField from '../components/TextField';
 import { addInviteEmail } from '../utils/inviteEmails';
 import { formatEventDate, formatEventTimeRange } from '../utils/formatEventDateTime';
 import {
@@ -117,6 +118,9 @@ type Props = CompositeScreenProps<
 >;
 
 type GameKind = 'game' | 'tournament';
+
+/** Remarks limit (team-screens-remarks AD-4, D-1): the server bounds `description` at 5000 after trimming. */
+const REMARKS_MAX = 5000;
 
 /**
  * Games put Date, Start time and Duration in one row. Below this width, or with a large
@@ -179,6 +183,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     lng: null,
   });
   const [courtDetails, setCourtDetails] = useState('Court 2');
+  /** Remarks (team-screens-remarks AD-4): the game's `description`, optional, plain text, at most 5000 characters (UX limit; the server bounds it too). */
+  const [remarks, setRemarks] = useState('');
 
   // Step 4: Who can play
   const [gVisibility, setGVisibility] = useState<EventVisibility>('group');
@@ -533,6 +539,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             ? { invite_user_ids: invitedPlayers.map(p => p.id) }
             : {}),
           skill_level_requirement: skillLevel,
+          // Remarks: trimmed, null when blank (the server stores blank as null as well).
+          description: remarks.trim() === '' ? null : remarks.trim(),
           ...gameFeeFields(),
           ...repeatFields(repeat),
           capacity: capacity,
@@ -1286,6 +1294,24 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         />
         </>
 
+        {/* Remarks (AD-4): the last input before the review; a game only (the v1 tournament form has no description path). */}
+        {mode === 'game' ? (
+          <View style={styles.remarksBlock}>
+            <Text style={styles.fieldLabel}>{t('mob.remarks.label')}</Text>
+            <TextField
+              value={remarks}
+              onChangeText={setRemarks}
+              placeholder={t('mob.remarks.placeholder')}
+              accessibilityLabel={t('mob.remarks.label')}
+              multiline
+              maxLength={REMARKS_MAX}
+              editable={!isSubmitting}
+              style={styles.remarksInput}
+              testID="game-remarks"
+            />
+          </View>
+        ) : null}
+
         {/* Review Card */}
         <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
           <Text style={styles.reviewHeaderTitle}>{t('mob.create_game.review_header')}</Text>
@@ -1423,6 +1449,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
 const noop = (): void => undefined;
 
 const styles = StyleSheet.create({
+  remarksBlock: { marginTop: spacing.lg },
+  remarksInput: { minHeight: 96, textAlignVertical: 'top' },
   screen: {
     flex: 1,
     backgroundColor: colors.background,
