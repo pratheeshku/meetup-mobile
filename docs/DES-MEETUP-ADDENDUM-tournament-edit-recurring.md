@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
-**Version:** v1.11
+**Version:** v1.12
 **Status:** **APPROVED by the owner, 2026-10-27** (instruction in conversation: "prepare design & mark it approved. Push to gh repo", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in sections 3 and 5. Open items are in section 12.
 **v1.1 amendment (2026-10-27):** architect amendment after the `er-p1-verify` (step 1.0) report, PR #158. Each 1.0 finding is classified and resolved in the paragraphs marked **[v1.1]** (rulings B-1 to B-8). Issued under the owner's 2026-10-27 instruction "go ahead with step 1"; an objection before the 1.1 build starts reverses the affected ruling.
 **v1.2 amendment (2026-10-28):** architect amendment after the `er-bw-tournament` (step 1.1) report, PR #160, merged 2026-10-28. Accepted judgement calls are written back in the paragraphs marked **[v1.2]**; no requirement changed.
@@ -364,7 +364,7 @@ Negative API tests (P13, P15) are ER-T4, ER-T7, ER-T8 and ER-T13 plus one per se
 
 ### Steps and progress tracking (owner's four steps)
 
-**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.3 of 7 done (mobile PR #79) · overall 15 of 27 (56%). Next: 3.4 `er-m-series`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
+**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.4 of 7 done (mobile PR #81) · overall 16 of 27 (59%). Next: 3.5 `er-m-labels-report`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
 
 Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 27 (p%)`, updated after every step; the end state is all 27 steps done. Machines: Cloud (a Claude or Cursor cloud agent), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
@@ -585,5 +585,16 @@ No requirement changed.
 | A52 | Mobile layout, which the addendum leaves open, is accepted as built: "Shuffle again" sits in the draft card of the committee Fixtures setup between the group list and the submit block, shown while the latest draft is open and (as on the web) while a publication request is pending; no confirmation dialog because the server keeps the old draft as a superseded version | AD-4 |
 | A53 | "Draw n of N" shows only when the response returns `shuffle {index, total}`; the button disables on an in-flight request and when a draft's own `shuffle_total` is 1 or less; `SHUFFLE_UNAVAILABLE`, 429 and `FIXTURE_FROZEN` have labelled messages | AD-4 |
 | A54 | Step 3.3 recorded done, progress 15 of 27 | §11 |
+
+No requirement changed.
+
+**v1.12 (2026-10-28), architect amendment after the `er-m-series` report (mobile PR #81).** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A55 | Accepted calls: the series start-time box is typed `HH:MM` (the shared date field has no time-only mode and no invalid-time label is seeded); the game count is checked as a whole number only, the server refuses counts below 2 or over its limit; the chip is hidden when the server sends no `index`; the series cancel reuses the single cancel's fixed reason text | AD-8 |
+| A56 | Two existing suites (`CreateGameScreen.test.tsx`, `EventDetailScreen.test.tsx`, 71 tests) fail identically on main, so the screens this step changed have no working screen-level test coverage. Step 3.5 compares the failing test names with main and records the result; the device test (4.3) covers these screens by hand | §11 |
+| A57 | `tournament_updated` and `tournament_registration_added` route to the tournament, with preference rows and icons; series actions keep `event_changed` and `event_cancelled` | AD-9 |
+| A58 | Step 3.4 recorded done, progress 16 of 27 | §11 |
 
 No requirement changed.
