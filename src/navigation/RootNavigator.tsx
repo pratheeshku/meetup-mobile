@@ -120,6 +120,7 @@ import TournamentWizardScreen from '../screens/TournamentWizardScreen';
 import EventDetailScreen from '../screens/EventDetailScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
+import TeamDetailScreen from '../screens/TeamDetailScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import InviteMembersScreen from '../screens/InviteMembersScreen';
 import TournamentTeamsScreen from '../screens/TournamentTeamsScreen';
@@ -280,6 +281,11 @@ function GroupsStack(): React.JSX.Element {
         name="TournamentTeams"
         component={TournamentTeamsScreen}
         options={{ title: t('mob.menu.tournament_teams') }}
+      />
+      <GroupsStackNav.Screen
+        name="TeamDetail"
+        component={TeamDetailScreen}
+        options={{ title: t('mob.team.detail_title') }}
       />
     </GroupsStackNav.Navigator>
   );
