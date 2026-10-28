@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
-**Version:** v1.6
+**Version:** v1.7
 **Status:** **APPROVED by the owner, 2026-10-27** (instruction in conversation: "prepare design & mark it approved. Push to gh repo", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in sections 3 and 5. Open items are in section 12.
 **v1.1 amendment (2026-10-27):** architect amendment after the `er-p1-verify` (step 1.0) report, PR #158. Each 1.0 finding is classified and resolved in the paragraphs marked **[v1.1]** (rulings B-1 to B-8). Issued under the owner's 2026-10-27 instruction "go ahead with step 1"; an objection before the 1.1 build starts reverses the affected ruling.
 **v1.2 amendment (2026-10-28):** architect amendment after the `er-bw-tournament` (step 1.1) report, PR #160, merged 2026-10-28. Accepted judgement calls are written back in the paragraphs marked **[v1.2]**; no requirement changed.
@@ -364,7 +364,7 @@ Negative API tests (P13, P15) are ER-T4, ER-T7, ER-T8 and ER-T13 plus one per se
 
 ### Steps and progress tracking (owner's four steps)
 
-**Progress: Step 1.5 of 8 done · overall 6 of 27 (22%). Next: 1.6 `er-config-labels`.** (1.0 done 2026-10-27, PR #158; 1.1 PR #160; 1.2 PR #162; 1.3 PR #164; 1.4 PR #166; 1.5 PR #168, all 2026-10-28.)
+**Progress: Step 1 of 4 done (1.0 to 1.7) · overall 8 of 27 (30%). Next: 2.0 backup and rollback tag (owner, AWS).** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
 
 Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 27 (p%)`, updated after every step; the end state is all 27 steps done. Machines: Cloud (a Claude or Cursor cloud agent), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
@@ -528,5 +528,17 @@ No requirement changed.
 | A30 | Accepted drift: "This and following" edit offers start time and duration only (matches the API); Skip replaces Decline for an active going/waitlisted member; the series chip is on the game view only | AD-8 |
 | A31 | Step 1.6 scope fixed: M3 (config and label seed), registration of the game and shuffle keys, the 47 series and the tournament label keys from the 1.4 and 1.5 reports, rewording of "frozen" label texts (OI-14), and the PWA version bump to 185 (A25) | §11 |
 | A32 | Step 1.5 recorded done, progress 6 of 27 | §11 |
+
+No requirement changed.
+
+**v1.7 (2026-10-28), architect amendment after the `er-config-labels` report (PR #170); step 1 closed.** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A33 | M3 is `c4e9a2d71f08` (down `b3d8f1c27a64`), single head. Migrations to run in order: M1 `a7c2e9d41b58`, M2 `b3d8f1c27a64`, M3 `c4e9a2d71f08` | §5.1 |
+| A34 | Game config keys are stored in `app_config` under the dotted names the merged reader uses (the `upcoming_window_days` pattern stores elsewhere and does not apply); the home-settings fields refuse out-of-range values with 422. Shuffle keys are validated in the settings editor only, never at runtime, so a malformed stored value cannot stop scoring | AD-9, D-7 |
+| A35 | PWA version 185 in all four constants; admin bundle rebuilt and committed with its source | A25 |
+| A36 | Known failures carried to the step 2 owner run: the four on main (`te_b4` head pin, `s_t2`, `s_t3`, settings-editor key-set pin) plus `test_user_menu_label_seed_migrations`, `test_version_policy`, `test_tr_web` | §11 |
+| A37 | Step 1.7 (architect review and merge of all PRs) recorded done; step 1 closed, 8 of 27 | §11 |
 
 No requirement changed.
