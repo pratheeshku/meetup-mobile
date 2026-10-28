@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
-**Version:** v1.10
+**Version:** v1.11
 **Status:** **APPROVED by the owner, 2026-10-27** (instruction in conversation: "prepare design & mark it approved. Push to gh repo", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in sections 3 and 5. Open items are in section 12.
 **v1.1 amendment (2026-10-27):** architect amendment after the `er-p1-verify` (step 1.0) report, PR #158. Each 1.0 finding is classified and resolved in the paragraphs marked **[v1.1]** (rulings B-1 to B-8). Issued under the owner's 2026-10-27 instruction "go ahead with step 1"; an objection before the 1.1 build starts reverses the affected ruling.
 **v1.2 amendment (2026-10-28):** architect amendment after the `er-bw-tournament` (step 1.1) report, PR #160, merged 2026-10-28. Accepted judgement calls are written back in the paragraphs marked **[v1.2]**; no requirement changed.
@@ -364,7 +364,7 @@ Negative API tests (P13, P15) are ER-T4, ER-T7, ER-T8 and ER-T13 plus one per se
 
 ### Steps and progress tracking (owner's four steps)
 
-**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.2 of 7 done (mobile PR #77) · overall 14 of 27 (52%). Next: 3.3 `er-m-shuffle`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
+**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.3 of 7 done (mobile PR #79) · overall 15 of 27 (56%). Next: 3.4 `er-m-series`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
 
 Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 27 (p%)`, updated after every step; the end state is all 27 steps done. Machines: Cloud (a Claude or Cursor cloud agent), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
@@ -575,5 +575,15 @@ No requirement changed.
 | A49 | Edit covers title, description, start, end, registration closes, hard block, venue and the withdrawal switch. Capacity, visibility and audience groups are immutable per the addendum; `venue_detail` is not in `TournamentUpdate`. Accepted | AD-3 |
 | A50 | The Participants tab committee note ("until the roster is frozen on {date}") is wrong under AD-5 and no replacement text is seeded. Accepted as a known gap for this release: OI-19 (backend seeds the replacement, mobile default follows) | OI-19 |
 | A51 | Step 3.2 recorded done, progress 14 of 27 | §11 |
+
+No requirement changed.
+
+**v1.11 (2026-10-28), architect amendment after the `er-m-shuffle` report (mobile PR #79).** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A52 | Mobile layout, which the addendum leaves open, is accepted as built: "Shuffle again" sits in the draft card of the committee Fixtures setup between the group list and the submit block, shown while the latest draft is open and (as on the web) while a publication request is pending; no confirmation dialog because the server keeps the old draft as a superseded version | AD-4 |
+| A53 | "Draw n of N" shows only when the response returns `shuffle {index, total}`; the button disables on an in-flight request and when a draft's own `shuffle_total` is 1 or less; `SHUFFLE_UNAVAILABLE`, 429 and `FIXTURE_FROZEN` have labelled messages | AD-4 |
+| A54 | Step 3.3 recorded done, progress 15 of 27 | §11 |
 
 No requirement changed.
