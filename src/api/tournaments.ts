@@ -62,7 +62,7 @@ import type {
   PointsAccepted,
   ResultsUploadSummary,
 } from '../types/tournamentTabs';
-import type { DraftDetail } from '../types/tournamentTabs';
+import type { DraftDetail, ShuffleResult } from '../types/tournamentTabs';
 import { normaliseDraft } from '../utils/fixturesSetup';
 import { normaliseApprovals, normaliseEntryResponse, normaliseMediaPage, normalisePreview } from '../utils/tournamentTabs';
 import type {
@@ -979,6 +979,22 @@ export async function generateFixtureDraft(
     correlationId: options?.correlationId,
   });
   return normaliseDraft(data);
+}
+
+/**
+ * `POST /tournaments/{id}/fixtures/shuffle` (AD-7, committee only, 10 per minute): NO body. The server picks the next balanced draw and answers the
+ * new draft plus `shuffle {index, total}`. 409 `SHUFFLE_UNAVAILABLE` (with a `reason`), 409 `FIXTURE_FROZEN`, 429 when over the limit.
+ */
+export async function shuffleFixtureDraft(id: string, options?: RequestOptions): Promise<ShuffleResult> {
+  const { data } = await apiClient.post<unknown>(`/tournaments/${id}/fixtures/shuffle`, undefined, {
+    correlationId: options?.correlationId,
+  });
+  const raw = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {};
+  const shuffle = typeof raw.shuffle === 'object' && raw.shuffle !== null ? (raw.shuffle as Record<string, unknown>) : null;
+  return {
+    draft: normaliseDraft(data),
+    shuffle: shuffle && Number.isInteger(shuffle.index) && Number.isInteger(shuffle.total) ? { index: shuffle.index as number, total: shuffle.total as number } : null,
+  };
 }
 
 /** `GET /tournaments/{id}/drafts/{draft_id}`: registration ids only (no names). */

@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { withCorrelationId } from '../../../../api/correlationId';
+import { shuffleFixtureDraft } from '../../../../api/tournaments';
 import {
   generateFixtureDraft,
   getCommitteeActions,
@@ -34,6 +35,7 @@ import {
   publicationPending,
   readUploadRefusal,
 } from '../../../../utils/fixturesSetup';
+import { refusalText } from '../../../../utils/refusal';
 import { formatDayShort, formatClock } from '../../../../utils/tournamentExperience';
 import Button from '../../../Button';
 import { CheckIcon } from '../../../icons/ActionIcons';
@@ -118,7 +120,8 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
   const [pick, setPick] = useState<{ groupCount: number | null; advance: number | null }>({ groupCount: null, advance: null });
   const [generateNote, setGenerateNote] = useState<Note>(null);
   const [submitNote, setSubmitNote] = useState<Note>(null);
-  const [busy, setBusy] = useState<'generate' | 'submit' | null>(null);
+  const [busy, setBusy] = useState<'generate' | 'submit' | 'shuffle' | null>(null);
+  const [shuffleNote, setShuffleNote] = useState<Note>(null);
   const [draft, setDraft] = useState<DraftDetail | null>(null);
   const [pending, setPending] = useState<{ pending: boolean; createdAt: string | null }>({ pending: false, createdAt: null });
 
@@ -227,6 +230,41 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
       { text: t('mob.scoring.draw.submit'), onPress: runSubmit },
     ]);
   };
+
+  // Shuffle again (AD-7, A38): the committee asks the server for the next balanced draw. No body, no client draw logic: the answer is the new
+  // draft (its groups replace the list below) and, only when the server sends `shuffle {index, total}`, "Draw n of N". The server decides
+  // availability: `SHUFFLE_UNAVAILABLE`, `FIXTURE_FROZEN` and the rate limit (429) show their labels, never the server text.
+  const shuffle = async (): Promise<void> => {
+    if (busy !== null) {
+      return;
+    }
+    setBusy('shuffle');
+    setShuffleNote(null);
+    setSubmitNote(null);
+    try {
+      const result = await withCorrelationId(correlationId => shuffleFixtureDraft(tournamentId, { correlationId }));
+      if (result.draft) {
+        setDraft(result.draft);
+      }
+      setShuffleNote({
+        ok: true,
+        text: result.shuffle
+          ? t('web.console.shuffle.done', { n: result.shuffle.index + 1, total: result.shuffle.total })
+          : t('mob.scoring.draw.generated_ok'),
+      });
+      props.onChanged();
+    } catch (e) {
+      const code = (e as { response?: { data?: { code?: unknown } } } | null)?.response?.data?.code;
+      setShuffleNote({
+        ok: false,
+        text: code === 'FIXTURE_FROZEN' ? t(errLabelKey('FIXTURE_FROZEN')) : refusalText(e, t, 'mob.scoring.error.generic'),
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+  // The draft says itself when it has a single balanced draw (`shuffle_total`); a fresh draft carries none, so the server answers then (A40).
+  const singleDraw = draft?.shuffleTotal !== null && draft?.shuffleTotal !== undefined && draft.shuffleTotal <= 1;
 
   const unknownEntry = t('mob.scoring.unknown_entry');
 
@@ -345,6 +383,22 @@ export default function FixturesSetup(props: FixturesSetupProps): React.JSX.Elem
               ))}
             </View>
           ) : null}
+          {openDraft && draft ? (
+            <View style={styles.shuffleBox} testID="setup-shuffle">
+              <Text style={styles.body}>{t('web.console.shuffle.hint')}</Text>
+              <Button
+                label={t('web.console.shuffle.button')}
+                variant="secondary"
+                onPress={shuffle}
+                loading={busy === 'shuffle'}
+                disabled={busy !== null || singleDraw}
+                style={styles.button}
+                testID="setup-shuffle-button"
+              />
+              {singleDraw ? <Text style={styles.body}>{t('web.console.shuffle.single')}</Text> : null}
+              {noteView(shuffleNote)}
+            </View>
+          ) : null}
           {pending.pending ? (
             <View style={styles.waiting} testID="setup-waiting">
               <Text style={styles.waitingTitle}>{t('mob.scoring.draw.blocked.pending')}</Text>
@@ -384,6 +438,7 @@ const styles = StyleSheet.create({
   group: { borderWidth: borderWidth.thin, borderColor: dash.cardBorder, borderRadius: radius.md, marginTop: spacing.sm, overflow: 'hidden' },
   groupTitle: { ...typography.bodyBold, color: dash.text, backgroundColor: dash.page, padding: spacing.sm },
   member: { ...typography.body, color: dash.text, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs + 2, borderTopWidth: borderWidth.thin, borderTopColor: dash.cardBorder },
+  shuffleBox: { marginTop: spacing.sm },
   waiting: { backgroundColor: colors.warningLight, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
   waitingTitle: { ...typography.bodyBold, color: colors.warningDark },
 });

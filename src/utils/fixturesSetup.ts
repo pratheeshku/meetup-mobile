@@ -197,6 +197,8 @@ export function normaliseDraft(raw: unknown): DraftDetail | null {
     knockoutMatches: matches.filter(m => m.knockout).length,
     matches,
     excludedUnpaid: typeof raw.excluded_unpaid === 'number' ? raw.excluded_unpaid : null,
+    shuffleIndex: Number.isInteger(payload.shuffle_index) ? (payload.shuffle_index as number) : null,
+    shuffleTotal: Number.isInteger(payload.shuffle_total) ? (payload.shuffle_total as number) : null,
   };
 }
 

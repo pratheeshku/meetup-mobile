@@ -184,4 +184,16 @@ export interface DraftDetail {
   matches: DraftMatch[];
   /** The generate answer only (teams-payments AD-10): the unpaid entrants left out as actually applied at generation; null on a read of a draft. */
   excludedUnpaid: number | null;
+  /**
+   * Payload keys of a shuffled draft (`shuffle_index`, `shuffle_total`): present only on a draft a shuffle made, never on a fresh one (A40). The
+   * app shows them only as the server sent them and computes no draw counts.
+   */
+  shuffleIndex: number | null;
+  shuffleTotal: number | null;
+}
+
+/** The answer of `POST /tournaments/{id}/fixtures/shuffle`: the new draft and, when the server sends it, `shuffle {index, total}` (0-based index). */
+export interface ShuffleResult {
+  draft: DraftDetail | null;
+  shuffle: { index: number; total: number } | null;
 }
