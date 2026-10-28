@@ -1321,6 +1321,9 @@ export const DEFAULT_LABELS = {
   'mob.tournament.v2.format_max': 'Max {max}',
   'mob.tournament.v2.kd_title': 'Key dates',
   'mob.tournament.v2.kd_soft': 'Soft block',
+  'web.tournament.v2.kd_registration_closes': 'Registration closes',
+  'web.tournament.registered_count': '{count} registered',
+  'web.tournament.full_chip': 'Full',
   'mob.tournament.v2.kd_soft_sub': '{date} · self-registration ends',
   'mob.tournament.v2.kd_fixtures': 'Fixtures published',
   'mob.tournament.v2.kd_fixtures_pending': 'Being prepared by the committee',
@@ -1782,6 +1785,7 @@ export const DEFAULT_LABELS = {
   'mob.reg.err.withdrawal_after_close': "Registration has closed, so you can no longer withdraw.",
   'mob.reg.err.withdrawal_after_schedule': "The schedule is already generated. The organizer enters a walkover instead.",
   'mob.reg.err.withdrawal_closed': "Registration is frozen, so entries can no longer be removed. Use a walkover or a disqualification.",
+  'mob.reg.err.withdrawal_locked': "The organizer has switched off withdrawals for this tournament.",
   'mob.notif_pref.type_team_join_request': "Requests to join your tournament team",
   'mob.notif_pref.type_tournament_registration_removed': "Removed from a tournament",
 
