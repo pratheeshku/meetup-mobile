@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
-**Version:** v1.12
+**Version:** v1.13
 **Status:** **APPROVED by the owner, 2026-10-27** (instruction in conversation: "prepare design & mark it approved. Push to gh repo", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in sections 3 and 5. Open items are in section 12.
 **v1.1 amendment (2026-10-27):** architect amendment after the `er-p1-verify` (step 1.0) report, PR #158. Each 1.0 finding is classified and resolved in the paragraphs marked **[v1.1]** (rulings B-1 to B-8). Issued under the owner's 2026-10-27 instruction "go ahead with step 1"; an objection before the 1.1 build starts reverses the affected ruling.
 **v1.2 amendment (2026-10-28):** architect amendment after the `er-bw-tournament` (step 1.1) report, PR #160, merged 2026-10-28. Accepted judgement calls are written back in the paragraphs marked **[v1.2]**; no requirement changed.
@@ -364,7 +364,7 @@ Negative API tests (P13, P15) are ER-T4, ER-T7, ER-T8 and ER-T13 plus one per se
 
 ### Steps and progress tracking (owner's four steps)
 
-**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.4 of 7 done (mobile PR #81) · overall 16 of 27 (59%). Next: 3.5 `er-m-labels-report`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
+**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3 of 4 done (3.0 to 3.6; mobile PRs #73, #75, #77, #79, #81, #83) · overall 21 of 27 (78%). Open: 2.6 browser verification (owner). Next: 4.0 Mac git pull (owner).** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
 
 Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 27 (p%)`, updated after every step; the end state is all 27 steps done. Machines: Cloud (a Claude or Cursor cloud agent), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
@@ -596,5 +596,16 @@ No requirement changed.
 | A56 | Two existing suites (`CreateGameScreen.test.tsx`, `EventDetailScreen.test.tsx`, 71 tests) fail identically on main, so the screens this step changed have no working screen-level test coverage. Step 3.5 compares the failing test names with main and records the result; the device test (4.3) covers these screens by hand | §11 |
 | A57 | `tournament_updated` and `tournament_registration_added` route to the tournament, with preference rows and icons; series actions keep `event_changed` and `event_cancelled` | AD-9 |
 | A58 | Step 3.4 recorded done, progress 16 of 27 | §11 |
+
+No requirement changed.
+
+**v1.13 (2026-10-28), architect review of the consolidated mobile report `er-m-labels-report` (mobile PR #83); step 3 closed.** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A59 | Report accepted. Label audit clean (79 keys, none mismatched or unseeded). The two reads on the Edit screen without a correlation ID (config, sports) are screen-open reads, not user actions, and are accepted. Drift items 5, 6, 11, 12, 14, 22, 23, 24 and 27 of its table are accepted as built; the two unused labels (`mob.tournament.registered_line`, `register_spots_left`) stay until a label clean-up | §11 |
+| A60 | OI-20: pre-existing mobile debt, not caused by this feature and not fixed in this release: lint 34 errors, 71 failing tests in `CreateGameScreen.test.tsx` and `EventDetailScreen.test.tsx`, two failing Media tests in `TournamentTabBodies.test.tsx`. A separate clean-up task, at the owner's call | OI-20 |
+| A61 | Progress counter corrected. From the 2.5 report to v1.12 the tracked count was 3 too low (it showed 11 at 2.5 and 16 at 3.4). Correct count: step 1 = 8, steps 2.0 to 2.5 = 6, steps 3.0 to 3.6 = 7, so 21 of 27 (78%); remaining are 2.6 (owner) and step 4 (5 steps) | §11 |
+| A62 | Steps 3.5 and 3.6 recorded done; step 3 closed | §11 |
 
 No requirement changed.
