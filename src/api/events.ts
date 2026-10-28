@@ -26,6 +26,7 @@ import type {
   EventClosurePut,
   EventInvitation,
   EventMyParticipation,
+  EventSeries,
   EventsListResponse,
   EventSkillLevel,
   EventVisibility,
@@ -96,6 +97,8 @@ export interface EventApiItem {
   estimated_cost_currency?: string | null;
   allow_waitlist?: boolean;
   recurrence_rule_id: string | null;
+  /** AD-8: set by the server for a series game; null or absent otherwise. */
+  series?: Partial<EventSeries> | null;
   status: string;
   display_status?: string | null;
   lifecycle_status?: string | null;
@@ -191,6 +194,23 @@ function resolveLifecycleStatus(raw: EventApiItem): LifecycleStatus {
   return 'active';
 }
 
+/** `series` as sent: null without a rule id; a missing number stays null (never counted or defaulted). */
+function normaliseSeries(raw: Partial<EventSeries> | null | undefined): EventSeries | null {
+  if (!raw || typeof raw.rule_id !== 'string' || !raw.rule_id) {
+    return null;
+  }
+  const num = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+  return {
+    rule_id: raw.rule_id,
+    interval: num(raw.interval) ?? 1,
+    ends_on: typeof raw.ends_on === 'string' && raw.ends_on ? raw.ends_on : null,
+    occurrence_limit: num(raw.occurrence_limit),
+    index: num(raw.index),
+    total: num(raw.total),
+    my_membership: raw.my_membership === 'active' || raw.my_membership === 'left' ? raw.my_membership : 'none',
+  };
+}
+
 export function mapEventApiItem(raw: EventApiItem): Event {
   return {
     id: raw.id,
@@ -211,6 +231,7 @@ export function mapEventApiItem(raw: EventApiItem): Event {
     organiser_id: raw.organizer_id,
     organiser_nickname: raw.organizer_nickname ?? raw.organizer_display_name ?? '',
     is_recurring: raw.recurrence_rule_id !== null,
+    series: normaliseSeries(raw.series),
     cost: raw.estimated_cost_cents,
     current_user_rsvp_status: (raw.user_rsvp_status as RsvpStatus | null) ?? 'none',
     is_organiser: false,
@@ -591,3 +612,28 @@ export async function getEventResponses(
   return data;
 }
 
+
+/** `POST /events/{id}/series/leave` (AD-8): the member is withdrawn from every future game. The organizer is refused (409 `SERIES_ORGANIZER_CANNOT_LEAVE`). */
+export async function leaveEventSeries(id: string, options?: RequestOptions): Promise<{ gamesLeft: number | null }> {
+  const { data } = await apiClient.post<{ left?: boolean; games_left?: number } | undefined>(`/events/${id}/series/leave`, undefined, {
+    correlationId: options?.correlationId,
+  });
+  return { gamesLeft: typeof data?.games_left === 'number' ? data.games_left : null };
+}
+
+/**
+ * `PATCH /events/{id}/series` (AD-8, A21): "this and the following". The body is only `start_time` (a local `HH:MM`; each game keeps its date)
+ * and `duration_minutes`. Organizer only; 409 `SERIES_HAS_PARTICIPANTS`, 422 `SERIES_*`.
+ */
+export async function updateEventSeries(
+  id: string,
+  body: { start_time?: string; duration_minutes?: number },
+  options?: RequestOptions,
+): Promise<void> {
+  await apiClient.patch(`/events/${id}/series`, body, { correlationId: options?.correlationId });
+}
+
+/** `POST /events/{id}/series/cancel` (AD-8): cancels this and the following games; the rule goes inactive. Same `{ reason }` body as the game cancel. */
+export async function cancelEventSeries(id: string, reason: string, options?: RequestOptions): Promise<void> {
+  await apiClient.post(`/events/${id}/series/cancel`, { reason }, { correlationId: options?.correlationId });
+}

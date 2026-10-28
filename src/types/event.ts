@@ -44,6 +44,21 @@ export type LifecycleStatus = 'active' | 'cancelled' | 'past' | 'closed';
  */
 export type EventSkillLevel = 'all_levels' | 'beginner' | 'intermediate' | 'expert';
 
+/**
+ * `EventResponse.series` (tournament-edit-recurring AD-8): set only for a game that belongs to a weekly series; every number and date is the server's
+ * (the app never counts occurrences or computes dates). `index` and `total` are null for a legacy rolling series' total or when not set;
+ * `ends_on` is a calendar date; `my_membership` is `active`, `left` or `none`.
+ */
+export interface EventSeries {
+  rule_id: string;
+  interval: number;
+  ends_on: string | null;
+  occurrence_limit: number | null;
+  index: number | null;
+  total: number | null;
+  my_membership: 'active' | 'left' | 'none';
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -65,6 +80,8 @@ export interface Event {
   organiser_id: string;
   organiser_nickname: string;
   is_recurring: boolean;
+  /** AD-8: the series of this game; null or absent when it is not part of one. */
+  series?: EventSeries | null;
   /**
    * Proposed Assumption: nullable rather than always-present, since §4
    * of the task brief describes display as conditional ("Cost display
@@ -245,6 +262,15 @@ export interface CreateEventInput {
   /** teams-payments AD-8, AD-7: optional game fee in whole cents (a fee above 0 needs `payment_contact_number`, E.164). Sent only while the game fee switch is on. */
   registration_fee_cents?: number | null;
   payment_contact_number?: string | null;
+  /**
+   * AD-8 Repeat weekly: `recurrence_frequency` is `'weekly'`; the screen sends exactly one of `recurrence_ends_on` (YYYY-MM-DD) or
+   * `recurrence_occurrence_limit` (the number of games, the first included). The weekday is not sent (the server uses the start date's).
+   * The server refuses a bad end rule (`SERIES_END_INVALID`) or one over its limits (`SERIES_LIMIT_EXCEEDED`); no bound is kept on the device.
+   */
+  recurrence_frequency?: 'weekly';
+  recurrence_interval?: number;
+  recurrence_ends_on?: string;
+  recurrence_occurrence_limit?: number;
 }
 
 export interface ClosurePerson {
