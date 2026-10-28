@@ -67,6 +67,9 @@ import NumberField from '../components/NumberField';
 import SelectableCard from '../components/SelectableCard';
 import WizardFooter from '../components/WizardFooter';
 import WizardHeader from '../components/WizardHeader';
+import RepeatWeeklyControl from '../components/RepeatWeeklyControl';
+import { INITIAL_REPEAT, repeatFields, repeatProblem, type RepeatState } from '../utils/repeatWeekly';
+import { formatSeriesDate } from '../utils/seriesDisplay';
 import { useT } from '../labels/LabelsContext';
 import { getAvatarTint } from '../utils/avatarTint';
 import { maxGroupsFor, sortByLastActivity } from '../utils/gameGroups';
@@ -155,6 +158,9 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
     return d;
   });
   const [durationHours, setDurationHours] = useState<number>(DEFAULT_GAME_DURATION_HOURS);
+  // Repeat weekly (AD-8): new games only; the screen needs exactly one end rule, the server enforces the limits.
+  const [repeat, setRepeat] = useState<RepeatState>(INITIAL_REPEAT);
+  const [repeatError, setRepeatError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [venueQuery, setVenueQuery] = useState('Community Hall');
@@ -426,6 +432,11 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         setError(t('mob.create_game.venue_label'));
         return;
       }
+      const repeatProblemKey = mode === 'game' ? repeatProblem(repeat) : null;
+      if (repeatProblemKey) {
+        setRepeatError(t(repeatProblemKey));
+        return;
+      }
       setStep(4);
       return;
     }
@@ -523,6 +534,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             : {}),
           skill_level_requirement: skillLevel,
           ...gameFeeFields(),
+          ...repeatFields(repeat),
           capacity: capacity,
           starts_at: startsAtIso,
           ends_at: endsAtIso,
@@ -633,6 +645,11 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
       const detail = (e as any)?.response?.data?.detail;
       if (code === 'start_in_past' || detail === "Start time can't be in the past") {
         setError(t('mob.closure.start_in_past'));
+      } else if (typeof code === 'string' && code.startsWith('SERIES_')) {
+        // AD-8: SERIES_END_INVALID and SERIES_LIMIT_EXCEEDED show their own label (never the server text); the control is on step 3.
+        setError(null);
+        setRepeatError(refusalText(e, t, 'mob.create_game.err_game_create'));
+        setStep(3);
       } else if (typeof code === 'string' && (code.startsWith('PAYMENT_') || code === 'FEE_INVALID')) {
         // The game fee and its number: a coded refusal shows its own label (teams-payments AD-1), never the server text.
         setError(refusalText(e, t, 'mob.create_game.err_game_create'));
@@ -908,6 +925,19 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               onChange={handleTimeChange}
             />
           )}
+
+          {mode === 'game' ? (
+            <RepeatWeeklyControl
+              state={repeat}
+              onChange={next => {
+                setRepeatError(null);
+                setRepeat(next);
+              }}
+              weekday={dateValue.toLocaleDateString('en-US', { weekday: 'long' })}
+              error={repeatError}
+              disabled={isSubmitting}
+            />
+          ) : null}
 
           {venueCatalogueEnabled ? (
             <VenuePicker
@@ -1286,6 +1316,18 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
                 : `${formattedDate}, ${formattedTime}`}
             </Text>
           </View>
+
+          {mode === 'game' && repeat.on && repeatProblem(repeat) === null ? (
+            <Text style={styles.reviewSeriesLine} testID="review-repeat">
+              {t('web.series.review_line', {
+                every: Number(repeat.every) === 1 ? t('web.series.every_one') : t('web.series.every_many', { n: Number(repeat.every) }),
+                end:
+                  repeat.end === 'count'
+                    ? t('web.series.end_after', { total: Number(repeat.count) })
+                    : t('web.series.end_on', { date: formatSeriesDate(repeat.endDate) }),
+              })}
+            </Text>
+          ) : null}
 
           <View style={styles.reviewDetailRow}>
             <View style={[styles.reviewIconCircle, { backgroundColor: colors.accent }]}>
@@ -1702,6 +1744,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  reviewSeriesLine: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
   reviewDetailText: {
     ...typography.caption,
     fontWeight: '600',

@@ -67,6 +67,8 @@ const NOTIFICATION_TYPE_LABEL_KEYS: Record<NotificationType, LabelKey> = {
   team_invite: 'mob.notif_pref.type_team_invite',
   team_join_request: 'mob.notif_pref.type_team_join_request',
   tournament_registration_removed: 'mob.notif_pref.type_tournament_registration_removed',
+  tournament_updated: 'mob.notif_pref.type_tournament_updated',
+  tournament_registration_added: 'mob.notif_pref.type_tournament_registration_added',
   group_deleted: 'mob.notif_pref.type_group_deleted',
   group_ownership_transferred: 'mob.notif_pref.type_group_ownership_transferred',
 };

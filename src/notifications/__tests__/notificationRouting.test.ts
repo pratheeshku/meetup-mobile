@@ -28,13 +28,15 @@ const ADDED_TYPES = [
   'tournament_result_corrected',
   'team_join_request',
   'tournament_registration_removed',
+  'tournament_updated',
+  'tournament_registration_added',
 ] as const;
 
 describe('type list', () => {
-  it('contains the added types alongside the original 12 (23 total, no duplicates)', () => {
+  it('contains the added types alongside the original 12 (25 total, no duplicates)', () => {
     expect(NOTIFICATION_TYPES).toEqual(expect.arrayContaining([...ADDED_TYPES]));
-    expect(NOTIFICATION_TYPES).toHaveLength(23);
-    expect(new Set(NOTIFICATION_TYPES).size).toBe(23);
+    expect(NOTIFICATION_TYPES).toHaveLength(25);
+    expect(new Set(NOTIFICATION_TYPES).size).toBe(25);
   });
 
   it('resolves every listed type without throwing (list and switch cannot drift)', () => {
@@ -192,5 +194,24 @@ describe('teams-payments AD-15 routing', () => {
     navigateToNotificationTarget(resolveNotificationTarget('team_invite', 'team-9'));
     expect(navigate).toHaveBeenCalledWith('Groups', { screen: 'GroupsList', params: { section: 'teams' } });
     jest.restoreAllMocks();
+  });
+});
+
+describe('tournament_updated and tournament_registration_added (er-m-series, AD-9, A41)', () => {
+  it.each(['tournament_updated', 'tournament_registration_added'] as const)('%s opens the tournament for the entity id', type => {
+    expect(resolveNotificationTarget(type, 't-9')).toEqual({
+      tab: 'Tournaments',
+      screen: 'TournamentDetail',
+      params: { tournamentId: 't-9' },
+    });
+  });
+
+  it('routes exactly like tournament_registration_removed', () => {
+    expect(resolveNotificationTarget('tournament_updated', 't-9')).toEqual(resolveNotificationTarget('tournament_registration_removed', 't-9'));
+  });
+
+  it('series actions keep reusing event_changed and event_cancelled, which open the game', () => {
+    expect(resolveNotificationTarget('event_changed', 'evt-1')).toEqual({ tab: 'Home', screen: 'EventDetail', params: { eventId: 'evt-1' } });
+    expect(resolveNotificationTarget('event_cancelled', 'evt-1')).toEqual({ tab: 'Home', screen: 'EventDetail', params: { eventId: 'evt-1' } });
   });
 });

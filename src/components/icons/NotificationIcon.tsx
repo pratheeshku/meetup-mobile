@@ -32,6 +32,8 @@ export const NOTIFICATION_TYPE_MAP: Record<string, RegistryIconName> = {
   group_ownership_transferred: 'owner',
   group_deleted: 'delete',
   tournament_registration_removed: 'player-removed',
+  tournament_updated: 'edit',
+  tournament_registration_added: 'players',
   team_join_request: 'players',
 };
 
