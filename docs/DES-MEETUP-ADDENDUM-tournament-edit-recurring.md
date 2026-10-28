@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
-**Version:** v1.9
+**Version:** v1.10
 **Status:** **APPROVED by the owner, 2026-10-27** (instruction in conversation: "prepare design & mark it approved. Push to gh repo", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in sections 3 and 5. Open items are in section 12.
 **v1.1 amendment (2026-10-27):** architect amendment after the `er-p1-verify` (step 1.0) report, PR #158. Each 1.0 finding is classified and resolved in the paragraphs marked **[v1.1]** (rulings B-1 to B-8). Issued under the owner's 2026-10-27 instruction "go ahead with step 1"; an objection before the 1.1 build starts reverses the affected ruling.
 **v1.2 amendment (2026-10-28):** architect amendment after the `er-bw-tournament` (step 1.1) report, PR #160, merged 2026-10-28. Accepted judgement calls are written back in the paragraphs marked **[v1.2]**; no requirement changed.
@@ -364,7 +364,7 @@ Negative API tests (P13, P15) are ER-T4, ER-T7, ER-T8 and ER-T13 plus one per se
 
 ### Steps and progress tracking (owner's four steps)
 
-**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.1 of 7 done (mobile PR #75) · overall 13 of 27 (48%). Next: 3.2 `er-m-committee`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
+**Progress: Step 2.0 to 2.5 done (migrations M1 to M3 run, api and worker on PWA 185, 2026-10-28); 2.6 browser verification pending (owner) · Step 3.2 of 7 done (mobile PR #77) · overall 14 of 27 (52%). Next: 3.3 `er-m-shuffle`.** (1.0 PR #158; 1.1 #160; 1.2 #162; 1.3 #164; 1.4 #166; 1.5 #168; 1.6 #170, all 2026-10-28.)
 
 Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 27 (p%)`, updated after every step; the end state is all 27 steps done. Machines: Cloud (a Claude or Cursor cloud agent), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
@@ -563,5 +563,17 @@ No requirement changed.
 | A44 | Accepted calls beyond the step list: the cap is hidden from participants in the Format card (AD-1); Register is hidden while `is_full` (the server still refuses with `TOURNAMENT_FULL`); a missing `registered_count` hides the count line, never shows 0; a missing `registration_open` falls back to the closing-date derivation | AD-1 |
 | A45 | Screenshots could not be taken in the cloud session (no emulator). They are taken on the Mac at the 4.3 device test and attached to the 3.6 review; the code is accepted without them | §11 |
 | A46 | Step 3.1 recorded done, progress 13 of 27 | §11 |
+
+No requirement changed.
+
+**v1.10 (2026-10-28), architect amendment after the `er-m-committee` report (mobile PR #77).** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A47 | The 3.2 brief wrongly said "organizer and active committee" may edit a tournament; AD-3, OI-5 and ER-T4 say organizer only. The agent followed the addendum and the Edit row shows for the organizer only. The brief was wrong, the design stands; committee members still add and remove | AD-3 |
+| A48 | Glossary conflict: the seeded texts "Add team", "Add a team" and "Search teams" trip the glossary's banned bare "team". Ruling: the seeded text stays (it is live on the web); the three allowlist entries in `scripts/check-labels.allowlist.json`, each with its reason, are accepted for this release. OI-18: the owner decides later whether the glossary or the seed changes | OI-18 |
+| A49 | Edit covers title, description, start, end, registration closes, hard block, venue and the withdrawal switch. Capacity, visibility and audience groups are immutable per the addendum; `venue_detail` is not in `TournamentUpdate`. Accepted | AD-3 |
+| A50 | The Participants tab committee note ("until the roster is frozen on {date}") is wrong under AD-5 and no replacement text is seeded. Accepted as a known gap for this release: OI-19 (backend seeds the replacement, mobile default follows) | OI-19 |
+| A51 | Step 3.2 recorded done, progress 14 of 27 | §11 |
 
 No requirement changed.
