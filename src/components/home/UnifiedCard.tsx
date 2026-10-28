@@ -544,10 +544,10 @@ export function UnifiedTournamentCard({
 }
 
 /**
- * Tournament team card (teams-payments AD-4): the tournament-list card layout, read-only. It has no `onPress` and no action button because the
- * team detail screen does not exist yet (task tp-mobile-teams). Every number and the role come from `GET /teams/mine`; null hides the line.
+ * Tournament team card (teams-payments AD-4): the tournament-list card layout. A tap opens the team detail (team-screens-remarks AD-1, TS-01)
+ * when `onPress` is given. Every number and the role come from `GET /teams/mine`; null hides the line (the Discover list carries neither).
  */
-export function UnifiedTeamCard({ team }: { team: Team }): React.JSX.Element {
+export function UnifiedTeamCard({ team, onPress }: { team: Team; onPress?: () => void }): React.JSX.Element {
   const t = useT();
   const sportLabel = useSportDisplayName(team.sport);
   const roleLabel = team.my_role ? t(team.my_role === 'captain' ? 'mob.teams.role_captain' : 'mob.teams.role_player') : null;
@@ -587,7 +587,8 @@ export function UnifiedTeamCard({ team }: { team: Team }): React.JSX.Element {
       avatars={[]}
       moreCount={0}
       countLabel={countLabel}
-      actionButtonLabel=""
+      actionButtonLabel={t('mob.common.view_arrow')}
+      onPress={onPress}
       accessibilityLabel={[team.name, sportLabel, roleLabel, visibilityLabel, countLabel].filter(Boolean).join(', ')}
     />
   );

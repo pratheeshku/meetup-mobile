@@ -247,6 +247,7 @@ export default function GroupsScreen(props: Props): React.JSX.Element {
   }, [requested, route.params, section, changeSection, navigation]);
 
   const openCreateTeam = useCallback(() => navigation.navigate('CreateGroup', { kind: 'team' }), [navigation]);
+  const openTeam = useCallback((teamId: string) => navigation.navigate('TeamDetail', { teamId }), [navigation]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -274,7 +275,7 @@ export default function GroupsScreen(props: Props): React.JSX.Element {
       </View>
       {teamsVisited ? (
         <View style={[styles.flex, section === 'teams' ? null : styles.hidden]}>
-          <TeamsListContent onCreateTeam={openCreateTeam} reloadKey={teamsReload} />
+          <TeamsListContent onCreateTeam={openCreateTeam} onOpenTeam={openTeam} reloadKey={teamsReload} />
         </View>
       ) : null}
     </View>

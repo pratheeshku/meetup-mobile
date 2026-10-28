@@ -175,9 +175,13 @@ describe('tournament_invited', () => {
   });
 });
 
-describe('teams-payments AD-15 routing', () => {
-  it.each(['team_invite', 'team_join_request'] as const)('%s opens Groups with Tournament teams selected, never a group detail', type => {
-    expect(resolveNotificationTarget(type, 'team-9')).toEqual({ tab: 'Groups', screen: 'GroupsList', params: { section: 'teams' } });
+describe('team-screens-remarks AD-5 routing (final routing of teams-payments AD-15), TS-T12', () => {
+  it.each(['team_invite', 'team_join_request'] as const)('%s opens the team detail with the entity id as the team id, never a group detail', type => {
+    expect(resolveNotificationTarget(type, 'team-9')).toEqual({ tab: 'Groups', screen: 'TeamDetail', params: { teamId: 'team-9' } });
+  });
+
+  it.each(['team_invite', 'team_join_request'] as const)('%s with a blank entity id falls back to the Tournament teams list', type => {
+    expect(resolveNotificationTarget(type, '  ')).toEqual({ tab: 'Groups', screen: 'GroupsList', params: { section: 'teams' } });
   });
 
   it('tournament_registration_removed opens the tournament', () => {
@@ -188,11 +192,11 @@ describe('teams-payments AD-15 routing', () => {
     });
   });
 
-  it('navigates to Groups with the teams section param', () => {
+  it('navigates to the Groups stack TeamDetail screen with the team id', () => {
     jest.spyOn(navigationRef, 'isReady').mockReturnValue(true);
     const navigate = jest.spyOn(navigationRef, 'navigate').mockImplementation(() => {});
     navigateToNotificationTarget(resolveNotificationTarget('team_invite', 'team-9'));
-    expect(navigate).toHaveBeenCalledWith('Groups', { screen: 'GroupsList', params: { section: 'teams' } });
+    expect(navigate).toHaveBeenCalledWith('Groups', { screen: 'TeamDetail', params: { teamId: 'team-9' } });
     jest.restoreAllMocks();
   });
 });

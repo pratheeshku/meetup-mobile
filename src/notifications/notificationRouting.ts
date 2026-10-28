@@ -10,8 +10,8 @@
  * duplicated (and never silently drifts) between the two call sites, per
  * the task brief's "no unhandled types" rule.
  *
- * `team_invite` and `team_join_request` (teams-payments AD-15) open Groups with the Tournament teams list selected, because the team detail
- * screen does not exist yet (task tp-mobile-teams). They used to open `GroupDetailScreen` with a team id, which could never load.
+ * `team_invite` and `team_join_request` (team-screens-remarks AD-5, the final routing of teams-payments AD-15) open the team detail with the
+ * notification's `entity_id` as the team id. They once opened `GroupDetailScreen` with a team id, which could never load.
  */
 import { createNavigationContainerRef } from '@react-navigation/native';
 
@@ -29,6 +29,7 @@ export type NotificationTarget =
   | { tab: 'Home'; screen: 'EventDetail'; params: { eventId: string } }
   | { tab: 'Groups'; screen: 'GroupsList'; params?: { section: 'teams' } }
   | { tab: 'Groups'; screen: 'GroupDetail'; params: { groupId: string } }
+  | { tab: 'Groups'; screen: 'TeamDetail'; params: { teamId: string } }
   | {
       tab: 'Tournaments';
       screen: 'TournamentDetail';
@@ -120,14 +121,17 @@ export function resolveNotificationTarget(
         params: { tournamentId: entityId },
       };
 
-    // teams-payments AD-15: there is no team detail screen yet (task tp-mobile-teams), so a team invitation and a join request open Groups with
-    // the Tournament teams list selected. `entity_id` (a team id) is not used: it is never read as a group id.
+    // team-screens-remarks AD-5: a team invitation and a join request open the team detail; `entity_id` is the team id. A blank id (never sent
+    // by the server) falls back to the Tournament teams list rather than opening the detail with an empty id.
     case 'team_invite':
     case 'team_join_request':
+      if (entityId.trim() === '') {
+        return { tab: 'Groups', screen: 'GroupsList', params: { section: 'teams' } };
+      }
       return {
         tab: 'Groups',
-        screen: 'GroupsList',
-        params: { section: 'teams' },
+        screen: 'TeamDetail',
+        params: { teamId: entityId },
       };
 
     // teams-payments AD-12: the removed entrant is told; the push opens the tournament (entity_id = the tournament id).
@@ -214,6 +218,11 @@ export function navigateToNotificationTarget(target: NotificationTarget): void {
   } else if (target.tab === 'Groups' && target.screen === 'GroupDetail') {
     navigationRef.navigate('Groups', {
       screen: 'GroupDetail',
+      params: target.params,
+    });
+  } else if (target.tab === 'Groups' && target.screen === 'TeamDetail') {
+    navigationRef.navigate('Groups', {
+      screen: 'TeamDetail',
       params: target.params,
     });
   } else if (target.tab === 'Tournaments') {
