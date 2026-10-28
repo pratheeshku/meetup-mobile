@@ -8,7 +8,7 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - closure-report v1.0 AD-4: decline is a locked game write, responses stay readable. dashboard v1.9 AD-20/21: declined items leave the default Games list and Public scope. invitation-response v1.0 AD-8 (new): decline is also recorded. Wording only on the approved versions; versions not bumped.
 
 ## DES-MEETUP-ADDENDUM-team-screens-remarks.md
-- v1.0 (2026-10-28): DRAFT written by the architect after the owner's requests of 2026-10-28 (tournament team screens on mobile, optional Remarks on game and tournament creation, venue row). Awaiting owner approval. 19 tracked steps.
+- v1.0 (2026-10-28): written by the architect after the owner's requests of 2026-10-28 (tournament team screens on mobile, optional Remarks on game and tournament creation, venue row); APPROVED by the owner the same day. Steps set to 14 (one task per repo) at approval.
 
 ## DES-MEETUP-ADDENDUM-tournament-edit-recurring.md
 - v1.4 (2026-10-28): series contract live in the backend (meetup PR #164): EventResponse.series, POST /events/{id}/series/leave (returns {left, games_left}), PATCH /events/{id}/series (start_time HH:MM, duration_minutes), POST /events/{id}/series/cancel, codes SERIES_END_INVALID, SERIES_LIMIT_EXCEEDED, SERIES_HAS_PARTICIPANTS, SERIES_ORGANIZER_CANNOT_LEAVE. Full text in this copy.
