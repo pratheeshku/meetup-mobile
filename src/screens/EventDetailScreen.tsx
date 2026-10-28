@@ -4,6 +4,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Image,
   Modal,
   PermissionsAndroid,
@@ -62,6 +63,7 @@ import UserAvatar from '../components/UserAvatar';
 import LoadingView from '../components/LoadingView';
 import ShareActionSheet from '../components/ShareActionSheet';
 import Toast from '../components/Toast';
+import { confirmSeriesCancel, SeriesAcceptNote, SeriesEditModal, SeriesInfo, SeriesLeaveButton } from '../components/series/SeriesParts';
 import { useAppShare } from '../hooks/useAppShare';
 import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
 import VenueRow from '../components/venue/VenueRow';
@@ -171,6 +173,9 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   // The invite picker (GV-5): which tab it opens on, `null` = closed.
   const [pickerTab, setPickerTab] = useState<InviteTab | null>(null);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
+  // AD-8 series: the notice of a series action, and the "this and following" edit sheet.
+  const [seriesNotice, setSeriesNotice] = useState<string | null>(null);
+  const [isSeriesEditOpen, setIsSeriesEditOpen] = useState(false);
 
   // Delete modal state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -814,7 +819,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     }
   };
 
-  const handleWithdraw = async () => {
+  const handleWithdraw = async (): Promise<boolean> => {
     setActionError(null);
     setIsActionLoading(true);
     try {
@@ -825,6 +830,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         unavailable.markOwnAction();
         await loadEvent(true);
       });
+      return true;
     } catch (e: any) {
       if (isNotFoundError(e)) {
         unavailable.onNotFound();
@@ -841,6 +847,61 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     } finally {
       setIsActionLoading(false);
     }
+    return false;
+  };
+
+  // ---- series (AD-8): Skip this game, and the "this game" or "this and following" choice for the organizer ----------
+  const handleSkip = (): void => {
+    Alert.alert(t('web.series.skip'), t('web.series.skip_confirm'), [
+      { text: t('mob.common.cancel'), style: 'cancel' },
+      {
+        text: t('web.series.skip'),
+        onPress: async () => {
+          // The existing withdraw: the membership stays and the server keeps the invitation accepted (AD-8).
+          if (await handleWithdraw()) {
+            setSeriesNotice(t('web.series.skipped'));
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleEditPress = (): void => {
+    if (!event?.series) {
+      handleStartEdit();
+      return;
+    }
+    Alert.alert(t('web.series.scope_edit_title'), t('web.series.scope_hint'), [
+      { text: t('web.series.scope_this'), onPress: handleStartEdit },
+      { text: t('web.series.scope_following'), onPress: () => setIsSeriesEditOpen(true) },
+      { text: t('mob.common.cancel'), style: 'cancel' },
+    ]);
+  };
+
+  const handleCancelPress = (): void => {
+    if (!event?.series) {
+      setIsDeleteModalOpen(true);
+      return;
+    }
+    Alert.alert(t('web.series.scope_cancel_title'), t('web.series.scope_hint'), [
+      { text: t('web.series.scope_this'), onPress: () => setIsDeleteModalOpen(true) },
+      {
+        text: t('web.series.scope_following'),
+        onPress: () =>
+          confirmSeriesCancel({
+            t,
+            eventId,
+            reason: 'Deleted by host',
+            onDone: async () => {
+              unavailable.markOwnAction();
+              setSeriesNotice(t('web.series.cancel_done'));
+              await loadEvent(true);
+            },
+            onError: setActionError,
+          }),
+      },
+      { text: t('mob.common.cancel'), style: 'cancel' },
+    ]);
   };
 
   const handleAcceptInvite = async () => {
@@ -1495,7 +1556,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={t('mob.game_detail.edit_game')}
-                  onPress={handleStartEdit}
+                  onPress={handleEditPress}
                   style={styles.bannerNavBtn}
                 >
                   <EditIcon size={20} color={colors.white} />
@@ -1504,7 +1565,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={t('mob.game_detail.cancel_game')}
-                  onPress={() => setIsDeleteModalOpen(true)}
+                  onPress={handleCancelPress}
                   style={styles.bannerNavBtn}
                 >
                   <TrashIcon size={20} color={colors.white} />
@@ -1563,6 +1624,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 {formattedDate}, {formattedTime}
               </Text>
             </View>
+            {event.series ? <SeriesInfo series={event.series} /> : null}
 
             {venueCatalogueEnabled ? (
               <VenueRow
@@ -1716,6 +1778,16 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           {!isOrganiser && !isClosed && !isGameEnded ? (
             <View style={styles.rsvpActionContainer}>
               {event.current_user_rsvp_status === 'going' ? (
+                event.series?.my_membership === 'active' ? (
+                  <Button
+                    label={t('web.series.skip')}
+                    accessibilityLabel={t('web.series.skip')}
+                    variant="secondary"
+                    onPress={handleSkip}
+                    loading={isActionLoading}
+                    testID="series-skip-button"
+                  />
+                ) : (
                 <Button
                   label={t('mob.respond.decline')}
                   accessibilityLabel={t('mob.respond.decline')}
@@ -1724,6 +1796,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                   loading={isActionLoading}
                   testID="decline-button"
                 />
+                )
               ) : event.my_declined ? (
                 <Button
                   label={
@@ -1786,6 +1859,24 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                   />
                 </View>
               )}
+              {/* AD-8: a person who has not joined is told that accepting joins the whole series. */}
+              {event.series && event.current_user_rsvp_status !== 'going' ? <SeriesAcceptNote /> : null}
+              {/* AD-8: an active member can leave the series (the organizer is never in this block). */}
+              {event.series?.my_membership === 'active' ? (
+                <SeriesLeaveButton
+                  eventId={eventId}
+                  disabled={isActionLoading}
+                  onLeft={async gamesLeft => {
+                    // Leaving ends access to an invite-only game: a 404 on the refetch closes the screen quietly.
+                    unavailable.markOwnAction();
+                    if (gamesLeft !== null) {
+                      setSeriesNotice(t('web.series.left', { games_left: gamesLeft }));
+                    }
+                    await loadEvent(true);
+                  }}
+                  onError={setActionError}
+                />
+              ) : null}
             </View>
           ) : null}
 
@@ -1840,6 +1931,19 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         onSent={handleInvitesSent}
       />
       <Toast message={inviteNotice} onDismiss={() => setInviteNotice(null)} />
+      <Toast message={seriesNotice} onDismiss={() => setSeriesNotice(null)} />
+      {isOrganiser ? (
+        <SeriesEditModal
+          visible={isSeriesEditOpen}
+          eventId={eventId}
+          onClose={() => setIsSeriesEditOpen(false)}
+          onSaved={async () => {
+            setIsSeriesEditOpen(false);
+            setSeriesNotice(t('web.series.edit_saved'));
+            await loadEvent(true);
+          }}
+        />
+      ) : null}
       <ShareActionSheet
         visible={share.sheetVisible}
         title={t('mob.game_detail.share_title')}
