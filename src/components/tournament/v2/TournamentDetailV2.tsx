@@ -59,6 +59,8 @@ export interface TournamentDetailV2Props {
   /** False while the screen is not the focused one: the live refresh stops. */
   focused: boolean;
   register: RegisterAction;
+  /** Edit tournament (AD-3): provided only to the organizer of a version 2 tournament that has not started. */
+  onEdit: (() => void) | null;
   secondary: { label: string; loading: boolean; onPress: () => void } | null;
   notice: string | null;
   cancel: { visible: boolean; loading: boolean; error: string | null; onPress: () => void };
@@ -179,6 +181,7 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
           onOpenClosure={() => setSelected('results')}
           invitePanel={props.invitePanel}
           secondary={props.secondary}
+          onEdit={props.onEdit}
           notice={props.notice}
           cancel={props.cancel}
           courtProviders={courtProviders}

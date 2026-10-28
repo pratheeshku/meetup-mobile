@@ -91,6 +91,8 @@ export interface OverviewProps {
   notice: string | null;
   cancel: { visible: boolean; loading: boolean; error: string | null; onPress: () => void };
   courtProviders: CourtProvider[] | null;
+  /** Edit tournament (AD-3): set only for the organizer of a version 2 tournament that has not started; null hides the row. */
+  onEdit: (() => void) | null;
   /** "Add banner" (AD-T1, te-a2): offered to the committee while the server says the tournament has no banner of its own. */
   banner: { visible: boolean; loading: boolean; error: string | null; onPress: () => void };
 }
@@ -230,6 +232,15 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
         tone: 'blue',
         icon: <CheckIcon size={20} color={colors.white} />,
         onPress: () => props.onSelectTab('approvals'),
+      });
+    }
+    if (props.onEdit) {
+      tools.push({
+        key: 'edit',
+        titleKey: 'web.tournament.edit_tournament',
+        tone: 'blue',
+        icon: <EditIcon size={20} color={colors.white} />,
+        onPress: props.onEdit,
       });
     }
     if (props.banner.visible) {

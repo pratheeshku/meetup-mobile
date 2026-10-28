@@ -100,6 +100,7 @@ import PaymentCard from '../components/tournament/PaymentCard';
 import { committeeAnswerOutcome, type CommitteeAnswerState } from '../utils/committeeInvitation';
 import type { LabelKey } from '../labels/fallbackLabels';
 import { isActiveRegistration } from '../utils/responseGroups';
+import { canOfferEdit } from '../utils/tournamentEdit';
 import { usesV2Page } from '../utils/tournamentTabs';
 import { useSportDisplayName } from '../utils/labels';
 import { formatEventDate } from '../utils/formatEventDateTime';
@@ -807,6 +808,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
         isOrganiser={isOrganiser}
         isCommittee={canReadResponses}
         register={register}
+        onEdit={canOfferEdit(tournament, isOrganiser, new Date()) ? () => navigation.navigate('TournamentEdit', { tournamentId: tournament.id }) : null}
         secondary={secondary}
         notice={registerError ?? withdrawError}
         cancel={{ visible: canCancel, loading: isCancelling, error: cancelError, onPress: handleCancel }}
