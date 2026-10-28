@@ -31,6 +31,7 @@ import type {
   DeclineAck,
   ResponsesResponse,
   TournamentClosurePut,
+  TournamentEditBody,
   TournamentClosureResponse,
   TournamentAudienceGroup,
   TournamentInvitation,
@@ -885,6 +886,28 @@ export async function committeeAddPlayer(id: string, userId: string, options?: R
   await apiClient.post(`/tournaments/${id}/registrations/committee-add`, { user_id: userId }, {
     correlationId: options?.correlationId,
   });
+}
+
+/** `POST /tournaments/{id}/registrations/committee-add` with `team_id` only (AD-2: exactly one of `user_id` or `team_id`). */
+export async function committeeAddTeam(id: string, teamId: string, options?: RequestOptions): Promise<void> {
+  await apiClient.post(`/tournaments/${id}/registrations/committee-add`, { team_id: teamId }, {
+    correlationId: options?.correlationId,
+  });
+}
+
+/**
+ * `PATCH /tournaments/{id}` for Edit tournament (AD-3, lifecycle version 2): only the fields in `body` are sent. The answer's `fixtures_reset` is
+ * true when the edit threw the generated fixtures away. The fee client above (`updateTournamentFee`) is a separate call and unchanged.
+ */
+export async function updateTournament(
+  id: string,
+  body: TournamentEditBody,
+  options?: RequestOptions,
+): Promise<{ fixturesReset: boolean }> {
+  const { data } = await apiClient.patch<{ fixtures_reset?: boolean | null } | undefined>(`/tournaments/${id}`, body, {
+    correlationId: options?.correlationId,
+  });
+  return { fixturesReset: data?.fixtures_reset === true };
 }
 
 /** `GET /tournaments/{id}/media`: newest first, paginated. Anyone who can view the tournament. */

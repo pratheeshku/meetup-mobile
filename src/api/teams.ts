@@ -61,3 +61,14 @@ export async function getMyTeams(options?: RequestOptions): Promise<Team[]> {
   });
   return Array.isArray(data) ? data.map(mapTeamApiItem) : [];
 }
+
+/**
+ * `GET /teams`: the teams the caller may see (visibility is enforced by the server). Used by the committee's Add team (AD-2, A40); the screen
+ * keeps the teams of the tournament's sport and drops the ones already entered. `player_count` is set only by `/teams/mine`, so it is null here.
+ */
+export async function getTeams(options?: RequestOptions): Promise<Team[]> {
+  const { data } = await apiClient.get<TeamApiItem[]>('/teams', {
+    correlationId: options?.correlationId,
+  });
+  return Array.isArray(data) ? data.map(mapTeamApiItem) : [];
+}

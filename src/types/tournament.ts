@@ -174,6 +174,25 @@ export interface Tournament {
   committee?: TournamentPerson[];
 }
 
+/**
+ * `PATCH /tournaments/{id}` body of Edit tournament (AD-3, `TournamentUpdate`): changed fields only. Dates are ISO UTC. The venue goes as
+ * `venue_id`, `others` (the Others form) or `venue_name` + `venue_address`, as on create. `registrants_may_withdraw` rides with a start, end
+ * or venue change (A40: the stored flag is not in the response).
+ */
+export interface TournamentEditBody {
+  title?: string;
+  description?: string;
+  starts_at?: string;
+  ends_at?: string;
+  registration_closes_at?: string;
+  registration_hard_block_at?: string;
+  venue_id?: string;
+  others?: OthersVenueInput;
+  venue_name?: string;
+  venue_address?: string;
+  registrants_may_withdraw?: boolean;
+}
+
 /** `GET /tournaments/{id}` `my_registration`: what the Payment card needs (teams-payments AD-9). */
 export interface TournamentMyRegistration {
   registration_id: string;
