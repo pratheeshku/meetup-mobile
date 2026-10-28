@@ -355,6 +355,14 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
         </Block>
       ) : null}
 
+      {/* Remarks (team-screens-remarks AD-4, TS-11): the tournament's description, only when there is some, as plain text. */}
+      {tournament.description && tournament.description.trim() !== '' ? (
+        <Block testID="overview-remarks">
+          <Text style={styles.cardTitle}>{t('mob.remarks.title')}</Text>
+          <Text style={styles.remarks}>{tournament.description}</Text>
+        </Block>
+      ) : null}
+
       <Block testID="overview-format">
         <Text style={styles.cardTitle}>{t('mob.tournament.v2.format_title')}</Text>
         <View style={styles.formatRow}>
@@ -487,6 +495,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: { ...typography.h3, color: dash.text, marginBottom: spacing.xs },
   body: { ...typography.body, color: dash.textMuted, marginBottom: spacing.sm },
+  remarks: { ...typography.body, color: dash.text },
   progressText: { ...typography.bodyBold, color: dash.text, marginBottom: spacing.xs },
   track: { height: 8, borderRadius: 4, backgroundColor: dash.skeleton, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 4, backgroundColor: dash.brand },
