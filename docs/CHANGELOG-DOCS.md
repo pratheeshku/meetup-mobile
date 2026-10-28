@@ -7,6 +7,9 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 ## Amendments by DES-MEETUP-ADDENDUM-decline-response (2026-10-20, owner approved)
 - closure-report v1.0 AD-4: decline is a locked game write, responses stay readable. dashboard v1.9 AD-20/21: declined items leave the default Games list and Public scope. invitation-response v1.0 AD-8 (new): decline is also recorded. Wording only on the approved versions; versions not bumped.
 
+## DES-MEETUP-ADDENDUM-team-screens-remarks.md
+- v1.0 (2026-10-28): DRAFT written by the architect after the owner's requests of 2026-10-28 (tournament team screens on mobile, optional Remarks on game and tournament creation, venue row). Awaiting owner approval. 19 tracked steps.
+
 ## DES-MEETUP-ADDENDUM-tournament-edit-recurring.md
 - v1.4 (2026-10-28): series contract live in the backend (meetup PR #164): EventResponse.series, POST /events/{id}/series/leave (returns {left, games_left}), PATCH /events/{id}/series (start_time HH:MM, duration_minutes), POST /events/{id}/series/cancel, codes SERIES_END_INVALID, SERIES_LIMIT_EXCEEDED, SERIES_HAS_PARTICIPANTS, SERIES_ORGANIZER_CANNOT_LEAVE. Full text in this copy.
 - v1.3 (2026-10-28): shuffle draw counts corrected (12 entrants in 4 groups: 28 draws at tolerance 0). POST /tournaments/{id}/fixtures/shuffle is live in the backend (meetup PR #162); the response carries shuffle {index, total}. Full text in this copy.
