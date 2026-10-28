@@ -36,6 +36,7 @@ const CODE_LABELS = {
   WITHDRAWAL_CLOSED: 'mob.reg.err.withdrawal_closed',
   WITHDRAWAL_LOCKED: 'mob.reg.err.withdrawal_locked',
   ROSTER_LOCKED: 'mob.reg.err.roster_locked',
+  SHUFFLE_UNAVAILABLE: 'mob.reg.err.shuffle_unavailable',
   TOURNAMENT_STARTED: 'mob.reg.err.tournament_started',
   TOURNAMENT_HAS_RESULTS: 'mob.reg.err.tournament_has_results',
   REGISTRATION_DATES_REQUIRED: 'mob.reg.err.registration_dates_required',
