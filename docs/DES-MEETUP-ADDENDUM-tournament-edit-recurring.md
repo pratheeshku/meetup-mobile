@@ -1,10 +1,11 @@
 # DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TOURNAMENT-EDIT-RECURRING
-**Version:** v1.2
+**Version:** v1.3
 **Status:** **APPROVED by the owner, 2026-10-27** (instruction in conversation: "prepare design & mark it approved. Push to gh repo", given after elicitation of the same day). Approval covers section 1 (requirements, restated from the owner's words) and the assumptions marked **[A]** in sections 3 and 5. Open items are in section 12.
 **v1.1 amendment (2026-10-27):** architect amendment after the `er-p1-verify` (step 1.0) report, PR #158. Each 1.0 finding is classified and resolved in the paragraphs marked **[v1.1]** (rulings B-1 to B-8). Issued under the owner's 2026-10-27 instruction "go ahead with step 1"; an objection before the 1.1 build starts reverses the affected ruling.
 **v1.2 amendment (2026-10-28):** architect amendment after the `er-bw-tournament` (step 1.1) report, PR #160, merged 2026-10-28. Accepted judgement calls are written back in the paragraphs marked **[v1.2]**; no requirement changed.
+**v1.3 amendment (2026-10-28):** architect correction after the `er-bw-shuffle` (step 1.2) report, PR #162: the draw counts of AD-7 and section 5.4 (an arithmetic error of the architect); no requirement or behaviour changed.
 **Owner:** Pratheesh
 **Date:** 2026-10-28
 **Scale Tier:** T1
@@ -149,7 +150,7 @@ Amends the lifecycle AD-6 table (`registration_v2` header). Phases are still com
 - **What it is.** A committee-only action on an unpublished engine draft of a lifecycle v2 groups + knockout tournament. The server picks the next draw from a deterministic list and replaces the draft. The caller sends no draw parameters and cannot choose or edit group members.
 - **Pots.** Entrants are ranked once. With g groups, pot j is ranks (j-1)g+1 to jg (DES-FIXTURE-CORE-001 FD-5). The canonical draw is the library's snake deal (pot 1 forward, pot 2 reversed, and so on). Every full pot has exactly one entrant per group, so the top pot is always spread over all groups; the owner's "top x%" is satisfied for every full pot.
 - **Draws.** A draw is a rotation r_j in 0..g-1 for each **full** pot relative to the canonical deal, plus a group-label rotation s in 0..g-1 (which renames groups and so changes the knockout paths and the group-stage match order). A partial last pot is left as canonical. Draw 0 is the canonical draw.
-- **Balanced draws only.** For each draw the group strength is the sum of the ranks of its members; the draw is kept when `max - min` of those sums is not above the canonical spread plus `meetup.tournament.shuffle.spread_tolerance` (default 0). For 12 entrants in 4 groups this keeps 10 of the 16 compositions (40 draws with labels); worked example in section 5.4. The enumeration is bounded by `meetup.tournament.shuffle.max_enumeration` (default 4096); above it only single-pot rotations are enumerated.
+- **Balanced draws only.** For each draw the group strength is the sum of the ranks of its members; the draw is kept when `max - min` of those sums is not above the canonical spread plus `meetup.tournament.shuffle.spread_tolerance` (default 0). For 12 entrants in 4 groups this keeps 7 of the 16 relative compositions (28 draws with the 4 label rotations) at tolerance 0; a tolerance of 2 keeps 9 compositions (36 draws) and 3 keeps 13 (52). **[v1.3]** v1.0 to v1.2 said "10 of 16, 40 draws": that was an architect arithmetic error, found by the step 1.2 build; worked example in section 5.4. The enumeration is bounded by `meetup.tournament.shuffle.max_enumeration` (default 4096); above it only single-pot rotations are enumerated.
 - **Order and "next".** The kept draws are ordered by SHA-256 of `rng_seed || draw descriptor` ascending (FD-6: no PRNG). The draft payload records `shuffle_index` and `shuffle_total`; each call moves to `(index + 1) mod total` and wraps. Each draft is reproducible from `rng_seed` and `shuffle_index`.
 - **How it is built.** The adapter generates the canonical draft, then applies the draw as `apply_edit(swap_entrants)` operations between groups inside each pot (class B, reason `organizer_shuffle:{index}`), and maps the result to the draft payload as today. The library validator re-runs on every edit (`FV_PLACEMENT_DEVIATION` allows permutations inside exchange sets). **[v1.1] The Phase 1 gate PASSED** (1.0 report, G1: 12/4, 13/4 and 24/8 on algorithm revision 2; every in-pot swap accepted class B, cross-pot refused `POLICY_SEED_INTEGRITY`, `group_place` refs untouched, payload round-trips; 60 edits with full validation in 0.48 s). No library change; OI-1 closes. Facts the build must honour: the library does not retain the edit reason, so `shuffle_index` and `shuffle_total` live in the draft payload (new keys; the payload hash changes, which is correct — a shuffle is a new draft) and in the edit log; a rotation costs g-1 swaps per pot; the group-label rotation is a true rename only when group sizes are equal, and a partial pot stays canonical either way.
 - **Availability.** Disabled, with a label explaining why, when the draft is published, when any result is recorded (`FIXTURE_FROZEN`), when only one balanced draw exists, or when the draft is not an engine draft. Superseded drafts are kept (versioned), so a shuffle never destroys evidence.
@@ -230,7 +231,7 @@ New stable codes (**[v1.1]**: date refusals reuse the existing 422 `TOURNAMENT_D
 A non-committee caller refused during the committee-only or frozen stage receives the neutral "Registration is closed" text (code unchanged). `ROSTER_LOCKED` and `TOURNAMENT_STARTED` are committee-facing.
 
 ### 5.4 Worked example of the shuffle
-12 entrants (ranks 1 to 12), 4 groups, 3 pots. Canonical snake: A {1, 8, 9}, B {2, 7, 10}, C {3, 6, 11}, D {4, 5, 12}; rank sums 18, 19, 20, 21 (spread 3). Rotating pot 1 by one: A {4, 8, 9}, B {1, 7, 10}, C {2, 6, 11}, D {3, 5, 12}; sums 21, 18, 19, 20 (spread 3, kept). Pots 2 and 3 sum to 17 in every group, so a single-pot rotation of pot 1 can never unbalance the draw. Rotating pot 2 alone against pots 1 and 3 can (sums spread 5 or 6) and is dropped. The 16 compositions split into 10 kept and 6 dropped; with the 4 label rotations that is 40 offered draws.
+12 entrants (ranks 1 to 12), 4 groups, 3 pots. Canonical snake: A {1, 8, 9}, B {2, 7, 10}, C {3, 6, 11}, D {4, 5, 12}; rank sums 18, 19, 20, 21 (spread 3). Rotating pot 1 by one: A {4, 8, 9}, B {1, 7, 10}, C {2, 6, 11}, D {3, 5, 12}; sums 21, 18, 19, 20 (spread 3, kept). Pots 2 and 3 sum to 17 in every group, so a single-pot rotation of pot 1 can never unbalance the draw. Rotating pot 2 alone against pots 1 and 3 can (pot 2 rotated by one gives sums 15, 20, 21, 22: spread 7) and is dropped. **[v1.3]** The 16 compositions by spread: 7 at spread 3 (kept at tolerance 0), 2 at spread 5, 4 at spread 6, 3 at spread 7; with the 4 label rotations that is 28 offered draws at tolerance 0, confirmed by an independent brute-force count in the tests.
 
 ---
 
@@ -362,7 +363,7 @@ Negative API tests (P13, P15) are ER-T4, ER-T7, ER-T8 and ER-T13 plus one per se
 
 ### Steps and progress tracking (owner's four steps)
 
-**Progress: Step 1.1 of 8 done · overall 2 of 27 (7%). Next: 1.2 `er-bw-shuffle`.** (1.0 done 2026-10-27, PR #158; 1.1 done 2026-10-28, PR #160.)
+**Progress: Step 1.2 of 8 done · overall 3 of 27 (11%). Next: 1.3 `er-bw-series`.** (1.0 done 2026-10-27, PR #158; 1.1 done 2026-10-28, PR #160; 1.2 done 2026-10-28, PR #162.)
 
 Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported as `Step x.y of n · overall d of 27 (p%)`, updated after every step; the end state is all 27 steps done. Machines: Cloud (a Claude or Cursor cloud agent), Mac (`~/Developer/meetup-mobile`), AWS (`/home/ubuntu/meetup`, see `docs/ENVIRONMENTS.md`).
 
@@ -372,7 +373,7 @@ Tasks are named `{step}.{n} {repo} ({machine}) {task}` and progress is reported 
 |---|---|---|
 | 1.0 | `er-p1-verify` | **Done 2026-10-27** (PR #158). G1 shuffle gate PASS; findings B-1 to B-8 resolved in v1.1 |
 | 1.1 | `er-bw-tournament` | **Done 2026-10-28** (PR #160, M1 `a7c2e9d41b58`). Edit route, changed-only date validation, withdrawal flag, `reset_fixtures` (unpublish, points unlock), override table, `ROSTER_LOCKED`, committee team add, `is_full` and `registration_open` on every route, hard-block omission, `scoring/state` phase mapping, neutral refusal texts, edit log, notifications; **writes M1 [v1.1]** |
-| 1.2 | `er-bw-shuffle` | Draw enumeration, swap application, `POST /fixtures/shuffle`, availability rules |
+| 1.2 | `er-bw-shuffle` | **Done 2026-10-28** (PR #162). Draw enumeration, swap application, `POST /fixtures/shuffle`, availability rules |
 | 1.3 | `er-bw-series` | Create fields, immediate expansion, members table, accept-join, job changes (copy source, venue and waitlist fields, instance reminders), series routes, series notifications; **writes M2 [v1.1]** |
 | 1.4 | `er-web-tournament` | Count and Full chip, hidden block dates, Edit tournament, committee add and remove after the closure, Shuffle again, PWA version bump |
 | 1.5 | `er-web-series` | Repeat weekly on create game, series chip and actions on the game view |
@@ -485,3 +486,12 @@ No requirement changed; every ER of section 1 holds as approved.
 | A17 | OI-14 opened (label texts and web lists still say "frozen" until 1.6 and 1.4); step 1.1 recorded done, progress 2 of 27 | §11, §12 |
 
 No requirement changed.
+
+**v1.3 (2026-10-28), architect correction after the `er-bw-shuffle` report (PR #162).** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A18 | 12 entrants in 4 groups keep 7 of 16 compositions, 28 draws (not 10 and 40) under the written balance rule; the tolerance setting widens it (2 gives 36, 3 gives 52); the pot-2-alone spread is 7 | AD-7, §5.4 |
+| A19 | Step 1.2 recorded done, progress 3 of 27 | §11 |
+
+No requirement changed. The rule "balanced = spread within the canonical spread plus tolerance, default 0" stands as the owner approved it.
