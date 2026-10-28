@@ -244,6 +244,107 @@ describe('Participants (TV2MobOpenParticipants)', () => {
   });
 });
 
+describe('committee roster override (er-m-committee, AD-2, AD-5, A38)', () => {
+  const committeeFrozen = (tournament: Record<string, unknown> = {}): void =>
+    reset({
+      state: { registration_phase: 'frozen', tabs: { ...ALL_OPEN, approvals: { state: 'open', badge: 0 } } },
+      tournament: { organizer_id: 'u-me', my_invite_access: 'full', ...tournament },
+    });
+  const withTeams = (teams: unknown[]): void => {
+    const previous = get.getMockImplementation()!;
+    get.mockImplementation((url: string, config?: unknown) => (url === '/teams' ? Promise.resolve({ data: teams }) : previous(url, config)));
+  };
+  const team = (id: string, name: string, sport = 'badminton') => ({ id, name, sport, visibility: 'public', captain_user_id: 'c', created_at: '2026-10-01T00:00:00Z' });
+
+  it('Add player is offered in the frozen phase and sends user_id only; no phase hides it', async () => {
+    committeeFrozen();
+    const root = await mount();
+    await press(root, 'tournament-tab-participants');
+    expect(byId(root, 'participants-add').length).toBeGreaterThan(0);
+    await press(root, 'participants-add');
+    await press(root, 'picker-select');
+    expect(callsTo(post, '/tournaments/t-1/registrations/committee-add')[0][1]).toEqual({ user_id: 'u-new' });
+  });
+
+  it('a removal refused with ROSTER_LOCKED shows its labelled message, not the server text', async () => {
+    committeeFrozen();
+    const root = await mount();
+    await press(root, 'tournament-tab-participants');
+    del.mockRejectedValue({ response: { status: 409, data: { code: 'ROSTER_LOCKED', detail: 'raw server text' } } });
+    await press(root, 'participant-remove-r2');
+    await alertPress('Remove from tournament');
+    await press(root, 'remove-yes');
+    await flush();
+    const all = everyText(root);
+    expect(all).toContain('The entries can no longer be changed: a result has been recorded or the tournament has started.');
+    expect(all).not.toContain('raw server text');
+  });
+
+  it('warns before an add or a removal when fixtures exist, and not otherwise', async () => {
+    committeeFrozen({ status: 'schedule_draft' });
+    const root = await mount();
+    await press(root, 'tournament-tab-participants');
+    await press(root, 'participants-add');
+    expect(everyText(byId(root, 'participants-add-reset-warning')[0])).toContain('Adding or removing an entry resets them');
+    await press(root, 'participant-remove-r2');
+    await alertPress('Remove from tournament');
+    expect(everyText(root)).toContain('Adding or removing an entry resets them');
+
+    committeeFrozen({ status: 'upcoming' });
+    const none = await mount();
+    await press(none, 'tournament-tab-participants');
+    await press(none, 'participants-add');
+    expect(byId(none, 'participants-add-reset-warning')).toHaveLength(0);
+  });
+
+  it('team tournament: Add team lists GET /teams of the sport minus entered teams, and sends team_id only', async () => {
+    committeeFrozen({ participation_mode: 'team' });
+    server.registrations = [
+      { id: 'rt1', user_id: null, team_id: 'tm-in', team_name: 'Entered FC', participant_name: 'Entered FC', registered_at: '2026-10-13T00:00:00Z', status: 'registered' },
+    ];
+    const root = await mount();
+    withTeams([team('tm-in', 'Entered FC'), team('tm-new', 'Smashers'), team('tm-tt', 'Pong', 'table_tennis')]);
+    await press(root, 'tournament-tab-participants');
+    expect(everyText(root)).not.toContain('The committee adds individual players only');
+    expect(byId(root, 'participants-add')).toHaveLength(0);
+    await press(root, 'participants-add-team');
+    await flush();
+    expect(byId(root, 'add-team-row-tm-new')).toHaveLength(1);
+    expect(byId(root, 'add-team-row-tm-in')).toHaveLength(0);
+    expect(byId(root, 'add-team-row-tm-tt')).toHaveLength(0);
+    await press(root, 'add-team-row-tm-new');
+    await flush();
+    const add = callsTo(post, '/tournaments/t-1/registrations/committee-add')[0];
+    expect(add[1]).toEqual({ team_id: 'tm-new' });
+    expect((add[2] as { correlationId: string }).correlationId).toEqual(expect.any(String));
+  });
+
+  it('Add team asks first when fixtures exist, and shows the labelled refusal of a skill or size failure', async () => {
+    committeeFrozen({ participation_mode: 'team', status: 'published' });
+    server.registrations = [];
+    const root = await mount();
+    withTeams([team('tm-new', 'Smashers')]);
+    post.mockRejectedValue({ response: { status: 422, data: { code: 'TEAM_SIZE_INVALID', min: 2, max: 2 } } });
+    await press(root, 'tournament-tab-participants');
+    await press(root, 'participants-add-team');
+    await flush();
+    expect(byId(root, 'add-team-reset-warning')).toHaveLength(1);
+    await press(root, 'add-team-row-tm-new');
+    expect(callsTo(post, '/tournaments/t-1/registrations/committee-add')).toHaveLength(0);
+    await alertPress('Add team');
+    await flush();
+    expect(everyText(byId(root, 'add-team-error')[0])).toContain('2');
+  });
+
+  it('a player (not the committee) sees neither Add player nor Add team', async () => {
+    reset({ tournament: { participation_mode: 'team' } });
+    const root = await mount();
+    await press(root, 'tournament-tab-participants');
+    expect(byId(root, 'participants-add-team')).toHaveLength(0);
+    expect(byId(root, 'participants-add')).toHaveLength(0);
+  });
+});
+
 describe('Fixtures (TV2MobDoneFixtures)', () => {
   it('shows each match with names, the server\'s result and "N of M played"; filters work on the board as sent', async () => {
     reset({ standings: standings([rawMatch({ result: { result_type: 'normal', sets: [{ a: 21, b: 17 }, { a: 21, b: 15 }], advancing_side: null, version: 1 }, winner_registration_id: 'ra', status: 'completed' }), rawMatch({ fixture_id: 'f2', side_a: player('rc', 'Priya', true), side_b: player('rd', 'Sam') })]) });
