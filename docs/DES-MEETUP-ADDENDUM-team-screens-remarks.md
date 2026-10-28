@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TEAM-SCREENS-REMARKS
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TEAM-SCREENS-REMARKS
-**Version:** v1.0
+**Version:** v1.1
 **Status:** **APPROVED by the owner, 2026-10-28** (instruction in conversation: "for any amendments, you prepare the document as approved. upload it to gh & generate one instruction for backend/web & another for app", given after the draft of the same day). Approval covers sections 2 to 12 as drafted, including the architect decisions listed in section 13. Requested by the owner on 2026-10-28 ("we need the screen for this, if not the purpose is lost. can you build this").
 **Owner:** Pratheesh
 **Date:** 2026-10-28
@@ -210,7 +210,7 @@ Starts only after step 2 is complete (the invited-viewer rule and the label seed
 
 **Totals: 2 + 5 + 2 + 5 = 14 steps.** Order: strictly sequential; step 2 starts after 1.2, step 3 after step 2, step 4 after 3.2. Every step produces a report; the architect rates it and either accepts it or sends a fix brief. Agents never self-certify, never choose versions (the architect assigns 186 for the PWA) and never edit governance documents.
 
-**Progress: Step 0 of 14 done · overall 0 of 14 (0%). Next: 1.1 `tm-bw-web`.**
+**Progress: Step 1 of 4 done (1.1 and 1.2, backend and web PR #180, M1 `d5f1b7a3c926` written, not run) · overall 2 of 14 (14%). Next: 2.0 backup and rollback tag (owner, AWS).**
 
 ## 11. Risks and mitigations
 
@@ -234,7 +234,22 @@ Starts only after step 2 is complete (the invited-viewer rule and the label seed
 | OI-6 | Tagline label | 🟢 LOW | Owner action in section 7 |
 | OI-7 | "This and following" edit does not carry remarks | 🟢 LOW | Accepted; remarks edit per game. Reopen if the owner asks for series-wide remarks |
 | OI-8 | A team detail has no list of the tournaments the team entered | 🟢 LOW | Out of scope; separate request |
+| OI-9 | Five reworded description label keys unused after the move to `web.remarks.*` | 🟢 LOW | Remove in a label clean-up |
 
 ## 13. Approval record
 
 **v1.0 APPROVED by the owner, 2026-10-28.** Decisions taken from the owner's words: discovery and request to join are in scope; remarks are optional and visible to everyone who can see the game or tournament. Decisions taken by the architect and approved with the document: remarks reuse `description` with the label "Remarks" (AD-4, D-2); bound of 5000 (D-1); Discover as a Mine / Discover switch (AD-2); mirror of the web team actions (AD-1, TS-06, TS-07).
+
+**v1.1 (2026-10-28), architect amendment after the `tm-bw-web` report (PR #180, merged).** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A1 | Consequence of AD-3, accepted: `GET /teams` follows the same visibility rule, so it now also returns a private team the caller is invited to. Discover (AD-2) therefore also lists such a team, marked "Invite only", so an invitation can be found without the push. TS-T6 still holds (another user's private team is absent). The mobile task treats this as part of AD-2 | AD-2, AD-3 |
+| A2 | Accepted drift: the 5000 bound also applies to series updates and is measured after trimming | AD-4 |
+| A3 | Accepted drift: on the web tournament wizard the description input sits in the last input step (the Committee step), and the summary row is relabelled | AD-4 |
+| A4 | Five reworded description label keys are now unused by the new code in favour of `web.remarks.*`; kept until a label clean-up (OI-9) | OI-9 |
+| A5 | Known failures carried: two tests in `tests/test_tournament_wizard_web.py` fail identically on main (label-source agreement, unused labels); the updated Playwright wizard pins were not run, so step 2.4 (browser verification) covers the wizard by hand | §10 |
+| A6 | A second agent session produced a duplicate implementation (migration `d7b3e91a4c26`, branch not pushed). It is discarded; PR #180 is the only implementation. PWA version 186 is in all four constants | §10 |
+| A7 | Steps 1.1 and 1.2 recorded done; step 1 closed, 2 of 14 | §10 |
+
+No requirement changed.
