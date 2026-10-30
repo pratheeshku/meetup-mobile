@@ -8,6 +8,7 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - closure-report v1.0 AD-4: decline is a locked game write, responses stay readable. dashboard v1.9 AD-20/21: declined items leave the default Games list and Public scope. invitation-response v1.0 AD-8 (new): decline is also recorded. Wording only on the approved versions; versions not bumped.
 
 ## DES-MEETUP-ADDENDUM-team-screens-remarks.md
+- v1.2 (2026-10-30): architect amendment after the tm-m-teams-remarks report (mobile PR #88). Correction: POST /teams/{id}/captaincy does not exist in the backend (architect error); Make captain and captain-leave deferred (OI-10); mobile game remarks edit gap (OI-11). Steps 3.1 and 3.2 done, 8 of 14. No requirement changed.
 - v1.1 (2026-10-28): architect amendment after the tm-bw-web report (PR #180): GET /teams also returns private teams the caller is invited to (Discover shows them); accepted drift; duplicate implementation discarded; known failures carried. Steps 1.1 and 1.2 done, 2 of 14. No requirement changed.
 - v1.0 (2026-10-28): written by the architect after the owner's requests of 2026-10-28 (tournament team screens on mobile, optional Remarks on game and tournament creation, venue row); APPROVED by the owner the same day. Steps set to 14 (one task per repo) at approval.
 

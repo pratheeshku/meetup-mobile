@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-TEAM-SCREENS-REMARKS
 
 **Doc ID:** DES-MEETUP-ADDENDUM-TEAM-SCREENS-REMARKS
-**Version:** v1.1
+**Version:** v1.2
 **Status:** **APPROVED by the owner, 2026-10-28** (instruction in conversation: "for any amendments, you prepare the document as approved. upload it to gh & generate one instruction for backend/web & another for app", given after the draft of the same day). Approval covers sections 2 to 12 as drafted, including the architect decisions listed in section 13. Requested by the owner on 2026-10-28 ("we need the screen for this, if not the purpose is lost. can you build this").
 **Owner:** Pratheesh
 **Date:** 2026-10-28
@@ -210,7 +210,7 @@ Starts only after step 2 is complete (the invited-viewer rule and the label seed
 
 **Totals: 2 + 5 + 2 + 5 = 14 steps.** Order: strictly sequential; step 2 starts after 1.2, step 3 after step 2, step 4 after 3.2. Every step produces a report; the architect rates it and either accepts it or sends a fix brief. Agents never self-certify, never choose versions (the architect assigns 186 for the PWA) and never edit governance documents.
 
-**Progress: Step 1 of 4 done (1.1 and 1.2, backend and web PR #180, M1 `d5f1b7a3c926` written, not run) · overall 2 of 14 (14%). Next: 2.0 backup and rollback tag (owner, AWS).**
+**Progress: Steps 1 and 3 done (backend and web PR #180; mobile PR #88); step 2: 2.0 to 2.3 done on 2026-10-28 (M1 `d5f1b7a3c926` run, api and worker on PWA 186), 2.4 browser verification pending (owner) · overall 8 of 14 (57%). Next: 4.0 Mac git pull (owner).**
 
 ## 11. Risks and mitigations
 
@@ -235,6 +235,9 @@ Starts only after step 2 is complete (the invited-viewer rule and the label seed
 | OI-7 | "This and following" edit does not carry remarks | 🟢 LOW | Accepted; remarks edit per game. Reopen if the owner asks for series-wide remarks |
 | OI-8 | A team detail has no list of the tournaments the team entered | 🟢 LOW | Out of scope; separate request |
 | OI-9 | Five reworded description label keys unused after the move to `web.remarks.*` | 🟢 LOW | Remove in a label clean-up |
+| OI-10 | No captaincy transfer exists in the backend: Make captain (web and mobile) and a captain leaving with a replacement cannot work | 🟠 HIGH | Follow-up tasks `tm-bw-captain` (new `POST /teams/{id}/captaincy`: captain or admin only, the new captain must be an active team player, one transaction; a captain leaving must name a replacement through the same rule; negative tests under P13) and `tm-m-captain` (mobile buttons). Start at the owner's call after this release; not in the 14 steps |
+| OI-11 | The mobile game edit flow has no Remarks field | 🟡 MEDIUM | Include in `tm-m-captain` follow-up |
+| OI-12 | A few bare "Description" texts remain on mobile | 🟢 LOW | Label clean-up |
 
 ## 13. Approval record
 
@@ -251,5 +254,17 @@ Starts only after step 2 is complete (the invited-viewer rule and the label seed
 | A5 | Known failures carried: two tests in `tests/test_tournament_wizard_web.py` fail identically on main (label-source agreement, unused labels); the updated Playwright wizard pins were not run, so step 2.4 (browser verification) covers the wizard by hand | §10 |
 | A6 | A second agent session produced a duplicate implementation (migration `d7b3e91a4c26`, branch not pushed). It is discarded; PR #180 is the only implementation. PWA version 186 is in all four constants | §10 |
 | A7 | Steps 1.1 and 1.2 recorded done; step 1 closed, 2 of 14 | §10 |
+
+No requirement changed.
+
+**v1.2 (2026-10-30), architect amendment after the `tm-m-teams-remarks` report (mobile PR #88, merged).** Changes (BP-13):
+
+| ID | Change | Section |
+|---|---|---|
+| A8 | **Correction of an architect error (BP-01).** Section 4 listed `POST /teams/{id}/captaincy` as an existing route. It does not exist: the contract was read from the web call site, not from the router. The web "Make captain" button calls it and fails today. Also, `DELETE /teams/{id}/members/{user_id}` refuses a captain who leaves (400 "Transfer captaincy first"), and `replacement_captain_id` is used only on the admin-override path, which calls `transfer_captaincy`, a function that is not defined anywhere | §4 |
+| A9 | Consequence, accepted: the mobile build omits **Make captain** and **a captain leaving with a replacement** (TS-06 and TS-07 in part); the labels are bundled and unused. Other team actions are built. A backend route and rule are needed first: OI-10 | OI-10 |
+| A10 | Accepted drift: the mobile game edit flow has no description field, so an organizer cannot edit a game's remarks in the app (TS-12 for games is met on web only; OI-11); the v2 tournament overview had no description block, so a Remarks block was added; a few bare "Description" texts remain, such as the wizard length error (OI-12) | OI-11, OI-12 |
+| A11 | Known failures carried to the device test: `homeComponents` (7 tests) and `TournamentListRows` (1 test) also fail on main, in addition to the OI-20 baseline of `tournament-edit-recurring`. The venue row regression test fails on unchanged code and passes now, but jest cannot measure layout, so the device test checks the width | §10 |
+| A12 | Steps 3.1 and 3.2 recorded done; progress 8 of 14 (step 1: 2, step 2: 4 done with 2.4 pending, step 3: 2) | §10 |
 
 No requirement changed.
