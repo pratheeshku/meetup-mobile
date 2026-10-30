@@ -8,7 +8,7 @@
   "reportFormUrl": "https://docs.google.com/forms/d/e/1FAIpQLSepcUYvSlC8C6YRJN9-eBVaZTzjMjeJS245kGY_OmQdiyQUcg/viewform",
   "ios": {
     "marketingVersion": "0.1.0",
-    "buildNumber": "48",
+    "buildNumber": "49",
     "apiBaseUrl": "https://meetupaws.duckdns.org",
     "avatarBucketBaseUrl": "https://meetup-prod-mediabucket-0vfp2elpzttk.s3.ap-southeast-1.amazonaws.com"
   },
