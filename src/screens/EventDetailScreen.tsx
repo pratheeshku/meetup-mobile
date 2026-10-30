@@ -1661,6 +1661,18 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             />
           </Card>
 
+          {/* Remarks (team-screens-remarks AD-4, TS-11): the game's description, only when there is some, as plain text (never interpreted). */}
+          {event.description && event.description.trim() !== '' ? (
+            <Card style={styles.infoCard}>
+              <Text style={styles.playersCardTitle} accessibilityRole="header">
+                {t('mob.remarks.title')}
+              </Text>
+              <Text style={styles.remarksText} testID="event-remarks">
+                {event.description}
+              </Text>
+            </Card>
+          ) : null}
+
           {event.lifecycle_status === 'closed' && !isOrganiser ? (
             <ClosureSummaryCard
               outcome={event.closure_outcome ?? closure?.outcome ?? 'completed'}
@@ -2165,6 +2177,11 @@ const styles = StyleSheet.create({
   playersCardTitle: {
     ...typography.bodyBold,
     color: colors.textPrimary,
+  },
+  remarksText: {
+    ...typography.body,
+    color: colors.textPrimary,
+    marginTop: spacing.xs,
   },
   playersJoinedCount: {
     ...typography.caption,

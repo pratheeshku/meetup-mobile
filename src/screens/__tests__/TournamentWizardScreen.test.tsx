@@ -441,3 +441,48 @@ describe('discard (board TournDiscard)', () => {
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
 });
+
+describe('Remarks moved to the last input step (team-screens-remarks AD-4, D-2; TS-T13)', () => {
+  const remarksInput = (root: Instance): Instance[] =>
+    root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.accessibilityLabel === 'Remarks');
+
+  it('step 1 no longer has the description row; the Committee step (last input) has Remarks', async () => {
+    const root = await mount();
+    expect(remarksInput(root)).toHaveLength(0);
+    await toStep(root, 6);
+    expect(remarksInput(root)).toHaveLength(1);
+    expect(remarksInput(root)[0].props.placeholder).toBe('Anything else players should know');
+  });
+
+  it('is optional: the wizard reaches the review without it and sends no description', async () => {
+    const root = await mount();
+    await toStep(root, REVIEW);
+    await press(byLabel(root, 'Create tournament'));
+    expect((createWizardTournament as jest.Mock).mock.calls[0][0]).not.toHaveProperty('description');
+  });
+
+  it('typed Remarks are sent trimmed as description', async () => {
+    const root = await mount();
+    await toStep(root, 6);
+    await type(root, 'Remarks', '  Bring your own shuttles  ');
+    await press(byTestId(root, 'tw-committee-add'));
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+    });
+    await press(root.findAll(n => n.props.testID === 'user-search-row' && String(n.props.accessibilityLabel).includes('Ravi'))[0]);
+    await press(byLabel(root, 'Add 1 member'));
+    await next(root);
+    await press(byLabel(root, 'Create tournament'));
+    expect((createWizardTournament as jest.Mock).mock.calls[0][0].description).toBe('Bring your own shuttles');
+  });
+
+  it('more than 5000 characters shows the length message under the field and holds Next', async () => {
+    const root = await mount();
+    await toStep(root, 6);
+    await type(root, 'Remarks', 'x'.repeat(5001));
+    expect(has(root, 'at most 5000 characters')).toBe(true);
+    expect(nextIsDisabled(root)).toBe(true);
+    await type(root, 'Remarks', 'x'.repeat(5000));
+    expect(has(root, 'at most 5000 characters')).toBe(false);
+  });
+});

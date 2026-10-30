@@ -239,7 +239,8 @@ export interface CreateEventInput {
   venue_lng?: number | null;
   venue_id?: string;
   others?: OthersVenueInput;
-  description?: string;
+  /** Remarks (team-screens-remarks AD-4): plain text, null when blank. */
+  description?: string | null;
   /**
    * Contract-verification finding (Create Game screen rebuild task):
    * `EventCreate` (`events/schemas.py`, `pratheeshku/meetup`, fetched

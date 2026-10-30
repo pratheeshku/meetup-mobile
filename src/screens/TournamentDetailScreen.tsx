@@ -898,7 +898,13 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             {tournament.is_full === true ? <Badge label={t('web.tournament.full_chip')} variant="warning" style={styles.fullChip} /> : null}
           </View>
         ) : null}
-        <Text style={styles.description}>{tournament.description}</Text>
+        {/* Remarks (team-screens-remarks AD-4): titled, only when there is some, plain text. */}
+        {tournament.description && tournament.description.trim() !== '' ? (
+          <View testID="tournament-remarks">
+            <Text style={styles.remarksTitle}>{t('mob.remarks.title')}</Text>
+            <Text style={styles.description}>{tournament.description}</Text>
+          </View>
+        ) : null}
         {venueCatalogueEnabled ? (
           <VenueRow
             snapshot={tournament.venue_snapshot}
@@ -1203,7 +1209,8 @@ const styles = StyleSheet.create({
   meta: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xs },
   countRow: { flexDirection: 'row', alignItems: 'center' },
   fullChip: { marginLeft: spacing.sm, marginBottom: spacing.xs },
-  description: { ...typography.body, color: colors.textPrimary, marginTop: spacing.sm },
+  remarksTitle: { ...typography.bodyBold, color: colors.textPrimary, marginTop: spacing.sm },
+  description: { ...typography.body, color: colors.textPrimary, marginTop: spacing.xs },
   closedNotice: {
     ...typography.body,
     color: colors.textPrimary,

@@ -1,4 +1,4 @@
-/** Groups | Tournament teams (teams-payments AD-4, AD-15): the switch, the read-only teams list from GET /teams/mine, and the create entry. */
+/** Groups | Tournament teams (teams-payments AD-4, AD-15): the switch, the teams list from GET /teams/mine (cards open the detail), and the create entry. */
 import React from 'react';
 
 import { act, pressableLabelled, renderAsync, texts } from '../../test-utils/render';
@@ -73,13 +73,16 @@ describe('the switch', () => {
   });
 });
 
-describe('the cards are not tappable (team detail is task tp-mobile-teams)', () => {
-  it('a team card has no press handler and no "View" button', async () => {
+describe('the cards open the tournament team detail (team-screens-remarks AD-1, TS-01, TS-T9)', () => {
+  it('a team card is pressable with a View button and a tap opens TeamDetail with the team id', async () => {
     const root = await mount({ section: 'teams' });
     const card = root.findAll(n => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.startsWith('Team Smashers'))[0];
-    expect(card).toBeDefined();
-    expect(typeof card.props.onPress).not.toBe('function');
-    expect(texts(root)).not.toContain('View tournament');
+    expect(typeof card.props.onPress).toBe('function');
+    expect(texts(root)).toContain('View');
+    await act(async () => {
+      card.props.onPress();
+    });
+    expect(navigate).toHaveBeenCalledWith('TeamDetail', { teamId: 'tm-1' });
   });
 });
 

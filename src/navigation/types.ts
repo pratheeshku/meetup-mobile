@@ -58,6 +58,8 @@ export type GroupsStackParamList = {
   /** Group creation step 2 (DES-MEETUP-FEEDBACK-001 C4). */
   InviteMembers: { groupId: string };
   TournamentTeams: undefined;
+  /** Tournament team detail (team-screens-remarks AD-1). Opened by a team card and by the team_invite / team_join_request pushes (AD-5). */
+  TeamDetail: { teamId: string };
 };
 
 /**

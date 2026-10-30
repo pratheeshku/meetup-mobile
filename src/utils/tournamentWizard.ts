@@ -172,10 +172,17 @@ export function validateBasics(state: WizardState): WizardIssue[] {
   } else if (state.title.trim().length > TITLE_MAX) {
     issues.push({ key: 'mob.tw.err_title_long', params: { max: TITLE_MAX }, field: 'title', step: WIZARD_STEP.basics });
   }
-  if (state.description.length > DESCRIPTION_MAX) {
-    issues.push({ key: 'mob.tw.err_description_long', params: { max: DESCRIPTION_MAX }, field: 'description', step: WIZARD_STEP.basics });
-  }
   return issues;
+}
+
+/**
+ * Remarks (team-screens-remarks AD-4, D-2): the description row moved from step 1 to the last input step before the review. The server bounds
+ * it at 5000 characters after trimming (A2); the client mirrors that for early feedback.
+ */
+export function validateRemarks(state: WizardState): WizardIssue[] {
+  return state.description.trim().length > DESCRIPTION_MAX
+    ? [{ key: 'mob.tw.err_description_long', params: { max: DESCRIPTION_MAX }, field: 'description', step: WIZARD_STEP.committee }]
+    : [];
 }
 
 // ---- dates: the client mirror of the five server rules (AD-20 step 3) -------------------------------------
@@ -466,7 +473,7 @@ export function validateStep(step: number, state: WizardState, ctx: WizardContex
     case WIZARD_STEP.registration:
       return validateRegistration(state, ctx.now, ctx.formatDayTime, ctx.fee);
     case WIZARD_STEP.committee:
-      return validateCommittee(state, ctx.limits.committee_max);
+      return [...validateCommittee(state, ctx.limits.committee_max), ...validateRemarks(state)];
     default:
       return [];
   }
@@ -674,7 +681,8 @@ export function mapCreateRejection(
  */
 export function firstFocusField(step: number, errors: Record<string, string>): string {
   const order: Record<number, string[]> = {
-    [WIZARD_STEP.basics]: ['sport', 'title', 'description'],
+    [WIZARD_STEP.basics]: ['sport', 'title'],
+    [WIZARD_STEP.committee]: ['description'],
     [WIZARD_STEP.when]: ['starts_at', 'ends_at', 'venue', 'venue_detail'],
     [WIZARD_STEP.registration]: ['registration_closes_at', 'registration_hard_block_at', 'registration_fee_cents', 'payment_contact_number'],
   };

@@ -187,3 +187,14 @@ describe('Edit tournament', () => {
     expect(patch).toHaveBeenCalledWith('/tournaments/t-1', { registration_fee_cents: 2500, payment_contact_number: '+6591234567' }, { correlationId: undefined });
   });
 });
+
+describe('Remarks label (team-screens-remarks AD-4, TS-12)', () => {
+  it('the description field of the edit screen reads Remarks (same key, same stored value)', async () => {
+    const root = await mount();
+    expect(texts(root)).toContain('Remarks');
+    expect(texts(root)).not.toContain('Description (optional)');
+    const field = root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.testID === 'edit-description')[0];
+    expect(field.props.accessibilityLabel).toBe('Remarks');
+    expect(field.props.value).toBe('A cup');
+  });
+});

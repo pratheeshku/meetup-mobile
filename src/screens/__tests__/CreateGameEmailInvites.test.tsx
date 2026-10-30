@@ -58,7 +58,8 @@ describe('one search field', () => {
   it('has exactly one text input on step 6 and no separate "Invite by email" input', async () => {
     const root = await mountCreateGame([ALEX]);
     await toStep6InviteOnly(root);
-    expect(root.findAll(n => (n.type as unknown) === 'TextInput')).toHaveLength(1);
+    // The optional Remarks field (team-screens-remarks) is not a people-search input.
+    expect(root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.testID !== 'game-remarks')).toHaveLength(1);
     expect(root.findAll(n => n.props.accessibilityLabel === 'Invite by email')).toHaveLength(0);
     expect(texts(root)).not.toContain('Invite by email');
     expect(byLabel(root, 'Add')).toBeUndefined();

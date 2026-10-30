@@ -1,7 +1,7 @@
 /**
  * "Tournament teams" section of the Groups screen (DES-MEETUP-ADDENDUM-teams-payments AD-4, TP-05): the teams the caller is an active player
- * of, from `GET /teams/mine`, in the tournament-list card layout. The cards are read-only until the team detail screen exists (task
- * tp-mobile-teams). Loads, empties and fails on its own; the list is read again on every new `reloadKey` (focus, return to the section).
+ * of, from `GET /teams/mine`, in the tournament-list card layout. A card opens the team detail (team-screens-remarks AD-1). Loads, empties and
+ * fails on its own; the list is read again on every new `reloadKey` (focus, return to the section).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet } from 'react-native';
@@ -19,11 +19,13 @@ import LoadingView from './LoadingView';
 interface Props {
   /** Opens the Create team form (empty state action). */
   onCreateTeam: () => void;
+  /** Opens the tournament team detail (team-screens-remarks AD-1, TS-01). */
+  onOpenTeam: (teamId: string) => void;
   /** Every new value fetches again with the loading state in place of the old rows. */
   reloadKey?: number;
 }
 
-export default function TeamsListContent({ onCreateTeam, reloadKey }: Props): React.JSX.Element {
+export default function TeamsListContent({ onCreateTeam, onOpenTeam, reloadKey }: Props): React.JSX.Element {
   const t = useT();
   const tRef = useRef(t);
   tRef.current = t;
@@ -83,7 +85,7 @@ export default function TeamsListContent({ onCreateTeam, reloadKey }: Props): Re
           onAction={onCreateTeam}
         />
       }
-      renderItem={({ item }) => <UnifiedTeamCard team={item} />}
+      renderItem={({ item }) => <UnifiedTeamCard team={item} onPress={() => onOpenTeam(item.id)} />}
     />
   );
 }

@@ -21,7 +21,7 @@ import { headerAddButton } from '../components/HeaderAddButton';
 import { UnifiedGroupCard } from '../components/home/UnifiedCard';
 import LoadingView from '../components/LoadingView';
 import SegmentedSwitch from '../components/SegmentedSwitch';
-import TeamsListContent from '../components/TeamsListContent';
+import TeamsSection from '../components/TeamsSection';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { Group } from '../types/group';
 import type { GroupsStackParamList } from '../navigation/types';
@@ -246,7 +246,16 @@ export default function GroupsScreen(props: Props): React.JSX.Element {
     }
   }, [requested, route.params, section, changeSection, navigation]);
 
+  // Coming back from a team detail (join, accept, leave, ...) reads the lists again; the first focus is the mount load.
+  useEffect(() => {
+    if (!teamsVisited) {
+      return undefined;
+    }
+    return navigation.addListener?.('focus', () => setTeamsReload(value => value + 1));
+  }, [navigation, teamsVisited]);
+
   const openCreateTeam = useCallback(() => navigation.navigate('CreateGroup', { kind: 'team' }), [navigation]);
+  const openTeam = useCallback((teamId: string) => navigation.navigate('TeamDetail', { teamId }), [navigation]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -274,7 +283,7 @@ export default function GroupsScreen(props: Props): React.JSX.Element {
       </View>
       {teamsVisited ? (
         <View style={[styles.flex, section === 'teams' ? null : styles.hidden]}>
-          <TeamsListContent onCreateTeam={openCreateTeam} reloadKey={teamsReload} />
+          <TeamsSection onCreateTeam={openCreateTeam} onOpenTeam={openTeam} reloadKey={teamsReload} />
         </View>
       ) : null}
     </View>

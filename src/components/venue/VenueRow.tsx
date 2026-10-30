@@ -56,6 +56,8 @@ interface VenueRowProps {
 }
 
 const ICON_BOX = 32;
+/** List rows (team-screens-remarks AD-6, TS-13): the address wraps up to this many lines before it is truncated. */
+const ADDRESS_LINES = 3;
 
 export default function VenueRow({
   snapshot,
@@ -116,10 +118,10 @@ export default function VenueRow({
         </View>
         {showAddress && address ? (
           <View style={styles.nameColumn}>
-            <Text style={styles.nameInColumn} numberOfLines={1}>
+            <Text style={styles.nameInColumn} numberOfLines={2}>
               {name}
             </Text>
-            <Text style={styles.address} numberOfLines={2} testID="venue-row-address">
+            <Text style={styles.address} numberOfLines={ADDRESS_LINES} testID="venue-row-address">
               {address}
             </Text>
           </View>
@@ -237,7 +239,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: spacing.sm,
   },
-  nameColumn: { flex: 1, marginRight: spacing.sm },
+  // minWidth 0: the column takes all the width right of the pin and wraps its text, so a long name or address is never pushed out or cut short.
+  nameColumn: { flex: 1, minWidth: 0, marginRight: spacing.sm },
   nameInColumn: { ...typography.bodyBold, color: colors.primary },
   address: { ...typography.caption, color: colors.textSecondary },
   backdrop: {

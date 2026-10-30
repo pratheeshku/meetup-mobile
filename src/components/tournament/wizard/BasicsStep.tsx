@@ -1,4 +1,4 @@
-/** Step 1, board TournBasics / TournBasicsErr: sport row, tournament name, description. */
+/** Step 1, board TournBasics / TournBasicsErr: sport row, tournament name. The description row moved to the last input step (team-screens-remarks D-2). */
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -13,7 +13,7 @@ import { TrophyIcon } from '../../icons/SharedIcons';
 import InlineError from '../../InlineError';
 import ImagesCard from './ImagesCard';
 import { FieldError, FieldLabel, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
-import { DESCRIPTION_MAX, TITLE_MAX, type WizardState } from '../../../utils/tournamentWizard';
+import { TITLE_MAX, type WizardState } from '../../../utils/tournamentWizard';
 
 const BADGE = 44;
 
@@ -37,7 +37,6 @@ export default function BasicsStep({
   const t = useT();
   const sportFocus = useAccessibilityFocus(tokenFor(focus, 'sport'));
   const titleRef = useTextFocus(tokenFor(focus, 'title'));
-  const descriptionRef = useTextFocus(tokenFor(focus, 'description'));
   const [picking, setPicking] = useState(false);
   const [pickFailed, setPickFailed] = useState(false);
   const current = sports.find(item => item.name === state.sport);
@@ -117,19 +116,6 @@ export default function BasicsStep({
           testID="tw-title"
         />
         <FieldError message={errors.title} testID="tw-title-error" />
-
-        <FieldLabel>{t('mob.tw.description')}</FieldLabel>
-        <TextField
-          ref={descriptionRef}
-          value={state.description}
-          onChangeText={description => onChange({ description })}
-          multiline
-          maxLength={DESCRIPTION_MAX + 20}
-          accessibilityLabel={t('mob.tw.description')}
-          style={styles.multiline}
-          testID="tw-description"
-        />
-        <FieldError message={errors.description} />
       </SectionCard>
     </View>
   );
@@ -151,5 +137,4 @@ const styles = StyleSheet.create({
   sportOptionOn: { fontWeight: '700', color: colors.primary },
   basicsCard: { marginTop: spacing.md },
   invalid: { borderColor: colors.error },
-  multiline: { minHeight: 96, textAlignVertical: 'top' },
 });
