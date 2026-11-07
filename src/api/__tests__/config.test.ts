@@ -64,7 +64,23 @@ describe('getClientConfig & getGameLimits', () => {
       game_fee_enabled: false,
       game_fee_currency: null,
       game_fee_max_cents: null,
+      android_store_url: '',
+      ios_store_url: '',
     });
+  });
+
+  it('reads the admin store URLs (TASK 3.1); empty when absent', async () => {
+    mockedGet.mockResolvedValueOnce({
+      data: { android_store_url: 'https://play.example/app', ios_store_url: '' },
+    });
+    const withUrls = await getClientConfig();
+    expect(withUrls.android_store_url).toBe('https://play.example/app');
+    expect(withUrls.ios_store_url).toBe('');
+
+    mockedGet.mockResolvedValueOnce({ data: {} });
+    const without = await getClientConfig();
+    expect(without.android_store_url).toBe('');
+    expect(without.ios_store_url).toBe('');
   });
 
   it('returns default game limits on API error', async () => {

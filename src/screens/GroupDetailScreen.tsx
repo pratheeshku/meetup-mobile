@@ -118,7 +118,7 @@ export default function GroupDetailScreen({ navigation, route }: Props): React.J
   const [isLeaving, setIsLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
 
-  const share = useAppShare();
+  const share = useAppShare(groupId);
 
   // `silent` refreshes in place (focus / foreground after the first load) instead of flashing
   // the loading view.
