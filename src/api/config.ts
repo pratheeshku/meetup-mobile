@@ -18,6 +18,9 @@ export interface ClientConfig {
   game_fee_enabled: boolean;
   game_fee_currency: string | null;
   game_fee_max_cents: number | null;
+  /** Admin store URLs for the share invite message; '' when unset (the store line is then omitted). */
+  android_store_url: string;
+  ios_store_url: string;
 }
 
 const CLIENT_CONFIG_DEFAULTS: ClientConfig = {
@@ -29,6 +32,8 @@ const CLIENT_CONFIG_DEFAULTS: ClientConfig = {
   game_fee_enabled: false,
   game_fee_currency: null,
   game_fee_max_cents: null,
+  android_store_url: '',
+  ios_store_url: '',
 };
 
 export async function getGameLimits(): Promise<GameLimits> {
@@ -57,6 +62,8 @@ export async function getClientConfig(): Promise<ClientConfig> {
       game_fee_currency: typeof data?.game_fee_currency === 'string' && data.game_fee_currency ? data.game_fee_currency : null,
       game_fee_max_cents:
         typeof data?.game_fee_max_cents === 'number' && Number.isFinite(data.game_fee_max_cents) ? data.game_fee_max_cents : null,
+      android_store_url: typeof data?.android_store_url === 'string' ? data.android_store_url.trim() : '',
+      ios_store_url: typeof data?.ios_store_url === 'string' ? data.ios_store_url.trim() : '',
     };
   } catch {
     return { ...CLIENT_CONFIG_DEFAULTS };
