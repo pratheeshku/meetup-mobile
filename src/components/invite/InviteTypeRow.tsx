@@ -17,6 +17,7 @@ import type { ResponsesResponse } from '../../types/event';
 import type { UserMenuContext } from '../../types/userMenu';
 import { invitedPeople } from '../../utils/responseGroups';
 import { ChevronRightIcon } from '../icons/ActionIcons';
+import { GlobeLineIcon } from '../icons/ListCardIcons';
 import { PeopleIcon } from '../icons/SharedIcons';
 import InvitedSheet, { type InvitedGroup } from './InvitedSheet';
 
@@ -73,18 +74,15 @@ export function ListInviteTypeRow({
       : t('mob.reg.invite_only');
   const content = (
     <>
-      <View style={styles.iconBox}>
-        <PeopleIcon size={18} />
-      </View>
-      <Text style={[styles.value, styles.listValue, hasGroups ? null : styles.valuePlain]} numberOfLines={1}>
+      <GlobeLineIcon size={16} color={colors.textSecondary} />
+      <Text style={[styles.listText, hasGroups ? styles.listTextLink : null]} numberOfLines={1}>
         {value}
       </Text>
-      {hasGroups ? <ChevronRightIcon size={18} color={colors.textMuted} /> : null}
     </>
   );
   if (!hasGroups) {
     return (
-      <View style={styles.row} testID="list-invite-type">
+      <View style={styles.listRow} testID="list-invite-type">
         {content}
       </View>
     );
@@ -95,7 +93,8 @@ export function ListInviteTypeRow({
         accessibilityRole="button"
         accessibilityLabel={`${t('mob.gv.invite_type')}: ${value}`}
         onPress={() => setOpen(true)}
-        style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+        hitSlop={{ top: 8, bottom: 8 }}
+        style={({ pressed }) => [styles.listRow, pressed ? styles.pressed : null]}
         testID="list-invite-type"
       >
         {content}
@@ -224,5 +223,8 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   valuePlain: { color: colors.textPrimary, marginRight: 0 },
-  listValue: { textAlign: 'left' },
+  // List card (NE-06 board): 16 px line icon, 5 between icon and 12 px text; a group name takes the link colour at 600.
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  listText: { ...typography.label, fontWeight: '400', color: colors.textSecondary, flexShrink: 1 },
+  listTextLink: { fontWeight: '600', color: colors.primary },
 });
