@@ -225,6 +225,40 @@ describe('updateEvent (PATCH /events/{id})', () => {
     mockedPatch.mockReset();
   });
 
+  it('sends group_ids and the venue fields when given (NE-03), and nothing that was not given', async () => {
+    mockedPatch.mockResolvedValue({ data: { id: 'evt-1', group_ids: ['g-2', 'g-3'] } });
+    await updateEvent('evt-1', {
+      group_ids: ['g-2', 'g-3'],
+      venue_name: 'Bishan Hall',
+      venue_address: '5 Bishan St 14',
+      venue_place_id: 'place-1',
+      venue_lat: 1.35,
+      venue_lng: 103.85,
+    });
+    expect(mockedPatch.mock.calls[0][1]).toEqual({
+      group_ids: ['g-2', 'g-3'],
+      venue_name: 'Bishan Hall',
+      venue_address: '5 Bishan St 14',
+      venue_place_id: 'place-1',
+      venue_lat: 1.35,
+      venue_lng: 103.85,
+    });
+  });
+
+  it('sends venue_id or others for a catalogue venue, and an empty group_ids list replaces the groups', async () => {
+    mockedPatch.mockResolvedValue({ data: { id: 'evt-1' } });
+    await updateEvent('evt-1', { venue_id: 'v-1', group_ids: [] });
+    expect(mockedPatch.mock.calls[0][1]).toEqual({ venue_id: 'v-1', group_ids: [] });
+    await updateEvent('evt-1', { others: { name: 'Park court' } as never });
+    expect(mockedPatch.mock.calls[1][1]).toEqual({ others: { name: 'Park court' } });
+  });
+
+  it('leaves group_ids and every venue field out when they are not in the input', async () => {
+    mockedPatch.mockResolvedValue({ data: { id: 'evt-1' } });
+    await updateEvent('evt-1', { title: 'Only the title' });
+    expect(mockedPatch.mock.calls[0][1]).toEqual({ title: 'Only the title' });
+  });
+
   it('patches all supported EventUpdate fields and maps the response', async () => {
     mockedPatch.mockResolvedValueOnce({
       data: {

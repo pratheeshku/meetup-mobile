@@ -120,6 +120,21 @@ describe('edit wizard groups', () => {
     expect(mockUpdate.mock.calls[0][1].group_ids).toEqual(['g-2', 'g-3']);
   });
 
+  it('an unchanged group selection and venue are not in the PATCH, and the game reloads after the save (NE-03)', async () => {
+    const root = await mount();
+    await openEdit(root);
+    await press(labelled(root, 'Next'));
+    for (let i = 0; i < 4 && !labelled(root, 'Save changes'); i += 1) await press(labelled(root, 'Next'));
+    const loadsBefore = mockGet.mock.calls.filter(([url]) => String(url) === '/events/evt-1').length;
+    await press(labelled(root, 'Save changes'));
+    const payload = mockUpdate.mock.calls[0][1];
+    ['group_ids', 'venue_name', 'venue_address', 'venue_id', 'others', 'venue_place_id', 'venue_lat', 'venue_lng'].forEach(key =>
+      expect(payload).not.toHaveProperty(key),
+    );
+    const loadsAfter = mockGet.mock.calls.filter(([url]) => String(url) === '/events/evt-1').length;
+    expect(loadsAfter).toBeGreaterThan(loadsBefore);
+  });
+
   it('keeps a current group the user is no longer in, by the game\'s own name', async () => {
     const root = await mount({ group_ids: ['g-1', 'g-9'], group_names: ['Group 1', 'Gone group'] });
     await openEdit(root);

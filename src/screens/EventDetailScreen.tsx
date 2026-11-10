@@ -638,38 +638,51 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         return hasFee(event.registration_fee_cents) ? { registration_fee_cents: null } : {};
       };
 
-      const payload: UpdateEventInput = {
-        title: editTitle.trim(),
-        skill_level_requirement: editSkillLevel,
-        capacity: editCapacity,
-        starts_at: editDateValue.toISOString(),
-        ...editFeeFields(),
-        // The full list replaces the game's groups.
-        ...(event.visibility === 'group' ? { group_ids: editGroupIds } : {}),
-        ...(venueCatalogueEnabled && editCatalogueVenue
+      // Changed-only, as the web client does (NE-03, AD-6): the groups of a group game, and the venue.
+      const currentGroups = new Set(event.group_ids ?? []);
+      const groupsChanged =
+        event.visibility === 'group' &&
+        (editGroupIds.length !== currentGroups.size || editGroupIds.some(id => !currentGroups.has(id)));
+      const venueFields: Pick<
+        UpdateEventInput,
+        'venue_id' | 'others' | 'venue_name' | 'venue_address' | 'venue_place_id' | 'venue_lat' | 'venue_lng'
+      > =
+        venueCatalogueEnabled && editCatalogueVenue
           ? editCatalogueVenue.isOthers && editCatalogueVenue.othersInput
-            ? {
-                others: editCatalogueVenue.othersInput,
-              }
-            : {
-                venue_id: editCatalogueVenue.venueId || null,
-              }
-          : {
+            ? { others: editCatalogueVenue.othersInput }
+            : (editCatalogueVenue.venueId || null) !== (event.venue_id ?? null)
+            ? { venue_id: editCatalogueVenue.venueId || null }
+            : {}
+          : venueChanged
+          ? {
               venue_name: fullVenueName || null,
               venue_address: editSelectedVenue.address || null,
-              ...(venueChanged && mapsApiKey && editSelectedVenue.place_id
+              ...(mapsApiKey && editSelectedVenue.place_id
                 ? {
                     venue_place_id: editSelectedVenue.place_id,
                     venue_lat: editSelectedVenue.lat,
                     venue_lng: editSelectedVenue.lng,
                   }
                 : {}),
-            }),
+            }
+          : {};
+
+      const payload: UpdateEventInput = {
+        title: editTitle.trim(),
+        skill_level_requirement: editSkillLevel,
+        capacity: editCapacity,
+        starts_at: editDateValue.toISOString(),
+        ...editFeeFields(),
+        // The full list replaces the game's groups; sent only when the selection changed (NE-03).
+        ...(groupsChanged ? { group_ids: editGroupIds } : {}),
+        ...venueFields,
       };
 
       await withCorrelationId(async correlationId => {
         await updateEvent(eventId, payload, { correlationId });
       });
+      // Reload so the new groups and venue show on the game without leaving the screen.
+      await loadEvent(true);
       const originalSkill = toSkillRequirement(event.skill_level_requirement);
       const originalCapacity = event.capacity || 4;
       const originalWhen = event.starts_at ? new Date(event.starts_at).getTime() : Number.NaN;

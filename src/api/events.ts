@@ -349,9 +349,10 @@ export async function cancelEvent(
 /**
  * Partial update for an owned event: calls `PATCH /events/{id}` (§5.9 Event Edit Lifecycle).
  * Organiser-only action. Only fields present in `input` are sent.
- * Accepts: title, description, venue_name, venue_address, skill_level_requirement,
- * capacity, starts_at, ends_at, visibility, sport, allow_waitlist,
- * estimated_cost_cents, estimated_cost_currency.
+ * Accepts: title, description, venue_name, venue_address, venue_place_id, venue_lat, venue_lng,
+ * venue_id, others, group_ids, skill_level_requirement, capacity, starts_at, ends_at, visibility,
+ * sport, allow_waitlist, estimated_cost_cents, estimated_cost_currency, registration_fee_cents,
+ * payment_contact_number.
  */
 export async function updateEvent(
   id: string,
@@ -363,8 +364,13 @@ export async function updateEvent(
   if (input.description !== undefined) payload.description = input.description;
   if (input.venue_name !== undefined) payload.venue_name = input.venue_name;
   if (input.venue_address !== undefined) payload.venue_address = input.venue_address;
+  if (input.venue_place_id !== undefined) payload.venue_place_id = input.venue_place_id;
+  if (input.venue_lat !== undefined) payload.venue_lat = input.venue_lat;
+  if (input.venue_lng !== undefined) payload.venue_lng = input.venue_lng;
   if (input.venue_id !== undefined) payload.venue_id = input.venue_id;
   if (input.others !== undefined) payload.others = input.others;
+  // Groups replace: the full new list (EventUpdate.group_ids, NE-03). Sent only when given.
+  if (input.group_ids !== undefined) payload.group_ids = input.group_ids;
   if (input.skill_level_requirement !== undefined) {
     payload.skill_level_requirement = input.skill_level_requirement;
   }
