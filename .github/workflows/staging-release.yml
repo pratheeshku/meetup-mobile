@@ -1,0 +1,521 @@
+# Staging release: Android to Play internal testing, iOS to TestFlight
+# (DES-MEETUP-ADDENDUM-staging-pipeline.md AD-9 and section 18, in repo pratheeshku/meetup).
+#
+# Manual only (workflow_dispatch). Both jobs are bound to the GitHub Environment
+# "staging" (limited to branch main) and run independently: a failure in one does
+# not cancel the other.
+#
+# SECRETS (Environment "staging"):
+#   android job: ANDROID_KEYSTORE_B64, ANDROID_KEY_ALIAS, ANDROID_KEYSTORE_PASSWORD,
+#                ANDROID_GOOGLE_SERVICES_JSON_B64, and PLAY_SERVICE_ACCOUNT_JSON_B64
+#                (only when android_upload is true)
+#   ios job:     IOS_GOOGLE_SERVICE_INFO_PLIST_B64, ASC_API_KEY_P8_B64, ASC_API_KEY_ID,
+#                ASC_API_ISSUER_ID, APPLE_TEAM_ID
+#
+# Versions: the marketing version comes from the committed files only
+# (config/appConfig.json ios.marketingVersion; Android versionName from
+# android/version.properties through the Gradle build). The staging build number is
+# BUILD_NUMBER = run_number * 10 + run_attempt (re-runs allowed up to attempt 9). It
+# is the Android versionCode (STAGING_VERSION_CODE) and the iOS CURRENT_PROJECT_VERSION.
+# Nothing is written to android/version.properties or ios.buildNumber, and nothing is
+# committed back.
+name: Staging release
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Which platform to release'
+        type: choice
+        options: [both, android, ios]
+        default: both
+      android_upload:
+        description: 'Android: upload to the Play internal track (false = build and sign only, keep the AAB as a workflow artifact)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-release
+  cancel-in-progress: false
+
+jobs:
+  android:
+    name: Android staging AAB
+    if: ${{ inputs.platform == 'android' || inputs.platform == 'both' }}
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 60
+    env:
+      ANDROID_UPLOAD: ${{ inputs.android_upload }}
+      STAGING_PACKAGE: org.duckdns.meetups.staging
+      AAB_PATH: android/app/build/outputs/bundle/stagingRelease/app-staging-release.aab
+    steps:
+      - name: Derive the build number
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" -gt 9 ]; then
+            echo "::error::run_attempt $GITHUB_RUN_ATTEMPT is above 9; BUILD_NUMBER (run_number * 10 + run_attempt) would collide with the next run. Start a new run instead of re-running."
+            exit 1
+          fi
+          echo "BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT))" >> "$GITHUB_ENV"
+
+      - name: Fail fast if a secret is missing
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_GOOGLE_SERVICES_JSON_B64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_B64 }}
+          PLAY_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          required="ANDROID_KEYSTORE_B64 ANDROID_KEY_ALIAS ANDROID_KEYSTORE_PASSWORD ANDROID_GOOGLE_SERVICES_JSON_B64"
+          if [ "$ANDROID_UPLOAD" = "true" ]; then required="$required PLAY_SERVICE_ACCOUNT_JSON_B64"; fi
+          missing=0
+          for name in $required; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is empty or not defined in the 'staging' Environment."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set scratch paths
+        run: |
+          set -euo pipefail
+          {
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/staging-upload.keystore"
+            echo "KEY_PROPERTIES_FILE=$RUNNER_TEMP/staging-key.properties"
+            echo "PLAY_CREDENTIALS_PATH=$RUNNER_TEMP/play-service-account.json"
+            echo "GOOGLE_SERVICES_PATH=$GITHUB_WORKSPACE/android/app/google-services.json"
+          } >> "$GITHUB_ENV"
+
+      # react-native 0.86.3 needs Node ^20.19.4 || ^22.13.0 || ^24.3.0 || >=25.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      # The repo needs JDK 17 (scripts/build-release-aab.sh). The runner image ships it;
+      # no extra action is used.
+      - name: Select JDK 17
+        run: |
+          set -euo pipefail
+          if [ -z "${JAVA_HOME_17_X64:-}" ] || [ ! -d "$JAVA_HOME_17_X64" ]; then
+            echo "::error::JDK 17 (JAVA_HOME_17_X64) is not installed on this runner image."
+            exit 1
+          fi
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          "$JAVA_HOME_17_X64/bin/java" -version
+
+      - name: Install JavaScript dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: Decode the keystore and write the signing properties file
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          echo "::add-mask::$KEY_ALIAS"
+          echo "::add-mask::$KEYSTORE_PASSWORD"
+          printf '%s' "$KEYSTORE_B64" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$KEYSTORE_PATH"
+          # Only one password secret exists: the key password is assumed equal to the store password.
+          {
+            echo "storeFile=$KEYSTORE_PATH"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyPassword=$KEYSTORE_PASSWORD"
+          } > "$KEY_PROPERTIES_FILE"
+          chmod 600 "$KEYSTORE_PATH" "$KEY_PROPERTIES_FILE"
+
+      - name: Decode google-services.json and check the staging client
+        env:
+          GOOGLE_SERVICES_B64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$GOOGLE_SERVICES_B64" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$GOOGLE_SERVICES_PATH"
+          python3 - "$GOOGLE_SERVICES_PATH" "$STAGING_PACKAGE" <<'PY'
+          import json, sys
+          path, package = sys.argv[1], sys.argv[2]
+          data = json.load(open(path))
+          for c in data.get("client", []):
+              values = [k.get("current_key") for k in c.get("api_key", [])]
+              values.append(c.get("client_info", {}).get("mobilesdk_app_id"))
+              for value in values:
+                  if value:
+                      print(f"::add-mask::{value}")
+          names = [c["client_info"]["android_client_info"]["package_name"] for c in data.get("client", [])]
+          if package not in names:
+              print(f"::error::google-services.json has no client for package {package}.")
+              sys.exit(1)
+          PY
+
+      - name: Build the signed staging AAB
+        env:
+          STAGING_VERSION_CODE: ${{ env.BUILD_NUMBER }}
+        run: |
+          set -euo pipefail
+          npm run build:aab:staging
+
+      - name: Check the AAB output
+        run: |
+          set -euo pipefail
+          if [ ! -f "$AAB_PATH" ]; then
+            echo "::error::AAB not found at $AAB_PATH (the 3.1 staging flavor output path)."
+            exit 1
+          fi
+          ls -l "$AAB_PATH"
+
+      - name: Keep the AAB as a workflow artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-aab-${{ github.run_number }}-${{ github.run_attempt }}
+          path: android/app/build/outputs/bundle/stagingRelease/app-staging-release.aab
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Install the Play upload dependencies
+        if: ${{ inputs.android_upload }}
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/play-venv"
+          "$RUNNER_TEMP/play-venv/bin/pip" install --disable-pip-version-check -r scripts/requirements-play-upload.txt
+
+      - name: Upload to the Play internal testing track
+        if: ${{ inputs.android_upload }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON_B64" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$PLAY_CREDENTIALS_PATH"
+          python3 - "$PLAY_CREDENTIALS_PATH" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1]))
+          for field in ("client_email", "private_key_id", "private_key"):
+              for line in str(data.get(field, "")).splitlines():
+                  if line.strip():
+                      print(f"::add-mask::{line.strip()}")
+          PY
+          "$RUNNER_TEMP/play-venv/bin/python" scripts/play-upload-staging.py "$AAB_PATH" "$PLAY_CREDENTIALS_PATH"
+
+      - name: Delete decoded secret files
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f "${KEYSTORE_PATH:-}" "${KEY_PROPERTIES_FILE:-}" "${PLAY_CREDENTIALS_PATH:-}" "${GOOGLE_SERVICES_PATH:-}"
+
+      - name: Run summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          version_name="$(sed -nE 's/^versionName=(.*)$/\1/p' android/version.properties 2>/dev/null || true)"
+          {
+            echo "### Staging release: Android"
+            echo "- Result: $JOB_STATUS"
+            echo "- Package: $STAGING_PACKAGE"
+            echo "- Version name: ${version_name:-unknown} (from the committed file)"
+            echo "- Build number (versionCode): ${BUILD_NUMBER:-not derived}"
+            echo "- Play upload requested: $ANDROID_UPLOAD (track: internal)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ios:
+    name: iOS staging to TestFlight
+    if: ${{ inputs.platform == 'ios' || inputs.platform == 'both' }}
+    runs-on: macos-26
+    environment: staging
+    timeout-minutes: 90
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
+      MIN_XCODE_MAJOR: '26' # Apple's current upload requirement, see ios-testflight.yml
+    steps:
+      - name: Derive the build number
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" -gt 9 ]; then
+            echo "::error::run_attempt $GITHUB_RUN_ATTEMPT is above 9; BUILD_NUMBER (run_number * 10 + run_attempt) would collide with the next run. Start a new run instead of re-running."
+            exit 1
+          fi
+          echo "BUILD_NUMBER=$((GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT))" >> "$GITHUB_ENV"
+
+      - name: Fail fast if a secret is missing
+        env:
+          IOS_GOOGLE_SERVICE_INFO_PLIST_B64: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST_B64 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+          ASC_API_KEY_P8_B64: ${{ secrets.ASC_API_KEY_P8_B64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in IOS_GOOGLE_SERVICE_INFO_PLIST_B64 ASC_API_KEY_ID ASC_API_ISSUER_ID ASC_API_KEY_P8_B64 APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is empty or not defined in the 'staging' Environment."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set scratch paths
+        run: |
+          set -euo pipefail
+          {
+            echo "ASC_KEY_PATH=$RUNNER_TEMP/asc-api-key.p8"
+            echo "EXPORT_OPTIONS_PATH=$RUNNER_TEMP/ExportOptions.plist"
+            echo "ARCHIVE_PATH=$RUNNER_TEMP/app.xcarchive"
+            echo "EXPORT_PATH=$RUNNER_TEMP/export"
+            echo "XCODEBUILD_LOG=$RUNNER_TEMP/xcodebuild.log"
+          } >> "$GITHUB_ENV"
+
+      # react-native 0.86.3 needs Node ^20.19.4 || ^22.13.0 || ^24.3.0 || >=25.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Set up Ruby and the Gemfile (CocoaPods, xcodeproj)
+        uses: ruby/setup-ruby@14594264cd68ce8a2345dd349bc3d138a4ef85c8 # v1.327.0
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          # Same pin as ios-testflight.yml: newest Xcode 26.x, never 27+ until UIScene is signed off.
+          xcode_app=""
+          for candidate in /Applications/Xcode_26*.app; do
+            case "$candidate" in
+              *[Bb]eta*) ;;
+              *) [ -d "$candidate" ] && xcode_app="$candidate" ;;
+            esac
+          done
+          if [ -z "$xcode_app" ]; then
+            echo "::error::No Xcode 26.x (/Applications/Xcode_26*.app) is installed on this runner image."
+            echo "Installed Xcode apps:"; ls -d /Applications/Xcode*.app 2>/dev/null || true
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode_app/Contents/Developer"
+          xcodebuild -version
+          major="$(xcodebuild -version | awk '/^Xcode/ {split($2, v, "."); print v[1]}')"
+          if [ "$major" -lt "$MIN_XCODE_MAJOR" ]; then
+            echo "::error::Xcode $major is older than the Xcode $MIN_XCODE_MAJOR that App Store Connect requires."
+            exit 1
+          fi
+
+      - name: Install JavaScript dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+
+      # Must run before ios-project-info.rb so IOS_BUNDLE_ID, the plist check and the
+      # GoogleService step all see the staging bundle id.
+      - name: Switch the checked-out Xcode project to staging
+        run: |
+          set -euo pipefail
+          bundle exec ruby scripts/ios-set-environment.rb staging
+
+      - name: Read project facts and build settings from the project and config
+        run: |
+          set -euo pipefail
+          bundle exec ruby scripts/ios-project-info.rb >> "$GITHUB_ENV"
+          {
+            echo "APP_MARKETING_VERSION=$(node -p "require('./config/appConfig.json').ios.marketingVersion")"
+            echo "APP_DISPLAY_NAME_CONFIG=$(node -p "require('./config/appConfig.json').environments.staging.displayName")"
+            echo "STAGING_BUNDLE_ID=$(node -p "require('./config/appConfig.json').environments.staging.applicationId")"
+          } >> "$GITHUB_ENV"
+
+      - name: Check the configuration values
+        run: |
+          set -euo pipefail
+          for name in APP_MARKETING_VERSION APP_DISPLAY_NAME_CONFIG STAGING_BUNDLE_ID BUILD_NUMBER; do
+            if [ -z "${!name}" ]; then
+              echo "::error::No value for $name (config/appConfig.json or the derived build number)."
+              exit 1
+            fi
+          done
+          if [ "$IOS_BUNDLE_ID" != "$STAGING_BUNDLE_ID" ]; then
+            echo "::error::The Xcode project uses bundle id '$IOS_BUNDLE_ID' after the staging switch, expected '$STAGING_BUNDLE_ID'."
+            exit 1
+          fi
+          echo "Version $APP_MARKETING_VERSION ($BUILD_NUMBER) as '$APP_DISPLAY_NAME_CONFIG' ($IOS_BUNDLE_ID)"
+
+      - name: Decode GoogleService-Info.plist and reference it as an app resource
+        env:
+          PLIST_B64: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_PLIST_B64 }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$PLIST_B64" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$IOS_PLIST_PATH"
+          plutil -lint "$IOS_PLIST_PATH" > /dev/null
+          for key in API_KEY GCM_SENDER_ID GOOGLE_APP_ID CLIENT_ID; do
+            value="$(/usr/libexec/PlistBuddy -c "Print :$key" "$IOS_PLIST_PATH" 2>/dev/null || true)"
+            if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+          done
+          plist_bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$IOS_PLIST_PATH")"
+          if [ "$plist_bundle_id" != "$STAGING_BUNDLE_ID" ]; then
+            echo "::error::GoogleService-Info.plist is for bundle id '$plist_bundle_id', but the staging app uses '$STAGING_BUNDLE_ID'."
+            exit 1
+          fi
+          bundle exec ruby scripts/ios-add-google-service-plist.rb
+
+      - name: Write the App Store Connect API key
+        env:
+          KEY_B64: ${{ secrets.ASC_API_KEY_P8_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$KEY_B64" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$ASC_KEY_PATH"
+          chmod 600 "$ASC_KEY_PATH"
+          while IFS= read -r line; do
+            if [ -n "$line" ]; then echo "::add-mask::$line"; fi
+          done < "$ASC_KEY_PATH"
+
+      - name: Write build-time .env from config/appConfig.json (staging)
+        run: |
+          set -euo pipefail
+          : > .env
+          add() {
+            name="$1"; value="$2"
+            case "$value" in
+              "") ;;
+              https://*) echo "$name=$value" >> .env ;;
+              *) echo "::error::$name in config/appConfig.json environments.staging must start with https://"; exit 1 ;;
+            esac
+          }
+          add API_BASE_URL "$(node -p "require('./config/appConfig.json').environments.staging.apiBaseUrl || ''")"
+          add AVATAR_BUCKET_BASE_URL "$(node -p "require('./config/appConfig.json').environments.staging.avatarBucketBaseUrl || ''")"
+          echo "APP_ENV=staging" >> .env
+          cat .env
+
+      - name: Cache Pods
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ios/Pods
+          key: pods-${{ runner.os }}-none-${{ hashFiles('ios/Podfile', 'ios/Podfile.lock', 'package-lock.json') }}
+          restore-keys: |
+            pods-${{ runner.os }}-none-
+
+      - name: Install Pods
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          bundle exec pod install
+
+      - name: Archive (Release, generic iOS device, automatic signing)
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -workspace "ios/$IOS_WORKSPACE" \
+            -scheme "$IOS_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$ARCHIVE_PATH" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="$APP_MARKETING_VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            APP_DISPLAY_NAME="$APP_DISPLAY_NAME_CONFIG" \
+            > "$XCODEBUILD_LOG" 2>&1 || {
+              status=$?
+              echo "xcodebuild archive failed (exit $status). First errors:"
+              grep -E "error:" "$XCODEBUILD_LOG" | head -n 40 || true
+              exit "$status"
+            }
+
+      - name: Export and upload to App Store Connect
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          cat > "$EXPORT_OPTIONS_PATH" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>${APPLE_TEAM_ID}</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$EXPORT_OPTIONS_PATH" > /dev/null
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \
+            -exportPath "$EXPORT_PATH" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_API_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID" \
+            > "$XCODEBUILD_LOG" 2>&1 || {
+              status=$?
+              echo "xcodebuild -exportArchive failed (exit $status). Last lines:"
+              tail -n 60 "$XCODEBUILD_LOG" || true
+              exit "$status"
+            }
+          echo "Upload to App Store Connect finished; the build appears in TestFlight after processing."
+
+      - name: Delete decoded secret files
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f "${ASC_KEY_PATH:-}" "${EXPORT_OPTIONS_PATH:-}" "${XCODEBUILD_LOG:-}" .env
+          if [ -n "${IOS_PLIST_PATH:-}" ]; then rm -f "$IOS_PLIST_PATH"; fi
+
+      - name: Run summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### Staging release: iOS"
+            echo "- Result: $JOB_STATUS"
+            echo "- Bundle id: ${IOS_BUNDLE_ID:-not read}"
+            echo "- Version: ${APP_MARKETING_VERSION:-not read} (from config/appConfig.json)"
+            echo "- Build number (CURRENT_PROJECT_VERSION): ${BUILD_NUMBER:-not derived}"
+            echo "- Note: the build must be in an internal TestFlight group with automatic distribution to reach testers."
+          } >> "$GITHUB_STEP_SUMMARY"
