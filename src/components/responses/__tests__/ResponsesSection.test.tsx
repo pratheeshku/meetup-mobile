@@ -153,6 +153,24 @@ describe('ResponsesSection (game-view-redesign GV-4, GV-P1)', () => {
     );
   });
 
+  it('Registered shows a team entry by its name as a plain row (no user pop-up), one row per registration', () => {
+    function Host(): React.JSX.Element {
+      const menu = useUserMenu({ context: { type: 'none' } });
+      return <ResponsesSection responses={game} entity="tournament" menu={menu} registrations={registrations} />;
+    }
+    const registrations: TournamentRegistration[] = [
+      { id: 'r-t', user_id: null, team_id: 't-1', nickname: 'Net Ninjas', registered_at: '2999-01-01T00:00:00Z', status: 'registered' },
+      { id: 'r-1', user_id: 'u-1', nickname: 'Arun', registered_at: '2999-01-01T00:00:00Z', status: 'registered' },
+      { id: 'r-w', user_id: 'u-w', nickname: 'Withdrawn One', registered_at: '2999-01-01T00:00:00Z', status: 'withdrawn' },
+    ];
+    const root = render(<Host />);
+    expect(rows(root, 'registered')).toHaveLength(2);
+    expect(texts(root)).toContain('Net Ninjas');
+    expect(texts(root)).not.toContain('Withdrawn One');
+    expect(root.findAll(n => n.props.testID === 'response-person-u-1' && typeof n.props.onPress === 'function')).toHaveLength(1);
+    expect(root.findAll(n => String(n.props.testID ?? '').startsWith('response-person-null'))).toHaveLength(0);
+  });
+
   it('T5/GV-4: a person row with a menu opens the combined pop-up carrying the response badge', async () => {
     function Host(): React.JSX.Element {
       const menu = useUserMenu({ context: { type: 'none' } });

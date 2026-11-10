@@ -6,7 +6,8 @@
  * Header "Responses" with a right-aligned summary ("x of y joined" / "x of y registered").
  * Groups, most done first:
  * - game: Accepted (organizer first with the Organizer badge, Waitlisted badge), Declined, Pending;
- * - tournament: Registered, Accepted but not yet registered, Declined, Pending.
+ * - tournament: Registered (every registration with status `registered`, a team entry by its name), Accepted but not yet registered,
+ *   Declined, Pending.
  * Every person with a user id is a `UserPressable` that opens the combined user pop-up (GV-6), which
  * carries the response/role badge. Without `menu` the rows are read-only, as before.
  *
@@ -203,6 +204,8 @@ export default function ResponsesSection({
           : null
         : null;
     const emailOnly = section.key === 'pending' && !person.user_id && Boolean(person.email);
+    // A team entry in Registered has no person behind it: a plain row, no user pop-up.
+    const teamEntry = section.key === 'registered' && !person.user_id;
 
     const identity = (
       <>
@@ -222,7 +225,7 @@ export default function ResponsesSection({
 
     return (
       <View key={key} style={styles.personRow} testID={`${section.key}-row-${index}`}>
-        {menu && !emailOnly ? (
+        {menu && !emailOnly && !teamEntry ? (
           <UserPressable
             person={{
               userId: person.user_id ?? null,

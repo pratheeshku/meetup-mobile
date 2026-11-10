@@ -99,7 +99,7 @@ import { registrationTargetFor, useTournamentRegistration } from '../hooks/useTo
 import PaymentCard from '../components/tournament/PaymentCard';
 import { committeeAnswerOutcome, type CommitteeAnswerState } from '../utils/committeeInvitation';
 import type { LabelKey } from '../labels/fallbackLabels';
-import { isActiveRegistration } from '../utils/responseGroups';
+import { isActiveRegistration, registeredCount } from '../utils/responseGroups';
 import { canOfferEdit } from '../utils/tournamentEdit';
 import { usesV2Page } from '../utils/tournamentTabs';
 import { useSportDisplayName } from '../utils/labels';
@@ -772,7 +772,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
   // Lifecycle version 2 (`lifecycle_version`; an older server that sends none falls back to the server `tabs` object):
   // header, tabs and tab bodies of the tournament-experience design. Version 1 keeps the page below unchanged.
   if (usesV2Page(tournament, scoring)) {
-    const activeCount = registrations.filter(isActiveRegistration).length;
+    const activeCount = registeredCount(registrations);
     // A39: the API's `registration_open` and `is_full`, never recomputed on the device.
     const registrationOpen = tournament.registration_open;
     const canRegisterV2 =
@@ -849,7 +849,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
                 entity="tournament"
                 menu={personMenu}
                 summary={t('mob.gv.registered_of', {
-                  registered: registrations.filter(isActiveRegistration).length,
+                  registered: registeredCount(registrations),
                   capacity: tournament.max_participants,
                 })}
                 organizerId={tournament.organiser_id}
@@ -966,7 +966,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             entity="tournament"
             menu={personMenu}
             summary={t('mob.gv.registered_of', {
-              registered: registrations.filter(isActiveRegistration).length,
+              registered: registeredCount(registrations),
               capacity: tournament.max_participants,
             })}
             organizerId={tournament.organiser_id}
