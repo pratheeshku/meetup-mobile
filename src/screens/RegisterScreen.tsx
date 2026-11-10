@@ -20,7 +20,7 @@ const FULL_LOGO = require('../assets/gameonsg-logo-full.png');
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AxiosError } from 'axios';
 
-import appConfig from '../../config/appConfig.json';
+import { getPrivacyPolicyUrl, getTermsOfUseUrl } from '../../config/env';
 import { AuthContext } from '../auth/AuthContext';
 import { AppleSignInCancelledError } from '../auth/appleAuth';
 import { signup } from '../auth/emailAuth';
@@ -82,11 +82,11 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
     }
   };
 
-  const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
+  const privacyPolicyUrl = toHttpsUrl(getPrivacyPolicyUrl());
   // Terms agreement (email registration only): required only when a valid
   // terms URL is configured; with none, registration is unchanged. The
   // acceptance is not recorded server-side.
-  const termsOfUseUrl = toHttpsUrl(appConfig.termsOfUseUrl);
+  const termsOfUseUrl = toHttpsUrl(getTermsOfUseUrl());
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const termsBlocking = termsOfUseUrl !== null && !agreedToTerms;
 
