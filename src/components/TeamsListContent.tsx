@@ -10,11 +10,12 @@ import { withCorrelationId } from '../api/correlationId';
 import { getMyTeams } from '../api/teams';
 import { useT } from '../labels/LabelsContext';
 import { colors, spacing } from '../theme/tokens';
-import type { Team } from '../types/team';
+import type { PendingTeams, Team } from '../types/team';
 import EmptyState from './EmptyState';
 import ErrorView from './ErrorView';
 import { UnifiedTeamCard } from './home/UnifiedCard';
 import LoadingView from './LoadingView';
+import TeamsPendingSection from './TeamsPendingSection';
 
 interface Props {
   /** Opens the Create team form (empty state action). */
@@ -23,9 +24,13 @@ interface Props {
   onOpenTeam: (teamId: string) => void;
   /** Every new value fetches again with the loading state in place of the old rows. */
   reloadKey?: number;
+  /** `GET /teams/pending` (NE-05); the Pending section shows above the cards only while its `pending_count` is above 0. */
+  pending?: PendingTeams | null;
+  /** Reads Pending again; the list reads Mine itself after an action. */
+  onPendingChanged?: () => Promise<void> | void;
 }
 
-export default function TeamsListContent({ onCreateTeam, onOpenTeam, reloadKey }: Props): React.JSX.Element {
+export default function TeamsListContent({ onCreateTeam, onOpenTeam, reloadKey, pending, onPendingChanged }: Props): React.JSX.Element {
   const t = useT();
   const tRef = useRef(t);
   tRef.current = t;
@@ -58,6 +63,11 @@ export default function TeamsListContent({ onCreateTeam, onOpenTeam, reloadKey }
     load(false);
   }, [load, reloadKey]);
 
+  // After a Pending action both lists are read again, so the row, the badge and (after an accept or approve) the cards are current.
+  const refreshAfterAction = async (): Promise<void> => {
+    await Promise.all([load(true), onPendingChanged?.()]);
+  };
+
   if (isLoading) {
     return <LoadingView />;
   }
@@ -76,6 +86,9 @@ export default function TeamsListContent({ onCreateTeam, onOpenTeam, reloadKey }
           colors={[colors.primary]}
           progressBackgroundColor={colors.surface}
         />
+      }
+      ListHeaderComponent={
+        pending && pending.pending_count > 0 ? <TeamsPendingSection pending={pending} onChanged={refreshAfterAction} /> : null
       }
       ListEmptyComponent={
         <EmptyState

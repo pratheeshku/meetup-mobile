@@ -7,6 +7,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { useT } from '../labels/LabelsContext';
 import { spacing } from '../theme/tokens';
+import type { PendingTeams } from '../types/team';
 import SegmentedSwitch from './SegmentedSwitch';
 import TeamsDiscoverContent from './TeamsDiscoverContent';
 import TeamsListContent from './TeamsListContent';
@@ -18,9 +19,12 @@ interface Props {
   onOpenTeam: (teamId: string) => void;
   /** Every new value reads Mine (and Discover, once visited) again. */
   reloadKey?: number;
+  /** NE-05: shown above the cards of Mine. */
+  pending?: PendingTeams | null;
+  onPendingChanged?: () => Promise<void> | void;
 }
 
-export default function TeamsSection({ onCreateTeam, onOpenTeam, reloadKey }: Props): React.JSX.Element {
+export default function TeamsSection({ onCreateTeam, onOpenTeam, reloadKey, pending, onPendingChanged }: Props): React.JSX.Element {
   const t = useT();
   const [scope, setScope] = useState<Scope>('mine');
   const [discoverVisited, setDiscoverVisited] = useState(false);
@@ -47,7 +51,13 @@ export default function TeamsSection({ onCreateTeam, onOpenTeam, reloadKey }: Pr
         />
       </View>
       <View style={[styles.flex, scope === 'mine' ? null : styles.hidden]}>
-        <TeamsListContent onCreateTeam={onCreateTeam} onOpenTeam={onOpenTeam} reloadKey={reloadKey} />
+        <TeamsListContent
+          onCreateTeam={onCreateTeam}
+          onOpenTeam={onOpenTeam}
+          reloadKey={reloadKey}
+          pending={pending}
+          onPendingChanged={onPendingChanged}
+        />
       </View>
       {discoverVisited ? (
         <View style={[styles.flex, scope === 'discover' ? null : styles.hidden]}>

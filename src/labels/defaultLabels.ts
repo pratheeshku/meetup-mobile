@@ -2048,5 +2048,12 @@ export const DEFAULT_LABELS = {
   'mob.teams.switch_discover': 'Discover',
   'mob.teams.discover_empty': 'There are no public tournament teams to join yet.',
   'mob.teams.discover_search': 'Search tournament teams',
+  'mob.teams.pending_title': 'Pending',
+  'mob.teams.pending_invitations': 'Invitations to you',
+  'mob.teams.pending_requests': 'Join requests',
+  'mob.teams.pending_invited_by': 'Invited by {name}',
+  'mob.teams.pending_requested_by': '{name} wants to join',
+  'mob.teams.pending_unknown_person': 'Someone',
+  'mob.teams.pending_badge_a11y': '{count} pending',
 } as const;
 
