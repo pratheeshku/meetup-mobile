@@ -17,7 +17,7 @@
  * - Network error: "Unable to connect to server." with Retry button
  * - 400 errors: inline mappings for duplicate email/nickname and password length.
  */
-import React, { useContext, useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppleButton } from '@invertase/react-native-apple-authentication';
 
@@ -41,6 +41,8 @@ import MobileNumberInput from '../components/MobileNumberInput';
 import type { MobileNumberChange } from '../components/MobileNumberInput';
 import { useFieldChain } from '../hooks/useFieldChain';
 import { useMobileNumberConfig } from '../hooks/useMobileNumberConfig';
+import { usePhoneVerification } from '../hooks/usePhoneVerification';
+import PhoneCodeStep from '../components/auth/PhoneCodeStep';
 import { colors, spacing, typography } from '../theme/tokens';
 import {
   isNetworkError,
@@ -76,6 +78,13 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   const phoneRequired = phoneConfig.status === 'ready' && phoneConfig.consent.phone_required;
   const [mobile, setMobile] = useState<MobileNumberChange>({ e164: null, isEmpty: true });
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  // Task 1.7: the WhatsApp code step shows only while the server says verification is active (`phone_verification`), never on
+  // `whatsapp_otp_enabled`. After a good code the proof is held in memory and the sign-up runs again with it.
+  const verificationOn = phoneRequired && phoneConfig.status === 'ready' && phoneConfig.consent.phone_verification;
+  const registerRef = useRef<() => Promise<void>>(async () => undefined);
+  const otp = usePhoneVerification(() => {
+    registerRef.current();
+  });
 
   const handleAppleSignIn = async (): Promise<void> => {
     if (!auth?.signInWithApple) {
@@ -150,6 +159,25 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       return;
     }
 
+    // Task 1.7: with verification active the number is proved first. A proof held for this very number is reused (a failed sign-up
+    // retries without a new code); a 404 on send means the server has no verification: carry on as without it.
+    let proof: string | null = null;
+    if (verificationOn && mobile.e164) {
+      proof = otp.proofFor(mobile.e164);
+      if (!proof) {
+        setIsSubmitting(true);
+        const started = await otp.begin(mobile.e164);
+        setIsSubmitting(false);
+        if (started.kind === 'code') {
+          return;
+        }
+        if (started.kind === 'error') {
+          setPhoneError(started.message);
+          return;
+        }
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const termsVersion = await getTermsVersion();
@@ -160,11 +188,19 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         nickname: trimmedNickname,
         terms_version: termsVersion,
         ...(phoneRequired && mobile.e164 && phoneConfig.status === 'ready'
-          ? { mobile_number: mobile.e164, mobile_consent_version: phoneConfig.consent.version }
+          ? {
+              mobile_number: mobile.e164,
+              mobile_consent_version: phoneConfig.consent.version,
+              ...(proof ? { mobile_verification: proof } : {}),
+            }
           : {}),
       });
+      otp.clearProof();
+      otp.leaveStep();
       navigation.navigate('Verify', { email: trimmedEmail });
     } catch (err) {
+      // Back on the form so the error shows; a good proof is kept for the retry.
+      otp.leaveStep();
       if (isNetworkError(err)) {
         setRetryError(t(NETWORK_ERROR_MESSAGE));
         setRetryAction(() => handleRegister);
@@ -207,7 +243,11 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         detailString = detail.map(item => item.msg ?? '').join(' ');
       }
 
-      if (axiosErr.response?.status === 422 && detailString.includes('Mobile number is required')) {
+      if (axiosErr.response?.status === 422 && detailString.includes('verification is required')) {
+        // The proof was refused or is gone: drop it and ask for a new code on the next try.
+        otp.clearProof();
+        setPhoneError(t('mob.otp.required'));
+      } else if (axiosErr.response?.status === 422 && detailString.includes('Mobile number is required')) {
         if (phoneRequired) {
           setPhoneError(t('mob.register.phone_required'));
         } else {
@@ -233,6 +273,12 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       setIsSubmitting(false);
     }
   };
+
+  registerRef.current = handleRegister;
+
+  if (otp.step) {
+    return <PhoneCodeStep otp={otp} />;
+  }
 
   return (
     <ScreenContainer edges="bottom">
@@ -314,9 +360,11 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
           <MobileNumberInput
             countries={phoneConfig.countries}
             consentText={phoneConfig.consent.text}
+            initialValue={mobile.e164}
             onChange={next => {
               setMobile(next);
               setPhoneError(null);
+              otp.clearProof();
             }}
             error={phoneError}
           />

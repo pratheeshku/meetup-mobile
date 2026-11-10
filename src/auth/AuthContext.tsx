@@ -81,7 +81,7 @@ interface AuthContextValue {
    */
   pendingSignup: PendingSignup | null;
   /** `POST /auth/complete-signup`; on success the person is signed in exactly like a normal login. A failure throws and keeps the ticket. */
-  completeSignup: (mobileNumber: string, consentVersion: string) => Promise<void>;
+  completeSignup: (mobileNumber: string, consentVersion: string, mobileVerification?: string) => Promise<void>;
   /** Drops the ticket (back to Login, 400, unmount). */
   cancelPendingSignup: () => void;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -434,7 +434,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   }, [finishSocial]);
 
   const completeSignup = useCallback(
-    async (mobileNumber: string, consentVersion: string): Promise<void> => {
+    async (mobileNumber: string, consentVersion: string, mobileVerification?: string): Promise<void> => {
       const ticket = signupTicketRef.current;
       if (!ticket) {
         throw new Error('no pending sign-up');
@@ -444,6 +444,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         ticket,
         mobile_number: mobileNumber,
         mobile_consent_version: consentVersion,
+        ...(mobileVerification ? { mobile_verification: mobileVerification } : {}),
       });
       cancelPendingSignup();
       establishSession(profile);

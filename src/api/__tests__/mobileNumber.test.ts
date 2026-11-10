@@ -28,6 +28,7 @@ describe('getMobileConsent', () => {
       text: 'Hello',
       phone_required: false,
       whatsapp_otp_enabled: false,
+      phone_verification: false,
     });
     expect(get).toHaveBeenCalledWith('/public/consent/mobile-number', { correlationId: 'c' });
   });
@@ -113,5 +114,12 @@ it('reads the two admin flags of the consent endpoint (NE-01); an older server w
   get.mockResolvedValueOnce({ data: { version: 'v1', text: 'T', phone_required: true, whatsapp_otp_enabled: true } });
   await expect(getMobileConsent()).resolves.toMatchObject({ phone_required: true, whatsapp_otp_enabled: true });
   get.mockResolvedValueOnce({ data: { version: 'v1', text: 'T' } });
-  await expect(getMobileConsent()).resolves.toMatchObject({ phone_required: false, whatsapp_otp_enabled: false });
+  await expect(getMobileConsent()).resolves.toMatchObject({ phone_required: false, whatsapp_otp_enabled: false, phone_verification: false });
+});
+
+it('phone_verification is read on its own: whatsapp_otp_enabled does not imply it (Task 1.7)', async () => {
+  get.mockResolvedValueOnce({ data: { version: 'v1', text: 'T', whatsapp_otp_enabled: true, phone_verification: false } });
+  await expect(getMobileConsent()).resolves.toMatchObject({ whatsapp_otp_enabled: true, phone_verification: false });
+  get.mockResolvedValueOnce({ data: { version: 'v1', text: 'T', phone_verification: true } });
+  await expect(getMobileConsent()).resolves.toMatchObject({ phone_verification: true });
 });

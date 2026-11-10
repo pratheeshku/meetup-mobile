@@ -23,6 +23,8 @@ export interface SignupParams {
    */
   mobile_number?: string;
   mobile_consent_version?: string;
+  /** Task 1.7: the `phone_proof` of a verified WhatsApp code, sent only while verification is active. A secret: never logged. */
+  mobile_verification?: string;
 }
 
 /** Signs in with email/password (R-012) and stores the returned tokens. */
@@ -45,7 +47,11 @@ export async function signup(params: SignupParams): Promise<void> {
     nickname: params.nickname,
     terms_version: termsVersion,
     ...(params.mobile_number && params.mobile_consent_version
-      ? { mobile_number: params.mobile_number, mobile_consent_version: params.mobile_consent_version }
+      ? {
+          mobile_number: params.mobile_number,
+          mobile_consent_version: params.mobile_consent_version,
+          ...(params.mobile_verification ? { mobile_verification: params.mobile_verification } : {}),
+        }
       : {}),
   });
 }
@@ -59,11 +65,13 @@ export async function completeSignup(params: {
   ticket: string;
   mobile_number: string;
   mobile_consent_version: string;
+  mobile_verification?: string;
 }): Promise<UserProfile> {
   const { data } = await apiClient.post<AuthResponse>('/auth/complete-signup', {
     ticket: params.ticket,
     mobile_number: params.mobile_number,
     mobile_consent_version: params.mobile_consent_version,
+    ...(params.mobile_verification ? { mobile_verification: params.mobile_verification } : {}),
   });
   await saveTokens(data.access_token, data.refresh_token);
   return data.user;

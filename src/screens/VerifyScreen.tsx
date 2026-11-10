@@ -12,18 +12,10 @@
  *   "Failed to resend verification code. Please try again." on resend.
  */
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { resendVerification, verifyEmail } from '../auth/emailAuth';
-import Button from '../components/Button';
-import InlineError from '../components/InlineError';
-import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
-import ScreenContainer from '../components/ScreenContainer';
-import TextField from '../components/TextField';
-import TextLink from '../components/TextLink';
-import { useFieldChain } from '../hooks/useFieldChain';
-import { colors, spacing, typography } from '../theme/tokens';
+import VerificationCodeForm from '../components/auth/VerificationCodeForm';
 import {
   isNetworkError,
   isRateLimitError,
@@ -44,6 +36,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
 
   const [code, setCode] = useState('');
   const [cooldown, setCooldown] = useState(0);
+  const [focusSignal, setFocusSignal] = useState(0);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +52,6 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     return () => clearInterval(timer);
   }, [cooldown]);
 
-  const chain = useFieldChain(['code']);
-
   const handleVerify = async (): Promise<void> => {
     setError(null);
     setInfoMessage(null);
@@ -70,7 +61,7 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     const trimmedCode = code.trim();
     if (!trimmedCode || trimmedCode.length !== 6) {
       setError(t('mob.verify.bad_code'));
-      chain.focus('code');
+      setFocusSignal(value => value + 1);
       return;
     }
 
@@ -139,107 +130,29 @@ export default function VerifyScreen({ navigation, route }: Props): React.JSX.El
     cooldown > 0 ? t('mob.verify.resend_cooldown', { seconds: cooldown }) : t('mob.verify.resend');
 
   return (
-    <ScreenContainer edges="bottom">
-    <KeyboardAwareScreen contentContainerStyle={styles.container}>
-      <Text style={styles.title}>{t('mob.verify.title')}</Text>
-
-      {explanation ? <Text style={styles.explanation}>{explanation}</Text> : null}
-
-      <Text style={styles.instructions}>
-        {t('mob.verify.instructions')}{'\n'}
-        <Text style={styles.emailHighlight}>{email}</Text>
-      </Text>
-
-      <TextField
-        style={styles.input}
-        {...chain.props('code')}
-        placeholder={t('mob.verify.code_placeholder')}
-        autoCapitalize="none"
-        keyboardType="number-pad"
-        textContentType="oneTimeCode"
-        maxLength={6}
-        value={code}
-        onChangeText={setCode}
-        editable={!isVerifying && !isResending}
-      />
-
-      {retryError && retryAction ? (
-        <InlineError
-          message={retryError}
-          onRetry={retryAction}
-          retryLabel={t('mob.common.retry')}
-        />
-      ) : error ? (
-        <Text style={styles.error}>{error}</Text>
-      ) : null}
-
-      {infoMessage ? <Text style={styles.info}>{infoMessage}</Text> : null}
-
-      <Button
-        label={t('mob.verify.submit')}
-        onPress={handleVerify}
-        loading={isVerifying}
-        disabled={isResending}
-        style={styles.button}
-      />
-
-      <Button
-        label={resendLabel}
-        variant="secondary"
-        onPress={handleResend}
-        loading={isResending}
-        disabled={resendDisabled}
-        style={styles.button}
-      />
-
-      <TextLink
-        label={t('mob.common.back')}
-        onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Login'))}
-        disabled={isVerifying || isResending}
-        style={styles.link}
-      />
-    </KeyboardAwareScreen>
-    </ScreenContainer>
+    <VerificationCodeForm
+      title={t('mob.verify.title')}
+      explanation={explanation}
+      instructions={t('mob.verify.instructions')}
+      target={email}
+      codePlaceholder={t('mob.verify.code_placeholder')}
+      code={code}
+      onChangeCode={setCode}
+      verifyLabel={t('mob.verify.submit')}
+      onVerify={handleVerify}
+      isVerifying={isVerifying}
+      resendLabel={resendLabel}
+      onResend={handleResend}
+      isResending={isResending}
+      resendDisabled={resendDisabled}
+      backLabel={t('mob.common.back')}
+      onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Login'))}
+      retryLabel={t('mob.common.retry')}
+      error={error}
+      info={infoMessage}
+      retryError={retryError}
+      retryAction={retryAction}
+      focusSignal={focusSignal}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flexGrow: 1, justifyContent: 'center', padding: spacing.lg },
-  title: {
-    ...typography.h1,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  explanation: {
-    ...typography.body,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  instructions: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginBottom: spacing.lg,
-    textAlign: 'center',
-  },
-  emailHighlight: {
-    ...typography.bodyBold,
-    color: colors.textPrimary,
-  },
-  input: { marginBottom: spacing.md, textAlign: 'center', letterSpacing: 4 },
-  error: {
-    ...typography.body,
-    color: colors.error,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  info: {
-    ...typography.body,
-    color: colors.success,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  button: { marginBottom: spacing.md },
-  link: { alignSelf: 'center', minHeight: 44, justifyContent: 'center' },
-});
