@@ -56,7 +56,8 @@ import {
 } from './googleAuth';
 import { isGoogleSignInAvailable } from './googleSupport';
 import { signIn as appleSignIn } from './appleAuth';
-import { login as emailLogin } from './emailAuth';
+import { completeSignup as completeSignupRequest, login as emailLogin } from './emailAuth';
+import type { SignupRequiredResponse, SocialSignInResult } from './types';
 import { startPushRegistration } from '../notifications/pushRegistration';
 import type { UserProfile } from '../types/user';
 import { perfLog, startSpan, logSessionHeader } from '../diagnostics/perfLog';
@@ -71,8 +72,18 @@ interface AuthContextValue {
    * Never set by a failed sign-in attempt or a user-initiated sign-out.
    */
   sessionExpired: boolean;
-  signInWithGoogle: () => Promise<void>;
-  signInWithApple: () => Promise<void>;
+  /** Resolves `'signup_required'` when a NEW person must give a mobile number first (NE-01): the caller opens Complete your account. */
+  signInWithGoogle: () => Promise<SocialOutcome>;
+  signInWithApple: () => Promise<SocialOutcome>;
+  /**
+   * NE-01: the social sign-in waiting for a mobile number. In memory only: never persisted, never logged, dropped on cancel, success or a 400.
+   * Holds what the Complete your account screen shows (email, name) and the single-use ticket.
+   */
+  pendingSignup: PendingSignup | null;
+  /** `POST /auth/complete-signup`; on success the person is signed in exactly like a normal login. A failure throws and keeps the ticket. */
+  completeSignup: (mobileNumber: string, consentVersion: string) => Promise<void>;
+  /** Drops the ticket (back to Login, 400, unmount). */
+  cancelPendingSignup: () => void;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   /**
@@ -93,6 +104,9 @@ interface AuthContextValue {
    */
   updateUser: (patch: Partial<UserProfile>) => void;
 }
+
+export type SocialOutcome = 'signed_in' | 'signup_required';
+export type PendingSignup = Pick<SignupRequiredResponse, 'email' | 'display_name'>;
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -387,15 +401,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     setUser(profile);
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
-    setSessionExpired(false);
-    establishSession(await googleSignIn());
-  }, [establishSession]);
+  // NE-01: the single-use ticket lives in a ref (never state, props, route params or storage); the state holds only what the screen shows.
+  const signupTicketRef = useRef<string | null>(null);
+  const [pendingSignup, setPendingSignup] = useState<PendingSignup | null>(null);
+  const cancelPendingSignup = useCallback(() => {
+    signupTicketRef.current = null;
+    setPendingSignup(null);
+  }, []);
 
-  const signInWithApple = useCallback(async () => {
+  const finishSocial = useCallback(
+    (result: SocialSignInResult): SocialOutcome => {
+      if (result.kind === 'signup_required') {
+        signupTicketRef.current = result.signup.signup_ticket;
+        setPendingSignup({ email: result.signup.email, display_name: result.signup.display_name });
+        return 'signup_required';
+      }
+      cancelPendingSignup();
+      establishSession(result.user);
+      return 'signed_in';
+    },
+    [establishSession, cancelPendingSignup],
+  );
+
+  const signInWithGoogle = useCallback(async (): Promise<SocialOutcome> => {
     setSessionExpired(false);
-    establishSession(await appleSignIn());
-  }, [establishSession]);
+    return finishSocial(await googleSignIn());
+  }, [finishSocial]);
+
+  const signInWithApple = useCallback(async (): Promise<SocialOutcome> => {
+    setSessionExpired(false);
+    return finishSocial(await appleSignIn());
+  }, [finishSocial]);
+
+  const completeSignup = useCallback(
+    async (mobileNumber: string, consentVersion: string): Promise<void> => {
+      const ticket = signupTicketRef.current;
+      if (!ticket) {
+        throw new Error('no pending sign-up');
+      }
+      setSessionExpired(false);
+      const profile = await completeSignupRequest({
+        ticket,
+        mobile_number: mobileNumber,
+        mobile_consent_version: consentVersion,
+      });
+      cancelPendingSignup();
+      establishSession(profile);
+    },
+    [establishSession, cancelPendingSignup],
+  );
 
   const signInWithEmail = useCallback(
     async (email: string, password: string) => {
@@ -432,6 +486,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       sessionExpired,
       signInWithGoogle,
       signInWithApple,
+      pendingSignup,
+      completeSignup,
+      cancelPendingSignup,
       signInWithEmail,
       signOut,
       sessionCheckPendingRetry,
@@ -445,6 +502,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       sessionExpired,
       signInWithGoogle,
       signInWithApple,
+      pendingSignup,
+      completeSignup,
+      cancelPendingSignup,
       signInWithEmail,
       signOut,
       sessionCheckPendingRetry,

@@ -66,7 +66,9 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
     setRetryAction(null);
     setIsSubmitting(true);
     try {
-      await signInWithApple();
+      if ((await signInWithApple()) === 'signup_required') {
+        navigation.navigate('CompleteAccount');
+      }
     } catch (err) {
       if (!(err instanceof AppleSignInCancelledError)) {
         setError(t('mob.auth.apple_failed'));
@@ -90,7 +92,9 @@ export default function LoginScreen({ navigation, route }: Props): React.JSX.Ele
     setRetryAction(null);
     setIsSubmitting(true);
     try {
-      await signInWithGoogle();
+      if ((await signInWithGoogle()) === 'signup_required') {
+        navigation.navigate('CompleteAccount');
+      }
     } catch (err) {
       if (!(err instanceof GoogleSignInCancelledError)) {
         if (isNetworkError(err)) {

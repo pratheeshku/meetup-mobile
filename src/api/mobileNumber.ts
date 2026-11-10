@@ -2,7 +2,7 @@
  * Mobile number endpoints (DES-MEETUP-ADDENDUM-profile-onboarding.md §4.1,
  * §5, AD-1, AD-3, AD-9). Contract verified against the live OpenAPI
  * document (`GET /openapi.json`):
- * - `GET /public/consent/mobile-number` -> `{ version, text }` (unauthenticated)
+ * - `GET /public/consent/mobile-number` -> `{ version, text, phone_required, whatsapp_otp_enabled }` (unauthenticated)
  * - `GET /public/country-codes` -> `[{ iso2, name, dial_code, sort_order,
  *   enabled }]` in `sort_order` (unauthenticated)
  * - `PATCH /users/me` with `UserUpdate.mobile_number: string | null` and
@@ -20,6 +20,10 @@ interface RequestOptions {
 export interface MobileConsent {
   version: string;
   text: string;
+  /** NE-01b: admin flag `phone_required_enabled`. False (or absent, an older server) = the number stays optional / hidden at sign-up. */
+  phone_required: boolean;
+  /** NE-01a: admin flag `whatsapp_otp_enabled`. Read only: no OTP screen is built (Task 1.6 first). */
+  whatsapp_otp_enabled: boolean;
 }
 
 export interface CountryCode {
@@ -32,10 +36,15 @@ export interface CountryCode {
 }
 
 export async function getMobileConsent(options?: RequestOptions): Promise<MobileConsent> {
-  const { data } = await apiClient.get<MobileConsent>('/public/consent/mobile-number', {
+  const { data } = await apiClient.get<Partial<MobileConsent> & { version: string; text: string }>('/public/consent/mobile-number', {
     correlationId: options?.correlationId,
   });
-  return { version: data.version, text: data.text };
+  return {
+    version: data.version,
+    text: data.text,
+    phone_required: data.phone_required === true,
+    whatsapp_otp_enabled: data.whatsapp_otp_enabled === true,
+  };
 }
 
 /**

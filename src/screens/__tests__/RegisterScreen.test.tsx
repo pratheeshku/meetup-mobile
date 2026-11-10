@@ -1,10 +1,5 @@
 import React from 'react';
 import { StyleSheet, TextInput } from 'react-native';
-declare const require: (id: string) => any;
-declare const __dirname: string;
-
-const fs = require('fs');
-const path = require('path');
 
 import { apiClient } from '../../api/client';
 import { act, pressables, pressableWithText, renderAsync, texts } from '../../test-utils/render';
@@ -122,19 +117,13 @@ describe('RegisterScreen', () => {
     expect(sentBody).not.toHaveProperty('invite');
   });
 
-  it('[Source check] confirms a mobile number field does not exist in the screen source or rendered tree', async () => {
+  it('[Execute] shows no mobile number field while the server does not require it (NE-01: the field is covered in RegisterPhone.test.tsx)', async () => {
     const root = await mount();
-    const inputs = root.findAllByType(TextInput);
-    for (const input of inputs) {
+    for (const input of root.findAllByType(TextInput)) {
       const placeholder = (input.props.placeholder ?? '').toLowerCase();
       expect(placeholder).not.toContain('mobile');
       expect(placeholder).not.toContain('phone');
     }
-
-    const sourcePath = path.resolve(__dirname, '../RegisterScreen.tsx');
-    const sourceContent = fs.readFileSync(sourcePath, 'utf8');
-    expect(sourceContent).not.toContain('mobile_number');
-    expect(sourceContent).not.toContain('mobile_consent');
   });
 
   it('[Execute] toggles password visibility with show/hide button', async () => {

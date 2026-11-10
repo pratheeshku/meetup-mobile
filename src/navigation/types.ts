@@ -10,6 +10,8 @@ export type { GamesScope };
 export type AuthStackParamList = {
   Login: { successMessage?: string; email?: string } | undefined;
   Register: undefined;
+  /** NE-01: a new social sign-in gives its mobile number here. The ticket stays in AuthContext memory, never in params. */
+  CompleteAccount: undefined;
   Verify: { email: string; explanation?: string };
   ForgotPassword: { email?: string } | undefined;
   /** Post-submit summary. Also the signed-out host for account deletion. */

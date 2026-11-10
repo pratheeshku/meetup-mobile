@@ -69,7 +69,7 @@ describe('appleAuth', () => {
 
       const user = await signIn();
 
-      expect(user).toEqual(mockUser);
+      expect(user).toEqual({ kind: 'signed_in', user: mockUser });
       expect(mockPerformRequest).toHaveBeenCalledWith({
         requestedOperation: appleAuth.Operation.LOGIN,
         requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],

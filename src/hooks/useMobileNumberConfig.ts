@@ -26,7 +26,8 @@ export type MobileNumberConfig =
       reloadConsent: () => Promise<boolean>;
     };
 
-export function useMobileNumberConfig(): MobileNumberConfig {
+/** `reloadKey`: a new value reads the consent text and the country list again (a sign-up that found the number required after a failed read). */
+export function useMobileNumberConfig(reloadKey = 0): MobileNumberConfig {
   const [state, setState] = useState<
     { status: 'loading' } | { status: 'unavailable' } | { status: 'ready'; consent: MobileConsent; countries: CountryCode[] }
   >({ status: 'loading' });
@@ -34,6 +35,9 @@ export function useMobileNumberConfig(): MobileNumberConfig {
 
   useEffect(() => {
     mounted.current = true;
+    if (reloadKey > 0) {
+      setState({ status: 'loading' });
+    }
     withCorrelationId(async correlationId => {
       try {
         const [consent, countries] = await Promise.all([
@@ -57,7 +61,7 @@ export function useMobileNumberConfig(): MobileNumberConfig {
     return () => {
       mounted.current = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const reloadConsent = useCallback(async (): Promise<boolean> => {
     try {
