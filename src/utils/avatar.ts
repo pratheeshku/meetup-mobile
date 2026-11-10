@@ -22,7 +22,8 @@ import { ENV } from '../../config/env';
  * or guesses a key; it only resolves one it received from the backend.
  */
 export function getAvatarUrl(storageKey: string | null | undefined): string | null {
-  if (!storageKey) {
+  if (!storageKey || !ENV.AVATAR_BUCKET_BASE_URL) {
+    // No key, or no bucket configured (e.g. staging until its bucket exists).
     return null;
   }
   return `${ENV.AVATAR_BUCKET_BASE_URL}/${storageKey}`;

@@ -12,5 +12,15 @@
     "apiBaseUrl": "https://meetupaws.duckdns.org",
     "avatarBucketBaseUrl": "https://meetup-prod-mediabucket-0vfp2elpzttk.s3.ap-southeast-1.amazonaws.com"
   },
-  "labelsCacheTtlSeconds": 300
+  "labelsCacheTtlSeconds": 300,
+  "environments": {
+    "staging": {
+      "applicationId": "org.duckdns.meetups.staging",
+      "displayName": "GameOn SG Staging",
+      "apiBaseUrl": "https://meetupstg.duckdns.org",
+      "avatarBucketBaseUrl": "",
+      "privacyPolicyUrl": "https://meetupstg.duckdns.org/privacy",
+      "termsOfUseUrl": "https://meetupstg.duckdns.org/terms"
+    }
+  }
 }

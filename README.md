@@ -23,7 +23,15 @@ override at build time with `API_BASE_URL` in the gitignored root `.env`.
 npm run build:aab
 ```
 
-Output: `android/app/build/outputs/bundle/release/app-release.aab`.
+Output: `android/app/build/outputs/bundle/productionRelease/app-production-release.aab`.
+
+**Staging** (side-by-side app `org.duckdns.meetups.staging`, backend
+`https://meetupstg.duckdns.org`; values in `config/appConfig.json` →
+`environments.staging`): `npm run build:aab:staging` → 
+`android/app/build/outputs/bundle/stagingRelease/app-staging-release.aab`.
+It never edits `android/version.properties`; an optional `STAGING_VERSION_CODE=N`
+(or `-PstagingVersionCode=N`) overrides the staging `versionCode`, and is
+rejected for production builds.
 
 The script (`scripts/build-release-aab.sh`):
 1. checks the signing file exists and that `android/app/google-services.json`
@@ -31,7 +39,7 @@ The script (`scripts/build-release-aab.sh`):
 2. increments `versionCode` in `android/version.properties` (strictly
    increasing; never reused even if the build later fails) — **commit the
    bumped file after each release build**;
-3. runs `./gradlew bundleRelease`;
+3. runs `./gradlew bundleProductionRelease` (`bundleStagingRelease` for staging);
 4. verifies the AAB is signed by the Shuttlr upload key.
 
 **Signing.** The upload keystore lives outside the repo at
@@ -41,12 +49,12 @@ through the `KEY_PROPERTIES_FILE` environment variable, which the script sets
 to that path by default (override by exporting `KEY_PROPERTIES_FILE`). CI can
 supply the same file contents from secrets. Back up `~/keys/shuttlr/`; keystore
 patterns (`*.jks`, `*.keystore`, `*.p12`, `key.properties`) are gitignored.
-Do not run `./gradlew bundleRelease` directly without `KEY_PROPERTIES_FILE`
+Do not run `./gradlew bundleProductionRelease` / `bundleStagingRelease` directly without `KEY_PROPERTIES_FILE`
 set — it would fall back to `android/key.properties`, which may hold another
 app's key.
 
 **Firebase.** `android/app/google-services.json` (gitignored) must contain a
-client for `org.duckdns.meetups`: register that package (plus the upload-key
+client for `org.duckdns.meetups` and `org.duckdns.meetups.staging`: register those packages (plus the upload-key
 SHA-1/SHA-256 from `keytool -list -v -keystore ~/keys/shuttlr/upload-keystore.jks`,
 and later the Play App Signing key's) in the Firebase console, download the new
 file and place it there.

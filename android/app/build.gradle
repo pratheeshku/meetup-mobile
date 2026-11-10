@@ -10,6 +10,7 @@ apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.grad
 
 import java.util.Properties
 import java.io.FileInputStream
+import groovy.json.JsonSlurper
 
 // Release signing config is loaded from android/key.properties, which is
 // never committed to version control (see .gitignore). CI injects this
@@ -49,6 +50,28 @@ if (!appVersionName) {
     throw new GradleException("android/version.properties must define versionName")
 }
 
+// Staging identity (applicationId) comes from config/appConfig.json
+// ("environments.staging"), the single source shared with the JS config and the
+// iOS script. The staging app name lives in src/staging/res/values/strings.xml
+// (kept equal to displayName by config/__tests__/appConfig.test.ts).
+def stagingConfig = new JsonSlurper().parse(rootProject.file("../config/appConfig.json")).environments.staging
+if (!stagingConfig?.applicationId) {
+    throw new GradleException("config/appConfig.json must define environments.staging.applicationId")
+}
+
+// Optional versionCode override for STAGING builds only (CI): -PstagingVersionCode=N
+// or STAGING_VERSION_CODE=N. Production versionCode/versionName come only from
+// android/version.properties; giving the override to a production build fails
+// (see the pre*Build check below).
+def stagingVersionCodeRaw = (project.findProperty("stagingVersionCode") ?: System.getenv("STAGING_VERSION_CODE"))?.toString()?.trim()
+Integer stagingVersionCodeOverride = null
+if (stagingVersionCodeRaw) {
+    if (!(stagingVersionCodeRaw ==~ /[1-9][0-9]*/)) {
+        throw new GradleException("stagingVersionCode / STAGING_VERSION_CODE must be a positive integer, got '${stagingVersionCodeRaw}'")
+    }
+    stagingVersionCodeOverride = stagingVersionCodeRaw.toInteger()
+}
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -67,8 +90,8 @@ react {
     /* Variants */
     //   The list of variants to that are debuggable. For those we're going to
     //   skip the bundling of the JS bundle and the assets. Default is "debug", "debugOptimized".
-    //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    // debuggableVariants = ["liteDebug", "liteDebugOptimized", "prodDebug", "prodDebugOptimized"]
+    //   With flavors the variant names change, so they must be listed.
+    debuggableVariants = ["productionDebug", "productionDebugOptimized", "stagingDebug", "stagingDebugOptimized"]
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
@@ -133,7 +156,6 @@ android {
     // Play/device identity. They differ since the Shuttlr identity change.
     namespace "com.meetupmobile"
     defaultConfig {
-        applicationId "org.duckdns.meetups"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode
@@ -143,6 +165,27 @@ android {
         // not the applicationId, and the two now differ — so this MUST stay
         // the namespace ("com.meetupmobile"), not the applicationId.
         resValue "string", "build_config_package", "com.meetupmobile"
+    }
+    // Two flavors on one dimension. The applicationId is the only identity that
+    // differs (the namespace and build_config_package above stay shared), so the
+    // staging app installs side by side with production. APP_ENV is exposed to JS
+    // by react-native-config (BuildConfig) and selects the config in config/env.ts;
+    // the flavor value wins over any APP_ENV in .env.
+    flavorDimensions "environment"
+    productFlavors {
+        production {
+            dimension "environment"
+            applicationId "org.duckdns.meetups"
+            buildConfigField "String", "APP_ENV", "\"production\""
+        }
+        staging {
+            dimension "environment"
+            applicationId stagingConfig.applicationId
+            buildConfigField "String", "APP_ENV", "\"staging\""
+            if (stagingVersionCodeOverride != null) {
+                versionCode stagingVersionCodeOverride
+            }
+        }
     }
     signingConfigs {
         debug {
@@ -190,6 +233,15 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
+    }
+}
+
+// Fail production builds when the staging-only versionCode override is present.
+tasks.matching { it.name ==~ /preProduction(Debug|Release)Build/ }.configureEach {
+    doFirst {
+        if (stagingVersionCodeRaw) {
+            throw new GradleException("stagingVersionCode / STAGING_VERSION_CODE is only valid for the staging flavor; production versionCode comes from android/version.properties. Unset it or build staging.")
+        }
     }
 }
 

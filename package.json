@@ -3,9 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
+    "android": "react-native run-android --mode=productionDebug --appId org.duckdns.meetups",
     "check:labels": "node scripts/check-labels.js",
     "build:aab": "bash scripts/build-release-aab.sh",
+    "build:aab:staging": "bash scripts/build-release-aab.sh --flavor staging",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",

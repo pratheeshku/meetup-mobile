@@ -13,8 +13,18 @@
  */
 import Config from 'react-native-config';
 
+import { getAllowedLinkHosts, selectEnvironment } from './environment';
+
+// Build-time environment (production unless the build sets APP_ENV=staging).
+// See config/environment.ts.
+const selected = selectEnvironment(Config.APP_ENV, {
+  apiBaseUrl: Config.API_BASE_URL,
+  avatarBucketBaseUrl: Config.AVATAR_BUCKET_BASE_URL,
+});
+
 export const ENV = {
-  API_BASE_URL: Config.API_BASE_URL ?? 'https://meetups.duckdns.org',
+  APP_ENV: selected.appEnv,
+  API_BASE_URL: selected.apiBaseUrl,
   CORRELATION_ID_HEADER: 'X-Correlation-ID',
   // OAuth client ID for Google Sign-In (R-010, R-018). Never a secret in
   // the OAuth-client sense (it's not a client *secret*), but still kept
@@ -30,11 +40,20 @@ export const ENV = {
   // never hardcoded). `avatar_storage_key` from the backend is appended
   // to this to form the full display URL. Config-overridable via .env,
   // same as API_BASE_URL.
-  AVATAR_BUCKET_BASE_URL:
-    Config.AVATAR_BUCKET_BASE_URL ?? 'https://meetup.hel1.your-objectstorage.com',
+  AVATAR_BUCKET_BASE_URL: selected.avatarBucketBaseUrl,
   // Perf-diagnostics build flag (perf-diagnostics task).
   // Set PERF_LOG=true in .env to enable the diagnostics layer at build time.
   // Default empty = OFF. Parsed explicitly (not truthy-cast) to avoid the
   // "false" string being truthy under naive boolean coercion.
   PERF_LOG: Config.PERF_LOG ?? '',
 };
+
+// Read live from appConfig (not cached in ENV) so the legal links follow the
+// build environment: production values are the top-level appConfig URLs.
+export const getPrivacyPolicyUrl = (): string =>
+  selectEnvironment(Config.APP_ENV).privacyPolicyUrl;
+export const getTermsOfUseUrl = (): string => selectEnvironment(Config.APP_ENV).termsOfUseUrl;
+
+/** Hostnames accepted for in-app https links in this build (see config/environment.ts). */
+export const getAllowedLinkHostnames = (): string[] =>
+  getAllowedLinkHosts(Config.APP_ENV, ENV.API_BASE_URL);

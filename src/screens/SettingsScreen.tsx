@@ -28,6 +28,7 @@ import {
 } from '../api/profile';
 import { withCorrelationId } from '../api/correlationId';
 import appConfig from '../../config/appConfig.json';
+import { getPrivacyPolicyUrl, getTermsOfUseUrl } from '../../config/env';
 import { toHttpsUrl } from '../utils/httpsUrl';
 import { openLink } from '../utils/openLink';
 import { copyTextToClipboard } from '../utils/shareLink';
@@ -70,8 +71,8 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const reportFormUrl = toHttpsUrl(appConfig.reportFormUrl);
-  const privacyPolicyUrl = toHttpsUrl(appConfig.privacyPolicyUrl);
-  const termsOfUseUrl = toHttpsUrl(appConfig.termsOfUseUrl);
+  const privacyPolicyUrl = toHttpsUrl(getPrivacyPolicyUrl());
+  const termsOfUseUrl = toHttpsUrl(getTermsOfUseUrl());
   const supportLink = toSupportLink(appConfig.supportContact);
 
   const loadSettings = useCallback(async () => {

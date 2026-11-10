@@ -32,6 +32,7 @@ import {
   View,
 } from 'react-native';
 
+import { getAllowedLinkHostnames } from '../../config/env';
 import {
   getNotificationHistory,
   getUnreadCount,
@@ -89,7 +90,7 @@ function openNotification(item: NotificationHistoryItem): void {
   const parsedUrl = absoluteUrlOf(url);
   // A web-relative url (a team notification) is not a link the app can open: the row routes by its type below instead of showing an error.
   if (url && parsedUrl) {
-    const isApiOrWebHost = parsedUrl.protocol === 'https:' && parsedUrl.hostname === 'meetups.duckdns.org';
+    const isApiOrWebHost = parsedUrl.protocol === 'https:' && getAllowedLinkHostnames().includes(parsedUrl.hostname);
     const isAppScheme = parsedUrl.protocol === 'shuttlr:' || parsedUrl.protocol === 'meetup:';
     if (isApiOrWebHost || isAppScheme) {
       Linking.openURL(url).catch(() => {
