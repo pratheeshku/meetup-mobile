@@ -21,6 +21,7 @@ import {
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 
 import { useT } from '../../labels/LabelsContext';
+import { dashSize } from '../../theme/dashboardTheme';
 import {
   borderWidth,
   colors,
@@ -33,6 +34,7 @@ import type { VenueSnapshot } from '../../types/venue';
 import { buildGoogleMapsUrl } from '../../utils/mapsUrl';
 import { copyTextToClipboard } from '../../utils/shareLink';
 import { CrossIcon, ChevronRightIcon } from '../icons/ActionIcons';
+import { PinLineIcon } from '../icons/ListCardIcons';
 import { PinIcon } from '../icons/SharedIcons';
 import Toast from '../Toast';
 import VenueDetailCard from './VenueDetailCard';
@@ -110,11 +112,12 @@ export default function VenueRow({
         accessibilityRole="button"
         accessibilityLabel={`${t('mob.gv.venue_title')}: ${name}`}
         onPress={() => setOpen(true)}
-        style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
+        style={({ pressed }) => [styles.row, showAddress ? styles.listRow : null, pressed ? styles.pressed : null]}
         testID="venue-row"
       >
-        <View style={styles.pinBox}>
-          <PinIcon size={18} />
+        <View style={[styles.pinBox, showAddress ? styles.listPinBox : null]}>
+          {/* List rows (NE-06): the board's white line pin on the accent box. */}
+          {showAddress ? <PinLineIcon size={18} color={colors.white} /> : <PinIcon size={18} />}
         </View>
         {showAddress && address ? (
           <View style={styles.nameColumn}>
@@ -223,6 +226,9 @@ const styles = StyleSheet.create({
     minHeight: sizes.touchTarget,
     paddingVertical: spacing.xs,
   },
+  // List card (NE-06 board): 44 high row, 12 between the pin box and the text.
+  listRow: { minHeight: dashSize.touchTarget, paddingVertical: 0 },
+  listPinBox: { marginRight: spacing.sm + spacing.xs },
   pressed: { opacity: 0.8 },
   pinBox: {
     width: ICON_BOX,

@@ -19,15 +19,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 
 import { GroupsIcon } from '../icons/DashboardIcons';
 import { ShieldIcon } from '../icons/SharedIcons';
-import {
-  ClockIcon,
-  MapPinIcon,
-  OwnerCrownIcon,
-  PeopleGreenIcon,
-} from '../icons/HomeV2Icons';
+import { OwnerCrownIcon, PeopleGreenIcon } from '../icons/HomeV2Icons';
+import { ClockLineIcon, PeopleLineIcon, PinLineIcon } from '../icons/ListCardIcons';
 import { getRolePillColor, ROLE_BADGE_LABEL_KEY } from '../GroupCard';
 import Badge from '../Badge';
 import LifecycleStatusChip, { getLifecycleStatusText } from '../LifecycleStatusChip';
@@ -47,6 +44,7 @@ import type { GameBadge } from '../../utils/gameLists';
 import { useSportDisplayName } from '../../utils/labels';
 import type { LabelKey } from '../../labels/fallbackLabels';
 import { useUserMenu } from '../../hooks/useUserMenu';
+import type { UserMenuApi } from '../../hooks/useUserMenu';
 import UserMenuSheet from '../user/UserMenuSheet';
 import UserPressable from '../user/UserPressable';
 
@@ -88,7 +86,6 @@ export function UnifiedCard({
   belowCount,
   perfScreen,
 }: UnifiedCardProps): React.JSX.Element {
-  const t = useT();
   const hasAvatars = (avatars && avatars.length > 0) || moreCount > 0;
   // The 22 px avatars: tap only, View Details from the card's own data, no card request (UM-06).
   const menu = useUserMenu({ context: { type: 'none' } });
@@ -106,40 +103,13 @@ export function UnifiedCard({
           </Text>
           <View style={styles.detailsContainer}>{details}</View>
           {hasAvatars ? (
-            <View style={styles.avatarRow}>
-              {avatars.slice(0, 4).map((person, idx) => (
-                <View key={idx} style={[styles.avatarOverlap, { zIndex: 10 - idx }]}>
-                  <UserPressable
-                    person={{
-                      userId: person.user_id ?? null,
-                      displayName: person.display_name,
-                      photoUrl: person.photo_url,
-                    }}
-                    menu={menu}
-                    longPress={false}
-                    accessibilityLabel={person.display_name}
-                    testID="card-avatar"
-                  >
-                    <UserAvatar
-                      imageUrl={person.photo_url}
-                      name={person.display_name}
-                      size={22}
-                      accessibilityLabel={person.display_name}
-                      perfScreen={perfScreen}
-                    />
-                  </UserPressable>
-                </View>
-              ))}
-              {moreCount > 0 ? (
-                <View
-                  style={styles.moreBadge}
-                  accessible
-                  accessibilityLabel={t('mob.home.more_avatars', { count: moreCount })}
-                >
-                  <Text style={styles.moreText}>+{moreCount}</Text>
-                </View>
-              ) : null}
-            </View>
+            <AvatarStack
+              avatars={avatars}
+              moreCount={moreCount}
+              menu={menu}
+              perfScreen={perfScreen}
+              style={styles.avatarRowSpacing}
+            />
           ) : null}
         </View>
 
@@ -184,6 +154,160 @@ export function UnifiedCard({
       )}
     <UserMenuSheet menu={menu} />
     </>
+  );
+}
+
+/**
+ * Overlapped initials/photo avatars (max four) plus the "+n" badge. Each avatar is a tap target that opens the user menu from the card's own
+ * data (UM-06); the controller and its sheet belong to the card that renders this.
+ */
+function AvatarStack({
+  avatars,
+  moreCount,
+  menu,
+  perfScreen,
+  style,
+}: {
+  avatars: AvatarItem[];
+  moreCount: number;
+  menu: UserMenuApi;
+  perfScreen?: string;
+  style?: StyleProp<ViewStyle>;
+}): React.JSX.Element {
+  const t = useT();
+  return (
+    <View style={[styles.avatarRow, style]}>
+      {avatars.slice(0, 4).map((person, idx) => (
+        <View key={idx} style={[styles.avatarOverlap, { zIndex: 10 - idx }]}>
+          <UserPressable
+            person={{
+              userId: person.user_id ?? null,
+              displayName: person.display_name,
+              photoUrl: person.photo_url,
+            }}
+            menu={menu}
+            longPress={false}
+            accessibilityLabel={person.display_name}
+            testID="card-avatar"
+          >
+            <UserAvatar
+              imageUrl={person.photo_url}
+              name={person.display_name}
+              size={22}
+              accessibilityLabel={person.display_name}
+              perfScreen={perfScreen}
+            />
+          </UserPressable>
+        </View>
+      ))}
+      {moreCount > 0 ? (
+        <View
+          style={styles.moreBadge}
+          accessible
+          accessibilityLabel={t('mob.home.more_avatars', { count: moreCount })}
+        >
+          <Text style={styles.moreText}>+{moreCount}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+interface ListCardProps {
+  dateString: string;
+  title: string;
+  /** Chips left of the title, in order; the row wraps. */
+  chips: React.ReactNode;
+  /** The rows between the header and the footer; the card spaces them. */
+  children: React.ReactNode;
+  /** Footer, left: avatars (game) or the registered count (tournament). */
+  footerLeft: React.ReactNode;
+  /** Footer, right of a game card: the "x of y going" count before the button. */
+  footerCount?: React.ReactNode;
+  actionButtonLabel: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+  /** Rendered under the footer (the Join button of a game card). */
+  belowFooter?: React.ReactNode;
+}
+
+/**
+ * Phone list card of games and tournaments (DES-MEETUP-ADDENDUM-nov10-enhancements AD-7, NE-06; boards docs/design/list-cards/): full-width
+ * rows under a header of date block, chips and title, and a footer with the action button. The card and the button open the detail.
+ */
+function ListCard({
+  dateString,
+  title,
+  chips,
+  children,
+  footerLeft,
+  footerCount,
+  actionButtonLabel,
+  onPress,
+  accessibilityLabel,
+  belowFooter,
+}: ListCardProps): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, styles.listCard, pressed ? styles.pressed : null]}
+      testID="list-card"
+    >
+      <View style={styles.listHeader}>
+        <DateBlock dateString={dateString} />
+        <View style={styles.listHeaderText}>
+          <View style={styles.listChips}>{chips}</View>
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+      </View>
+
+      {children}
+
+      <View style={styles.listFooter}>
+        {footerLeft}
+        <View style={styles.listFooterRight}>
+          {footerCount}
+          <View style={styles.actionBtnList} testID="list-card-button">
+            <Text style={styles.actionBtnText}>{actionButtonLabel}</Text>
+          </View>
+        </View>
+      </View>
+      {belowFooter}
+    </Pressable>
+  );
+}
+
+/** "x of y going" / "n registered": green line people icon and the count in the brand blue (board footer). */
+function ListCardCount({ label }: { label: string }): React.JSX.Element {
+  return (
+    <View style={styles.countContainer} testID="list-card-count">
+      <PeopleLineIcon size={14} color={colors.success} />
+      <Text style={styles.countText}>{label}</Text>
+    </View>
+  );
+}
+
+/** One 12 px text row of a list card: 16 px line icon (optional) and the text. */
+function ListCardRow({
+  icon,
+  children,
+  testID,
+}: {
+  icon?: React.ReactNode;
+  children: string;
+  testID?: string;
+}): React.JSX.Element {
+  return (
+    <View style={styles.listRowLine} testID={testID}>
+      {icon}
+      <Text style={styles.metaText} numberOfLines={1}>
+        {children}
+      </Text>
+    </View>
   );
 }
 
@@ -347,65 +471,66 @@ export function UnifiedGameCard({
   const badgeWithStatus = showStatus ? (
     <>
       {badgeNode}
-      <View style={badgeNode ? styles.statusPillGap : undefined}>
-        <LifecycleStatusChip
-          status={effectiveStatus}
-          closureOutcome={event.closure_outcome}
-        />
-      </View>
+      <LifecycleStatusChip
+        status={effectiveStatus}
+        closureOutcome={event.closure_outcome}
+      />
     </>
   ) : (
     badgeNode
   );
 
+  const menu = useUserMenu({ context: { type: 'none' } });
+
   return (
-    <UnifiedCard
-      leftTile={<DateBlock dateString={event.starts_at} />}
-      title={event.title}
-      details={
-        <View>
-          <View style={styles.detailRow}>
-            <ClockIcon size={16} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {timeLine}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <MapPinIcon size={16} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {venue}
-            </Text>
-          </View>
+    <>
+      <ListCard
+        dateString={event.starts_at}
+        title={event.title}
+        chips={badgeWithStatus}
+        footerLeft={
+          preview.length > 0 || more > 0 ? (
+            <AvatarStack avatars={preview} moreCount={more} menu={menu} perfScreen={perfScreen} />
+          ) : (
+            <View />
+          )
+        }
+        footerCount={<ListCardCount label={countLabel} />}
+        actionButtonLabel={t('mob.home.view_game')}
+        onPress={onPress}
+        accessibilityLabel={
+          showStatus
+            ? `${event.title}, ${timeLine}, ${venue}, ${statusLabel}, ${countLabel}`
+            : `${event.title}, ${timeLine}, ${venue}, ${countLabel}`
+        }
+        belowFooter={
+          onJoin ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${t('mob.game_detail.join')}, ${event.title}`}
+              accessibilityState={{ disabled: joining, busy: joining }}
+              disabled={joining}
+              onPress={onJoin}
+              style={({ pressed }) => [styles.joinBtn, joining ? styles.joinBtnBusy : null, pressed ? styles.pressed : null]}
+              testID="card-join-button"
+            >
+              <Text style={styles.joinBtnText}>{t('mob.game_detail.join')}</Text>
+            </Pressable>
+          ) : null
+        }
+      >
+        <View style={styles.listRows}>
+          <ListCardRow icon={<ClockLineIcon size={16} color={colors.textSecondary} />} testID="game-card-time">
+            {timeLine}
+          </ListCardRow>
+          {/* The venue of a game stays plain text: not a tap target. */}
+          <ListCardRow icon={<PinLineIcon size={16} color={colors.accent} />} testID="game-card-venue">
+            {venue}
+          </ListCardRow>
         </View>
-      }
-      avatars={preview}
-      moreCount={more}
-      countLabel={countLabel}
-      actionButtonLabel={t('mob.home.view_game')}
-      onPress={onPress}
-      accessibilityLabel={
-        showStatus
-          ? `${event.title}, ${timeLine}, ${venue}, ${statusLabel}, ${countLabel}`
-          : `${event.title}, ${timeLine}, ${venue}, ${countLabel}`
-      }
-      badge={badgeWithStatus}
-      perfScreen={perfScreen}
-      belowCount={
-        onJoin ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${t('mob.game_detail.join')}, ${event.title}`}
-            accessibilityState={{ disabled: joining, busy: joining }}
-            disabled={joining}
-            onPress={onJoin}
-            style={({ pressed }) => [styles.joinBtn, joining ? styles.joinBtnBusy : null, pressed ? styles.pressed : null]}
-            testID="card-join-button"
-          >
-            <Text style={styles.joinBtnText}>{t('mob.game_detail.join')}</Text>
-          </Pressable>
-        ) : null
-      }
-    />
+      </ListCard>
+      <UserMenuSheet menu={menu} />
+    </>
   );
 }
 
@@ -470,76 +595,56 @@ export function UnifiedTournamentCard({
       <TournamentRegistrationBadge status={tournament.current_user_registration_status} />
     ) : null;
   const statusLabel = getLifecycleStatusText(tournament.lifecycle_status, tournament.closure_outcome, t);
-  const statusChip = (
-    <LifecycleStatusChip
-      status={tournament.lifecycle_status}
-      closureOutcome={tournament.closure_outcome}
-    />
-  );
   const combinedBadge = (
     <>
       {badgeNode}
-      <View style={badgeNode ? styles.statusPillGap : undefined}>
-        {statusChip}
-      </View>
-      {tournament.is_full === true ? (
-        <View style={styles.statusPillGap}>
-          <Badge label={t('web.tournament.full_chip')} variant="warning" />
-        </View>
-      ) : null}
+      <LifecycleStatusChip
+        status={tournament.lifecycle_status}
+        closureOutcome={tournament.closure_outcome}
+      />
+      {tournament.is_full === true ? <Badge label={t('web.tournament.full_chip')} variant="warning" /> : null}
     </>
   );
 
   return (
-    <UnifiedCard
-      leftTile={<DateBlock dateString={tournament.starts_at} />}
+    <ListCard
+      dateString={tournament.starts_at}
       title={tournament.name}
-      details={
-        <View>
-          <View style={styles.detailRow}>
-            <ClockIcon size={16} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {dateFormatted}
-            </Text>
-          </View>
-          <VenueRow
-            snapshot={tournament.venue_snapshot}
-            fallbackText={venue}
-            venueName={tournament.venue_name}
-            venueAddress={tournament.venue_address}
-            venueLat={tournament.venue_lat}
-            venueLng={tournament.venue_lng}
-            venuePlaceId={tournament.venue_place_id}
-            showAddress
-          />
-          <ListInviteTypeRow
-            visibility={tournament.visibility}
-            groups={(tournament.audience_groups ?? []).map(group => ({ key: group.id, name: group.name }))}
-            menuContext={{ type: 'tournament', id: tournament.id }}
-          />
-          <View style={styles.detailRow}>
-            <PeopleGreenIcon size={16} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {sportFormat}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.metaText} numberOfLines={1}>
-              {t('mob.tournament.status_line', { status: tournament.status })}
-            </Text>
-          </View>
-        </View>
-      }
-      avatars={[]}
-      moreCount={0}
-      countLabel={countLabel}
+      chips={combinedBadge}
+      footerLeft={countLabel ? <ListCardCount label={countLabel} /> : <View />}
       actionButtonLabel={t('mob.done.btn_view_tournament')}
       onPress={onPress}
       accessibilityLabel={[tournament.name, dateFormatted, venue, sportFormat, statusLabel, countLabel]
         .filter(Boolean)
         .join(', ')}
-      badge={combinedBadge}
-    />
+    >
+      <VenueRow
+        snapshot={tournament.venue_snapshot}
+        fallbackText={venue}
+        venueName={tournament.venue_name}
+        venueAddress={tournament.venue_address}
+        venueLat={tournament.venue_lat}
+        venueLng={tournament.venue_lng}
+        venuePlaceId={tournament.venue_place_id}
+        showAddress
+      />
+      <View style={styles.listRows}>
+        <ListCardRow icon={<ClockLineIcon size={16} color={colors.textSecondary} />} testID="tournament-card-time">
+          {dateFormatted}
+        </ListCardRow>
+        <ListInviteTypeRow
+          visibility={tournament.visibility}
+          groups={(tournament.audience_groups ?? []).map(group => ({ key: group.id, name: group.name }))}
+          menuContext={{ type: 'tournament', id: tournament.id }}
+        />
+        <ListCardRow icon={<PeopleLineIcon size={16} color={colors.success} />} testID="tournament-card-sport">
+          {sportFormat}
+        </ListCardRow>
+        <ListCardRow testID="tournament-card-status">
+          {t('mob.tournament.status_line', { status: tournament.status })}
+        </ListCardRow>
+      </View>
+    </ListCard>
   );
 }
 
@@ -713,9 +818,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 4,
   },
-  statusPillGap: {
-    marginLeft: spacing.xs,
-  },
   rolePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -788,7 +890,54 @@ const styles = StyleSheet.create({
   avatarRow: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  avatarRowSpacing: {
     marginTop: 7,
+  },
+  // List cards (NE-06 boards): 10 between sections, full card width, 4 between the text rows.
+  listCard: {
+    gap: spacing.sm + 2,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+  },
+  listHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  listChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  listRows: {
+    gap: spacing.xs,
+  },
+  listRowLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  listFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm + 4,
+  },
+  listFooterRight: {
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 4,
+  },
+  actionBtnList: {
+    backgroundColor: '#E3ECFF',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm + 6,
+    paddingVertical: 7,
   },
   avatarOverlap: {
     marginRight: -8,
@@ -824,7 +973,8 @@ const styles = StyleSheet.create({
   joinBtn: {
     minWidth: 56,
     height: 28,
-    marginTop: 4,
+    marginTop: 0,
+    alignSelf: 'flex-end',
     paddingHorizontal: spacing.sm + 4,
     borderRadius: radius.md,
     backgroundColor: dash.brand,
