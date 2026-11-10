@@ -13,8 +13,8 @@ import { appleAuth } from '@invertase/react-native-apple-authentication';
 import { getTermsVersion } from './terms';
 import { apiClient } from '../api/client';
 import { saveTokens } from '../storage/tokens';
-import type { AuthResponse } from './types';
-import type { UserProfile } from '../types/user';
+import { isSignupRequired } from './types';
+import type { AuthResponse, SignupRequiredResponse, SocialSignInResult } from './types';
 
 export class AppleSignInCancelledError extends Error {
   constructor() {
@@ -27,7 +27,7 @@ export function isAppleSignInAvailable(): boolean {
   return Platform.OS === 'ios' && Boolean(appleAuth?.isSupported);
 }
 
-export async function signIn(): Promise<UserProfile> {
+export async function signIn(): Promise<SocialSignInResult> {
   if (Platform.OS !== 'ios') {
     throw new Error('Apple sign-in is only available on iOS');
   }
@@ -86,12 +86,16 @@ export async function signIn(): Promise<UserProfile> {
   }
 
   try {
-    const { data } = await apiClient.post<AuthResponse>(
+    const { data } = await apiClient.post<AuthResponse | SignupRequiredResponse>(
       '/auth/oauth/apple/callback',
       payload,
     );
+    // NE-01: a new person while the phone is required gets a ticket and no session.
+    if (isSignupRequired(data)) {
+      return { kind: 'signup_required', signup: data };
+    }
     await saveTokens(data.access_token, data.refresh_token);
-    return data.user;
+    return { kind: 'signed_in', user: data.user };
   } catch {
     // Never expose server detail
     throw new Error('Apple sign-in failed. Please try again.');

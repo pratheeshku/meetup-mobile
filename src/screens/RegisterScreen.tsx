@@ -3,8 +3,13 @@
  * DES-MEETUP-ADDENDUM-email-auth AD-5).
  *
  * Password lives only in this component's local state for the duration
- * of the active input session (R-111, P10). Exactly four fields are
- * sent: email, password, display_name, nickname. No mobile number field.
+ * of the active input session (R-111, P10). The fields sent are email, password,
+ * display_name, nickname and the terms version. NE-01: while the admin flag
+ * `phone_required_enabled` is on (read from `GET /public/consent/mobile-number`)
+ * a required mobile number field shows and `mobile_number` and
+ * `mobile_consent_version` are sent too; with the flag off (or the consent
+ * unreadable) the screen and the request are exactly as before. The number is
+ * PII: never logged, never echoed in an error.
  *
  * Error handling:
  * - 429: "Too many attempts. Try again in a minute." (inline error)
@@ -32,7 +37,10 @@ import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import ScreenContainer from '../components/ScreenContainer';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import MobileNumberInput from '../components/MobileNumberInput';
+import type { MobileNumberChange } from '../components/MobileNumberInput';
 import { useFieldChain } from '../hooks/useFieldChain';
+import { useMobileNumberConfig } from '../hooks/useMobileNumberConfig';
 import { colors, spacing, typography } from '../theme/tokens';
 import {
   isNetworkError,
@@ -62,6 +70,12 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
   const [isEmailRegistered, setIsEmailRegistered] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
+  // NE-01: the number is asked only while the server says it is required.
+  const [configKey, setConfigKey] = useState(0);
+  const phoneConfig = useMobileNumberConfig(configKey);
+  const phoneRequired = phoneConfig.status === 'ready' && phoneConfig.consent.phone_required;
+  const [mobile, setMobile] = useState<MobileNumberChange>({ e164: null, isEmpty: true });
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   const handleAppleSignIn = async (): Promise<void> => {
     if (!auth?.signInWithApple) {
@@ -72,7 +86,9 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
     setRetryAction(null);
     setIsSubmitting(true);
     try {
-      await auth.signInWithApple();
+      if ((await auth.signInWithApple()) === 'signup_required') {
+        navigation.navigate('CompleteAccount');
+      }
     } catch (err) {
       if (!(err instanceof AppleSignInCancelledError)) {
         setError(t('mob.auth.apple_failed'));
@@ -104,6 +120,7 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
     setIsEmailRegistered(false);
     setRetryError(null);
     setRetryAction(null);
+    setPhoneError(null);
 
     const trimmedNickname = nickname.trim();
     const trimmedDisplayName = displayName.trim();
@@ -123,6 +140,16 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
       return;
     }
 
+    // UX check only: the server decides (422). Same helper as the profile field (`buildE164` inside `MobileNumberInput`).
+    if (phoneRequired && mobile.isEmpty) {
+      setPhoneError(t('mob.register.phone_required'));
+      return;
+    }
+    if (phoneRequired && mobile.e164 === null) {
+      setPhoneError(t('mob.mobile_number.invalid'));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const termsVersion = await getTermsVersion();
@@ -132,6 +159,9 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         display_name: trimmedDisplayName,
         nickname: trimmedNickname,
         terms_version: termsVersion,
+        ...(phoneRequired && mobile.e164 && phoneConfig.status === 'ready'
+          ? { mobile_number: mobile.e164, mobile_consent_version: phoneConfig.consent.version }
+          : {}),
       });
       navigation.navigate('Verify', { email: trimmedEmail });
     } catch (err) {
@@ -152,8 +182,23 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         return;
       }
 
-      const axiosErr = err as AxiosError<{ detail?: string | Array<{ msg?: string }> }>;
-      const detail = axiosErr.response?.data?.detail;
+      const axiosErr = err as AxiosError<{ detail?: unknown }>;
+      const detail = axiosErr.response?.data?.detail as string | Array<{ msg?: string }> | { code?: string } | undefined;
+
+      // NE-01: the consent text changed while the form was open. Read it again; the person reviews it and registers again.
+      if (
+        axiosErr.response?.status === 409 &&
+        typeof detail === 'object' &&
+        detail !== null &&
+        !Array.isArray(detail) &&
+        detail.code === 'consent_version_stale'
+      ) {
+        if (phoneConfig.status === 'ready') {
+          await phoneConfig.reloadConsent();
+        }
+        setPhoneError(t('mob.mobile_number.reconfirm'));
+        return;
+      }
 
       let detailString = '';
       if (typeof detail === 'string') {
@@ -162,7 +207,17 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
         detailString = detail.map(item => item.msg ?? '').join(' ');
       }
 
-      if (detailString.includes('Email already registered')) {
+      if (axiosErr.response?.status === 422 && detailString.includes('Mobile number is required')) {
+        if (phoneRequired) {
+          setPhoneError(t('mob.register.phone_required'));
+        } else {
+          // The flag was on but the consent could not be read: the field was not shown. Read it again so it can be.
+          setError(t('mob.register.phone_unavailable'));
+          setConfigKey(key => key + 1);
+        }
+      } else if (axiosErr.response?.status === 422 && detailString.includes('Invalid mobile number format')) {
+        setPhoneError(t('mob.mobile_number.invalid'));
+      } else if (detailString.includes('Email already registered')) {
         setError(t('mob.register.email_taken'));
         setIsEmailRegistered(true);
       } else if (detailString.includes('Nickname already taken')) {
@@ -253,6 +308,20 @@ export default function RegisterScreen({ navigation }: Props): React.JSX.Element
           <Text style={styles.showHideText}>{showPassword ? t('mob.register.hide') : t('mob.register.show')}</Text>
         </Pressable>
       </View>
+
+      {phoneRequired && phoneConfig.status === 'ready' ? (
+        <View style={styles.input} testID="register-mobile-number">
+          <MobileNumberInput
+            countries={phoneConfig.countries}
+            consentText={phoneConfig.consent.text}
+            onChange={next => {
+              setMobile(next);
+              setPhoneError(null);
+            }}
+            error={phoneError}
+          />
+        </View>
+      ) : null}
 
       {termsOfUseUrl ? (
         <View style={styles.agreeRow}>

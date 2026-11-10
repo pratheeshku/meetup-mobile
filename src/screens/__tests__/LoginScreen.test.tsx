@@ -333,3 +333,26 @@ describe('LoginScreen Apple sign-in and iOS elements (AD-6, AD-8, AD-9)', () => 
   });
 });
 
+describe('social sign-in of a new person while the phone is required (NE-01)', () => {
+  it('Apple answering signup_required opens Complete your account', async () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    mockAuth.signInWithApple.mockResolvedValueOnce('signup_required');
+    const root = await mount();
+    mockNavigate.mockClear();
+    await act(async () => {
+      pressableWithText(root, 'Continue with Apple').props.onPress();
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('CompleteAccount');
+  });
+
+  it('a normal sign-in does not navigate', async () => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    mockAuth.signInWithApple.mockResolvedValueOnce('signed_in');
+    const root = await mount();
+    mockNavigate.mockClear();
+    await act(async () => {
+      pressableWithText(root, 'Continue with Apple').props.onPress();
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+});

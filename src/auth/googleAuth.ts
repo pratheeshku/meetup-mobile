@@ -48,8 +48,8 @@ import { withCorrelationId } from '../api/correlationId';
 import { deregisterDeviceToken } from '../notifications/fcm';
 import { describeError } from '../utils/logSafeError';
 import { isGoogleSignInAvailable } from './googleSupport';
-import type { AuthResponse } from './types';
-import type { UserProfile } from '../types/user';
+import { isSignupRequired } from './types';
+import type { AuthResponse, SignupRequiredResponse, SocialSignInResult } from './types';
 
 let isConfigured = false;
 
@@ -94,7 +94,7 @@ export class GoogleSignInCancelledError extends Error {
  * session-establishment sequence as email/password (§3.5): exchange the
  * Google ID token for platform tokens, store them, return the profile.
  */
-export async function signIn(): Promise<UserProfile> {
+export async function signIn(): Promise<SocialSignInResult> {
   if (!isGoogleSignInAvailable()) {
     throw new Error('Google sign-in is not available on this platform');
   }
@@ -123,13 +123,17 @@ export async function signIn(): Promise<UserProfile> {
 
   const termsVersion = await getTermsVersion();
 
-  const { data } = await apiClient.post<AuthResponse>('/auth/oauth/google/callback', {
+  const { data } = await apiClient.post<AuthResponse | SignupRequiredResponse>('/auth/oauth/google/callback', {
     id_token: response.data.idToken,
     terms_version: termsVersion,
   });
 
+  // NE-01: a new person while the phone is required gets a ticket and no session (tokens are saved only for a session).
+  if (isSignupRequired(data)) {
+    return { kind: 'signup_required', signup: data };
+  }
   await saveTokens(data.access_token, data.refresh_token);
-  return data.user;
+  return { kind: 'signed_in', user: data.user };
 }
 
 /**

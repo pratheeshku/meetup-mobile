@@ -41,3 +41,27 @@ export interface AuthResponse {
    */
   joined_group_id?: string | null;
 }
+
+/**
+ * `POST /auth/oauth/{provider}/callback` for a NEW person while `phone_required_enabled` is on (NE-01, AD-3): HTTP 200, no session. The ticket
+ * is single-use, lives 10 minutes and is held in memory only (never stored, never logged).
+ */
+export interface SignupRequiredResponse {
+  signup_required: true;
+  signup_ticket: string;
+  expires_in: number;
+  email: string;
+  display_name: string;
+}
+
+export function isSignupRequired(data: unknown): data is SignupRequiredResponse {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    (data as { signup_required?: unknown }).signup_required === true &&
+    typeof (data as { signup_ticket?: unknown }).signup_ticket === 'string'
+  );
+}
+
+/** What a social sign-in step hands to the caller: a session, or the need to complete the account first. */
+export type SocialSignInResult = { kind: 'signed_in'; user: UserProfile } | { kind: 'signup_required'; signup: SignupRequiredResponse };

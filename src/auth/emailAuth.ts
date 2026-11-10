@@ -17,6 +17,12 @@ export interface SignupParams {
   display_name: string;
   nickname: string;
   terms_version?: string;
+  /**
+   * NE-01: E.164 number and the consent version it was given under. Sent only when both are given; with the admin flag off the screen gives
+   * neither and the body is exactly as before. PII: never logged.
+   */
+  mobile_number?: string;
+  mobile_consent_version?: string;
 }
 
 /** Signs in with email/password (R-012) and stores the returned tokens. */
@@ -38,7 +44,29 @@ export async function signup(params: SignupParams): Promise<void> {
     display_name: params.display_name,
     nickname: params.nickname,
     terms_version: termsVersion,
+    ...(params.mobile_number && params.mobile_consent_version
+      ? { mobile_number: params.mobile_number, mobile_consent_version: params.mobile_consent_version }
+      : {}),
   });
+}
+
+/**
+ * `POST /auth/complete-signup` (NE-01, AD-3): turns a social `signup_ticket` and the person's number into an account and a session, and stores
+ * the tokens. The ticket and the number go only into the request body: never logged, never kept. A 400 means the ticket is invalid, expired
+ * or used (sign in again); a 422 or 409 does not use the ticket up.
+ */
+export async function completeSignup(params: {
+  ticket: string;
+  mobile_number: string;
+  mobile_consent_version: string;
+}): Promise<UserProfile> {
+  const { data } = await apiClient.post<AuthResponse>('/auth/complete-signup', {
+    ticket: params.ticket,
+    mobile_number: params.mobile_number,
+    mobile_consent_version: params.mobile_consent_version,
+  });
+  await saveTokens(data.access_token, data.refresh_token);
+  return data.user;
 }
 
 /**

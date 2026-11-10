@@ -111,6 +111,7 @@ import {
 import { claimAuthHandoff } from './showCompletion';
 import CompletionScreen from '../screens/CompletionScreen';
 import LoginScreen from '../screens/LoginScreen';
+import CompleteAccountScreen from '../screens/CompleteAccountScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import VerifyScreen from '../screens/VerifyScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
@@ -193,6 +194,7 @@ const tabScreenOptions = ({
 };
 
 function AuthStack(): React.JSX.Element {
+  const t = useT();
   // Claimed once per mount. Account deletion sets this before sign-out so
   // the summary is still here after the app stack is replaced.
   const [initialRouteName] = useState<'Login' | 'Completion'>(() =>
@@ -202,6 +204,11 @@ function AuthStack(): React.JSX.Element {
     <AuthStackNav.Navigator initialRouteName={initialRouteName} screenOptions={stackScreenOptions}>
       <AuthStackNav.Screen name="Login" component={LoginScreen} />
       <AuthStackNav.Screen name="Register" component={RegisterScreen} />
+      <AuthStackNav.Screen
+        name="CompleteAccount"
+        component={CompleteAccountScreen}
+        options={{ title: t('mob.complete_account.title') }}
+      />
       <AuthStackNav.Screen name="Verify" component={VerifyScreen} />
       <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <AuthStackNav.Screen
