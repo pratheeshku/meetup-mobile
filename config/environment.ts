@@ -62,3 +62,26 @@ export function selectEnvironment(
   }
   throw new Error(`Unknown APP_ENV "${appEnv}" (expected "production" or "staging")`);
 }
+
+// Hosts the app already accepted for in-app https links in production, kept so
+// production does not narrow. Staging accepts only its own API host.
+export const PRODUCTION_LINK_HOSTS = ['meetups.duckdns.org', 'meetupaws.duckdns.org'];
+
+/**
+ * Hostnames accepted for in-app https links: the host of `apiBaseUrl`, plus the
+ * legacy production hosts when `appEnv` is production (or unset). Unknown
+ * `appEnv` throws, as in `selectEnvironment`.
+ */
+export function getAllowedLinkHosts(appEnv: string | null | undefined, apiBaseUrl: string): string[] {
+  const { appEnv: resolved } = selectEnvironment(appEnv);
+  const hosts: string[] = [];
+  try {
+    hosts.push(new URL(apiBaseUrl).hostname);
+  } catch {
+    // unparseable base URL: contributes no host
+  }
+  if (resolved === 'production') {
+    hosts.push(...PRODUCTION_LINK_HOSTS);
+  }
+  return Array.from(new Set(hosts));
+}

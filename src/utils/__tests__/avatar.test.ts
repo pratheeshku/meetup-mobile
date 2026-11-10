@@ -33,3 +33,21 @@ describe('getAvatarUrl', () => {
     );
   });
 });
+
+describe('getAvatarUrl with an empty bucket base URL', () => {
+  it('returns null instead of a relative "/<key>"', () => {
+    jest.isolateModules(() => {
+      jest.doMock('../../../config/env', () => ({ ENV: { AVATAR_BUCKET_BASE_URL: '' } }));
+      const { getAvatarUrl: empty } = require('../avatar');
+      expect(empty('avatars/u-1.png')).toBeNull();
+    });
+  });
+
+  it('still builds the URL for a non-empty base', () => {
+    jest.isolateModules(() => {
+      jest.doMock('../../../config/env', () => ({ ENV: { AVATAR_BUCKET_BASE_URL: 'https://b.test' } }));
+      const { getAvatarUrl: full } = require('../avatar');
+      expect(full('avatars/u-1.png')).toBe('https://b.test/avatars/u-1.png');
+    });
+  });
+});

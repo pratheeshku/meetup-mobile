@@ -4,6 +4,7 @@
  */
 import appConfig from '../appConfig.json';
 import {
+  getAllowedLinkHosts,
   PRODUCTION_API_BASE_URL,
   PRODUCTION_AVATAR_BUCKET_BASE_URL,
   selectEnvironment,
@@ -86,5 +87,24 @@ describe('environments.staging in appConfig.json', () => {
     expect(gradle).toContain('applicationId stagingConfig.applicationId');
     expect(gradle).toContain('namespace "com.meetupmobile"');
     expect(gradle).toContain('"build_config_package", "com.meetupmobile"');
+  });
+});
+
+describe('getAllowedLinkHosts', () => {
+  it.each([undefined, '', 'production'])('%p: API host plus both production hosts', value => {
+    const hosts = getAllowedLinkHosts(value, 'https://meetups.duckdns.org');
+    expect(hosts).toContain('meetups.duckdns.org');
+    expect(hosts).toContain('meetupaws.duckdns.org');
+    expect(hosts).not.toContain('meetupstg.duckdns.org');
+  });
+
+  it('production with an overridden API host still accepts the legacy hosts', () => {
+    const hosts = getAllowedLinkHosts('production', 'https://other.test');
+    expect(hosts).toEqual(expect.arrayContaining(['other.test', 'meetups.duckdns.org', 'meetupaws.duckdns.org']));
+  });
+
+  it('staging accepts only the staging API host (meetups link rejected, meetupstg accepted)', () => {
+    const hosts = getAllowedLinkHosts('staging', selectEnvironment('staging').apiBaseUrl);
+    expect(hosts).toEqual(['meetupstg.duckdns.org']);
   });
 });

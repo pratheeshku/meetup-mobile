@@ -32,7 +32,7 @@ import {
   View,
 } from 'react-native';
 
-import { ENV } from '../../config/env';
+import { getAllowedLinkHostnames } from '../../config/env';
 import {
   getNotificationHistory,
   getUnreadCount,
@@ -73,15 +73,6 @@ function isKnownType(value: string): value is NotificationType {
   return (NOTIFICATION_TYPES as string[]).includes(value);
 }
 
-/** Host of the configured API/web base URL (production or staging, per build); null when unparseable. */
-function apiHostname(): string | null {
-  try {
-    return new URL(ENV.API_BASE_URL).hostname;
-  } catch {
-    return null;
-  }
-}
-
 /** The absolute `https`/app-scheme URL of a row, or null when it has none or is a web-relative path (teams-payments: `/#team-detail/<id>`). */
 function absoluteUrlOf(url: string | null | undefined): URL | null {
   if (!url) {
@@ -99,7 +90,7 @@ function openNotification(item: NotificationHistoryItem): void {
   const parsedUrl = absoluteUrlOf(url);
   // A web-relative url (a team notification) is not a link the app can open: the row routes by its type below instead of showing an error.
   if (url && parsedUrl) {
-    const isApiOrWebHost = parsedUrl.protocol === 'https:' && parsedUrl.hostname === apiHostname();
+    const isApiOrWebHost = parsedUrl.protocol === 'https:' && getAllowedLinkHostnames().includes(parsedUrl.hostname);
     const isAppScheme = parsedUrl.protocol === 'shuttlr:' || parsedUrl.protocol === 'meetup:';
     if (isApiOrWebHost || isAppScheme) {
       Linking.openURL(url).catch(() => {

@@ -13,7 +13,7 @@
  */
 import Config from 'react-native-config';
 
-import { selectEnvironment } from './environment';
+import { getAllowedLinkHosts, selectEnvironment } from './environment';
 
 // Build-time environment (production unless the build sets APP_ENV=staging).
 // See config/environment.ts.
@@ -53,3 +53,7 @@ export const ENV = {
 export const getPrivacyPolicyUrl = (): string =>
   selectEnvironment(Config.APP_ENV).privacyPolicyUrl;
 export const getTermsOfUseUrl = (): string => selectEnvironment(Config.APP_ENV).termsOfUseUrl;
+
+/** Hostnames accepted for in-app https links in this build (see config/environment.ts). */
+export const getAllowedLinkHostnames = (): string[] =>
+  getAllowedLinkHosts(Config.APP_ENV, ENV.API_BASE_URL);
