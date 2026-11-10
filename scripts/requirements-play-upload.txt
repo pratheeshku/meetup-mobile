@@ -1,0 +1,4 @@
+# Exact pins for scripts/play-upload-staging.py (installed by the staging-release workflow).
+google-api-python-client==2.202.0
+google-auth==2.62.1
+google-auth-httplib2==0.4.4
