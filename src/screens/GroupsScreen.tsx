@@ -13,7 +13,9 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { withCorrelationId } from '../api/correlationId';
 import { getGroups } from '../api/groups';
+import { getPendingTeams } from '../api/teams';
 import { useAuth } from '../auth/AuthContext';
 import EmptyState from '../components/EmptyState';
 import ErrorView from '../components/ErrorView';
@@ -24,6 +26,7 @@ import SegmentedSwitch from '../components/SegmentedSwitch';
 import TeamsSection from '../components/TeamsSection';
 import { borderWidth, colors, radius, spacing, typography } from '../theme/tokens';
 import type { Group } from '../types/group';
+import type { PendingTeams } from '../types/team';
 import type { GroupsStackParamList } from '../navigation/types';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
 import { useT } from '../labels/LabelsContext';
@@ -226,6 +229,20 @@ export default function GroupsScreen(props: Props): React.JSX.Element {
   const [section, setSection] = useState<Section>(requested === 'teams' ? 'teams' : 'groups');
   const [teamsVisited, setTeamsVisited] = useState(section === 'teams');
   const [teamsReload, setTeamsReload] = useState(0);
+  // NE-05: Pending (invitations to me, join requests on teams I captain). Read here, like the web, so the count shows before the section is opened.
+  // A failed read shows neither the section nor the badge.
+  const [pending, setPending] = useState<PendingTeams | null>(null);
+  const loadPending = useCallback(async (): Promise<void> => {
+    try {
+      setPending(await withCorrelationId(correlationId => getPendingTeams({ correlationId })));
+    } catch {
+      setPending(null);
+    }
+  }, []);
+  useEffect(() => {
+    loadPending();
+  }, [loadPending, teamsReload]);
+  useEffect(() => navigation.addListener?.('focus', () => loadPending()), [navigation, loadPending]);
 
   const changeSection = useCallback((next: Section) => {
     setSection(next);
@@ -272,7 +289,12 @@ export default function GroupsScreen(props: Props): React.JSX.Element {
         <SegmentedSwitch<Section>
           options={[
             { value: 'groups', label: t('mob.groups.switch_groups') },
-            { value: 'teams', label: t('mob.groups.switch_teams') },
+            {
+              value: 'teams',
+              label: t('mob.groups.switch_teams'),
+              badge: pending?.pending_count ?? 0,
+              badgeLabel: t('mob.teams.pending_badge_a11y', { count: pending?.pending_count ?? 0 }),
+            },
           ]}
           value={section}
           onChange={changeSection}
@@ -283,7 +305,13 @@ export default function GroupsScreen(props: Props): React.JSX.Element {
       </View>
       {teamsVisited ? (
         <View style={[styles.flex, section === 'teams' ? null : styles.hidden]}>
-          <TeamsSection onCreateTeam={openCreateTeam} onOpenTeam={openTeam} reloadKey={teamsReload} />
+          <TeamsSection
+            onCreateTeam={openCreateTeam}
+            onOpenTeam={openTeam}
+            reloadKey={teamsReload}
+            pending={pending}
+            onPendingChanged={loadPending}
+          />
         </View>
       ) : null}
     </View>

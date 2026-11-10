@@ -6,6 +6,7 @@ import {
   inviteToTeam,
   removeTeamMember,
   requestToJoinTeam,
+  getPendingTeams,
   respondToTeamInvite,
   respondToTeamRequest,
   updateTeam,
@@ -64,5 +65,23 @@ describe('team detail clients', () => {
     const team = await updateTeam('t-1', { name: 'Net Ninjas 2' }, { correlationId: 'c' });
     expect(patch).toHaveBeenLastCalledWith('/teams/t-1', { name: 'Net Ninjas 2' }, { correlationId: 'c' });
     expect(team.name).toBe('Net Ninjas 2');
+  });
+});
+
+describe('getPendingTeams (GET /teams/pending, NE-05)', () => {
+  it('reads the endpoint and returns invitations, requests and the server count', async () => {
+    const body = {
+      invitations: [{ team_id: 't-1', team_name: 'Smashers', sport: 'badminton', inviter_user_id: 'u-1', inviter_display_name: 'Aisha', created_at: 'x' }],
+      requests: [{ team_id: 't-2', team_name: 'Ninjas', sport: 'tennis', requester_user_id: 'u-2', requester_display_name: null, created_at: 'y' }],
+      pending_count: 2,
+    };
+    get.mockResolvedValueOnce({ data: body });
+    await expect(getPendingTeams({ correlationId: 'c' })).resolves.toEqual(body);
+    expect(get).toHaveBeenLastCalledWith('/teams/pending', { correlationId: 'c' });
+  });
+
+  it('treats a body without lists or count as empty', async () => {
+    get.mockResolvedValueOnce({ data: {} });
+    await expect(getPendingTeams()).resolves.toEqual({ invitations: [], requests: [], pending_count: 0 });
   });
 });

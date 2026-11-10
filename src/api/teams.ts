@@ -9,7 +9,7 @@
  * Mirrors the pattern established in `src/api/groups.ts`.
  */
 import { apiClient } from './client';
-import type { CreateTeamInput, Team, TeamMembership, UpdateTeamInput } from '../types/team';
+import type { CreateTeamInput, PendingTeams, Team, TeamMembership, UpdateTeamInput } from '../types/team';
 
 interface RequestOptions {
   correlationId?: string;
@@ -60,6 +60,21 @@ export async function getMyTeams(options?: RequestOptions): Promise<Team[]> {
     correlationId: options?.correlationId,
   });
   return Array.isArray(data) ? data.map(mapTeamApiItem) : [];
+}
+
+/**
+ * `GET /teams/pending` (NE-05, AD-5): invitations to the caller and join requests on teams the caller captains, with the server's
+ * `pending_count`. The actions reuse `respondToTeamInvite` and `respondToTeamRequest`.
+ */
+export async function getPendingTeams(options?: RequestOptions): Promise<PendingTeams> {
+  const { data } = await apiClient.get<Partial<PendingTeams>>('/teams/pending', {
+    correlationId: options?.correlationId,
+  });
+  return {
+    invitations: Array.isArray(data?.invitations) ? data.invitations : [],
+    requests: Array.isArray(data?.requests) ? data.requests : [],
+    pending_count: typeof data?.pending_count === 'number' ? data.pending_count : 0,
+  };
 }
 
 /**

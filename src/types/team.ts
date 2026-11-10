@@ -70,3 +70,30 @@ export interface UpdateTeamInput {
   name?: string;
   visibility?: TeamVisibility;
 }
+
+/** One row of `GET /teams/pending` `invitations`: an invitation to the caller (NE-05, AD-5). */
+export interface PendingTeamInvitation {
+  team_id: string;
+  team_name: string;
+  sport: string;
+  inviter_user_id: string;
+  inviter_display_name: string | null;
+  created_at: string;
+}
+
+/** One row of `GET /teams/pending` `requests`: a join request on a team the caller captains. */
+export interface PendingTeamRequest {
+  team_id: string;
+  team_name: string;
+  sport: string;
+  requester_user_id: string;
+  requester_display_name: string | null;
+  created_at: string;
+}
+
+/** `GET /teams/pending`. `pending_count` is the server's number (never recomputed here). */
+export interface PendingTeams {
+  invitations: PendingTeamInvitation[];
+  requests: PendingTeamRequest[];
+  pending_count: number;
+}

@@ -14,7 +14,7 @@ import { dash, dashRadius, dashSize } from '../theme/dashboardTheme';
 import { spacing, typography } from '../theme/tokens';
 
 interface SegmentedSwitchProps<T extends string> {
-  options: ReadonlyArray<{ value: T; label: string; shortLabel?: string }>;
+  options: ReadonlyArray<{ value: T; label: string; shortLabel?: string; badge?: number; badgeLabel?: string }>;
   value: T;
   onChange: (value: T) => void;
   compact?: boolean;
@@ -40,7 +40,7 @@ export default function SegmentedSwitch<T extends string>({
             ref={selected ? focus.ref : undefined}
             onBlur={selected ? focus.clear : undefined}
             accessibilityRole="tab"
-            accessibilityLabel={option.label}
+            accessibilityLabel={option.badge && option.badge > 0 && option.badgeLabel ? `${option.label}, ${option.badgeLabel}` : option.label}
             accessibilityState={{ selected }}
             onPress={() => onChange(option.value)}
             style={({ pressed }) => [
@@ -60,6 +60,11 @@ export default function SegmentedSwitch<T extends string>({
             >
               {compact && option.shortLabel ? option.shortLabel : option.label}
             </Text>
+            {option.badge && option.badge > 0 ? (
+              <View style={styles.badge} testID={`segment-badge-${option.value}`}>
+                <Text style={styles.badgeText}>{option.badge}</Text>
+              </View>
+            ) : null}
           </Pressable>
         );
       })}
@@ -85,6 +90,19 @@ const styles = StyleSheet.create({
   segmentCompact: { flex: 0, paddingHorizontal: spacing.xs },
   segmentSelected: { backgroundColor: dash.card },
   pressed: { opacity: 0.8 },
+  badge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: dashRadius.circle,
+    backgroundColor: dash.badgeRed,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { ...typography.label, fontSize: 11, color: dash.white, lineHeight: 14 },
   label: { ...typography.bodyBold, color: dash.textMuted, paddingHorizontal: spacing.sm },
   labelCompact: { ...typography.caption, fontWeight: '700', paddingHorizontal: spacing.xs },
   labelSelected: { color: dash.brand },
