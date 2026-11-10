@@ -20,7 +20,9 @@ import type { MobileNumberChange } from '../components/MobileNumberInput';
 import ScreenContainer from '../components/ScreenContainer';
 import TextField from '../components/TextField';
 import TextLink from '../components/TextLink';
+import PhoneCodeStep from '../components/auth/PhoneCodeStep';
 import { useMobileNumberConfig } from '../hooks/useMobileNumberConfig';
+import { usePhoneVerification } from '../hooks/usePhoneVerification';
 import { useT } from '../labels/LabelsContext';
 import type { AuthStackParamList } from '../navigation/types';
 import { colors, spacing, typography } from '../theme/tokens';
@@ -41,6 +43,12 @@ export default function CompleteAccountScreen({ navigation }: Props): React.JSX.
   // Set when this screen ends the sign-up itself (success or a dead ticket), so the "no pending sign-up" redirect does not also fire.
   const leaving = useRef(false);
   const cancel = auth?.cancelPendingSignup;
+  // Task 1.7: the WhatsApp code step, only while `phone_verification` is on; after a good code Continue runs again with the proof in memory.
+  const verificationOn = config.status === 'ready' && config.consent.phone_verification;
+  const continueRef = useRef<() => Promise<void>>(async () => undefined);
+  const otp = usePhoneVerification(() => {
+    continueRef.current();
+  });
 
   // Nothing waiting (the app was reopened, or the ticket was dropped): back to Login.
   useEffect(() => {
@@ -72,13 +80,37 @@ export default function CompleteAccountScreen({ navigation }: Props): React.JSX.
       setNumberError(t('mob.mobile_number.invalid'));
       return;
     }
+    // A proof held for this very number is reused; none: send a code (a 404 on send = no verification here, carry on without it).
+    let proof: string | null = null;
+    if (verificationOn) {
+      proof = otp.proofFor(mobile.e164);
+      if (!proof) {
+        setIsSubmitting(true);
+        const started = await otp.begin(mobile.e164);
+        setIsSubmitting(false);
+        if (started.kind === 'code') {
+          return;
+        }
+        if (started.kind === 'error') {
+          setNumberError(started.message);
+          return;
+        }
+      }
+    }
     setIsSubmitting(true);
     try {
       leaving.current = true;
-      await auth.completeSignup(mobile.e164, config.consent.version);
+      if (proof) {
+        await auth.completeSignup(mobile.e164, config.consent.version, proof);
+      } else {
+        await auth.completeSignup(mobile.e164, config.consent.version);
+      }
+      otp.clearProof();
       // Signed in: the app stack replaces this one.
     } catch (err) {
       leaving.current = false;
+      // Back on the form so the error shows; a good proof is kept for the retry, and the ticket always is (422/409).
+      otp.leaveStep();
       const axiosErr = err as AxiosError<{ detail?: unknown }>;
       const status = axiosErr.response?.status;
       const detail = axiosErr.response?.data?.detail;
@@ -97,6 +129,10 @@ export default function CompleteAccountScreen({ navigation }: Props): React.JSX.
         // The consent text changed: read it again; the person reviews it and continues again (the ticket is not used up).
         await config.reloadConsent();
         setNumberError(t('mob.mobile_number.reconfirm'));
+      } else if (status === 422 && typeof detail === 'string' && detail.includes('verification is required')) {
+        // The proof was refused or is gone (the ticket is kept): drop it and ask for a new code on the next Continue.
+        otp.clearProof();
+        setNumberError(t('mob.otp.required'));
       } else if (status === 422) {
         setNumberError(
           typeof detail === 'string' && detail.includes('required')
@@ -115,11 +151,18 @@ export default function CompleteAccountScreen({ navigation }: Props): React.JSX.
     }
   };
 
+  continueRef.current = handleContinue;
+
   const backToSignIn = (): void => {
+    otp.clearProof();
     leaving.current = true;
     auth?.cancelPendingSignup();
     navigation.replace('Login');
   };
+
+  if (otp.step) {
+    return <PhoneCodeStep otp={otp} />;
+  }
 
   return (
     <ScreenContainer edges="bottom">
@@ -156,9 +199,11 @@ export default function CompleteAccountScreen({ navigation }: Props): React.JSX.
             <MobileNumberInput
               countries={config.countries}
               consentText={config.consent.text}
+              initialValue={mobile.e164}
               onChange={next => {
                 setMobile(next);
                 setNumberError(null);
+                otp.clearProof();
               }}
               error={numberError}
             />
