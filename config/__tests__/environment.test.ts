@@ -16,12 +16,12 @@ describe('selectEnvironment', () => {
   it.each([undefined, null, '', 'production'])('%p selects production with the existing values', value => {
     expect(selectEnvironment(value)).toEqual({
       appEnv: 'production',
-      apiBaseUrl: 'https://meetups.duckdns.org',
+      apiBaseUrl: 'https://meetupaws.duckdns.org',
       avatarBucketBaseUrl: 'https://meetup.hel1.your-objectstorage.com',
       privacyPolicyUrl: 'https://meetupaws.duckdns.org/privacy',
       termsOfUseUrl: 'https://meetupaws.duckdns.org/terms',
     });
-    expect(PRODUCTION_API_BASE_URL).toBe('https://meetups.duckdns.org');
+    expect(PRODUCTION_API_BASE_URL).toBe('https://meetupaws.duckdns.org');
     expect(PRODUCTION_AVATAR_BUCKET_BASE_URL).toBe('https://meetup.hel1.your-objectstorage.com');
   });
 
@@ -92,7 +92,7 @@ describe('environments.staging in appConfig.json', () => {
 
 describe('getAllowedLinkHosts', () => {
   it.each([undefined, '', 'production'])('%p: API host plus both production hosts', value => {
-    const hosts = getAllowedLinkHosts(value, 'https://meetups.duckdns.org');
+    const hosts = getAllowedLinkHosts(value, 'https://meetupaws.duckdns.org');
     expect(hosts).toContain('meetups.duckdns.org');
     expect(hosts).toContain('meetupaws.duckdns.org');
     expect(hosts).not.toContain('meetupstg.duckdns.org');

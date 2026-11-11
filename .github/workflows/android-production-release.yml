@@ -1,0 +1,263 @@
+# Production Android release build (Task 3.3; DES-MEETUP-ADDENDUM-staging-pipeline AD-9, OI-3).
+#
+# Manual only (workflow_dispatch) and only on main. Builds and signs the PRODUCTION AAB
+# with the upload keystore held in the GitHub Environment "production" (owner is the
+# required reviewer; the environment is limited to main) and keeps it as a workflow
+# artefact. There is NO Play API upload: the owner uploads the AAB in the Play Console.
+#
+# SECRETS (Environment "production"; names only):
+#   ANDROID_KEYSTORE_B64               base64 of the upload keystore
+#   ANDROID_KEY_ALIAS                  key alias
+#   ANDROID_KEYSTORE_PASSWORD          keystore (store) password
+#   ANDROID_GOOGLE_SERVICES_JSON_B64   base64 of google-services.json (clients of both packages)
+#   ANDROID_KEY_PASSWORD               OPTIONAL; when absent the key password = the store password
+#
+# Versions: versionName and versionCode come ONLY from android/version.properties,
+# assigned by the architect. This workflow never computes or bumps a number.
+#
+# Version guard (no Play API here, so git tags are the record): before building, fail if
+# android-prod-v<versionName>-<versionCode> already exists or if the committed
+# versionCode is <= the highest versionCode in any android-prod-v* tag. After the AAB is
+# built, signed and verified, and the artefact is uploaded, the `tag` job creates and
+# pushes that tag. A failed or cancelled run creates no tag. Re-running a successful
+# version fails the guard by design.
+name: Android production release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-production-release
+  cancel-in-progress: false
+
+jobs:
+  ref-check:
+    name: Only main may run this
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Refuse any ref other than main
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow only runs on main (got '$GITHUB_REF')."
+            exit 1
+          fi
+
+  build:
+    name: Build, sign and verify the production AAB
+    needs: ref-check
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      version_name: ${{ steps.guard.outputs.VERSION_NAME }}
+      version_code: ${{ steps.guard.outputs.VERSION_CODE }}
+      tag: ${{ steps.guard.outputs.TAG }}
+    env:
+      AAB_PATH: android/app/build/outputs/bundle/productionRelease/app-production-release.aab
+    steps:
+      - name: Fail fast if a secret is missing
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_GOOGLE_SERVICES_JSON_B64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in ANDROID_KEYSTORE_B64 ANDROID_KEY_ALIAS ANDROID_KEYSTORE_PASSWORD ANDROID_GOOGLE_SERVICES_JSON_B64; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is empty or not defined in the 'production' Environment."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Check out (full history and tags for the version guard)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Version guard
+        id: guard
+        run: |
+          set -euo pipefail
+          echo "### Production Android release" >> "$GITHUB_STEP_SUMMARY"
+          GUARD_OUTPUT="$GITHUB_OUTPUT" bash scripts/android-prod-version-guard.sh
+
+      - name: Set scratch paths
+        run: |
+          set -euo pipefail
+          {
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/production-upload.keystore"
+            echo "KEY_PROPERTIES_FILE=$RUNNER_TEMP/production-key.properties"
+            echo "GOOGLE_SERVICES_TEMP=$RUNNER_TEMP/google-services.json"
+            echo "GOOGLE_SERVICES_LINK=$GITHUB_WORKSPACE/android/app/google-services.json"
+          } >> "$GITHUB_ENV"
+
+      # react-native 0.86.3 needs Node ^20.19.4 || ^22.13.0 || ^24.3.0 || >=25.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      # The repo needs JDK 17 (scripts/build-release-aab.sh). The runner image ships it.
+      - name: Select JDK 17
+        run: |
+          set -euo pipefail
+          if [ -z "${JAVA_HOME_17_X64:-}" ] || [ ! -d "$JAVA_HOME_17_X64" ]; then
+            echo "::error::JDK 17 (JAVA_HOME_17_X64) is not installed on this runner image."
+            exit 1
+          fi
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          "$JAVA_HOME_17_X64/bin/java" -version
+
+      - name: Install JavaScript dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: Decode the keystore and write the signing properties file (runner temp)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD_OPTIONAL: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          echo "::add-mask::$KEY_ALIAS"
+          echo "::add-mask::$KEYSTORE_PASSWORD"
+          key_password="${KEY_PASSWORD_OPTIONAL:-$KEYSTORE_PASSWORD}"
+          echo "::add-mask::$key_password"
+          printf '%s' "$KEYSTORE_B64" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$KEYSTORE_PATH"
+          if [ ! -s "$KEYSTORE_PATH" ]; then
+            echo "::error::ANDROID_KEYSTORE_B64 decoded to an empty file."
+            exit 1
+          fi
+          {
+            echo "storeFile=$KEYSTORE_PATH"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyPassword=$key_password"
+          } > "$KEY_PROPERTIES_FILE"
+          chmod 600 "$KEYSTORE_PATH" "$KEY_PROPERTIES_FILE"
+
+      # The Google Services plugin only reads android/app/google-services.json, so the
+      # decoded file stays in the runner temp directory and the workspace holds only a
+      # (git-ignored) link to it. Both are removed in the cleanup step.
+      - name: Decode google-services.json (runner temp) and check the production client
+        env:
+          GOOGLE_SERVICES_B64: ${{ secrets.ANDROID_GOOGLE_SERVICES_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$GOOGLE_SERVICES_B64" | python3 -c 'import base64, sys; sys.stdout.buffer.write(base64.b64decode(sys.stdin.read()))' > "$GOOGLE_SERVICES_TEMP"
+          python3 - "$GOOGLE_SERVICES_TEMP" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1]))
+          for c in data.get("client", []):
+              values = [k.get("current_key") for k in c.get("api_key", [])]
+              values.append(c.get("client_info", {}).get("mobilesdk_app_id"))
+              for value in values:
+                  if value:
+                      print(f"::add-mask::{value}")
+          names = [c["client_info"]["android_client_info"]["package_name"] for c in data.get("client", [])]
+          if "org.duckdns.meetups" not in names:
+              print("::error::google-services.json has no client for package org.duckdns.meetups.")
+              sys.exit(1)
+          PY
+          ln -s "$GOOGLE_SERVICES_TEMP" "$GOOGLE_SERVICES_LINK"
+
+      - name: Build and sign the production AAB (versionCode preserved, no bump)
+        env:
+          SKIP_VERSION_BUMP: '1'
+        run: |
+          set -euo pipefail
+          unset STAGING_VERSION_CODE
+          bash scripts/build-release-aab.sh --no-bump
+          # The committed version files must be exactly as checked out.
+          git diff --exit-code -- android/version.properties config/appConfig.json
+
+      - name: Verify the AAB
+        env:
+          VERSION_NAME: ${{ steps.guard.outputs.VERSION_NAME }}
+          VERSION_CODE: ${{ steps.guard.outputs.VERSION_CODE }}
+        run: |
+          set -euo pipefail
+          if [ ! -s "$AAB_PATH" ]; then
+            echo "::error::AAB missing or empty at $AAB_PATH"
+            exit 1
+          fi
+          python3 scripts/verify-android-production-aab.py "$AAB_PATH" "$VERSION_CODE" "$VERSION_NAME" "$GOOGLE_SERVICES_TEMP"
+          fingerprint="$(keytool -printcert -jarfile "$AAB_PATH" 2>/dev/null | sed -nE 's/^[[:space:]]*SHA256: (.*)$/\1/p' | head -1)"
+          if [ -z "$fingerprint" ]; then
+            echo "::error::Could not read the signing certificate from the AAB."
+            exit 1
+          fi
+          file_sha="$(sha256sum "$AAB_PATH" | cut -d' ' -f1)"
+          {
+            echo "- AAB: android-production-${VERSION_NAME}-${VERSION_CODE} (artefact, kept 30 days)"
+            echo "- AAB file SHA-256: \`$file_sha\`"
+            echo "- Signing certificate SHA-256 (compare with the upload key in the Play Console): \`$fingerprint\`"
+            echo "- Next: download the artefact and upload it in the Play Console by hand (no API upload)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the AAB as a workflow artefact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-production-${{ steps.guard.outputs.VERSION_NAME }}-${{ steps.guard.outputs.VERSION_CODE }}
+          path: android/app/build/outputs/bundle/productionRelease/app-production-release.aab
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Delete decoded secret files
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f "${GOOGLE_SERVICES_LINK:-}" "${KEYSTORE_PATH:-}" "${KEY_PROPERTIES_FILE:-}" "${GOOGLE_SERVICES_TEMP:-}"
+
+  tag:
+    name: Create the version tag
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the built commit (full history and tags)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      # Runs again because another run could have tagged this or a higher version
+      # while the build was running.
+      - name: Version guard (again, right before tagging)
+        id: guard
+        run: |
+          set -euo pipefail
+          GUARD_OUTPUT="$GITHUB_OUTPUT" bash scripts/android-prod-version-guard.sh
+
+      - name: Create and push the tag
+        env:
+          TAG: ${{ steps.guard.outputs.TAG }}
+          BUILT_TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TAG" ] || [ "$TAG" != "$BUILT_TAG" ]; then
+            echo "::error::Tag '$TAG' does not match the tag the build job verified ('$BUILT_TAG')."
+            exit 1
+          fi
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+          echo "- Tag **$TAG** created at $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
