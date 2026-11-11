@@ -14,7 +14,7 @@ This is a React Native project, bootstrapped using [`@react-native-community/cli
 App identity: `applicationId` `org.duckdns.meetups`, label **Shuttlr**,
 `versionName` in `android/version.properties`, `targetSdk` 36
 (`android/build.gradle`). The API/web host is defined once in
-`config/env.ts` (`ENV.API_BASE_URL`, default `https://meetups.duckdns.org`);
+`config/env.ts` (`ENV.API_BASE_URL`, default `https://meetupaws.duckdns.org`);
 override at build time with `API_BASE_URL` in the gitignored root `.env`.
 
 **One command:**

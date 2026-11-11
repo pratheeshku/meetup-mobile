@@ -35,6 +35,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - DES-MEETUP-ADDENDUM-access-consistency.md: no access means no view; mobile scope is AD-8 only (refetch on open, 404 closes the screen). Brief: `~/meetup/docs/briefs/BRIEF-access-consistency-mobile.md`.
 - DES-MEETUP-ADDENDUM-user-details-menu.md: one reusable user menu on every avatar or name (mobile: tap opens View Details, long-press opens the menu; web: click), View Details first, server-computed role actions, labels via admin. Mobile scope is tasks ud-p1-verify-mobile and ud-mobile; UI build gated on a board (OI-6) and on ud-backend being deployed. Brief: `~/meetup/docs/briefs/BRIEF-user-details-menu-mobile.md`.
 - DES-MEETUP-ADDENDUM-approval-context-signing.md, -profile-onboarding.md: approvals, first-run profile steps.
+- RELEASE-ANDROID-PRODUCTION.md: owner steps for the production Android release built in CI (secrets, version bump, run, fingerprint check, manual Play Console upload). Task 3.3.
 - DES-MEETUP-MOBILE-ADDENDUM-shareable-links.md: share links and deep links.
 - MOBILE-ADDENDUM-skill-level-delete.md, MOBILE-ADDENDUM-sports-filter-preselect.md: mobile-only features.
 - DES-MEETUP-FEEDBACK-001 — Terminology, Navigation, Group Invite & Share Link.md: feedback-driven UI and terminology rules.

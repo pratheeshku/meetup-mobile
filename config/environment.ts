@@ -27,8 +27,9 @@ export interface EnvironmentOverrides {
   avatarBucketBaseUrl?: string;
 }
 
-// Production defaults, unchanged from the former literals in config/env.ts.
-export const PRODUCTION_API_BASE_URL = 'https://meetups.duckdns.org';
+// Production defaults. The API host follows docs/ENVIRONMENTS.md and the iOS config
+// (OI-18, Task 3.3); the avatar bucket default is unchanged from the former config/env.ts literal.
+export const PRODUCTION_API_BASE_URL = 'https://meetupaws.duckdns.org';
 export const PRODUCTION_AVATAR_BUCKET_BASE_URL = 'https://meetup.hel1.your-objectstorage.com';
 
 /**

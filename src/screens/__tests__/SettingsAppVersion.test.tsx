@@ -164,7 +164,7 @@ describe('long press copies the support text', () => {
     const root = await mount();
     await longPress(root);
     const [url, init] = mockFetch.mock.calls[0];
-    expect(url).toBe('https://meetups.duckdns.org/health');
+    expect(url).toBe('https://meetupaws.duckdns.org/health');
     expect(JSON.stringify(init.headers ?? {})).not.toMatch(/authorization|cookie|token/i);
   });
 
