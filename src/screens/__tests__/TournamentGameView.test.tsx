@@ -36,12 +36,13 @@ const RESPONSES = {
 interface Setup {
   tournament?: Record<string, unknown>;
   responses?: unknown | 'refused';
+  registrations?: unknown[];
 }
 
-async function mount({ tournament = {}, responses = RESPONSES }: Setup = {}): Promise<Instance> {
+async function mount({ tournament = {}, responses = RESPONSES, registrations = REGISTRATIONS }: Setup = {}): Promise<Instance> {
   mockGet.mockReset().mockImplementation((url: string) => {
     if (url === '/tournaments/t-1') return Promise.resolve({ data: rawTournament(tournament) });
-    if (url === '/tournaments/t-1/registrations') return Promise.resolve({ data: REGISTRATIONS });
+    if (url === '/tournaments/t-1/registrations') return Promise.resolve({ data: registrations });
     if (url === '/tournaments/t-1/fixtures') {
       return Promise.resolve({
         data: [
@@ -116,6 +117,27 @@ describe('organizer view', () => {
     expect(texts(byId(root, 'responses-section-accepted_not_registered')[0])).toContain('Bob');
     // One active registration (the withdrawn one does not count) of capacity 8.
     expect(texts(root)).toContain('1 of 8 registered');
+  });
+
+  it('Registered lists every registered entry (a team, a walk-in, an invitee) and the header counts the same ones; withdrawn shows nowhere', async () => {
+    const root = await mount({
+      tournament: ORGANIZER,
+      registrations: [
+        { id: 'r-1', user_id: 'u-1', participant_name: 'Alice', registered_at: '2999-09-01T10:00:00Z', status: 'registered' },
+        { id: 'r-t', user_id: null, team_id: 'tm-1', participant_name: 'Net Ninjas', registered_at: '2999-09-02T10:00:00Z', status: 'registered' },
+        { id: 'r-w', user_id: 'u-7', participant_name: 'Walk In', registered_at: '2999-09-03T10:00:00Z', status: 'registered' },
+        { id: 'r-x', user_id: 'u-9', participant_name: 'Zed', registered_at: '2999-09-04T10:00:00Z', status: 'withdrawn' },
+      ],
+    });
+    const registered = texts(byId(root, 'responses-section-registered')[0]);
+    expect(registered).toEqual(expect.arrayContaining(['Alice', 'Net Ninjas', 'Walk In']));
+    expect(registered).not.toContain('Zed');
+    expect(registered).not.toContain('No one yet');
+    expect(byId(root, 'registered-row-0').length + byId(root, 'registered-row-1').length + byId(root, 'registered-row-2').length).toBe(3);
+    expect(texts(root)).toContain('3 of 8 registered');
+    // Bob is accepted with no registration: he stays "not yet registered"; Alice is not listed twice.
+    expect(texts(byId(root, 'responses-section-accepted_not_registered')[0])).toContain('Bob');
+    expect(texts(byId(root, 'responses-section-accepted_not_registered')[0])).not.toContain('Alice');
   });
 
   it('AD-10: no Fixtures | Registrations toggle; Fixtures is a titled section', async () => {
