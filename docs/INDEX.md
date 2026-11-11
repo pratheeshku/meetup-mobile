@@ -53,6 +53,7 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 - ../implementation-status-*.md (repo root): per-design implementation status.
 
 ## Design reference (UI)
+- design/team-size-capacity/: boards for the team-size-capacity addendum (create wizard and edit fields, locked and error states, participants team row; png for look, html for sizes; README lists each). v1, owner review pending.
 - Canvas (human only, agents cannot read it): https://claude.ai/artifact/SRavBx8jwnK8kK1QjVovnM. Board names match it.
 - design-ref-venue/: venue boards. `png/` for the look, `html/` for exact sizes, spacing and tokens (plain inline-styled markup; read it for dimensions). Key boards: Game3When, EditGame2, TournSched*, FXEdit*, GameDetail.
 - design/notifications/: notifications screen captures (`design/notifcations/` is an older misspelt copy).
