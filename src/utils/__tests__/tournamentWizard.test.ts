@@ -9,12 +9,15 @@ import {
   firstDateFailure,
   firstFocusField,
   firstInvalidStep,
+  FALLBACK_RANGE_HINTS,
   initialWizardState,
   listableTemplates,
   mapCreateRejection,
+  rangeHints,
   registrationRules,
   validateBasics,
   validateCommittee,
+  validateParticipation,
   validateRemarks,
   validateRegistration,
   validateStep,
@@ -206,12 +209,12 @@ describe('visibility mapping', () => {
 describe('request body', () => {
   it('has exactly the contract fields, ISO instants, and the one client_request_id', () => {
     const body = buildCreateBody(validState(), false);
-    // AD-T3: neither template_id nor overrides is ever sent.
+    // AD-T3: template_id is never sent. team-size-capacity AD-4: overrides carry the capacity (and the team size in team mode).
     expect(body).not.toHaveProperty('template_id');
-    expect(body).not.toHaveProperty('overrides');
+    expect(body.overrides).toEqual({ entrants_max: 32 });
     expect(Object.keys(body).sort()).toEqual(
       [
-        'client_request_id', 'title', 'sport', 'participation_mode', 'visibility', 'venue_name',
+        'client_request_id', 'title', 'sport', 'participation_mode', 'overrides', 'visibility', 'venue_name',
         'starts_at', 'ends_at', 'registration_closes_at', 'registration_hard_block_at', 'committee_member_ids',
       ].sort(),
     );
@@ -241,6 +244,64 @@ describe('request body', () => {
     expect(others).not.toHaveProperty('venue_id');
     const text = buildCreateBody(validState({ venueName: ' Hall ', venueAddress: ' 1 Road ' }), false);
     expect([text.venue_name, text.venue_address]).toEqual(['Hall', '1 Road']);
+  });
+});
+
+describe('capacity and team size (team-size-capacity AD-4, AD-8)', () => {
+  it('Team mode sends entrants_max and the one team size as min = max; Individual sends no team size', () => {
+    const team = buildCreateBody(validState({ participation: 'team', entrantsMax: 16, teamSize: 2 }), false);
+    expect(team.participation_mode).toBe('team');
+    expect(team.overrides).toEqual({ entrants_max: 16, team_size_min: 2, team_size_max: 2 });
+    // The team size typed before switching back to Individual is never sent.
+    const individual = buildCreateBody(validState({ participation: 'individual', entrantsMax: 24, teamSize: 5 }), false);
+    expect(individual.overrides).toEqual({ entrants_max: 24 });
+  });
+
+  it('prefill defaults: today\'s 32 and 1 until the client config answers', () => {
+    const state = initialWizardState('r');
+    expect([state.entrantsMax, state.teamSize, state.sizesTouched]).toEqual([32, 1, false]);
+  });
+
+  it('range hints come from the template organizer_overrides, else the fallback 6-128 and 1-11', () => {
+    expect(rangeHints(TEMPLATES)).toEqual({ entrants: { min: 8, max: 64 }, teamSize: { min: 2, max: 4 } });
+    expect(rangeHints({ templates: [] })).toEqual(FALLBACK_RANGE_HINTS);
+    expect(rangeHints(null)).toEqual({ entrants: { min: 6, max: 128 }, teamSize: { min: 1, max: 11 } });
+    const noOverrides = { templates: [{ ...GROUP_TEMPLATE, format: { ...GROUP_TEMPLATE.format, organizer_overrides: [] } }] };
+    expect(rangeHints(noOverrides)).toEqual(FALLBACK_RANGE_HINTS);
+  });
+
+  it('validation is a UX hint: out-of-range counts give an issue, the team size only in Team mode', () => {
+    expect(validateParticipation(validState())).toEqual([]);
+    const outOfRange = validState({ participation: 'team', teamSize: 12, entrantsMax: 5 });
+    expect(validateParticipation(outOfRange).map(issue => [issue.field, issue.key, issue.params])).toEqual([
+      ['team_size', 'mob.tw.err_team_size', { min: 1, max: 11 }],
+      ['entrants_max', 'mob.tw.err_entrants_range', { min: 6, max: 128 }],
+    ]);
+    expect(validateParticipation(validState({ participation: 'individual', teamSize: 99 }))).toEqual([]);
+    expect(validateStep(WIZARD_STEP.participation, validState({ entrantsMax: 500 }), ctx)).toHaveLength(1);
+    expect(firstInvalidStep(validState({ entrantsMax: 500 }), ctx)).toBe(WIZARD_STEP.participation);
+  });
+
+  it('server refusals show on the participation step by code', () => {
+    const reject = (status: number, data: unknown) => ({ response: { status, data } });
+    const rctx = { committeeMax: 10, startLabel: '', hints: { entrants: { min: 8, max: 64 }, teamSize: { min: 2, max: 4 } } };
+    expect(mapCreateRejection(reject(422, { code: 'TEAM_SIZE_INVALID' }), rctx)).toMatchObject({
+      kind: 'step',
+      step: WIZARD_STEP.participation,
+      issue: { key: 'mob.tw.err_team_size', field: 'team_size', params: { min: 2, max: 4 } },
+    });
+    expect(mapCreateRejection(reject(422, { code: 'OVERRIDE_NOT_LISTED' }), rctx)).toMatchObject({
+      kind: 'step',
+      step: WIZARD_STEP.participation,
+      issue: { key: 'mob.reg.err.override_not_listed' },
+    });
+    expect(mapCreateRejection(reject(422, { code: 'OVERRIDE_OUTSIDE_LIMITS', field: 'entrants_max' }), rctx)).toMatchObject({
+      step: WIZARD_STEP.participation,
+      issue: { key: 'mob.tw.err_entrants_range', field: 'entrants_max' },
+    });
+    expect(mapCreateRejection(reject(422, { code: 'OVERRIDE_OUTSIDE_LIMITS', field: 'team_size_min' }), rctx)).toMatchObject({
+      issue: { key: 'mob.tw.err_team_size', field: 'team_size' },
+    });
   });
 });
 

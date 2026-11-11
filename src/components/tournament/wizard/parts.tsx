@@ -181,6 +181,29 @@ export function LockedRow({ label, hint, value }: { label: string; hint?: string
   );
 }
 
+/** A read-only value with a lock (boards M5, M6): the sport or the team size once a registration exists. */
+export function LockedBox({
+  value,
+  width,
+  testID,
+}: {
+  value: string;
+  /** Fixed width for the compact (stepper-slot) variant; the full width when omitted. */
+  width?: number;
+  testID?: string;
+}): React.JSX.Element {
+  return (
+    <View style={[styles.lockedBox, width !== undefined ? { width } : null]} testID={testID}>
+      <Text style={styles.lockedText} numberOfLines={1}>
+        {value}
+      </Text>
+      <View style={styles.iconBox}>
+        <LockIcon size={16} color={colors.textMuted} />
+      </View>
+    </View>
+  );
+}
+
 export const wizardStyles = StyleSheet.create({
   content: { padding: spacing.md, paddingBottom: spacing.xl },
   gap: { marginTop: spacing.md },
@@ -235,5 +258,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepperDisabled: { opacity: opacity.disabled },
+  lockedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: STEPPER_BOX + spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    backgroundColor: colors.track,
+  },
+  lockedText: { ...typography.body, color: colors.textMuted, flexShrink: 1 },
   stepperGlyph: { ...typography.h3, color: colors.primary },
 });

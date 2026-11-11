@@ -57,6 +57,41 @@ export function displayStep(step: number): number {
   }
 }
 
+// ---- capacity and team size (team-size-capacity AD-3, AD-4, AD-8) -----------------------------------------
+export type WizardRange = { min: number; max: number };
+/** Range hints for the two steppers. UX only: the server decides (AD-4, `OVERRIDE_OUTSIDE_LIMITS`, `TEAM_SIZE_INVALID`). */
+export interface WizardRangeHints {
+  entrants: WizardRange;
+  teamSize: WizardRange;
+}
+/** Used when the templates answer carries no `organizer_overrides` for a field (the pinned contract's fallback hints). */
+export const FALLBACK_RANGE_HINTS: WizardRangeHints = {
+  entrants: { min: 6, max: 128 },
+  teamSize: { min: 1, max: 11 },
+};
+/** Prefill when the server's client config sends no default (an older server): today's values (AD-3). */
+export const FALLBACK_ENTRANTS_DEFAULT = 32;
+export const FALLBACK_TEAM_SIZE_DEFAULT = 1;
+
+function overrideRange(template: WizardTemplate | undefined, fields: string[]): WizardRange | null {
+  const entry = template?.format?.organizer_overrides?.find(
+    item => fields.includes(item.field) && Number.isFinite(item.min) && Number.isFinite(item.max) && item.min <= item.max,
+  );
+  return entry ? { min: entry.min, max: entry.max } : null;
+}
+
+/** The hints from the first listable template's `organizer_overrides`, else the fallback hints. */
+export function rangeHints(response: WizardTemplatesResponse | null | undefined): WizardRangeHints {
+  const template = listableTemplates(response)[0] ?? response?.templates?.[0];
+  return {
+    entrants: overrideRange(template, ['entrants_max']) ?? FALLBACK_RANGE_HINTS.entrants,
+    teamSize: overrideRange(template, ['team_size_max', 'team_size_min']) ?? FALLBACK_RANGE_HINTS.teamSize,
+  };
+}
+
+const inRange = (value: unknown, range: WizardRange): boolean =>
+  typeof value === 'number' && Number.isInteger(value) && value >= range.min && value <= range.max;
+
 /** Server defaults when `limits` is absent (`create_contract.DEFAULT_*`). Read from the server whenever it sends them. */
 export const FALLBACK_LIMITS: WizardLimits = { audience_group_cap: 20, committee_max: 10 };
 
@@ -89,6 +124,12 @@ export interface WizardState {
   title: string;
   description: string;
   participation: WizardParticipation;
+  /** "Maximum participants" (`entrants_max` override), always sent. Prefilled from the client config (AD-3). */
+  entrantsMax: number;
+  /** "Players per team" (`team_size_min` = `team_size_max`), sent in team mode only. */
+  teamSize: number;
+  /** True once the organizer used a stepper: a late client config answer then never overwrites the choice. */
+  sizesTouched: boolean;
   /** "YYYY-MM-DD HH:mm" in the device's local time, as the shared date-time field emits. */
   startsAt: string;
   endsAt: string;
@@ -125,6 +166,9 @@ export function initialWizardState(clientRequestId: string, sport = ''): WizardS
     title: '',
     description: '',
     participation: 'individual',
+    entrantsMax: FALLBACK_ENTRANTS_DEFAULT,
+    teamSize: FALLBACK_TEAM_SIZE_DEFAULT,
+    sizesTouched: false,
     startsAt: '',
     endsAt: '',
     closesAt: '',
@@ -162,6 +206,18 @@ export function listableTemplates(response: WizardTemplatesResponse | null | und
 }
 
 // ---- step validation -------------------------------------------------------------------------------------
+/** Step 2: both counts inside the hints (UX only, the stepper already stops at the ends; the server decides). */
+export function validateParticipation(state: WizardState, hints: WizardRangeHints = FALLBACK_RANGE_HINTS): WizardIssue[] {
+  const issues: WizardIssue[] = [];
+  if (state.participation === 'team' && !inRange(state.teamSize, hints.teamSize)) {
+    issues.push({ key: 'mob.tw.err_team_size', params: { ...hints.teamSize }, field: 'team_size', step: WIZARD_STEP.participation });
+  }
+  if (!inRange(state.entrantsMax, hints.entrants)) {
+    issues.push({ key: 'mob.tw.err_entrants_range', params: { ...hints.entrants }, field: 'entrants_max', step: WIZARD_STEP.participation });
+  }
+  return issues;
+}
+
 export function validateBasics(state: WizardState): WizardIssue[] {
   const issues: WizardIssue[] = [];
   if (!state.sport) {
@@ -455,6 +511,8 @@ export function validateCommittee(state: WizardState, committeeMax: number): Wiz
 }
 
 export interface WizardContext {
+  /** Stepper ranges (UX only); the fallback hints when absent. */
+  hints?: WizardRangeHints;
   /** Null while the server's fee flag is off. */
   fee?: WizardFeeConfig | null;
   limits: WizardLimits;
@@ -468,6 +526,8 @@ export function validateStep(step: number, state: WizardState, ctx: WizardContex
   switch (step) {
     case WIZARD_STEP.basics:
       return validateBasics(state);
+    case WIZARD_STEP.participation:
+      return validateParticipation(state, ctx.hints);
     case WIZARD_STEP.when:
       return [...validateWindow(state, ctx.now), ...validateVenue(state, ctx.catalogueEnabled)];
     case WIZARD_STEP.registration:
@@ -509,8 +569,9 @@ function feeFields(state: WizardState): { registration_fee_cents?: number; payme
 }
 
 /**
- * The exact `POST /tournaments/v2/create` body. `template_id` and `overrides` are never sent (AD-T3): the server uses
- * the single default format. Throws only when called on an invalid state (a programming error). */
+ * The exact `POST /tournaments/v2/create` body. `template_id` is never sent (AD-T3): the server uses the single default
+ * format. `overrides` carries `entrants_max` always and, in team mode only, `team_size_min` = `team_size_max` = N
+ * (team-size-capacity AD-4); an individual tournament sends no team size. Throws only when called on an invalid state (a programming error). */
 export function buildCreateBody(state: WizardState, catalogueEnabled: boolean, feeEnabled = false): WizardCreateBody {
   const visibility = visibilityOf(state);
   const description = state.description.trim();
@@ -534,6 +595,10 @@ export function buildCreateBody(state: WizardState, catalogueEnabled: boolean, f
     sport: state.sport,
     ...(description ? { description } : {}),
     participation_mode: state.participation,
+    overrides: {
+      entrants_max: state.entrantsMax,
+      ...(state.participation === 'team' ? { team_size_min: state.teamSize, team_size_max: state.teamSize } : {}),
+    },
     visibility,
     ...venue,
     ...(venueDetail ? { venue_detail: venueDetail } : {}),
@@ -584,8 +649,9 @@ const FAILED: WizardIssue = { key: 'mob.tw.err_create_failed', step: WIZARD_STEP
  */
 export function mapCreateRejection(
   error: unknown,
-  ctx: { committeeMax: number; startLabel: string; feeMaxText?: string },
+  ctx: { committeeMax: number; startLabel: string; feeMaxText?: string; hints?: WizardRangeHints },
 ): RejectionOutcome {
+  const hints = ctx.hints ?? FALLBACK_RANGE_HINTS;
   const response = (error as ErrorLike | null)?.response;
   const status = response?.status;
   const data = response?.data;
@@ -629,10 +695,33 @@ export function mapCreateRejection(
         dropUserId: drop,
       };
     }
+    // team-size-capacity AD-4: the refusal is shown on the step, by its code (the server decides, nothing is re-derived).
+    case 'TEAM_SIZE_INVALID':
+      return {
+        kind: 'step',
+        step: WIZARD_STEP.participation,
+        issue: { key: 'mob.tw.err_team_size', params: { ...hints.teamSize }, field: 'team_size', step: WIZARD_STEP.participation },
+      };
+    case 'OVERRIDE_OUTSIDE_LIMITS': {
+      const forTeamSize = typeof data.field === 'string' && data.field.startsWith('team_size');
+      return {
+        kind: 'step',
+        step: WIZARD_STEP.participation,
+        issue: forTeamSize
+          ? { key: 'mob.tw.err_team_size', params: { ...hints.teamSize }, field: 'team_size', step: WIZARD_STEP.participation }
+          : { key: 'mob.tw.err_entrants_range', params: { ...hints.entrants }, field: 'entrants_max', step: WIZARD_STEP.participation },
+      };
+    }
+    case 'OVERRIDE_NOT_LISTED':
+      return {
+        kind: 'step',
+        step: WIZARD_STEP.participation,
+        issue: { key: 'mob.reg.err.override_not_listed', field: 'entrants_max', step: WIZARD_STEP.participation },
+      };
     case 'TEMPLATE_NOT_FOUND':
     case 'TEMPLATE_NOT_ACTIVE':
     case 'OVERRIDES_INVALID':
-      // The client sends neither (AD-T3), so these mean the server's default format is not active: nothing the
+      // The client sends no template (AD-T3), so these mean the server's default format is not active: nothing the
       // organizer can change. Shown on Review, state kept.
       return { kind: 'failed', issue: { key: 'mob.tw.err_template_unavailable', step: WIZARD_STEP.review } };
     case 'VENUE_DETAIL_TOO_LONG':

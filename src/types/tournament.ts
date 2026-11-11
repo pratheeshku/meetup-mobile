@@ -130,6 +130,8 @@ export interface Tournament {
   my_declined?: boolean;
   /** `individual` or `team` (`TournamentResponse.participation_mode`). */
   participation_mode?: TournamentParticipationMode | null;
+  /** team-size-capacity AD-2: the one team size N of a team tournament; null for an individual or version 1 tournament. */
+  team_size?: number | null;
   /** When the committee published the fixtures, else null. A server fact; never derived on the device. */
   schedule_published_at?: string | null;
   /**
@@ -191,6 +193,12 @@ export interface TournamentEditBody {
   venue_name?: string;
   venue_address?: string;
   registrants_may_withdraw?: boolean;
+  /** team-size-capacity AD-5: the maximum participants (`entrants_max`); editable until the start, never below the registered count. */
+  capacity?: number;
+  /** AD-5: sport, mode and team size are editable only while no registration exists (409 `FIELD_LOCKED_AFTER_REGISTRATION` / `TEAM_SIZE_LOCKED`). */
+  sport?: string;
+  participation_mode?: TournamentParticipationMode;
+  team_size?: number;
 }
 
 /** `GET /tournaments/{id}` `my_registration`: what the Payment card needs (teams-payments AD-9). */

@@ -56,6 +56,7 @@ import {
   initialWizardState,
   feeMaxText,
   mapCreateRejection,
+  rangeHints,
   toDate,
   validateStep,
   withClosure,
@@ -63,6 +64,7 @@ import {
   type WizardContext,
   type WizardFeeConfig,
   type WizardIssue,
+  type WizardRangeHints,
   type WizardState,
 } from '../utils/tournamentWizard';
 
@@ -108,11 +110,13 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   const [now] = useState(() => new Date());
 
   const limits = response.limits ?? FALLBACK_LIMITS;
+  // Stepper ranges from the templates answer's organizer_overrides (UX only; the server decides).
+  const hints = useMemo(() => rangeHints(response), [response]);
   const sport = sports.find(item => item.name === state.sport);
 
   const ctx: WizardContext = useMemo(
-    () => ({ limits, catalogueEnabled, now, formatDayTime, fee }),
-    [limits, catalogueEnabled, now, fee],
+    () => ({ limits, catalogueEnabled, now, formatDayTime, fee, hints }),
+    [limits, catalogueEnabled, now, fee, hints],
   );
 
   // ---- loading ------------------------------------------------------------------------------------------
@@ -140,6 +144,16 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
       .then(config => {
         setMapsApiKey(config.google_maps_api_key);
         setCatalogueEnabled(Boolean(config.venue_catalogue_enabled));
+        // team-size-capacity AD-3: prefill both steppers from the admin defaults, unless the organizer already used one.
+        setState(current =>
+          current.sizesTouched
+            ? current
+            : {
+                ...current,
+                entrantsMax: config.tournament_default_entrants_max ?? current.entrantsMax,
+                teamSize: config.tournament_default_team_size ?? current.teamSize,
+              },
+        );
         setFee(
           config.tournament_fee_enabled
             ? { currency: config.tournament_fee_currency, maxCents: config.tournament_fee_max_cents }
@@ -277,9 +291,9 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
   };
 
   // ---- submit -------------------------------------------------------------------------------------------
-  const rejectionContext = (): { committeeMax: number; startLabel: string; feeMaxText: string } => {
+  const rejectionContext = (): { committeeMax: number; startLabel: string; feeMaxText: string; hints: WizardRangeHints } => {
     const starts = toDate(state.startsAt);
-    return { committeeMax: limits.committee_max, startLabel: starts ? formatDayTime(starts) : '', feeMaxText: feeMaxText(fee) };
+    return { committeeMax: limits.committee_max, startLabel: starts ? formatDayTime(starts) : '', feeMaxText: feeMaxText(fee), hints };
   };
 
   const submit = async (): Promise<void> => {
@@ -417,7 +431,7 @@ export default function TournamentWizardScreen({ navigation, route }: Props): Re
           />
         );
       case WIZARD_STEP.participation:
-        return <ParticipationStep state={state} onChange={update} focus={stepFocus} />;
+        return <ParticipationStep state={state} onChange={update} focus={stepFocus} hints={hints} errors={errors} />;
       case WIZARD_STEP.when:
         return (
           <WhenWhereStep

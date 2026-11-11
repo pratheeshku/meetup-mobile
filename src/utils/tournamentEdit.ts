@@ -4,11 +4,20 @@
  * The future-date check is UX only: the server (`TOURNAMENT_DATES_INVALID`, reason `DATE_IN_PAST`) is the authority.
  */
 import type { LabelKey } from '../labels/fallbackLabels';
-import type { Tournament, TournamentEditBody } from '../types/tournament';
+import type { Tournament, TournamentEditBody, TournamentParticipationMode } from '../types/tournament';
 import type { OthersVenueInput } from '../types/venue';
 import { formatLocalDateTime } from './localDateTime';
 import { classifyRefusal } from './refusal';
-import { dateFailureIssue, toDate, type DateField, type DateReason, type WizardVenue } from './tournamentWizard';
+import {
+  FALLBACK_RANGE_HINTS,
+  FALLBACK_TEAM_SIZE_DEFAULT,
+  dateFailureIssue,
+  toDate,
+  type DateField,
+  type DateReason,
+  type WizardRangeHints,
+  type WizardVenue,
+} from './tournamentWizard';
 
 export interface TournamentEditForm {
   title: string;
@@ -24,6 +33,11 @@ export interface TournamentEditForm {
   venueAddress: string;
   /** True once the organizer touched the venue: only then is a venue sent. */
   venueTouched: boolean;
+  /** team-size-capacity AD-5: sport, who plays, players per team and maximum participants. */
+  sport: string;
+  participation: TournamentParticipationMode;
+  teamSize: number;
+  capacity: number;
   /** The per-edit withdrawal choice. Always starts true: the stored flag is not in the response (A40, OI-15). */
   mayWithdraw: boolean;
 }
@@ -58,8 +72,20 @@ export function initialEditForm(tournament: Tournament): TournamentEditForm {
     venueName,
     venueAddress: tournament.venue_address ?? '',
     venueTouched: false,
+    sport: tournament.sport,
+    participation: tournament.participation_mode ?? 'individual',
+    teamSize: tournament.team_size ?? FALLBACK_TEAM_SIZE_DEFAULT,
+    capacity: tournament.max_participants,
     mayWithdraw: true,
   };
+}
+
+/**
+ * Registered entrants (the server's `registered_count`). Sport, who plays and players per team lock at the first registration
+ * (AD-5); unknown (null) counts as none, and the server's refusal then shows if it was wrong.
+ */
+export function registeredCountOf(tournament: Tournament): number {
+  return tournament.participant_count ?? 0;
 }
 
 const DATE_FIELDS: { field: DateField; form: keyof TournamentEditForm; original: (t: Tournament) => string | null | undefined }[] = [
@@ -75,6 +101,8 @@ export interface EditPlan {
   changedDates: DateField[];
   /** A start, end or venue change: the withdrawal choice rides with it and the registration dates may be required. */
   placeChanged: boolean;
+  /** The capacity, sport or who plays changed: the server resets existing fixtures (AD-5). */
+  structureChanged: boolean;
   /** True when the request would change something. */
   hasChanges: boolean;
   /** A changed date that is not in the future (UX hint; the server decides). */
@@ -130,12 +158,35 @@ export function planEdit(
       body.venue_address = form.venueAddress.trim();
     }
   }
+  // team-size-capacity AD-5. Capacity is editable until the start; sport, mode and team size only while nothing is registered
+  // (locked fields are never sent). The server decides everything: nothing here refuses.
+  let structureChanged = false;
+  if (Number.isInteger(form.capacity) && form.capacity !== tournament.max_participants) {
+    body.capacity = form.capacity;
+    structureChanged = true;
+  }
+  if (registeredCountOf(tournament) === 0) {
+    if (form.sport && form.sport !== tournament.sport) {
+      body.sport = form.sport;
+      structureChanged = true;
+    }
+    const originalMode = tournament.participation_mode ?? 'individual';
+    if (form.participation !== originalMode) {
+      body.participation_mode = form.participation;
+      structureChanged = true;
+      if (form.participation === 'team') {
+        body.team_size = form.teamSize;
+      }
+    } else if (form.participation === 'team' && form.teamSize !== (tournament.team_size ?? null)) {
+      body.team_size = form.teamSize;
+    }
+  }
   const placeChanged = changedDates.includes('starts_at') || changedDates.includes('ends_at') || venueChanged;
   const hasChanges = Object.keys(body).length > 0;
   if (hasChanges && (placeChanged || !form.mayWithdraw)) {
     body.registrants_may_withdraw = form.mayWithdraw;
   }
-  return { body, changedDates, placeChanged, hasChanges, pastDate };
+  return { body, changedDates, placeChanged, structureChanged, hasChanges, pastDate };
 }
 
 /** The generated fixtures exist (a draft or a published set): the same facts the web reads (`schedule_draft`, `published`). */
@@ -147,7 +198,8 @@ export function fixturesExist(tournament: Tournament): boolean {
 export function editResetsFixtures(tournament: Tournament, plan: EditPlan): boolean {
   return (
     fixturesExist(tournament) &&
-    (plan.placeChanged || plan.changedDates.includes('registration_closes_at') || plan.changedDates.includes('registration_hard_block_at'))
+    (plan.placeChanged ||
+      plan.structureChanged || plan.changedDates.includes('registration_closes_at') || plan.changedDates.includes('registration_hard_block_at'))
   );
 }
 
@@ -175,10 +227,28 @@ interface ErrorLike {
 /**
  * The label of a refused edit. `TOURNAMENT_DATES_INVALID` uses its `reason` and `field` (DATE_IN_PAST included) through the date messages the
  * create wizard already has; the other server codes (`REGISTRATION_DATES_REQUIRED`, `TOURNAMENT_HAS_RESULTS`, `TOURNAMENT_STARTED`, ...)
- * go through the one refusal table. The server's `detail` is never shown.
+ * go through the one refusal table. The server's `detail` is never shown. The team-size-capacity codes (AD-5): `CAPACITY_BELOW_REGISTERED`
+ * shows the registered count the screen already holds from the server; `TEAM_SIZE_INVALID` and `OVERRIDE_OUTSIDE_LIMITS` show the stepper range.
  */
-export function editErrorLabel(error: unknown, startLabel: string): EditErrorLabel {
+export function editErrorLabel(
+  error: unknown,
+  startLabel: string,
+  options: { registered?: number; hints?: WizardRangeHints } = {},
+): EditErrorLabel {
   const data = (error as ErrorLike | null)?.response?.data;
+  const hints = options.hints ?? FALLBACK_RANGE_HINTS;
+  if (data?.code === 'CAPACITY_BELOW_REGISTERED' && typeof options.registered === 'number') {
+    return { key: 'mob.reg.err.capacity_below_registered', params: { count: options.registered } };
+  }
+  if (data?.code === 'TEAM_SIZE_INVALID') {
+    return { key: 'mob.tw.err_team_size', params: { ...hints.teamSize } };
+  }
+  if (data?.code === 'OVERRIDE_OUTSIDE_LIMITS') {
+    const forTeamSize = typeof data.field === 'string' && data.field.startsWith('team_size');
+    return forTeamSize
+      ? { key: 'mob.tw.err_team_size', params: { ...hints.teamSize } }
+      : { key: 'mob.tw.err_entrants_range', params: { ...hints.entrants } };
+  }
   if (data?.code === 'TOURNAMENT_DATES_INVALID' && typeof data.reason === 'string' && typeof data.field === 'string') {
     const issue = dateFailureIssue({ field: data.field as DateField, reason: data.reason as DateReason }, { startLabel });
     return { key: issue.key, ...(issue.params ? { params: issue.params } : {}) };

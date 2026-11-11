@@ -43,6 +43,12 @@ const CODE_LABELS = {
   SHUFFLE_UNAVAILABLE: 'mob.reg.err.shuffle_unavailable',
   TOURNAMENT_STARTED: 'mob.reg.err.tournament_started',
   TOURNAMENT_HAS_RESULTS: 'mob.reg.err.tournament_has_results',
+  // team-size-capacity AD-4, AD-5 (create and edit): capacity, team size, sport and mode.
+  CAPACITY_BELOW_REGISTERED: 'mob.reg.err.capacity_below_registered',
+  TEAM_SIZE_LOCKED: 'mob.reg.err.team_size_locked',
+  FIELD_LOCKED_AFTER_REGISTRATION: 'mob.reg.err.field_locked_after_registration',
+  OVERRIDE_NOT_LISTED: 'mob.reg.err.override_not_listed',
+  OVERRIDE_OUTSIDE_LIMITS: 'mob.reg.err.override_outside_limits',
   REGISTRATION_DATES_REQUIRED: 'mob.reg.err.registration_dates_required',
   WITHDRAWAL_AFTER_SCHEDULE: 'mob.reg.err.withdrawal_after_schedule',
   WITHDRAWAL_AFTER_CLOSE: 'mob.reg.err.withdrawal_after_close',

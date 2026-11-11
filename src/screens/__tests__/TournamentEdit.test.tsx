@@ -188,6 +188,93 @@ describe('Edit tournament', () => {
   });
 });
 
+describe('Team size and capacity (team-size-capacity AD-5; boards M4, M5, M6)', () => {
+  const team = { participation_mode: 'team', team_size: 2, capacity: 16, registered_count: 0 };
+  const lockedTeam = { ...team, registered_count: 6 };
+  const valueOf = (root: Instance, id: string): string =>
+    ([] as unknown[]).concat(root.findAll(n => n.props.testID === `${id}-value`)[0].props.children).join('');
+
+  it('M4: with no registration the sport, who plays, players per team and maximum participants are all editable', async () => {
+    const root = await mount(team);
+    expect(byId(root, 'edit-sport-locked')).toHaveLength(0);
+    expect(byId(root, 'edit-team-size-locked')).toHaveLength(0);
+    expect(valueOf(root, 'edit-team-size')).toBe('2');
+    expect(valueOf(root, 'edit-capacity')).toBe('16');
+    expect(everyText(root)).toContain('Players per tournament team');
+    expect(everyText(root)).toContain('Maximum participants');
+    expect(everyText(root)).toContain('6 to 128.');
+    expect(byId(root, 'edit-lock-note')).toHaveLength(0);
+    await press(root, 'edit-team-size-plus');
+    await press(root, 'edit-capacity-plus');
+    await press(root, 'edit-save');
+    expect(patch.mock.calls[0][1]).toEqual({ capacity: 17, team_size: 3 });
+  });
+
+  it('M4: Individual hides players per team; switching to Team sends the mode with the team size', async () => {
+    const root = await mount({ participation_mode: 'individual', team_size: null, capacity: 16, registered_count: 0 });
+    expect(byId(root, 'edit-team-size-value')).toHaveLength(0);
+    const teamTab = root.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityLabel === 'Tournament team')[0];
+    await act(async () => teamTab.props.onPress());
+    expect(valueOf(root, 'edit-team-size')).toBe('1');
+    await press(root, 'edit-save');
+    expect(patch.mock.calls[0][1]).toEqual({ participation_mode: 'team', team_size: 1 });
+  });
+
+  it('M5: with registrations the sport, who plays and players per team are read-only with the reason; capacity stays editable', async () => {
+    const root = await mount(lockedTeam);
+    expect(byId(root, 'edit-sport-locked').length).toBeGreaterThan(0);
+    expect(byId(root, 'edit-team-size-locked').length).toBeGreaterThan(0);
+    expect(byId(root, 'edit-team-size-value')).toHaveLength(0);
+    const text = everyText(root);
+    expect(text).toContain('Locked: 6 tournament teams have registered.');
+    expect(text).toContain('At least 6 (already registered).');
+    expect(text).toContain('Sport and who plays are locked once the first tournament team registers.');
+    const tabs = root.findAll(n => n.props.accessibilityRole === 'tab' && typeof n.props.onPress === 'function');
+    expect(tabs).toHaveLength(2);
+    expect(tabs.every(tab => tab.props.disabled === true)).toBe(true);
+    await press(root, 'edit-capacity-plus');
+    await press(root, 'edit-save');
+    // Only the capacity is sent; the locked fields never are.
+    expect(patch.mock.calls[0][1]).toEqual({ capacity: 17 });
+  });
+
+  it('M5: the fixtures-reset notice shows when fixtures exist, and asks before saving a capacity change', async () => {
+    const root = await mount({ ...lockedTeam, status: 'schedule_draft' });
+    expect(everyText(root)).toContain('Changing the maximum resets the fixtures. You will need to build them again.');
+    await press(root, 'edit-capacity-plus');
+    await press(root, 'edit-save');
+    expect(patch).not.toHaveBeenCalled();
+    expect((Alert.alert as jest.Mock).mock.calls[0][1]).toContain('Changing the maximum resets the fixtures.');
+    await alertPress('Save');
+    expect(patch).toHaveBeenCalledTimes(1);
+  });
+
+  it('M6: CAPACITY_BELOW_REGISTERED shows the labelled message with the count, under the fields, not the server text', async () => {
+    const root = await mount(lockedTeam);
+    await press(root, 'edit-capacity-minus');
+    patch.mockRejectedValue({ response: { status: 409, data: { code: 'CAPACITY_BELOW_REGISTERED', detail: 'raw server text' } } });
+    await press(root, 'edit-save');
+    const shown = everyText(byId(root, 'edit-error')[0]);
+    expect(shown).toContain('Maximum participants cannot be below the 6 already registered.');
+    expect(shown).not.toContain('raw server text');
+    expect(patch.mock.calls[0][1]).toEqual({ capacity: 15 });
+    // A change clears the refusal.
+    await press(root, 'edit-capacity-plus');
+    expect(byId(root, 'edit-error')).toHaveLength(0);
+  });
+
+  it.each([
+    ['TEAM_SIZE_LOCKED', 'Players per tournament team cannot be changed once someone has registered.'],
+    ['FIELD_LOCKED_AFTER_REGISTRATION', 'Sport and who plays cannot be changed once someone has registered.'],
+  ])('%s shows its labelled message', async (code, expected) => {
+    const root = await mount(team);
+    await press(root, 'edit-team-size-plus');
+    patch.mockRejectedValue({ response: { status: 409, data: { code, detail: 'raw server text' } } });
+    await press(root, 'edit-save');
+    expect(everyText(byId(root, 'edit-error')[0])).toContain(expected);
+  });
+});
+
 describe('Remarks label (team-screens-remarks AD-4, TS-12)', () => {
   it('the description field of the edit screen reads Remarks (same key, same stored value)', async () => {
     const root = await mount();

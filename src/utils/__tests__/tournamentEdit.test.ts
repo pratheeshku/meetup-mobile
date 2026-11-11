@@ -47,6 +47,68 @@ describe('planEdit (AD-3: changed fields only, ISO UTC)', () => {
   });
 });
 
+describe('capacity, sport, mode and team size (team-size-capacity AD-5)', () => {
+  const teamTournament = { ...base, sport: 'badminton', participation_mode: 'team', team_size: 2, max_participants: 16, participant_count: 0 } as unknown as Tournament;
+  const registered = { ...teamTournament, participant_count: 6 } as unknown as Tournament;
+  const opts = { catalogueEnabled: false, now };
+
+  it('the form starts from the read response and an untouched form sends nothing', () => {
+    const form = initialEditForm(teamTournament);
+    expect([form.sport, form.participation, form.teamSize, form.capacity]).toEqual(['badminton', 'team', 2, 16]);
+    expect(planEdit(teamTournament, form, opts).hasChanges).toBe(false);
+  });
+
+  it('with no registration: capacity, sport and team size are sent when changed', () => {
+    const form = { ...initialEditForm(teamTournament), capacity: 24, sport: 'tennis', teamSize: 3 };
+    const plan = planEdit(teamTournament, form, opts);
+    expect(plan.body).toEqual({ capacity: 24, sport: 'tennis', team_size: 3 });
+    expect(plan.structureChanged).toBe(true);
+  });
+
+  it('switching to Individual sends the mode only; switching to Team sends the mode and the team size together', () => {
+    const toIndividual = planEdit(teamTournament, { ...initialEditForm(teamTournament), participation: 'individual' }, opts);
+    expect(toIndividual.body).toEqual({ participation_mode: 'individual' });
+    const individual = { ...teamTournament, participation_mode: 'individual', team_size: null } as unknown as Tournament;
+    const toTeam = planEdit(individual, { ...initialEditForm(individual), participation: 'team', teamSize: 2 }, opts);
+    expect(toTeam.body).toEqual({ participation_mode: 'team', team_size: 2 });
+  });
+
+  it('with registrations: sport, mode and team size are never sent; capacity still is', () => {
+    const form = { ...initialEditForm(registered), sport: 'tennis', participation: 'individual' as const, teamSize: 4, capacity: 20 };
+    const plan = planEdit(registered, form, opts);
+    expect(plan.body).toEqual({ capacity: 20 });
+  });
+
+  it('a capacity below the registered count is still sent: the server refuses it (CAPACITY_BELOW_REGISTERED)', () => {
+    const plan = planEdit(registered, { ...initialEditForm(registered), capacity: 4 }, opts);
+    expect(plan.body).toEqual({ capacity: 4 });
+  });
+
+  it('a capacity, sport or mode change resets existing fixtures; a title change does not', () => {
+    const drafted = { ...teamTournament, status: 'schedule_draft' } as unknown as Tournament;
+    const form = initialEditForm(drafted);
+    expect(editResetsFixtures(drafted, planEdit(drafted, { ...form, capacity: 24 }, opts))).toBe(true);
+    expect(editResetsFixtures(drafted, planEdit(drafted, { ...form, sport: 'tennis' }, opts))).toBe(true);
+    expect(editResetsFixtures(drafted, planEdit(drafted, { ...form, title: 'New' }, opts))).toBe(false);
+  });
+
+  it('refusals by code: the registered count shows in CAPACITY_BELOW_REGISTERED; locked codes use their own labels', () => {
+    const refuse = (code: string, extra: Record<string, unknown> = {}) => ({ response: { status: 409, data: { code, ...extra } } });
+    expect(editErrorLabel(refuse('CAPACITY_BELOW_REGISTERED'), '', { registered: 6 })).toEqual({
+      key: 'mob.reg.err.capacity_below_registered',
+      params: { count: 6 },
+    });
+    expect(editErrorLabel(refuse('TEAM_SIZE_LOCKED'), '').key).toBe('mob.reg.err.team_size_locked');
+    expect(editErrorLabel(refuse('FIELD_LOCKED_AFTER_REGISTRATION'), '').key).toBe('mob.reg.err.field_locked_after_registration');
+    expect(editErrorLabel(refuse('TOURNAMENT_STARTED'), '').key).toBe('mob.reg.err.tournament_started');
+    expect(editErrorLabel(refuse('TOURNAMENT_HAS_RESULTS'), '').key).toBe('mob.reg.err.tournament_has_results');
+    expect(editErrorLabel(refuse('TEAM_SIZE_INVALID'), '', { hints: { entrants: { min: 6, max: 128 }, teamSize: { min: 1, max: 11 } } })).toEqual({
+      key: 'mob.tw.err_team_size',
+      params: { min: 1, max: 11 },
+    });
+  });
+});
+
 describe('fixtures and entry points', () => {
   it('fixtures exist from the status or the published time; a reset applies to a place or block-date change only', () => {
     expect(fixturesExist(base)).toBe(false);

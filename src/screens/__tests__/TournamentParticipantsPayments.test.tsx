@@ -366,6 +366,16 @@ describe('team tournament (P2, P4)', () => {
     expect(all(root)).not.toContain('adds individual players only');
   });
 
+  const PAID = '2026-10-25T00:00:00Z';
+  it('M7: the row shows the server player count as given; a team of one reads "1 team player", never "1 team players"', async () => {
+    reset({ mode: 'team', registrations: [team('t1', 'Solo Team', { team_player_count: 1, team_captain_name: null, payment_received_at: PAID }), team('t2', 'Pair', { team_player_count: 2, team_captain_name: null, payment_received_at: PAID }), team('t3', 'One Capt', { team_player_count: 1, payment_received_at: PAID })], summary: summary({ registered: 3, paid: 3, unpaid: 0, fee_cents: 4000, collected_cents: 12000, excluded_from_fixtures: 0 }) });
+    const root = await mount();
+    expect(all(hostById(root, 'participant-t1')[0])).toContain('1 team player');
+    expect(all(hostById(root, 'participant-t1')[0])).not.toContain('1 team players');
+    expect(all(hostById(root, 'participant-t2')[0])).toContain('2 team players');
+    expect(all(hostById(root, 'participant-t3')[0])).toContain('1 team player · Capt. Mei Lin');
+  });
+
   it('tapping a team opens the team details with the roster from the frozen roster route, the captain marked, and the organizer section', async () => {
     reset({ mode: 'team', registrations: [team('t1', 'Team Smashers')], summary: summary({ registered: 1, paid: 0, unpaid: 1, fee_cents: 4000, collected_cents: 0, excluded_from_fixtures: 1 }) });
     server.roster = {
