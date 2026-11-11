@@ -11,7 +11,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { focusRingStyle, useAccessibilityFocus } from '../hooks/useAccessibilityFocus';
 import { dash, dashRadius, dashSize } from '../theme/dashboardTheme';
-import { spacing, typography } from '../theme/tokens';
+import { opacity, spacing, typography } from '../theme/tokens';
 
 interface SegmentedSwitchProps<T extends string> {
   options: ReadonlyArray<{ value: T; label: string; shortLabel?: string; badge?: number; badgeLabel?: string }>;
@@ -20,6 +20,8 @@ interface SegmentedSwitchProps<T extends string> {
   compact?: boolean;
   /** A new non-zero value moves focus to the selected segment (ring and screen reader) without changing it (te-a4). */
   focusToken?: number;
+  /** Read-only (a locked field): the selection is shown, taps do nothing and the segments read as disabled. */
+  disabled?: boolean;
 }
 
 export default function SegmentedSwitch<T extends string>({
@@ -28,10 +30,11 @@ export default function SegmentedSwitch<T extends string>({
   onChange,
   compact = false,
   focusToken,
+  disabled = false,
 }: SegmentedSwitchProps<T>): React.JSX.Element {
   const focus = useAccessibilityFocus(focusToken);
   return (
-    <View style={[styles.track, compact ? styles.trackCompact : null]} accessibilityRole="tablist">
+    <View style={[styles.track, compact ? styles.trackCompact : null, disabled ? styles.trackDisabled : null]} accessibilityRole="tablist">
       {options.map(option => {
         const selected = option.value === value;
         return (
@@ -41,7 +44,8 @@ export default function SegmentedSwitch<T extends string>({
             onBlur={selected ? focus.clear : undefined}
             accessibilityRole="tab"
             accessibilityLabel={option.badge && option.badge > 0 && option.badgeLabel ? `${option.label}, ${option.badgeLabel}` : option.label}
-            accessibilityState={{ selected }}
+            accessibilityState={disabled ? { selected, disabled } : { selected }}
+            disabled={disabled}
             onPress={() => onChange(option.value)}
             style={({ pressed }) => [
               styles.segment,
@@ -73,6 +77,7 @@ export default function SegmentedSwitch<T extends string>({
 }
 
 const styles = StyleSheet.create({
+  trackDisabled: { opacity: opacity.disabled },
   track: {
     flexDirection: 'row',
     backgroundColor: dash.cardBorder,

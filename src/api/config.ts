@@ -18,6 +18,9 @@ export interface ClientConfig {
   game_fee_enabled: boolean;
   game_fee_currency: string | null;
   game_fee_max_cents: number | null;
+  /** team-size-capacity AD-3: the wizard's prefill for Maximum participants and Players per team; null when the server does not send them. */
+  tournament_default_entrants_max: number | null;
+  tournament_default_team_size: number | null;
   /** Admin store URLs for the share invite message; '' when unset (the store line is then omitted). */
   android_store_url: string;
   ios_store_url: string;
@@ -32,9 +35,15 @@ const CLIENT_CONFIG_DEFAULTS: ClientConfig = {
   game_fee_enabled: false,
   game_fee_currency: null,
   game_fee_max_cents: null,
+  tournament_default_entrants_max: null,
+  tournament_default_team_size: null,
   android_store_url: '',
   ios_store_url: '',
 };
+
+function positiveInt(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
+}
 
 export async function getGameLimits(): Promise<GameLimits> {
   try {
@@ -62,6 +71,8 @@ export async function getClientConfig(): Promise<ClientConfig> {
       game_fee_currency: typeof data?.game_fee_currency === 'string' && data.game_fee_currency ? data.game_fee_currency : null,
       game_fee_max_cents:
         typeof data?.game_fee_max_cents === 'number' && Number.isFinite(data.game_fee_max_cents) ? data.game_fee_max_cents : null,
+      tournament_default_entrants_max: positiveInt(data?.tournament_default_entrants_max),
+      tournament_default_team_size: positiveInt(data?.tournament_default_team_size),
       android_store_url: typeof data?.android_store_url === 'string' ? data.android_store_url.trim() : '',
       ios_store_url: typeof data?.ios_store_url === 'string' ? data.ios_store_url.trim() : '',
     };

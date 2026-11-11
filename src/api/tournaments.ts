@@ -114,6 +114,10 @@ interface TournamentApiItem {
   closure_outcome?: string | null;
   my_declined?: boolean | null;
   participation_mode?: string | null;
+  /** team-size-capacity AD-2: null for an individual or version 1 tournament. */
+  team_size?: number | null;
+  /** The pinned read contract also names the capacity `max_participants`; `capacity` stays the source. */
+  max_participants?: number | null;
   ends_at?: string | null;
   schedule_published_at?: string | null;
   banner_url?: string | null;
@@ -192,7 +196,7 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
         : raw.registration_closes_at === null || Date.parse(raw.registration_closes_at) > Date.now(),
     participant_count: raw.registered_count ?? null,
     is_full: raw.is_full === true,
-    max_participants: raw.capacity,
+    max_participants: typeof raw.capacity === 'number' ? raw.capacity : raw.max_participants ?? 0,
     starts_at: raw.starts_at,
     registration_closes_at: raw.registration_closes_at,
     created_at: raw.created_at,
@@ -219,6 +223,7 @@ function mapTournamentApiItem(raw: TournamentApiItem, currentUserId?: string): T
       raw.participation_mode === 'individual' || raw.participation_mode === 'team'
         ? (raw.participation_mode as TournamentParticipationMode)
         : null,
+    team_size: typeof raw.team_size === 'number' ? raw.team_size : null,
     schedule_published_at: raw.schedule_published_at ?? null,
     banner_url: raw.banner_url ?? null,
     logo_url: raw.logo_url ?? null,

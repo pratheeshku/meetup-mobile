@@ -11,32 +11,47 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { getClientConfig } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
-import { getTournament, updateTournament } from '../api/tournaments';
+import { getTournament, getWizardTemplates, updateTournament } from '../api/tournaments';
 import Button from '../components/Button';
 import DateTimePickerField from '../components/DateTimePickerField';
+import DropdownField from '../components/DropdownField';
 import ErrorView from '../components/ErrorView';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import LoadingView from '../components/LoadingView';
+import SegmentedSwitch from '../components/SegmentedSwitch';
 import TextField from '../components/TextField';
 import { formatDayTime } from '../components/tournament/wizard/RegistrationStep';
-import { Banner, FieldError, FieldLabel, SectionCard } from '../components/tournament/wizard/parts';
+import { Banner, CountStepper, FieldError, FieldLabel, LockedBox, SectionCard } from '../components/tournament/wizard/parts';
 import VenuePicker from '../components/venue/VenuePicker';
 import { useT } from '../labels/LabelsContext';
 import type { TournamentsStackParamList } from '../navigation/types';
 import { getSports } from '../api/sports';
-import { colors, spacing, typography } from '../theme/tokens';
+import { borderWidth, colors, spacing, typography } from '../theme/tokens';
 import type { Sport } from '../types/sport';
 import type { Tournament } from '../types/tournament';
 import {
   editErrorLabel,
   editResetsFixtures,
   initialEditForm,
+  fixturesExist,
   planEdit,
+  registeredCountOf,
   type TournamentEditForm,
 } from '../utils/tournamentEdit';
-import { toDate, type WizardVenue } from '../utils/tournamentWizard';
+import { FALLBACK_RANGE_HINTS, rangeHints, toDate, type WizardRangeHints, type WizardVenue } from '../utils/tournamentWizard';
+import type { TournamentParticipationMode } from '../types/tournament';
 
 type Props = NativeStackScreenProps<TournamentsStackParamList, 'TournamentEdit'>;
+
+const LOCKED_WIDTH = 90;
+const STRUCTURE_CODES = new Set([
+  'CAPACITY_BELOW_REGISTERED',
+  'TEAM_SIZE_LOCKED',
+  'TEAM_SIZE_INVALID',
+  'FIELD_LOCKED_AFTER_REGISTRATION',
+  'OVERRIDE_NOT_LISTED',
+  'OVERRIDE_OUTSIDE_LIMITS',
+]);
 
 export default function TournamentEditScreen({ navigation, route }: Props): React.JSX.Element {
   const t = useT();
@@ -47,8 +62,12 @@ export default function TournamentEditScreen({ navigation, route }: Props): Reac
   const [catalogueEnabled, setCatalogueEnabled] = useState(false);
   const [mapsApiKey, setMapsApiKey] = useState<string | null>(null);
   const [sports, setSports] = useState<Sport[]>([]);
+  // Stepper ranges from the templates answer (UX only; the server decides). The fallback hints until it arrives.
+  const [hints, setHints] = useState<WizardRangeHints>(FALLBACK_RANGE_HINTS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A capacity, team size, sport or mode refusal shows under those fields (board M6); any other refusal above Save.
+  const [errorInStructure, setErrorInStructure] = useState(false);
   // Fixed for the life of the screen, like the wizard: the future-date hint compares against it.
   const [now] = useState(() => new Date());
 
@@ -73,6 +92,9 @@ export default function TournamentEditScreen({ navigation, route }: Props): Reac
     getSports()
       .then(setSports)
       .catch(() => {});
+    getWizardTemplates()
+      .then(answer => setHints(rangeHints(answer)))
+      .catch(() => {});
   }, [load]);
 
   const plan = useMemo(
@@ -89,6 +111,7 @@ export default function TournamentEditScreen({ navigation, route }: Props): Reac
 
   const patch = (change: Partial<TournamentEditForm>): void => {
     setError(null);
+    setErrorInStructure(false);
     setForm(current => (current ? { ...current, ...change } : current));
   };
   const sport = sports.find(item => item.name === tournament.sport);
@@ -106,6 +129,12 @@ export default function TournamentEditScreen({ navigation, route }: Props): Reac
     : null;
   const pastDateMessage = plan.pastDate ? t('web.tournament_edit.dates_future') : null;
   const hasHardBlock = tournament.lifecycle_version === 2;
+  // team-size-capacity AD-5, boards M4 to M6: sport, who plays and players per team lock at the first registration (UX only).
+  const registered = registeredCountOf(tournament);
+  const locked = registered > 0;
+  const team = form.participation === 'team';
+  const sportOptions = sports.map(item => ({ value: item.name, label: item.display_name }));
+  const sportLabel = sports.find(item => item.name === form.sport)?.display_name ?? form.sport;
 
   const send = async (): Promise<void> => {
     setSaving(true);
@@ -120,8 +149,9 @@ export default function TournamentEditScreen({ navigation, route }: Props): Reac
       );
     } catch (e) {
       const start = toDate(form.startsAt);
-      const label = editErrorLabel(e, start ? formatDayTime(start) : '');
+      const label = editErrorLabel(e, start ? formatDayTime(start) : '', { registered: registeredCountOf(tournament), hints });
       setError(t(label.key, label.params));
+      setErrorInStructure(STRUCTURE_CODES.has(String((e as { response?: { data?: { code?: unknown } } })?.response?.data?.code)));
     } finally {
       setSaving(false);
     }
@@ -136,7 +166,9 @@ export default function TournamentEditScreen({ navigation, route }: Props): Reac
       return;
     }
     if (editResetsFixtures(tournament, plan)) {
-      Alert.alert(t('web.tournament.edit_tournament'), t('web.tournament_edit.reset_confirm'), [
+      // The existing notice names dates and venue; a capacity, sport or who-plays change shows the board's wording (M5).
+      const notice = plan.placeChanged || !plan.structureChanged ? 'web.tournament_edit.reset_confirm' : 'mob.te.reset_note';
+      Alert.alert(t('web.tournament.edit_tournament'), t(notice), [
         { text: t('mob.common.cancel'), style: 'cancel' },
         { text: t('mob.common.save'), onPress: send },
       ]);
@@ -169,6 +201,75 @@ export default function TournamentEditScreen({ navigation, route }: Props): Reac
           testID="edit-description"
         />
       </SectionCard>
+
+      <View style={styles.structure}>
+        <FieldLabel>{t('mob.tw.sport')}</FieldLabel>
+        {locked ? (
+          <LockedBox value={sportLabel} testID="edit-sport-locked" />
+        ) : (
+          <DropdownField
+            options={sportOptions}
+            value={form.sport}
+            onChange={value => patch({ sport: value })}
+            placeholder={sportLabel}
+            accessibilityLabel={t('mob.tw.sport')}
+            disabled={saving}
+          />
+        )}
+        <FieldLabel>{t('mob.te.who_plays')}</FieldLabel>
+        <SegmentedSwitch<TournamentParticipationMode>
+          value={form.participation}
+          onChange={participation => patch({ participation })}
+          disabled={locked || saving}
+          options={[
+            { value: 'individual', label: t('mob.tw.part_individual') },
+            { value: 'team', label: t('mob.tw.part_team') },
+          ]}
+        />
+        <SectionCard style={styles.stepperCard}>
+          {team ? (
+            locked ? (
+              <View style={styles.counterRow} testID="edit-team-size-locked">
+                <View style={styles.counterText}>
+                  <Text style={styles.switchLabel}>{t('mob.tw.team_size')}</Text>
+                  <Text style={styles.hint}>
+                    {t(registered === 1 ? 'mob.te.team_size_locked_one' : 'mob.te.team_size_locked', { count: registered })}
+                  </Text>
+                </View>
+                <LockedBox value={String(form.teamSize)} width={LOCKED_WIDTH} />
+              </View>
+            ) : (
+              <CountStepper
+                label={t('mob.tw.team_size')}
+                hint={t('mob.tw.team_size_hint', hints.teamSize)}
+                value={form.teamSize}
+                min={hints.teamSize.min}
+                max={hints.teamSize.max}
+                onChange={teamSize => patch({ teamSize })}
+                decreaseLabel={t('mob.tw.team_size_less')}
+                increaseLabel={t('mob.tw.team_size_more')}
+                testID="edit-team-size"
+              />
+            )
+          ) : null}
+          <View style={team ? styles.divided : null}>
+            <CountStepper
+              label={t('mob.tw.entrants_max')}
+              hint={locked ? t('mob.te.capacity_floor', { count: registered }) : t('mob.tw.entrants_hint_range', hints.entrants)}
+              value={form.capacity}
+              min={hints.entrants.min}
+              max={hints.entrants.max}
+              onChange={capacity => patch({ capacity })}
+              decreaseLabel={t('mob.tw.entrants_less')}
+              increaseLabel={t('mob.tw.entrants_more')}
+              testID="edit-capacity"
+            />
+          </View>
+        </SectionCard>
+        {error && errorInStructure ? <Banner tone="error" message={error} testID="edit-error" /> : null}
+        {locked ? <Banner tone="info" message={t(team ? 'mob.te.lock_note_team' : 'mob.te.lock_note_individual')} testID="edit-lock-note" /> : null}
+        {fixturesExist(tournament) ? <Banner tone="info" message={t('mob.te.reset_note')} testID="edit-reset-note" /> : null}
+      </View>
 
       <SectionCard title={t('mob.tw.window_section')}>
         <View style={styles.pair}>
@@ -298,7 +399,7 @@ export default function TournamentEditScreen({ navigation, route }: Props): Reac
         </View>
       </SectionCard>
 
-      {error ? <Banner tone="error" message={error} testID="edit-error" /> : null}
+      {error && !errorInStructure ? <Banner tone="error" message={error} testID="edit-error" /> : null}
       <Button
         label={t('mob.common.save')}
         onPress={save}
@@ -313,6 +414,11 @@ export default function TournamentEditScreen({ navigation, route }: Props): Reac
 
 const styles = StyleSheet.create({
   container: { padding: spacing.md, paddingBottom: spacing.xl },
+  structure: { marginTop: spacing.md },
+  stepperCard: { marginTop: spacing.md },
+  divided: { borderTopWidth: borderWidth.thin, borderTopColor: colors.border },
+  counterRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
+  counterText: { flex: 1, paddingRight: spacing.sm },
   multiline: { minHeight: 96 },
   pair: { flexDirection: 'row', gap: spacing.sm },
   half: { flex: 1 },

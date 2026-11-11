@@ -424,9 +424,12 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
           const name = row.name;
           const sub = row.team_id
             ? row.team_captain_name
-              ? t('mob.part.sub_team', { count: row.team_player_count ?? 0, captain: row.team_captain_name })
+              ? t(row.team_player_count === 1 ? 'mob.part.sub_team_one' : 'mob.part.sub_team', {
+                  count: row.team_player_count ?? 0,
+                  captain: row.team_captain_name,
+                })
               : row.team_player_count !== null && row.team_player_count !== undefined
-              ? t('mob.part.sub_team_count', { count: row.team_player_count })
+              ? t(row.team_player_count === 1 ? 'mob.part.sub_team_count_one' : 'mob.part.sub_team_count', { count: row.team_player_count })
               : null
             : t('mob.part.sub_registered', { date: formatDayShort(row.registered_at) });
           return (

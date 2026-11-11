@@ -28,6 +28,15 @@ describe('getClientConfig & getGameLimits', () => {
     expect(config.google_maps_api_key).toBe('AIzaSy12345');
   });
 
+  it('parses the tournament capacity and team size defaults (team-size-capacity AD-3); absent or invalid = null', async () => {
+    mockedGet.mockResolvedValueOnce({ data: { tournament_default_entrants_max: 16, tournament_default_team_size: 2 } });
+    const config = await getClientConfig();
+    expect([config.tournament_default_entrants_max, config.tournament_default_team_size]).toEqual([16, 2]);
+    mockedGet.mockResolvedValueOnce({ data: { tournament_default_entrants_max: '16', tournament_default_team_size: 0 } });
+    const invalid = await getClientConfig();
+    expect([invalid.tournament_default_entrants_max, invalid.tournament_default_team_size]).toEqual([null, null]);
+  });
+
   it('defaults venue_catalogue_enabled to false when field is absent from server response', async () => {
     mockedGet.mockResolvedValueOnce({
       data: {
@@ -64,6 +73,8 @@ describe('getClientConfig & getGameLimits', () => {
       game_fee_enabled: false,
       game_fee_currency: null,
       game_fee_max_cents: null,
+      tournament_default_entrants_max: null,
+      tournament_default_team_size: null,
       android_store_url: '',
       ios_store_url: '',
     });

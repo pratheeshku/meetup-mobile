@@ -82,12 +82,15 @@ const childText = (root: Instance, testID: string): string =>
   ([] as unknown[]).concat(root.findAll(n => n.props.testID === testID)[0].props.children).join('');
 const has = (root: Instance, text: string): boolean => texts(root).some(x => x.includes(text));
 
-async function toStep(root: Instance, target: number, opts: { privateGroups?: boolean } = {}): Promise<void> {
+async function toStep(root: Instance, target: number, opts: { privateGroups?: boolean; team?: boolean } = {}): Promise<void> {
   if (target > 1) {
     await type(root, 'Tournament name', 'Punggol Open 2026');
     await next(root); // 1 Basics -> 2 Participation
   }
-  if (target > 2) await next(root); // 2 -> 3 When and where
+  if (target > 2) {
+    if (opts.team) await press(byTeamTab(root));
+    await next(root); // 2 -> 3 When and where
+  }
   if (target > 3) {
     await setDate(root, 'tw-starts', local(30, 9));
     await setDate(root, 'tw-ends', local(31, 18));
@@ -120,6 +123,12 @@ async function toStep(root: Instance, target: number, opts: { privateGroups?: bo
 }
 
 const REVIEW = 7;
+
+const byTeamTab = (root: Instance): Instance =>
+  root.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityLabel === 'Tournament team')[0];
+/** The number shown by a stepper (`CountStepper` testID + '-value'). */
+const valueOf = (root: Instance, testID: string): string =>
+  ([] as unknown[]).concat(root.findAll(n => n.props.testID === `${testID}-value`)[0].props.children).join('');
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -169,13 +178,73 @@ describe('steps and validation', () => {
     expect(root.findAll(n => String(n.props.testID ?? '').startsWith('tw-format-'))).toHaveLength(0);
   });
 
-  it('Who plays offers individual or team and no count fields (no overrides are sent)', async () => {
+  it('Who plays offers individual or team; Individual shows Maximum participants only (board M2)', async () => {
     const root = await mount();
     await toStep(root, 2);
-    expect(root.findAll(n => String(n.props.testID ?? '').startsWith('tw-entrants-'))).toHaveLength(0);
-    const team = root.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityLabel === 'Tournament team')[0];
-    await press(team);
+    expect(has(root, 'Maximum participants')).toBe(true);
+    expect(has(root, 'Players that can register. 8 to 64.')).toBe(true);
+    expect(has(root, 'Each player registers on their own.')).toBe(true);
+    expect(has(root, 'Players per tournament team')).toBe(false);
+    expect(root.findAll(n => n.props.testID === 'tw-team-size-value')).toHaveLength(0);
+    expect(has(root, 'Participation is fixed once')).toBe(false);
+  });
+
+  it('Team shows Players per tournament team and Maximum participants, both from the config defaults (board M1)', async () => {
+    (getClientConfig as jest.Mock).mockResolvedValue({
+      google_maps_api_key: null,
+      venue_catalogue_enabled: false,
+      tournament_default_entrants_max: 16,
+      tournament_default_team_size: 2,
+    });
+    const root = await mount();
+    await toStep(root, 2);
+    await press(byTeamTab(root));
+    expect(has(root, 'Players per tournament team')).toBe(true);
+    expect(has(root, 'Same for every tournament team. 2 to 4.')).toBe(true);
+    expect(has(root, 'Tournament teams that can register. 8 to 64.')).toBe(true);
     expect(has(root, 'Players create a tournament team when they register')).toBe(true);
+    expect(valueOf(root, 'tw-team-size')).toBe('2');
+    expect(valueOf(root, 'tw-entrants-max')).toBe('16');
+    // Back to Individual: the team size field is gone again.
+    await press(root.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityLabel === 'Individual')[0]);
+    expect(has(root, 'Players per tournament team')).toBe(false);
+    expect(valueOf(root, 'tw-entrants-max')).toBe('16');
+  });
+
+  it('the team size stepper stops at the template hints (2 to 4 here)', async () => {
+    const root = await mount();
+    await toStep(root, 2);
+    await press(byTeamTab(root));
+    // Team size starts at the fallback 1 (below the 2 to 4 hint): the minus is already at its floor after one plus.
+    await press(byTestId(root, 'tw-team-size-plus'));
+    expect(valueOf(root, 'tw-team-size')).toBe('2');
+    expect(byTestId(root, 'tw-team-size-minus').props.disabled).toBe(true);
+    await press(byTestId(root, 'tw-team-size-plus'));
+    await press(byTestId(root, 'tw-team-size-plus'));
+    expect(valueOf(root, 'tw-team-size')).toBe('4');
+    expect(byTestId(root, 'tw-team-size-plus').props.disabled).toBe(true);
+  });
+
+  it('Team submits entrants_max with team_size_min = team_size_max; the server refusal shows on the step (board M3)', async () => {
+    (getClientConfig as jest.Mock).mockResolvedValue({
+      google_maps_api_key: null,
+      venue_catalogue_enabled: false,
+      tournament_default_entrants_max: 16,
+      tournament_default_team_size: 2,
+    });
+    (createWizardTournament as jest.Mock).mockRejectedValueOnce({
+      response: { status: 422, data: { code: 'TEAM_SIZE_INVALID', detail: 'server text', step: 2 } },
+    });
+    const root = await mount();
+    await toStep(root, REVIEW, { team: true });
+    await press(byLabel(root, 'Create tournament'));
+    const [body] = (createWizardTournament as jest.Mock).mock.calls[0];
+    expect(body.participation_mode).toBe('team');
+    expect(body.overrides).toEqual({ entrants_max: 16, team_size_min: 2, team_size_max: 2 });
+    // The refusal sends the organizer back to Who plays with the labelled message, never the server text.
+    expect(has(root, 'Players per tournament team must be between 2 and 4.')).toBe(true);
+    expect(has(root, 'server text')).toBe(false);
+    expect(root.findAll(n => n.props.testID === 'tw-participation-error').length).toBeGreaterThan(0);
   });
 
   it('Registration dates shows the board errors and rule checklist; a hard block exactly at the first game is accepted', async () => {
@@ -257,9 +326,9 @@ describe('submit', () => {
       committee_member_ids: ['u-ravi'],
       venue_name: 'Punggol Sports Hall',
     });
-    // AD-T3: neither is ever sent.
+    // AD-T3: no template is sent. team-size-capacity AD-4: the capacity goes as an override, no team size for Individual.
     expect(body).not.toHaveProperty('template_id');
-    expect(body).not.toHaveProperty('overrides');
+    expect(body.overrides).toEqual({ entrants_max: 32 });
     expect(uploadTournamentImage).not.toHaveBeenCalled();
     expect(body.client_request_id).toMatch(/^[0-9a-f-]{36}$/);
     expect(options.correlationId).toMatch(/^[0-9a-f-]{36}$/);

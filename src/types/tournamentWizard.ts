@@ -60,6 +60,7 @@ export interface WizardCreateBody {
   client_request_id: string;
   /** Never sent (AD-T3): the server uses the single default format. */
   template_id?: string;
+  /** team-size-capacity AD-4: `entrants_max` always, `team_size_min` = `team_size_max` = N in team mode only. */
   overrides?: Partial<Record<WizardOverrideField, number>>;
   title: string;
   sport: string;
