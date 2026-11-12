@@ -20,6 +20,7 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Geolocation from '@react-native-community/geolocation';
 
+import appConfig from '../../config/appConfig.json';
 import { getClientConfig, getGameLimits, type GameLimits } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
 import { createEvent, inviteEmailToEvent } from '../api/events';
@@ -306,7 +307,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           {
             title: t('mob.create_game.permission_rationale_title'),
-            message: t('mob.create_game.permission_rationale_msg'),
+            message: t('mob.create_game.permission_rationale_msg', { appName: appConfig.appName }),
             buttonPositive: t('mob.notification_action.ok'),
             buttonNegative: t('mob.common.cancel'),
           },

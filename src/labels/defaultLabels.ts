@@ -604,7 +604,7 @@ export const DEFAULT_LABELS = {
   'mob.notif_pref.type_group_deleted': 'Group deleted',
   'mob.notif_pref.type_group_ownership_transferred': 'Group ownership transferred',
   'mob.push_rationale.title': 'Stay up to date',
-  'mob.push_rationale.message': 'Meetup sends notifications about game invites, changes, cancellations and waitlist updates. Next, your phone will ask whether to allow them. You can change this any time in your phone settings.',
+  'mob.push_rationale.message': '{appName} sends notifications about game invites, changes, cancellations and waitlist updates. Next, your phone will ask whether to allow them. You can change this any time in your phone settings.',
   'mob.push_rationale.continue': 'Continue',
   'mob.notification_banner.dismiss_a11y': 'Dismiss notification',
   'mob.notification_action.view': 'View',
@@ -892,7 +892,7 @@ export const DEFAULT_LABELS = {
   'mob.create_game.wizard_title_create': 'Create',
   'mob.create_game.wizard_title_create_game': 'Create game',
   'mob.create_game.permission_rationale_title': 'Location Permission',
-  'mob.create_game.permission_rationale_msg': 'Meetup needs access to your location to set the game venue.',
+  'mob.create_game.permission_rationale_msg': '{appName} needs access to your location to set the game venue.',
   'mob.create_game.err_location_permission': 'Location permission is required to detect your location.',
   'mob.create_game.err_location_failed': 'Could not detect your current location.',
 
