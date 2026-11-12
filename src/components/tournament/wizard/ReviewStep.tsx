@@ -6,11 +6,11 @@ import { useT } from '../../../labels/LabelsContext';
 import { colors, spacing, typography } from '../../../theme/tokens';
 import { Banner, SectionCard, StepHeading, tokenFor, type StepFocus } from './parts';
 import { toDate, WIZARD_STEP, type WizardState } from '../../../utils/tournamentWizard';
-import { formatDay } from './RegistrationStep';
+import { formatDayTime } from './RegistrationStep';
 
 function day(value: string): string {
   const date = toDate(value);
-  return date ? formatDay(date) : '–';
+  return date ? formatDayTime(date) : '–';
 }
 
 export default function ReviewStep({

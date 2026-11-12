@@ -14,13 +14,13 @@ import Button from '../../Button';
 import IconBadge from '../../IconBadge';
 import { TrophyIcon } from '../../icons/SharedIcons';
 import { Banner, SectionCard } from './parts';
-import { formatDay } from './RegistrationStep';
+import { formatDayTime } from './RegistrationStep';
 
 const BADGE = 64;
 const DOT = 12;
 
 function day(iso: string): string {
-  return formatDay(new Date(iso));
+  return formatDayTime(new Date(iso));
 }
 
 export default function CreatedView({
