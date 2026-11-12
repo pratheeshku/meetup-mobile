@@ -36,6 +36,7 @@ import {
   requestPermission,
 } from './fcm';
 import { currentT } from '../labels/LabelsContext';
+import appConfig from '../../config/appConfig.json';
 
 /** Device-level (not per-account): the OS permission is per-app. */
 export const RATIONALE_SHOWN_KEY = 'notifications.permissionRationaleShown.v1';
@@ -44,7 +45,7 @@ function showRationale(): Promise<void> {
   return new Promise(resolve => {
     Alert.alert(
       currentT('mob.push_rationale.title'),
-      currentT('mob.push_rationale.message'),
+      currentT('mob.push_rationale.message', { appName: appConfig.appName }),
       [{ text: currentT('mob.push_rationale.continue'), onPress: () => resolve() }],
       // No outside-tap / back dismissal: the promise must resolve via the button.
       { cancelable: false },

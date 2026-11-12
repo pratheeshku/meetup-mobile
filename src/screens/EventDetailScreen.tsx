@@ -44,6 +44,7 @@ import {
   reverseGeocodeCoordinates,
   type PlacePrediction,
 } from '../api/places';
+import appConfig from '../../config/appConfig.json';
 import { getClientConfig, getGameLimits } from '../api/config';
 import { getMyGroups } from '../api/groups';
 import GameFeeFields, { parseGameFee, type GameFeeConfig } from '../components/GameFeeFields';
@@ -494,7 +495,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           {
             title: t('mob.create_game.permission_rationale_title'),
-            message: t('mob.create_game.permission_rationale_msg'),
+            message: t('mob.create_game.permission_rationale_msg', { appName: appConfig.appName }),
             buttonPositive: t('mob.notification_action.ok'),
             buttonNegative: t('mob.common.cancel'),
           },
