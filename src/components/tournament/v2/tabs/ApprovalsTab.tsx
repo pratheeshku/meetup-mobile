@@ -22,9 +22,9 @@ import { dash } from '../../../../theme/dashboardTheme';
 import { colors, spacing, typography } from '../../../../theme/tokens';
 import type { CommitteeMember, Tournament } from '../../../../types/tournament';
 import type { ApprovalRequest } from '../../../../types/tournamentTabs';
-import { formatDayShort } from '../../../../utils/tournamentExperience';
 import { approvalCards, type ApprovalCard } from '../../../../utils/tournamentTabs';
 import Button from '../../../Button';
+import { formatDayTime } from '../../wizard/RegistrationStep';
 import { CardHead, EmptyLine, TabCard } from './parts';
 import ReviewFixturesSheet from './ReviewFixturesSheet';
 import type { StandingsBoard } from './useStandingsBoard';
@@ -137,7 +137,7 @@ export default function ApprovalsTab(props: ApprovalsTabProps): React.JSX.Elemen
   const history = cards.filter(c => c.bucket === 'history');
 
   const renderCard = (card: ApprovalCard): React.JSX.Element => {
-    const when = formatDayShort(card.resolvedAt ?? card.createdAt);
+    const when = formatDayTime(new Date(card.resolvedAt ?? card.createdAt));
     const meta = card.initiatorIsViewer
       ? t('mob.tournament.approvals.submitted_by_you', { name: card.initiatorName, when })
       : t('mob.tournament.approvals.requested_by', { name: card.initiatorName, when });
@@ -227,7 +227,7 @@ export default function ApprovalsTab(props: ApprovalsTabProps): React.JSX.Elemen
         <ReviewFixturesSheet
           tournamentId={tournament.id}
           draftId={reviewing.draftId}
-          requestedBy={t('mob.tournament.approvals.requested_by', { name: reviewing.initiatorName, when: formatDayShort(reviewing.createdAt) })}
+          requestedBy={t('mob.tournament.approvals.requested_by', { name: reviewing.initiatorName, when: formatDayTime(new Date(reviewing.createdAt)) })}
           names={props.names}
           busy={busyId === reviewing.id}
           onApprove={async () => {

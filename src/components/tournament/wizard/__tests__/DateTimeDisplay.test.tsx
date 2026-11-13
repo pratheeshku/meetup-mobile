@@ -10,7 +10,7 @@ import { createdResult } from '../../../../test-utils/tournamentWizardFixtures';
 import { render, texts } from '../../../../test-utils/render';
 import CreatedView from '../CreatedView';
 import ReviewStep from '../ReviewStep';
-import { formatDay, formatDayTime } from '../RegistrationStep';
+import RegistrationStep, { formatDay, formatDayTime } from '../RegistrationStep';
 
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
@@ -61,5 +61,20 @@ describe('CreatedView date and time', () => {
     expect(out).toContain(fmt(result.registration_hard_block_at));
     expect(out).toContain(fmt(result.starts_at));
     expect(fmt(result.starts_at)).not.toBe(formatDay(new Date(result.starts_at)));
+  });
+});
+
+describe('RegistrationStep "So far" date and time', () => {
+  it('shows the time on the soft and hard block rows', () => {
+    const state = {
+      ...initialWizardState('req-1', 'badminton'),
+      closesAt: local(20, 21, 15),
+      hardBlockAt: local(21, 7, 5),
+      startsAt: local(22, 9, 30),
+    };
+    const out = texts(render(<RegistrationStep state={state} now={new Date(2030, 10, 1)} onClosure={() => undefined} onHardBlock={() => undefined} errors={{}} />));
+    expect(out).toContain(formatDayTime(toDate(state.closesAt) as Date));
+    expect(out).toContain(formatDayTime(toDate(state.hardBlockAt) as Date));
+    expect(formatDayTime(toDate(state.closesAt) as Date)).not.toBe(formatDay(toDate(state.closesAt) as Date));
   });
 });

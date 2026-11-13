@@ -173,8 +173,8 @@ export default function RegistrationStep({
 
       <SectionCard style={styles.sofar}>
         <Text style={styles.sofarTitle}>{t('mob.tw.dates_sofar')}</Text>
-        <SoFarRow label={t('mob.tw.dates_sofar_soft')} value={closes ? shortDay(closes) : dash} />
-        <SoFarRow label={t('mob.tw.dates_sofar_hard')} value={hard ? shortDay(hard) : dash} />
+        <SoFarRow label={t('mob.tw.dates_sofar_soft')} value={closes ? formatDayTime(closes) : dash} />
+        <SoFarRow label={t('mob.tw.dates_sofar_hard')} value={hard ? formatDayTime(hard) : dash} />
         <SoFarRow
           label={t('mob.tw.dates_sofar_first')}
           value={starts ? `${shortDay(starts)}, ${starts.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}` : dash}
