@@ -103,7 +103,7 @@ import { isActiveRegistration, registeredCount } from '../utils/responseGroups';
 import { canOfferEdit } from '../utils/tournamentEdit';
 import { usesV2Page } from '../utils/tournamentTabs';
 import { useSportDisplayName } from '../utils/labels';
-import { formatEventDate } from '../utils/formatEventDateTime';
+import { formatDayTime } from '../components/tournament/wizard/RegistrationStep';
 import type { TournamentsStackParamList } from '../navigation/types';
 import { useT } from '../labels/LabelsContext';
 
@@ -652,7 +652,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
           rows: [
             { label: t('mob.done.f_title'), value: tournament.name },
             { label: t('mob.done.f_sport'), value: sportLabel },
-            { label: t('mob.done.f_date'), value: formatEventDate(tournament.starts_at) },
+            { label: t('mob.done.f_date'), value: formatDayTime(new Date(tournament.starts_at)) },
             { label: t('mob.done.f_status'), value: t('mob.done.v_cancelled') },
           ],
           primary: 'dashboard',

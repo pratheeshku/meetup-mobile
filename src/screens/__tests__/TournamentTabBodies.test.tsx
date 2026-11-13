@@ -13,6 +13,7 @@ import { apiClient } from '../../api/client';
 import { act, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import { pickImage } from '../../utils/imagePicker';
+import { formatDayTime } from '../../components/tournament/wizard/RegistrationStep';
 
 jest.mock('../../api/client', () => ({ apiClient: { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() } }));
 jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn().mockResolvedValue({ items: [] }) }));
@@ -221,6 +222,7 @@ describe('Participants (TV2MobOpenParticipants)', () => {
     const root = await mount();
     await press(root, 'tournament-tab-participants');
     expect(everyText(root)).toContain('Add or remove players until the roster is frozen on');
+    expect(everyText(root)).toContain(formatDayTime(new Date('2026-11-01T10:00:00Z')));
     await press(root, 'participant-remove-r2');
     await alertPress('Remove from tournament');
     // teams-payments AD-12: the row menu leads to "Are you sure?"; nothing is deleted until Yes.
@@ -611,6 +613,7 @@ describe('Approvals (TV2MobLiveApprovals, TV2MobClosedApprovals)', () => {
     expect(body).toContain('Change a match winner');
     expect(body).toContain('Ravi K. against Alicia Lim');
     expect(body).toContain('Requested by Alicia Lim');
+    expect(body).toContain(formatDayTime(new Date('2026-11-14T01:00:00Z')));
     expect(body).toContain('Submitted by you (Me Player)');
     expect(body).toContain('Waiting for Alicia Lim.');
     expect(body).not.toMatch(/u-alicia|u-me|a1\b/);
@@ -674,6 +677,7 @@ describe('Results and Close tournament (TV2MobDoneResults, TV2MobClose)', () => 
     expect(body).toContain('Thank you all for a fantastic weekend.');
     expect(body).toContain('See all 24 in Media');
     expect(body).toContain('Submitted');
+    expect(body).toContain(formatDayTime(new Date(closed.closed_at)));
     expect(texts(byId(root, 'results-summary')[0])).toContain('2');
     expect(byId(root, 'results-close-button')).toHaveLength(0);
   });

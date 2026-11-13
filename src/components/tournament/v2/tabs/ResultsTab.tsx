@@ -15,12 +15,13 @@ import { borderWidth, colors, radius, spacing, typography } from '../../../../th
 import type { Tournament, TournamentClosurePerson, TournamentClosureResponse } from '../../../../types/tournament';
 import type { MediaPage } from '../../../../types/tournamentTabs';
 import { toHttpsUrl } from '../../../../utils/httpsUrl';
-import { dayCount, formatDayShort } from '../../../../utils/tournamentExperience';
+import { dayCount } from '../../../../utils/tournamentExperience';
 import { matchesFor, playedCount } from '../../../../utils/tournamentTabs';
 import Button from '../../../Button';
 import { TrophyIcon } from '../../../icons/SharedIcons';
 import UserAvatar from '../../../UserAvatar';
 import CloseSheet from './CloseSheet';
+import { formatDayTime } from '../../wizard/RegistrationStep';
 import { CardHead, Chip, CommitteeNote, EmptyLine, TabCard } from './parts';
 import type { StandingsBoard } from './useStandingsBoard';
 
@@ -142,7 +143,7 @@ export default function ResultsTab(props: {
             <View style={styles.by}>
               {tournament.organizer ? <Text style={styles.byName}>{tournament.organizer.display_name}</Text> : null}
               <Chip label={t('mob.tournament.results.organizer_badge')} tone="amber" />
-              {closure.closed_at ? <Text style={styles.date}>{formatDayShort(closure.closed_at)}</Text> : null}
+              {closure.closed_at ? <Text style={styles.date}>{formatDayTime(new Date(closure.closed_at))}</Text> : null}
             </View>
             <Text style={styles.comments}>{closure.comments}</Text>
           </View>

@@ -52,6 +52,7 @@ import {
   TeamTile,
   UnpaidWarning,
 } from '../../participants/parts';
+import { formatDayTime } from '../../wizard/RegistrationStep';
 import TeamDetailsSheet from '../../participants/TeamDetailsSheet';
 import { CardHead, Chip, CommitteeNote, EmptyLine, TabCard } from './parts';
 
@@ -336,7 +337,7 @@ export default function ParticipantsTab(props: ParticipantsTabProps): React.JSX.
             props.phase === 'frozen'
               ? t('mob.tournament.participants.frozen_note')
               : t('mob.tournament.participants.committee_note', {
-                  date: tournament.registration_hard_block_at ? formatDayShort(tournament.registration_hard_block_at) : '–',
+                  date: tournament.registration_hard_block_at ? formatDayTime(new Date(tournament.registration_hard_block_at)) : '–',
                 })
           }
         />
