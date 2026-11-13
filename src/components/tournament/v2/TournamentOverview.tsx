@@ -20,10 +20,10 @@ import type { TournamentTabKey, TournamentTabs } from '../../../types/tournament
 import {
   formatClock,
   formatDateRange,
-  formatDayShort,
   keyDateStates,
   type OverviewKind,
 } from '../../../utils/tournamentExperience';
+import { formatDayTime } from '../wizard/RegistrationStep';
 import { formatRuleRows } from '../../../utils/tournamentTabs';
 import type { StageState } from '../../../utils/tournamentExperience';
 import Button from '../../Button';
@@ -117,7 +117,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
             <Text style={styles.cardTitle}>{t('mob.tournament.v2.ov_open_title')}</Text>
             <Text style={styles.body}>
               {t('mob.tournament.v2.ov_open_body', {
-                date: tournament.registration_closes_at ? formatDayShort(tournament.registration_closes_at) : '–',
+                date: tournament.registration_closes_at ? formatDayTime(new Date(tournament.registration_closes_at)) : '–',
               })}
             </Text>
             {props.isCommittee ? (
@@ -142,7 +142,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
             )}
             {tournament.roster_frozen_at ? (
               <Text style={styles.frozen} testID="overview-roster-frozen">
-                {t('mob.tournament.v2.ov_roster_frozen', { date: formatDayShort(tournament.roster_frozen_at) })}
+                {t('mob.tournament.v2.ov_roster_frozen', { date: formatDayTime(new Date(tournament.roster_frozen_at)) })}
               </Text>
             ) : null}
           </Block>
@@ -269,7 +269,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
     keyRows.push({
       key: 'opened',
       title: t('mob.tournament.v2.kd_opened'),
-      sub: formatDayShort(tournament.registration_opened_at),
+      sub: formatDayTime(new Date(tournament.registration_opened_at)),
       state: states.opened,
     });
   }
@@ -277,7 +277,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
   // only; its presence is what shows an admin who is not on the committee). A participant sees "Registration closes" and nothing else of the
   // block dates. A hard block the API did not return is never inferred.
   const seesBlockDates = props.isCommittee || Boolean(tournament.registration_hard_block_at);
-  const closesAt = tournament.registration_closes_at ? formatDayShort(tournament.registration_closes_at) : '–';
+  const closesAt = tournament.registration_closes_at ? formatDayTime(new Date(tournament.registration_closes_at)) : '–';
   keyRows.push({
     key: 'soft',
     title: seesBlockDates ? t('mob.tournament.v2.kd_soft') : t('web.tournament.v2.kd_registration_closes'),
@@ -292,7 +292,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
     keyRows.push({
       key: 'hard',
       title: t('mob.tournament.v2.kd_hard'),
-      sub: t('mob.tournament.v2.kd_hard_sub', { date: formatDayShort(tournament.registration_hard_block_at) }),
+      sub: t('mob.tournament.v2.kd_hard_sub', { date: formatDayTime(new Date(tournament.registration_hard_block_at)) }),
       state: states.hard,
     });
   }
@@ -301,7 +301,7 @@ export default function TournamentOverview(props: OverviewProps): React.JSX.Elem
       key: 'fixtures',
       title: t('mob.tournament.v2.kd_fixtures'),
       sub: tournament.schedule_published_at
-        ? formatDayShort(tournament.schedule_published_at)
+        ? formatDayTime(new Date(tournament.schedule_published_at))
         : t('mob.tournament.v2.kd_fixtures_pending'),
       state: states.fixtures,
     },

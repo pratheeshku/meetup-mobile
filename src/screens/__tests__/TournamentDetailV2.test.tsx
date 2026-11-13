@@ -11,6 +11,8 @@ import { apiClient } from '../../api/client';
 import { act, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import { mockGet, mockPost, rawTournament } from '../../test-utils/tournamentDetailHarness';
+import { formatDayTime } from '../../components/tournament/wizard/RegistrationStep';
+import { formatDayShort } from '../../utils/tournamentExperience';
 
 jest.mock('../../api/client', () => ({ apiClient: { get: jest.fn(), post: jest.fn(), delete: jest.fn() } }));
 jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn().mockResolvedValue({ items: [] }) }));
@@ -473,5 +475,53 @@ describe('withdrawal locked (A40)', () => {
     const all = everyText(root);
     expect(all).toContain('The organizer has switched off withdrawals for this tournament.');
     expect(all).not.toContain('raw server text');
+  });
+});
+
+describe('Overview dates carry the time (Task 3.3)', () => {
+  const OPENED = '2026-10-14T01:05:00Z';
+  const SOFT = '2026-10-30T15:59:00Z';
+  const HARD = '2026-11-03T15:59:00Z';
+  const FIXTURES = '2026-11-05T02:30:00Z';
+  const FROZEN = '2026-10-31T10:00:00Z';
+  const at = (iso: string): string => formatDayTime(new Date(iso));
+
+  it('the formatter really adds a time to the date', () => {
+    for (const iso of [OPENED, SOFT, HARD, FIXTURES, FROZEN]) {
+      expect(at(iso)).not.toBe(formatDayShort(iso));
+      expect(at(iso)).toMatch(/\d{1,2}:\d{2}/);
+    }
+  });
+
+  it('open banner shows the soft block with its time', async () => {
+    const root = await mount({ registration_closes_at: SOFT });
+    expect(everyText(byId(root, 'overview-status-open')[0])).toContain(at(SOFT));
+  });
+
+  it('Key dates for the organizer: Registration opened, Soft block, Hard block and Fixtures published show times', async () => {
+    const root = await mount({
+      organizer_id: 'user-me',
+      registration_opened_at: OPENED,
+      registration_closes_at: SOFT,
+      registration_hard_block_at: HARD,
+      schedule_published_at: FIXTURES,
+    });
+    const dates = everyText(byId(root, 'overview-key-dates')[0]);
+    for (const iso of [OPENED, SOFT, HARD, FIXTURES]) expect(dates).toContain(at(iso));
+  });
+
+  it('a participant sees the time on "Registration closes"', async () => {
+    const root = await mount({ registration_closes_at: SOFT });
+    expect(everyText(byId(root, 'overview-key-dates')[0])).toContain(at(SOFT));
+  });
+
+  it('keeps the dash when the soft block date is missing', async () => {
+    const root = await mount({ organizer_id: 'user-me', registration_closes_at: null });
+    expect(everyText(byId(root, 'overview-key-dates')[0])).toContain('–');
+  });
+
+  it('closed card: the roster-frozen line shows the time', async () => {
+    const root = await mount({ capacity: 32, roster_frozen_at: FROZEN }, stateOf({ registration_phase: 'frozen' }));
+    expect(everyText(byId(root, 'overview-roster-frozen')[0])).toContain(at(FROZEN));
   });
 });
