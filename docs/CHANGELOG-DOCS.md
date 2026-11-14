@@ -66,3 +66,4 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 - v1.0 (2026-11-14, approved on the owner's elicitation decisions): new addendum. Supersedes in part email-auth D1, shareable-links Decisions 15 and 21, and share-invite task 1.3 of 2026-11-07. Deviation D-1 (no boards).
 - v1.0.1 (2026-11-14): OI-7 device check moved to the staging app build task. No decision changed.
 - v1.0.2 (2026-11-14): write-back of the Task 3.1 Blocked Report. AD-8 to AD-11 name the verified fields and endpoints; GET /config/client gains link_base_url and app_links_enabled; DL-06 corrected (join at account creation only, OI-8 added). No owner decision changed.
+- v1.0.3 (2026-11-14): write-back of the Task 1.1 report. UI-05 close-action finding withdrawn (architect review error); UI-12 and OI-5 About/Help are admin data; POST /public/link-opened accepted. No owner decision changed.
