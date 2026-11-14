@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import NotificationCard from '../NotificationCard';
 import type { NotificationHistoryItem } from '../../types/notification';

@@ -1,3 +1,4 @@
+/* eslint-env jest */ // the whole file uses the `jest` global (as jest.setup.documents.js does)
 // react-native-keychain wraps native Keystore/Keychain APIs that don't
 // exist in the Jest environment. Mocked here so App-level smoke tests
 // don't need a native module bridge; behavioural tests for
@@ -133,11 +134,6 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 // the library's real ones (EventType: DISMISSED=0, PRESS=1, ACTION_PRESS=2;
 // AndroidImportance.HIGH=4) so tests can't pass on a wrong constant. Add to
 // this mock — not a new ad hoc one per test file — if new APIs are used.
-//
-// `no-undef` is disabled for this block only: ESLint has no jest env for this
-// file, so every `jest.` reference is flagged. Scoped (not `eslint-env jest`)
-// so the file's older `jest.` references are deliberately left as they were.
-/* eslint-disable no-undef */
 jest.mock('react-native-notify-kit', () => ({
   __esModule: true,
   default: {
@@ -197,14 +193,12 @@ jest.mock('@react-native-community/datetimepicker', () => {
     },
   };
 });
-/* eslint-enable no-undef */
 
 // react-native-image-crop-picker wraps native camera/gallery and crop
 // controllers (uCrop on Android, TOCropViewController on iOS) with no
 // Jest-environment equivalent. Added for profile photo upload + crop
 // (replaces react-native-image-picker). Centralised here per this
 // file's established convention.
-/* eslint-disable no-undef */
 const mockCropPicker = {
   openCamera: jest.fn(async () => {
     const error = new Error('User cancelled image selection');
@@ -322,8 +316,10 @@ jest.mock('@react-navigation/native', () => {
   return {
     ...actual,
     useFocusEffect: jest.fn(effect => {
-      React.useEffect(effect, []);
+      // Runs once on mount with the first render's effect, exactly as `useEffect(effect, [])` did.
+      const latest = React.useRef(effect);
+      latest.current = effect;
+      React.useEffect(() => latest.current(), []);
     }),
   };
 });
-/* eslint-enable no-undef */

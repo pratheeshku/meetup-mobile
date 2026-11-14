@@ -4,7 +4,6 @@ import Svg from 'react-native-svg';
 
 import { render } from '../../../test-utils/render';
 import {
-  REGISTRY_CONFIG,
   RegistryIcon,
   type RegistryIconName,
 } from '../RegistryIcons';

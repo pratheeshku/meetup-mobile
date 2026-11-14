@@ -130,18 +130,7 @@ const press = async (root: Instance, id: string): Promise<void> => {
     await node(root, id).props.onPress();
   });
 };
-const input = (root: Instance, id: string): Instance => {
-  const found = root.findAll(n => n.props.testID === id && typeof n.props.onEndEditing === 'function')[0];
-  if (!found) throw new Error(`no points box: ${id}`);
-  return found;
-};
-const flip = async (root: Instance, id: string, value: boolean): Promise<void> => {
-  await act(async () => {
-    await node(root, id).props.onValueChange(value);
-  });
-};
 const all = (root: Instance): string => texts(root).join(' | ');
-const of = (root: Instance, id: string): string => texts(hostById(root, id)[0]).join(' ');
 
 beforeEach(() => {
   mockUser = 'u-me';
