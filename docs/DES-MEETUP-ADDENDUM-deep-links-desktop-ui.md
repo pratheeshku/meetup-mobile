@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-DEEP-LINKS-DESKTOP-UI
 
 **Doc ID:** DES-MEETUP-ADDENDUM-DEEP-LINKS-DESKTOP-UI
-**Version:** v1.0.1
+**Version:** v1.0.2
 **Status:** APPROVED on the owner's elicitation decisions of 2026-11-14 (standing instruction of 2026-10-28 for Meetup amendments). Architect decisions are listed in §10 for the owner's visibility; the owner may overturn any.
 **Owner:** Pratheesh
 **Date:** 2026-11-14
@@ -27,7 +27,7 @@ Two pieces of work in one release.
 | DL-03 | The app has a native screen to set a new password from the emailed link. After success the user signs in with the new password. No session is created from the link. |
 | DL-04 | A game link shows the existing 7-field public preview to anyone, in the app as on the web. Joining follows today's rules. A link grants no access. |
 | DL-05 | A tournament link opens the tournament for a person who has access. Anyone else sees the existing "not available" notice. No tournament preview is added. |
-| DL-06 | A group invitation link keeps its meaning (single-use token, joins the group) and now also works when the person signs in or signs up inside the app. |
+| DL-06 | A group invitation link keeps its meaning (single-use token, joins the group) and now also works when the person signs up inside the app. An existing account does not join a group by link, on web or app, exactly as today (OI-8). |
 | DL-07 | A signed-out person signs in or signs up first, then lands on the link's target. |
 | DL-08 | Game and tournament share messages carry a link again, on web and mobile. |
 | DL-09 | The hostname used in generated links is an admin UI setting. Current hosts: `meetupaws.duckdns.org` (production), `meetupstg.duckdns.org` (staging). |
@@ -77,13 +77,13 @@ Rule: public identifiers go in the path or query; anything that proves a claim (
 
 **AD-7: Native reset screen (DL-03).** Fields: new password and confirmation. It calls the existing `POST /auth/reset-password-with-token`. The token comes only from the link, lives in memory, and is never logged, stored or sent to analytics. Every failure shows one message with a way back to `ForgotPasswordScreen`. Success returns to `LoginScreen` with a confirmation. If someone is signed in on the device, the screen still works and the device is signed out on success (the server already ends all sessions).
 
-**AD-8: Game link (DL-04).** With access: `EventDetailScreen`. Without access or signed out: the 7 fields of the existing `GET /public/events/{id}` plus the existing call to action. `ref` and `invite` are passed on at sign-up and join exactly as the web does. The app therefore now sends `invitation_token`, `ref`, `event_id` and `invite` at sign-up and social sign-in (supersedes email-auth D1).
+**AD-8: Game link (DL-04).** With access: `EventDetailScreen`. Otherwise the public preview from the existing `GET /public/events/{event_id}` (optional query `ref`), whose response is exactly `sport`, `starts_at`, `ends_at`, `venue_name`, `capacity`, `organizer_display_name`, `going_count`. Signed out: the preview with two actions, "Sign up to join" and "Already have an account? Log in", as the web's public game view. Signed in without access: the preview with the existing access notice and no join action. The existing invitation fields `invitation_token`, `ref`, `event_id` and `invite` are accepted by the server on account-creation requests only (`POST /auth/signup`, `POST /auth/oauth/{provider}/callback`, and through the sign-up ticket to `POST /auth/complete-signup`); the app now sends them there when a link supplied them (supersedes email-auth D1). They are not sent at ordinary sign-in.
 
-**AD-9: Tournament link (DL-05).** With access: `TournamentDetailScreen`. Otherwise the existing access notice. An emailed invitation is claimed as on the web.
+**AD-9: Tournament link (DL-05).** With access: `TournamentDetailScreen`. Otherwise the existing access notice. An emailed invitation is claimed by the server at account creation through the `invite` field (AD-8); there is no separate claim call.
 
-**AD-10: Group invitation (DL-06).** The app shows the group name from the existing `GET /public/groups/invitations/{token}`, then joins through the existing server-side flow. `invitation_url` returned by the API takes the AD-2 form when AD-5's switch is on. Token rules are unchanged.
+**AD-10: Group invitation (DL-06).** The app shows the group name from the existing `GET /public/groups/invitations/{token}` (response: `group_name` only). The join happens on the server at account creation when `invitation_token` is sent (AD-8); the response field `joined_group_id` tells the app which group to open. A person who already has an account is not joined by the link: after sign-in the app opens the Groups list, as the web does (OI-8). `invitation_url` returned by the API takes the AD-2 form when AD-5's switch is on. Token rules are unchanged.
 
-**AD-11: Share messages (DL-08).** Game and tournament shares end with their link on web and mobile, using the `{url}` placeholder the share labels already have. This reverses task 1.3 of 2026-11-07 by owner decision.
+**AD-11: Share messages (DL-08).** Game and tournament shares are the invite message followed by a blank line and the link, on web and mobile (the `{url}` placeholder in the share labels is for the store lines and is not used for this). The web builds the link from its own origin. The app builds it from two additive fields on the existing `GET /config/client`: `link_base_url` (string or null) and `app_links_enabled` (boolean). Switch on: the AD-2 form. Switch off: the hash form (`{base}/#event-detail/{event_id}?ref={user_id}`, `{base}/#tournament-detail/{tournament_id}`). No base: message only. This reverses task 1.3 of 2026-11-07 by owner decision.
 
 **AD-12: Shared desktop page frame (UI-01 to UI-12).** Applies at desktop width only. Every signed-in page uses one frame: the same header (notifications and profile always present), one content width rule, one back control, one title style, one page padding. Existing theme tokens only; no new visual language. The install banner must not add to page height or cover the header.
 
@@ -99,6 +99,8 @@ Rule: public identifiers go in the path or query; anything that proves a claim (
 |---|---|
 | core/config | Link allow-list, Apple and Android association values |
 | admin/config | `link_base_url`, `app_links_enabled` in Config Management |
+| client config | `GET /config/client` gains `link_base_url` and `app_links_enabled` (additive, AD-11) |
+| labels | Seed of the new mobile label keys reported by the app task |
 | main | Two `/.well-known` routes; `/l/*` answered by the web app |
 | auth | Reset email link built from AD-5 in AD-2 form |
 | groups, events, tournaments | Invitation and share links built from AD-5 in AD-2 form |
@@ -148,7 +150,7 @@ Old app versions keep working: they never receive `/l/` links as app links and t
 
 ## 6. Observability & Operability
 
-- Counters without identifiers or tokens: link opened by kind, platform and outcome (opened target, preview, not available, sign-in first, malformed); verification file requests by result; links generated by form (hash or path).
+- Counters without identifiers or tokens: link opened by kind, platform and outcome (opened target, preview, not available, sign-in first, malformed); verification file requests by result; links generated by form (hash or path). The app's counters are diagnostic log events through its existing diagnostics module; no server endpoint is added for them.
 - Start-up: incomplete association configuration logs a warning and the two files answer 404, so links open in the browser. This mirrors the existing `WEB_BASE_URL` behaviour.
 - Rollout order: deploy backend and web with the switch off; release both apps; owner turns `app_links_enabled` on in staging, checks the four link kinds on both phones, then turns it on in production.
 - Rollback: switch off. New links return to hash form at once; no deploy needed.
@@ -175,6 +177,7 @@ Old app versions keep working: they never receive `/l/` links as app links and t
 | OI-5 | Real About and Help addresses | Owner; links stay hidden until set |
 | OI-6 | Desktop pages not reviewed: wizard steps 4 to 6, tournament wizard, create group, edit profile, privacy and terms | Architect reviews after the shared frame lands; findings enter as v1.1 |
 | OI-7 | Device check that the fragment reaches the app on iOS and Android | Staging app build task, on the owner's phones (cloud agents have no devices). A failure is a Blocked Report against AD-2 and blocks the production switch |
+| OI-8 | A person who already has an account cannot join a group by tapping an invitation link (web and app, existing behaviour) | Owner decides whether to add it; it needs a new join rule and endpoint, so a separate addendum |
 | DF-1 | Deferred deep link through a store install | Revisit if more than 30% of `/l/` web opens over 30 days come from phone browsers |
 | DF-2 | Tournament public preview | Owner request only |
 
@@ -194,3 +197,4 @@ DL-01: AD-1, AD-2, AD-4, AD-6. DL-02: AD-2. DL-03: AD-7. DL-04: AD-8. DL-05: AD-
 |---|---|---|
 | v1.0 | 2026-11-14 | Initial. Approved on the owner's elicitation decisions of the same day. |
 | v1.0.1 | 2026-11-14 | OI-7 and its risk row: the device check moves from the first app coding task to the staging app build task, because coding agents run in the cloud without phones. No decision changed. |
+| v1.0.2 | 2026-11-14 | Write-back of the Task 3.1 Blocked Report (valid finding, HIGH: app contract not stated). AD-8 to AD-11 now name the fields, endpoints and behaviour verified in the code at `ed9187c`; `GET /config/client` gains two additive fields; app counters are diagnostic logs. Corrections of architect error: DL-06 said "signs in or signs up" (the server joins at account creation only; OI-8 added), and AD-11 named the wrong label placeholder. No owner decision changed. |
