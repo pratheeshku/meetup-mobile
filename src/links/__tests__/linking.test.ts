@@ -34,21 +34,78 @@ describe('createLinking', () => {
     expect(getActionFromState(inn)).toBeDefined();
   });
 
-  it('closed app: the initial URL waits for the force-update gate and never resolves while blocked', async () => {
-    jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(`https://meetupaws.duckdns.org/l/reset#token=${RESET}`);
-    const linking = createLinking(() => false);
-    const spy = jest.fn();
-    Promise.resolve(linking.getInitialURL!()).then(spy);
-    await flush();
-    expect(spy).not.toHaveBeenCalled();
+  describe('closed app (cold start)', () => {
+    const OWN = `https://meetupaws.duckdns.org/l/reset#token=${RESET}`;
+    const subscribeWith = (linking: ReturnType<typeof createLinking>, listener: (url: string) => void): void => {
+      jest.spyOn(Linking, 'addEventListener').mockReturnValue({ remove: jest.fn() } as never);
+      linking.subscribe!(listener);
+    };
 
-    reportUpdatePolicy(true); // blocked: no link may navigate behind the blocking screen
-    await flush();
-    expect(spy).not.toHaveBeenCalled();
+    it('check never answers and there is no launch URL: getInitialURL still resolves at once', async () => {
+      jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(null);
+      await expect(createLinking(() => false).getInitialURL!()).resolves.toBeUndefined();
+    });
 
-    reportUpdatePolicy(false); // a later re-check says the build is fine
-    await flush();
-    expect(spy).toHaveBeenCalledWith(`https://meetupaws.duckdns.org/l/reset#token=${RESET}`);
+    it.each([
+      ['another host', `https://example.org/l/game/${ID}`],
+      ['the staging host in a production build', `https://meetupstg.duckdns.org/l/game/${ID}`],
+      ['this host but not /l/', 'https://meetupaws.duckdns.org/privacy'],
+      ['http', `http://meetupaws.duckdns.org/l/game/${ID}`],
+      ['a custom scheme', `gameonsg://l/game/${ID}`],
+    ])('a launch URL on %s resolves at once, without waiting for the check, and is never delivered', async (_n, url) => {
+      jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(url);
+      const linking = createLinking(() => false);
+      const listener = jest.fn();
+      await expect(linking.getInitialURL!()).resolves.toBeUndefined();
+      subscribeWith(linking, listener);
+      reportUpdatePolicy(false);
+      await flush();
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('an /l/ launch link does not hold the first render: getInitialURL resolves at once with no URL', async () => {
+      jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(OWN);
+      await expect(createLinking(() => false).getInitialURL!()).resolves.toBeUndefined();
+    });
+
+    it('an /l/ launch link is handled only after the check answers, through the container listener', async () => {
+      jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(OWN);
+      const linking = createLinking(() => false);
+      const listener = jest.fn();
+      await linking.getInitialURL!();
+      subscribeWith(linking, listener); // the navigator has rendered and subscribed
+      await flush();
+      expect(listener).not.toHaveBeenCalled(); // check has not answered
+
+      reportUpdatePolicy(false);
+      await flush();
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(OWN);
+    });
+
+    it('the check answering before the navigator subscribes still delivers the link once, on subscribe', async () => {
+      jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(OWN);
+      const linking = createLinking(() => false);
+      await linking.getInitialURL!();
+      reportUpdatePolicy(false);
+      await flush();
+      const listener = jest.fn();
+      subscribeWith(linking, listener);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(OWN);
+    });
+
+    it('a blocked app never handles the launch link', async () => {
+      jest.spyOn(Linking, 'getInitialURL').mockResolvedValue(OWN);
+      const linking = createLinking(() => false);
+      const listener = jest.fn();
+      await linking.getInitialURL!();
+      subscribeWith(linking, listener);
+      reportUpdatePolicy(true);
+      await flush();
+      expect(listener).not.toHaveBeenCalled();
+      expect(getResetToken()).toBeNull(); // nothing was resolved, so no token was even stored
+    });
   });
 
   it('open app: URL events are held until the gate opens, then delivered', async () => {
@@ -70,6 +127,20 @@ describe('createLinking', () => {
     expect(listener).toHaveBeenCalledWith(`https://meetupaws.duckdns.org/l/game/${ID}`);
     (unsubscribe as () => void)();
     expect(remove).toHaveBeenCalled();
+  });
+
+  it('open app: a blocked app never handles the URL event', async () => {
+    let handler: ((event: { url: string }) => void) | undefined;
+    jest.spyOn(Linking, 'addEventListener').mockImplementation(((_t: string, cb: (event: { url: string }) => void) => {
+      handler = cb;
+      return { remove: jest.fn() };
+    }) as never);
+    const listener = jest.fn();
+    createLinking(() => true).subscribe!(listener);
+    reportUpdatePolicy(true);
+    handler!({ url: `https://meetupaws.duckdns.org/l/game/${ID}` });
+    await flush();
+    expect(listener).not.toHaveBeenCalled();
   });
 
   it('keeps the reset token out of the returned navigation state', () => {
