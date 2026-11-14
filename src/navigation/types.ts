@@ -16,6 +16,12 @@ export type AuthStackParamList = {
   ForgotPassword: { email?: string } | undefined;
   /** Post-submit summary. Also the signed-out host for account deletion. */
   Completion: undefined;
+  /** Deep-links AD-7. What the link carried is held in memory (`links/linkStore`), never in params. */
+  ResetPassword: undefined;
+  /** Deep-links AD-8: public game preview for a signed-out person; the target is held in memory. */
+  GamePreview: undefined;
+  /** Deep-links AD-10: group invitation landing for a signed-out person; the invitation is held in memory. */
+  GroupInvite: undefined;
 };
 
 /**
@@ -36,6 +42,8 @@ export type AuthStackParamList = {
 export type HomeStackParamList = {
   EventsList: { refreshKey?: number; successMessage?: string } | undefined;
   EventDetail: { eventId: string };
+  /** Deep-links AD-8: a game link for a signed-in person. Opens the game, or the public preview with the access notice. */
+  GameLink: { eventId: string; ref?: string };
   CreateGame: undefined;
   /**
    * Tournament creation wizard (AD-20). Opened by the Create tournament entry when

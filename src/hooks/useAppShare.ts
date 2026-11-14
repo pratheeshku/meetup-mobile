@@ -16,6 +16,9 @@ import {
   shareGeneric,
   shareToWhatsApp,
 } from '../utils/shareLink';
+import { countLinkGenerated } from '../links/linkCounters';
+import { buildShareLink } from '../links/shareLinks';
+import type { ShareTarget } from '../links/shareLinks';
 import { buildShareText } from '../utils/shareInvite';
 
 export interface AppShare {
@@ -29,28 +32,33 @@ export interface AppShare {
   copyLink: () => void;
 }
 
-/** The sharer's display name; '' when there is no auth provider (the name placeholder is then blank). */
-function useSharerName(): string {
+/** The sharer's display name and id; blank when there is no auth provider (the name placeholder is then blank). */
+function useSharer(): { name: string; id: string } {
   try {
     // Called unconditionally on every render; the try only absorbs the missing-provider throw.
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const { user } = useAuth();
-    return user?.display_name || user?.nickname || '';
+    return { name: user?.display_name || user?.nickname || '', id: user?.id ?? '' };
   } catch {
-    return '';
+    return { name: '', id: '' };
   }
 }
 
 /**
- * TASK 3.1: the share text is the admin-label GameOn SG invite message (see
- * `utils/shareInvite`). Game and tournament shares send it alone; pass
- * `groupId` for a group share, which appends the group invite link after a
- * blank line. When `share.invite_message` is missing nothing is shared.
+ * The share text is the admin-label GameOn SG invite message (see `utils/shareInvite`), then a blank
+ * line and a link:
+ * - `groupId`: the server's `invitation_url`, unchanged.
+ * - `target` (a game or tournament; deep-links AD-11): a link built from `link_base_url` and
+ *   `app_links_enabled` in `GET /config/client` (`links/shareLinks`). No base: the message alone.
+ * When `share.invite_message` is missing nothing is shared. A failing config call never aborts the
+ * share: it falls back to the message with no store lines and no link.
  */
-export function useAppShare(groupId?: string | null): AppShare {
+export function useAppShare(groupId?: string | null, target?: ShareTarget): AppShare {
   const t = useT();
   const labels = useLabels();
-  const name = useSharerName();
+  const { name, id: userId } = useSharer();
+  const targetKind = target?.kind;
+  const targetId = target ? (target.kind === 'game' ? target.eventId : target.tournamentId) : null;
   const [sheetVisible, setSheetVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -63,10 +71,23 @@ export function useAppShare(groupId?: string | null): AppShare {
 
   /** The text to share, or '' when nothing should be shared. */
   const composeText = useCallback(async (): Promise<string> => {
-    const { android_store_url, ios_store_url } = await getClientConfig();
-    const urls = { android: android_store_url, ios: ios_store_url };
+    let config: Awaited<ReturnType<typeof getClientConfig>> | null = null;
+    try {
+      config = await getClientConfig();
+    } catch {
+      config = null;
+    }
+    const urls = { android: config?.android_store_url, ios: config?.ios_store_url };
     if (!groupId) {
-      return buildShareText(labels, name, urls);
+      const built =
+        targetKind && targetId
+          ? buildShareLink(config, targetKind === 'game' ? { kind: 'game', eventId: targetId } : { kind: 'tournament', tournamentId: targetId }, userId)
+          : null;
+      const text = buildShareText(labels, name, urls, built?.url);
+      if (built && text && targetKind) {
+        countLinkGenerated(targetKind, built.form);
+      }
+      return text;
     }
     // Check the label before creating an invitation, so a missing label creates nothing.
     if (!buildShareText(labels, name, urls)) {
@@ -76,7 +97,7 @@ export function useAppShare(groupId?: string | null): AppShare {
       createGroupInvitation(groupId, { correlationId }),
     );
     return buildShareText(labels, name, urls, invitation_url);
-  }, [groupId, labels, name]);
+  }, [groupId, labels, name, userId, targetKind, targetId]);
 
   const shareViaSystem = useCallback(async () => {
     const message = await composeText();

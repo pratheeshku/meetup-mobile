@@ -54,9 +54,15 @@ if (!appVersionName) {
 // ("environments.staging"), the single source shared with the JS config and the
 // iOS script. The staging app name lives in src/staging/res/values/strings.xml
 // (kept equal to displayName by config/__tests__/appConfig.test.ts).
-def stagingConfig = new JsonSlurper().parse(rootProject.file("../config/appConfig.json")).environments.staging
+def appConfigJson = new JsonSlurper().parse(rootProject.file("../config/appConfig.json"))
+def stagingConfig = appConfigJson.environments.staging
 if (!stagingConfig?.applicationId) {
     throw new GradleException("config/appConfig.json must define environments.staging.applicationId")
+}
+// Verified App Links host per flavor (deep-links AD-1, AD-4), from the same file. The manifest
+// declares https + this host + path prefix /l/ only; an environment lists only its own host.
+if (!appConfigJson.linkHost || !stagingConfig?.linkHost) {
+    throw new GradleException("config/appConfig.json must define linkHost and environments.staging.linkHost")
 }
 
 // Optional versionCode override for STAGING builds only (CI): -PstagingVersionCode=N
@@ -176,11 +182,13 @@ android {
         production {
             dimension "environment"
             applicationId "org.duckdns.meetups"
+            manifestPlaceholders = [linkHost: appConfigJson.linkHost]
             buildConfigField "String", "APP_ENV", "\"production\""
         }
         staging {
             dimension "environment"
             applicationId stagingConfig.applicationId
+            manifestPlaceholders = [linkHost: stagingConfig.linkHost]
             buildConfigField "String", "APP_ENV", "\"staging\""
             if (stagingVersionCodeOverride != null) {
                 versionCode stagingVersionCodeOverride

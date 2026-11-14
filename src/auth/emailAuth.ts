@@ -8,6 +8,7 @@
 import { apiClient } from '../api/client';
 import { saveTokens } from '../storage/tokens';
 import { getTermsVersion } from './terms';
+import { getInvitationFields, noteJoinedGroup } from '../links/linkStore';
 import type { AuthResponse } from './types';
 import type { UserProfile } from '../types/user';
 
@@ -37,10 +38,16 @@ export async function login(email: string, password: string): Promise<UserProfil
 /**
  * Signs up a new account (DES-MEETUP-ADDENDUM-email-auth AD-5, D1).
  * Returns no tokens; user must verify email.
+ *
+ * Deep-links AD-8 (supersedes D1): when a link supplied them, the optional UUIDs `invitation_token`,
+ * `ref`, `event_id` and `invite` are sent here (account creation only; never at ordinary sign-in).
+ * With no link the body is exactly as before. When the response carries `joined_group_id` the person
+ * is opened into that group after they sign in (AD-10).
  */
 export async function signup(params: SignupParams): Promise<void> {
   const termsVersion = params.terms_version ?? (await getTermsVersion());
-  await apiClient.post('/auth/signup', {
+  const { data } = await apiClient.post<{ joined_group_id?: string | null } | undefined>('/auth/signup', {
+    ...getInvitationFields(),
     email: params.email,
     password: params.password,
     display_name: params.display_name,
@@ -54,6 +61,7 @@ export async function signup(params: SignupParams): Promise<void> {
         }
       : {}),
   });
+  noteJoinedGroup(data?.joined_group_id);
 }
 
 /**
@@ -74,6 +82,8 @@ export async function completeSignup(params: {
     ...(params.mobile_verification ? { mobile_verification: params.mobile_verification } : {}),
   });
   await saveTokens(data.access_token, data.refresh_token);
+  // The invitation fields travelled in the sign-up ticket (sent on the social callback only).
+  noteJoinedGroup(data.joined_group_id);
   return data.user;
 }
 
@@ -111,4 +121,13 @@ export async function requestPasswordReset(
     { email },
   );
   return data;
+}
+
+/**
+ * `POST /auth/reset-password-with-token` (email-auth AD-3, deep-links AD-7). 200 `Password updated`;
+ * every failure is 400 `This link is invalid or has expired.` (or 429). The token and the password go
+ * only into the request body: never logged, never kept.
+ */
+export async function resetPasswordWithToken(token: string, newPassword: string): Promise<void> {
+  await apiClient.post('/auth/reset-password-with-token', { token, new_password: newPassword });
 }

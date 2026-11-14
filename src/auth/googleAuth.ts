@@ -42,6 +42,7 @@ import { Platform } from 'react-native';
 import { getTermsVersion } from './terms';
 import { ENV } from '../../config/env';
 import { apiClient } from '../api/client';
+import { getInvitationFields, noteJoinedGroup } from '../links/linkStore';
 import { clearCookieJar } from '../api/cookies';
 import { saveTokens, clearTokens } from '../storage/tokens';
 import { withCorrelationId } from '../api/correlationId';
@@ -126,6 +127,8 @@ export async function signIn(): Promise<SocialSignInResult> {
   const { data } = await apiClient.post<AuthResponse | SignupRequiredResponse>('/auth/oauth/google/callback', {
     id_token: response.data.idToken,
     terms_version: termsVersion,
+    // Deep-links AD-8: only what a link supplied (empty otherwise). Sent on this callback only.
+    ...getInvitationFields(),
   });
 
   // NE-01: a new person while the phone is required gets a ticket and no session (tokens are saved only for a session).
@@ -133,6 +136,7 @@ export async function signIn(): Promise<SocialSignInResult> {
     return { kind: 'signup_required', signup: data };
   }
   await saveTokens(data.access_token, data.refresh_token);
+  noteJoinedGroup(data.joined_group_id);
   return { kind: 'signed_in', user: data.user };
 }
 

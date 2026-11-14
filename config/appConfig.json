@@ -3,6 +3,7 @@
   "appName": "GameOn SG",
   "privacyPolicyUrl": "https://meetupaws.duckdns.org/privacy",
   "termsOfUseUrl": "https://meetupaws.duckdns.org/terms",
+  "linkHost": "meetupaws.duckdns.org",
   "terms_version": "2026-10-10",
   "supportContact": "pratheeshknow@gmail.com",
   "reportFormUrl": "https://docs.google.com/forms/d/e/1FAIpQLSepcUYvSlC8C6YRJN9-eBVaZTzjMjeJS245kGY_OmQdiyQUcg/viewform",
@@ -17,6 +18,7 @@
     "staging": {
       "applicationId": "org.duckdns.meetups.staging",
       "displayName": "GameOn SG Staging",
+      "linkHost": "meetupstg.duckdns.org",
       "apiBaseUrl": "https://meetupstg.duckdns.org",
       "avatarBucketBaseUrl": "",
       "privacyPolicyUrl": "https://meetupstg.duckdns.org/privacy",

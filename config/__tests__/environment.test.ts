@@ -20,6 +20,7 @@ describe('selectEnvironment', () => {
       avatarBucketBaseUrl: 'https://meetup.hel1.your-objectstorage.com',
       privacyPolicyUrl: 'https://meetupaws.duckdns.org/privacy',
       termsOfUseUrl: 'https://meetupaws.duckdns.org/terms',
+      linkHost: 'meetupaws.duckdns.org',
     });
     expect(PRODUCTION_API_BASE_URL).toBe('https://meetupaws.duckdns.org');
     expect(PRODUCTION_AVATAR_BUCKET_BASE_URL).toBe('https://meetup.hel1.your-objectstorage.com');
@@ -38,6 +39,7 @@ describe('selectEnvironment', () => {
       avatarBucketBaseUrl: '',
       privacyPolicyUrl: 'https://meetupstg.duckdns.org/privacy',
       termsOfUseUrl: 'https://meetupstg.duckdns.org/terms',
+      linkHost: 'meetupstg.duckdns.org',
     });
   });
 

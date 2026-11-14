@@ -29,6 +29,14 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        <!-- Verified App Link (deep-links AD-1, AD-2, AD-4): https, this flavor's host (manifest
+             placeholder from config/appConfig.json) and path prefix /l/ only. No custom scheme. -->
+        <intent-filter android:autoVerify="true">
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" android:host="${linkHost}" android:pathPrefix="/l/" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>

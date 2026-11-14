@@ -10,10 +10,9 @@
  * (OI-14). The entries open the shared invite picker, which loops the tournament invite calls per
  * staged entry (AD-4).
  *
- * Share is client-side only: the app link from `getShareUrl()` through
- * `useAppShare`; no tournament route is called and no tournament identity is
- * in the link. A 404 from an invite route (flag turned off) hides the invite
- * actions silently. Email addresses are never logged.
+ * Share is client-side only, through `useAppShare`: the invite message, then (deep-links AD-11) a
+ * link to this tournament built from the server's `link_base_url`; no tournament route is called.
+ * A 404 from an invite route (flag turned off) hides the invite actions silently. Email addresses are never logged.
  */
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -55,7 +54,7 @@ export default function TournamentInvitePanel({
   onSent,
 }: Props): React.JSX.Element | null {
   const t = useT();
-  const share = useAppShare();
+  const share = useAppShare(null, { kind: 'tournament', tournamentId });
   const [pickerTab, setPickerTab] = useState<InviteTab | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
