@@ -42,7 +42,6 @@ const KEY_CALLEES = { t: 0, currentT: 0, bundledT: 0, getLabel: 1 };
 const KEY_LITERAL = /^mob[._]/;
 
 const failures = [];
-const used = new Set();
 
 function fail(file, line, kind, message) {
   failures.push({ file, line, kind, message });
