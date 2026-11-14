@@ -5,12 +5,29 @@ import { ENV } from '../../../config/env';
 import { act, pressableLabelled, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import { getShareUrl } from '../../utils/shareLink';
-import { mockGet, mockPost, mountTournament } from '../../test-utils/tournamentDetailHarness';
+import { mockGet, mockPost, mountTournament, tournamentCalls } from '../../test-utils/tournamentDetailHarness';
 
 jest.mock('../../api/client', () => ({ apiClient: { get: jest.fn(), post: jest.fn() } }));
 jest.mock('../../api/groups', () => ({ getMyGroups: jest.fn().mockResolvedValue({ items: [] }) }));
 jest.mock('../../api/users', () => ({ searchUsers: jest.fn().mockResolvedValue([]) }));
 jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ user: { id: 'user-me' } }) }));
+
+// The share text is the admin-label invite message (utils/shareInvite) and, since deep-links AD-11, ends with
+// a blank line and the tournament link built from GET /config/client (links/shareLinks).
+const mockLabels: Record<string, string> = {
+  'share.invite_message': 'Join GameOn SG 📲\n{store_links}',
+  'share.invite_android_line': '🤖 {url}',
+};
+jest.mock('../../labels/LabelsContext', () => ({
+  ...jest.requireActual('../../labels/LabelsContext'),
+  useLabels: () => mockLabels,
+}));
+const CLIENT_CONFIG = {
+  android_store_url: 'https://play.example',
+  link_base_url: 'https://links.example',
+  app_links_enabled: true,
+};
+const EXPECTED_MESSAGE = 'Join GameOn SG 📲\n🤖 https://play.example\n\nhttps://links.example/l/tournament/t-1';
 
 const has = (root: Instance, label: string): boolean => texts(root).includes(label);
 
@@ -30,11 +47,13 @@ describe('Share visibility follows my_invite_access', () => {
   });
 });
 
-describe('Share is the app link and calls no tournament route', () => {
-  it('opens the sheet; copy link, WhatsApp and system share use getShareUrl() and make no API call', async () => {
+describe('Share: invite message plus the tournament link, and no tournament route is called', () => {
+  it('opens the sheet; Copy Link copies the app share URL; WhatsApp and system share end with the tournament link', async () => {
     const root = await mountTournament({ my_invite_access: 'individuals' });
     mockGet.mockClear();
     mockPost.mockClear();
+    // After mount only the client config is read (the link base and switch).
+    mockGet.mockImplementation((url: string) => Promise.resolve({ data: url === '/config/client' ? CLIENT_CONFIG : [] }));
 
     await act(async () => pressableLabelled(root, 'Share app link').props.onPress());
     expect(has(root, 'Share via WhatsApp')).toBe(true);
@@ -50,7 +69,7 @@ describe('Share is the app link and calls no tournament route', () => {
     await act(async () => {
       await pressableLabelled(root, 'Share via other apps').props.onPress();
     });
-    expect(share.mock.calls[0][0].message).toContain(getShareUrl());
+    expect(share).toHaveBeenCalledWith({ message: EXPECTED_MESSAGE });
 
     jest.spyOn(Linking, 'canOpenURL').mockResolvedValue(true);
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined as never);
@@ -58,10 +77,25 @@ describe('Share is the app link and calls no tournament route', () => {
     await act(async () => {
       await pressableLabelled(root, 'Share via WhatsApp').props.onPress();
     });
-    expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain(getShareUrl());
+    expect(decodeURIComponent(String(open.mock.calls[0][0]))).toContain(EXPECTED_MESSAGE);
 
-    expect(mockGet).not.toHaveBeenCalled();
+    expect(tournamentCalls()).toEqual([]);
     expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('with the link switch off the message ends with the hash-form tournament link', async () => {
+    const root = await mountTournament({ my_invite_access: 'full' });
+    mockGet.mockImplementation((url: string) =>
+      Promise.resolve({ data: url === '/config/client' ? { ...CLIENT_CONFIG, app_links_enabled: false } : [] }),
+    );
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    await act(async () => pressableLabelled(root, 'Share app link').props.onPress());
+    await act(async () => {
+      await pressableLabelled(root, 'Share via other apps').props.onPress();
+    });
+    expect(share).toHaveBeenCalledWith({
+      message: 'Join GameOn SG 📲\n🤖 https://play.example\n\nhttps://links.example/#tournament-detail/t-1',
+    });
   });
 
   it('the URL is the game share URL (/public/share) with no tournament identity', () => {

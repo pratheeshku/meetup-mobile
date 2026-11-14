@@ -25,13 +25,20 @@ describe('appConfig.json', () => {
 
   it('matches the iOS project defaults', () => {
     const pbx = read('MeetupMobile.xcodeproj/project.pbxproj');
+    // Xcode writes a value with spaces (the display name) in double quotes.
+    const asPbx = (value: string): string => (/^[A-Za-z0-9_.]+$/.test(value) ? value : `"${value}"`);
     const count = (setting: string, value: string): number =>
-      pbx.split(`${setting} = ${value};`).length - 1;
+      pbx.split(`${setting} = ${asPbx(value)};`).length - 1;
 
     expect(count('MARKETING_VERSION', appConfig.ios.marketingVersion)).toBe(2);
     expect(count('CURRENT_PROJECT_VERSION', appConfig.ios.buildNumber)).toBe(2);
     expect(count('APP_DISPLAY_NAME', appConfig.displayName)).toBe(2);
-    expect(read('MeetupMobile/Info.plist')).toContain('<string>$(APP_DISPLAY_NAME)</string>');
+    // The home-screen name is the build setting or, as checked in, the configured display name itself.
+    const plist = read('MeetupMobile/Info.plist');
+    const shown = /<key>CFBundleDisplayName<\/key>\s*<string>([^<]*)<\/string>/.exec(plist)?.[1];
+    expect(['$(APP_DISPLAY_NAME)', appConfig.displayName]).toContain(shown);
+    // The location usage texts follow the build setting (Task 3.1 display-name change).
+    expect(plist).toContain('<string>$(APP_DISPLAY_NAME) only uses your location');
   });
 
   it('iOS build URL overrides are empty or https', () => {
