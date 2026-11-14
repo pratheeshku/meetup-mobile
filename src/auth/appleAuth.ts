@@ -13,6 +13,8 @@ import { appleAuth } from '@invertase/react-native-apple-authentication';
 import { getTermsVersion } from './terms';
 import { apiClient } from '../api/client';
 import { saveTokens } from '../storage/tokens';
+import { getInvitationFields, noteJoinedGroup } from '../links/linkStore';
+import type { InvitationFields } from '../links/linkStore';
 import { isSignupRequired } from './types';
 import type { AuthResponse, SignupRequiredResponse, SocialSignInResult } from './types';
 
@@ -75,10 +77,12 @@ export async function signIn(): Promise<SocialSignInResult> {
     client_kind: 'native';
     full_name?: string;
     terms_version: string;
-  } = {
+  } & InvitationFields = {
     code: authorizationCode,
     client_kind: 'native',
     terms_version: termsVersion,
+    // Deep-links AD-8: only what a link supplied (empty otherwise). Sent on this callback only.
+    ...getInvitationFields(),
   };
 
   if (fullNameString) {
@@ -95,6 +99,7 @@ export async function signIn(): Promise<SocialSignInResult> {
       return { kind: 'signup_required', signup: data };
     }
     await saveTokens(data.access_token, data.refresh_token);
+    noteJoinedGroup(data.joined_group_id);
     return { kind: 'signed_in', user: data.user };
   } catch {
     // Never expose server detail

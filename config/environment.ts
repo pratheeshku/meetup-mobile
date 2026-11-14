@@ -20,6 +20,8 @@ export interface EnvironmentValues {
   avatarBucketBaseUrl: string;
   privacyPolicyUrl: string;
   termsOfUseUrl: string;
+  /** Host this build claims for verified `/l/` app links (deep-links AD-1, AD-4). */
+  linkHost: string;
 }
 
 export interface EnvironmentOverrides {
@@ -49,6 +51,7 @@ export function selectEnvironment(
       avatarBucketBaseUrl: overrides.avatarBucketBaseUrl ?? PRODUCTION_AVATAR_BUCKET_BASE_URL,
       privacyPolicyUrl: appConfig.privacyPolicyUrl,
       termsOfUseUrl: appConfig.termsOfUseUrl,
+      linkHost: appConfig.linkHost,
     };
   }
   if (appEnv === 'staging') {
@@ -59,6 +62,7 @@ export function selectEnvironment(
       avatarBucketBaseUrl: staging.avatarBucketBaseUrl,
       privacyPolicyUrl: staging.privacyPolicyUrl,
       termsOfUseUrl: staging.termsOfUseUrl,
+      linkHost: staging.linkHost,
     };
   }
   throw new Error(`Unknown APP_ENV "${appEnv}" (expected "production" or "staging")`);

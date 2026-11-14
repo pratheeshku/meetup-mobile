@@ -60,9 +60,9 @@
  * as the design-compliant reading of "or equivalent". No native Android
  * file was modified by this task.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, getActionFromState } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -108,6 +108,9 @@ import {
   registerPushActionForegroundHandler,
 } from '../notifications/pushActions';
 
+import { createLinking } from '../links/linking';
+import { consumeAuthLanding, subscribeToLinkStore, takePendingTarget } from '../links/linkStore';
+import { stateForPending } from '../links/resolveLink';
 import { claimAuthHandoff } from './showCompletion';
 import CompletionScreen from '../screens/CompletionScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -115,6 +118,10 @@ import CompleteAccountScreen from '../screens/CompleteAccountScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import VerifyScreen from '../screens/VerifyScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
+import GamePreviewScreen from '../screens/GamePreviewScreen';
+import GroupInviteScreen from '../screens/GroupInviteScreen';
+import GameLinkScreen from '../screens/GameLinkScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CreateGameScreen from '../screens/CreateGameScreen';
 import TournamentWizardScreen from '../screens/TournamentWizardScreen';
@@ -150,6 +157,8 @@ import { recordNavChange } from '../hooks/usePerfScreen';
 type AppRootParamList = {
   Tabs: undefined;
   Completion: undefined;
+  /** Deep-links AD-7: a signed-in device can open the reset screen; it is signed out on success. */
+  ResetPassword: undefined;
 };
 
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
@@ -200,9 +209,17 @@ function AuthStack(): React.JSX.Element {
   const [initialRouteName] = useState<'Login' | 'Completion'>(() =>
     claimAuthHandoff() ? 'Completion' : 'Login',
   );
+  // A signed-in device signed out from the reset screen starts at Login with the confirmation, or at
+  // Forgot password (deep-links AD-7). Claimed once per mount.
+  const [landing] = useState(() => consumeAuthLanding());
+  const start = landing === 'forgot' ? 'ForgotPassword' : initialRouteName;
   return (
-    <AuthStackNav.Navigator initialRouteName={initialRouteName} screenOptions={stackScreenOptions}>
-      <AuthStackNav.Screen name="Login" component={LoginScreen} />
+    <AuthStackNav.Navigator initialRouteName={start} screenOptions={stackScreenOptions}>
+      <AuthStackNav.Screen
+        name="Login"
+        component={LoginScreen}
+        initialParams={landing === 'reset_done' ? { successMessage: t('mob.reset.success') } : undefined}
+      />
       <AuthStackNav.Screen name="Register" component={RegisterScreen} />
       <AuthStackNav.Screen
         name="CompleteAccount"
@@ -211,6 +228,21 @@ function AuthStack(): React.JSX.Element {
       />
       <AuthStackNav.Screen name="Verify" component={VerifyScreen} />
       <AuthStackNav.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <AuthStackNav.Screen
+        name="ResetPassword"
+        component={ResetPasswordScreen}
+        options={{ title: t('mob.reset.title') }}
+      />
+      <AuthStackNav.Screen
+        name="GamePreview"
+        component={GamePreviewScreen}
+        options={{ title: t('mob.nav.title_game') }}
+      />
+      <AuthStackNav.Screen
+        name="GroupInvite"
+        component={GroupInviteScreen}
+        options={{ title: t('mob.group_invite.title') }}
+      />
       <AuthStackNav.Screen
         name="Completion"
         component={CompletionScreen}
@@ -238,6 +270,11 @@ function HomeStack(): React.JSX.Element {
       <HomeStackNav.Screen
         name="EventDetail"
         component={EventDetailScreen}
+        options={{ title: t('mob.nav.title_game') }}
+      />
+      <HomeStackNav.Screen
+        name="GameLink"
+        component={GameLinkScreen}
         options={{ title: t('mob.nav.title_game') }}
       />
       <HomeStackNav.Screen
@@ -418,6 +455,7 @@ function AppStack(): React.JSX.Element {
 }
 
 function AppRoot(): React.JSX.Element {
+  const t = useT();
   return (
     <AppRootNav.Navigator screenOptions={{ headerShown: false }}>
       <AppRootNav.Screen name="Tabs" component={AppStack} />
@@ -425,6 +463,11 @@ function AppRoot(): React.JSX.Element {
         name="Completion"
         component={CompletionScreen}
         options={{ headerShown: false, gestureEnabled: false, fullScreenGestureEnabled: false }}
+      />
+      <AppRootNav.Screen
+        name="ResetPassword"
+        component={ResetPasswordScreen}
+        options={{ headerShown: true, title: t('mob.reset.title') }}
       />
     </AppRootNav.Navigator>
   );
@@ -448,6 +491,27 @@ export default function RootNavigator(): React.JSX.Element {
   // fresh read of it.
   const userRef = useRef(user);
   userRef.current = user;
+
+  // Deep links (AD-6): React Navigation's link handling with the one resolver. `userRef` is read at
+  // the moment a link is handled, so a link opened while signed out and one opened while signed in
+  // each get the right state.
+  const linking = useMemo(() => createLinking(() => userRef.current !== null), []);
+
+  // After sign-in or sign-up (or any sign-in with a remembered link) open the remembered target.
+  // Memory only; taken once. If the container is not ready yet, `onReady` runs it.
+  const resumePendingLink = useCallback(() => {
+    if (!userRef.current || !navigationRef.isReady()) {
+      return;
+    }
+    const target = takePendingTarget();
+    if (!target) {
+      return;
+    }
+    const action = getActionFromState(stateForPending(target));
+    if (action) {
+      navigationRef.dispatch(action);
+    }
+  }, []);
 
   const handleInitialNotification = useCallback(async () => {
     if (hasCheckedInitialNotification.current) {
@@ -524,8 +588,12 @@ export default function RootNavigator(): React.JSX.Element {
   useEffect(() => {
     if (user) {
       handleInitialNotification();
+      resumePendingLink();
     }
-  }, [user, handleInitialNotification]);
+  }, [user, handleInitialNotification, resumePendingLink]);
+
+  // A joined group (`joined_group_id`) can arrive in the same tick as the session; run again.
+  useEffect(() => subscribeToLinkStore(resumePendingLink), [resumePendingLink]);
 
   // `isLoading` covers the automatic restore attempts. `sessionCheckPendingRetry`
   // is the splash retry state after those attempts fail transiently: the
@@ -548,9 +616,11 @@ export default function RootNavigator(): React.JSX.Element {
         ref={navigationRef}
         theme={navigationTheme}
         navigationInChildEnabled
+        linking={linking}
         onReady={() => {
           perfLog('boot_nav_ready');
           handleInitialNotification();
+          resumePendingLink();
         }}
         onStateChange={state => {
           if (!isPerfCapturing() || !state) {

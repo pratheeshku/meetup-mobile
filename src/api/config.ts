@@ -24,6 +24,12 @@ export interface ClientConfig {
   /** Admin store URLs for the share invite message; '' when unset (the store line is then omitted). */
   android_store_url: string;
   ios_store_url: string;
+  /**
+   * Deep-links AD-5, AD-11 (backend task 1.2, additive): the base of generated links and the switch
+   * between the `/l/` form and the hash form. Both optional; absent on older servers.
+   */
+  link_base_url?: string | null;
+  app_links_enabled?: boolean;
 }
 
 const CLIENT_CONFIG_DEFAULTS: ClientConfig = {
@@ -75,6 +81,9 @@ export async function getClientConfig(): Promise<ClientConfig> {
       tournament_default_team_size: positiveInt(data?.tournament_default_team_size),
       android_store_url: typeof data?.android_store_url === 'string' ? data.android_store_url.trim() : '',
       ios_store_url: typeof data?.ios_store_url === 'string' ? data.ios_store_url.trim() : '',
+      link_base_url:
+        typeof data?.link_base_url === 'string' && data.link_base_url.trim() ? data.link_base_url.trim() : null,
+      app_links_enabled: data?.app_links_enabled === true,
     };
   } catch {
     return { ...CLIENT_CONFIG_DEFAULTS };

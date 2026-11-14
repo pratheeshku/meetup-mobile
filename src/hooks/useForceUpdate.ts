@@ -13,6 +13,7 @@ import { AppState } from 'react-native';
 import type { AppStateStatus } from 'react-native';
 
 import { fetchVersionPolicy } from '../api/versionPolicy';
+import { reportUpdatePolicy } from '../links/linkGate';
 import { getInstalledVersionCode } from '../utils/installedVersion';
 
 export interface ForceUpdateState {
@@ -45,6 +46,8 @@ export function useForceUpdate(): ForceUpdateState {
       if (policy && installed === null) {
         console.log('[update] installed version unreadable; not blocking');
       }
+      // Deep links wait for this first answer (deep-links AD-6): the gate runs before any link.
+      reportUpdatePolicy(Boolean(policy && installed !== null && installed < policy.minVersionCode));
       setState(
         policy && installed !== null && installed < policy.minVersionCode
           ? { blocked: true, storeUrl: policy.storeUrl }

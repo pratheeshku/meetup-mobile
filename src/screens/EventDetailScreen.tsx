@@ -170,7 +170,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Share + invite state
-  const share = useAppShare();
+  const share = useAppShare(null, { kind: 'game', eventId });
   // The invite picker (GV-5): which tab it opens on, `null` = closed.
   const [pickerTab, setPickerTab] = useState<InviteTab | null>(null);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);

@@ -54,6 +54,9 @@ export const getPrivacyPolicyUrl = (): string =>
   selectEnvironment(Config.APP_ENV).privacyPolicyUrl;
 export const getTermsOfUseUrl = (): string => selectEnvironment(Config.APP_ENV).termsOfUseUrl;
 
+/** The one host this build claims for `/l/` app links (config/appConfig.json: production `linkHost`, staging `environments.staging.linkHost`). */
+export const getLinkHost = (): string => selectEnvironment(Config.APP_ENV).linkHost;
+
 /** Hostnames accepted for in-app https links in this build (see config/environment.ts). */
 export const getAllowedLinkHostnames = (): string[] =>
   getAllowedLinkHosts(Config.APP_ENV, ENV.API_BASE_URL);

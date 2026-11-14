@@ -35,13 +35,16 @@ config_path = File.join(IosProject::REPO_ROOT, 'config', 'appConfig.json')
 staging = JSON.parse(File.read(config_path)).dig('environments', 'staging') || {}
 bundle_id = staging['applicationId'].to_s
 display_name = staging['displayName'].to_s
-IosProject.fail!('environments.staging needs applicationId and displayName in config/appConfig.json') if bundle_id.empty? || display_name.empty?
+link_host = staging['linkHost'].to_s
+IosProject.fail!('environments.staging needs applicationId, displayName and linkHost in config/appConfig.json') if bundle_id.empty? || display_name.empty? || link_host.empty?
 
 proj = IosProject.project
 target = IosProject.app_target(proj)
 target.build_configurations.each do |config|
   config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = bundle_id
   config.build_settings['APP_DISPLAY_NAME'] = display_name
+  # Associated Domains (deep-links AD-1/AD-4): the entitlement reads applinks:$(APP_LINK_HOST).
+  config.build_settings['APP_LINK_HOST'] = link_host
 end
 proj.save
 
@@ -54,4 +57,4 @@ if info['CFBundleDisplayName'] != '$(APP_DISPLAY_NAME)'
   Xcodeproj::Plist.write_to_path(info, info_plist)
 end
 
-puts "staging: target #{target.name} now uses bundle id #{bundle_id} and display name '#{display_name}'."
+puts "staging: target #{target.name} now uses bundle id #{bundle_id}, display name '#{display_name}' and link host #{link_host}."
