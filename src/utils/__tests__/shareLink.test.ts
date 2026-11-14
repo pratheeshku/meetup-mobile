@@ -28,10 +28,10 @@ describe('shareLink utilities', () => {
     it('builds the share message from the mob.share.message label (FEEDBACK-001 AD-6)', () => {
       const url = getShareUrl();
       expect(FALLBACK_LABELS['mob.share.message']).toBe(
-        'Join me on Shuttlr! Download the app: {link}',
+        'Join me on GameOn SG! Download the app: {link}',
       );
       expect(getLabel(FALLBACK_LABELS, 'mob.share.message', { link: url })).toBe(
-        `Join me on Shuttlr! Download the app: ${url}`,
+        `Join me on GameOn SG! Download the app: ${url}`,
       );
     });
   });
@@ -53,7 +53,7 @@ describe('shareLink utilities', () => {
       const canOpenSpy = jest.spyOn(Linking, 'canOpenURL').mockResolvedValueOnce(true);
       const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined as never);
 
-      const message = 'Pratheesh invited you to Game on Shuttlr — https://meetups.duckdns.org/#event-detail/1?ref=u-1';
+      const message = 'Pratheesh invited you to GameOn SG — https://meetups.duckdns.org/#event-detail/1?ref=u-1';
       await shareToWhatsApp(message);
 
       expect(canOpenSpy).toHaveBeenCalledWith('whatsapp://send');
@@ -64,7 +64,7 @@ describe('shareLink utilities', () => {
       const canOpenSpy = jest.spyOn(Linking, 'canOpenURL').mockResolvedValueOnce(false);
       const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined as never);
 
-      const message = 'Pratheesh invited you to Game on Shuttlr — https://meetups.duckdns.org/#event-detail/1?ref=u-1';
+      const message = 'Pratheesh invited you to GameOn SG — https://meetups.duckdns.org/#event-detail/1?ref=u-1';
       await shareToWhatsApp(message);
 
       expect(canOpenSpy).toHaveBeenCalledWith('whatsapp://send');
@@ -75,7 +75,7 @@ describe('shareLink utilities', () => {
       const canOpenSpy = jest.spyOn(Linking, 'canOpenURL').mockRejectedValueOnce(new Error('native err'));
       const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined as never);
 
-      const message = 'Pratheesh invited you to Game on Shuttlr — https://meetups.duckdns.org/#event-detail/1?ref=u-1';
+      const message = 'Pratheesh invited you to GameOn SG — https://meetups.duckdns.org/#event-detail/1?ref=u-1';
       await shareToWhatsApp(message);
 
       expect(canOpenSpy).toHaveBeenCalledWith('whatsapp://send');

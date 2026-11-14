@@ -1,14 +1,15 @@
 /**
  * Event Detail Screen tests:
- * - Organiser detection & action gates (Cancel, Edit, Group Invite)
+ * - Organiser detection & action gates (Edit and Cancel Game icons in the banner, Invite card, Share)
  * - RSVP Join/Leave contract (both use POST /events/{id}/rsvp)
- * - Cancel flow (POST /events/{id}/cancel with required reason)
- * - Edit flow (PATCH /events/{id}, full field set, 409 handling)
+ * - Delete game flow (header Cancel Game icon, bottom sheet, POST /events/{id}/cancel with the fixed host reason)
+ * - Edit game wizard (4 steps, sport and visibility locked, PATCH /events/{id} changed-field set, refusals)
  * - Group Invite flow (POST /events/{id}/invite-group)
  * - Sport label display lookup (BUG-M02)
+ * - Game view of DES-MEETUP-ADDENDUM-game-view-redesign (details card, Remarks, Players block, share)
  */
 import React from 'react';
-import { Clipboard, Linking, Platform, Share, StyleSheet } from 'react-native';
+import { Clipboard, Linking, Platform, Share, StyleSheet, TextInput } from 'react-native';
 
 import { apiClient } from '../../api/client';
 import { colors } from '../../theme/tokens';
@@ -19,6 +20,7 @@ import {
   texts,
 } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
+import { getShareUrl } from '../../utils/shareLink';
 import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import EventDetailScreen from '../EventDetailScreen';
 
@@ -29,6 +31,14 @@ jest.mock('../../api/client', () => ({
 let mockUser: { id: string; nickname: string } | null = { id: 'user-me', nickname: 'Sam' };
 jest.mock('../../auth/AuthContext', () => ({
   useAuth: () => ({ user: mockUser }),
+}));
+
+// The share text is the admin-label invite message (utils/shareInvite), then a blank line and the game link
+// built from GET /config/client (deep-links AD-11). Labels default to none, as before.
+let mockShareLabels: Record<string, string> = {};
+jest.mock('../../labels/LabelsContext', () => ({
+  ...jest.requireActual('../../labels/LabelsContext'),
+  useLabels: () => mockShareLabels,
 }));
 
 jest.mock('../../components/UserSearchPicker', () => {
@@ -93,10 +103,16 @@ function rawEvent(overrides: Record<string, unknown> = {}): Record<string, unkno
   };
 }
 
-async function mount(raw: Record<string, unknown>): Promise<Instance> {
+async function mount(
+  raw: Record<string, unknown>,
+  clientConfig: Record<string, unknown> = {},
+): Promise<Instance> {
   mockGet.mockImplementation((url: string) => {
     if (url.includes('/participants')) {
       return Promise.resolve({ data: [] });
+    }
+    if (url === '/config/client') {
+      return Promise.resolve({ data: clientConfig });
     }
     return Promise.resolve({ data: raw });
   });
@@ -109,8 +125,39 @@ async function mount(raw: Record<string, unknown>): Promise<Instance> {
 
 const has = (root: Instance, label: string): boolean => texts(root).includes(label);
 
+/** Header and sheet actions are icon buttons: found by accessibility label (a touchable can match twice). */
+const labelled = (root: Instance, label: string): Instance[] =>
+  root.findAll(n => n.props.accessibilityLabel === label && typeof n.props.onPress === 'function');
+const hasLabelled = (root: Instance, label: string): boolean => labelled(root, label).length > 0;
+const pressLabelled = async (root: Instance, label: string): Promise<void> => {
+  const matches = labelled(root, label);
+  if (matches.length === 0) {
+    throw new Error(`No pressable labelled "${label}"`);
+  }
+  await act(async () => {
+    matches[0].props.onPress();
+  });
+};
+/** A touchable without an accessibility label (the delete sheet's buttons): found by its text. */
+const pressText = async (root: Instance, text: string): Promise<void> => {
+  const matches = root.findAll(n => typeof n.props.onPress === 'function' && texts(n).includes(text));
+  if (matches.length === 0) {
+    throw new Error(`No pressable with text "${text}"`);
+  }
+  await act(async () => {
+    matches[0].props.onPress();
+  });
+};
+const textInputs = (root: Instance): Instance[] => root.findAllByType(TextInput);
+const typeInto = async (input: Instance, value: string): Promise<void> => {
+  await act(async () => {
+    input.props.onChangeText(value);
+  });
+};
+
 beforeEach(() => {
   mockUser = { id: 'user-me', nickname: 'Sam' };
+  mockShareLabels = {};
   goBack.mockReset();
   mockGet.mockReset();
   mockPost.mockReset().mockResolvedValue({ data: {} });
@@ -132,15 +179,15 @@ it('resolves the sport slug to its display_name from GET /admin/sports/public (B
     navigation: { goBack },
   } as unknown as React.ComponentProps<typeof EventDetailScreen>;
   const root = await renderAsync(<EventDetailScreen {...props} />);
-  expect(texts(root)).toContain('Badminton · Riverside Courts');
+  // Game view: the banner subtitle shows the sport display name and the skill level; the venue is its own row.
+  expect(texts(root)).toContain('Badminton · All levels •');
+  expect(texts(root)).toContain('Riverside Courts, 123 River Rd');
 });
 
-it('renders formatted cost with currency when estimated_cost_cents is set', async () => {
-  const root = await mount(
-    rawEvent({ estimated_cost_cents: 1550, estimated_cost_currency: 'USD' }),
-  );
-  expect(has(root, 'Cost')).toBe(true);
-  expect(has(root, '$15.50 USD')).toBe(true);
+it('does not render the retired estimated-cost fields: the game view has no Cost row (the price is the game fee)', async () => {
+  const root = await mount(rawEvent({ estimated_cost_cents: 1550, estimated_cost_currency: 'USD' }));
+  expect(has(root, 'Cost')).toBe(false);
+  expect(has(root, '$15.50 USD')).toBe(false);
 });
 
 it('does not render Cost row when estimated_cost_cents and cost are null', async () => {
@@ -166,20 +213,25 @@ it('renders without throwing when the participants endpoint resolves with a non-
 });
 
 describe('organiser (organizer_id === signed-in user id)', () => {
-  it('sees "Edit Game", "Invite Group", "Invite Individual", and "Cancel Event", but not "Join" or "Leave"', async () => {
+  it('sees the Edit Game and Cancel Game icons, the Invite card and Share, but not Register or Decline', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    expect(has(root, 'Cancel Event')).toBe(true);
-    expect(has(root, 'Edit Game')).toBe(true);
+    expect(hasLabelled(root, 'Cancel Game')).toBe(true);
+    expect(hasLabelled(root, 'Edit Game')).toBe(true);
     expect(has(root, 'Invite groups')).toBe(true);
     expect(has(root, 'Invite players')).toBe(true);
-    expect(has(root, 'Share Event')).toBe(true);
+    expect(hasLabelled(root, 'Share app link')).toBe(true);
+    expect(has(root, 'Host')).toBe(true);
     expect(has(root, 'Register')).toBe(false);
     expect(has(root, 'Decline')).toBe(false);
   });
 
-  it('renders the Edit Game button in the standing-rule CTA blue (#1D5FA3), not the accent color', async () => {
+  it('opens Edit game in the standing-rule CTA blue (#1D5FA3), not the accent color, on its Save button', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    const button = pressableLabelled(root, 'Edit Game');
+    await pressLabelled(root, 'Edit Game');
+    for (let step = 1; step < 4; step += 1) {
+      await pressLabelled(root, 'Next');
+    }
+    const button = pressableLabelled(root, 'Save changes');
     const view = button.findAll(n => (n.type as unknown) === 'View')[0];
     const background = StyleSheet.flatten(view.props.style)?.backgroundColor;
     expect(background).toBe(colors.ctaBlue);
@@ -188,8 +240,8 @@ describe('organiser (organizer_id === signed-in user id)', () => {
 
   it('sees organiser controls and no RSVP control even when they also have an RSVP row (going)', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', user_rsvp_status: 'going' }));
-    expect(has(root, 'Cancel Event')).toBe(true);
-    expect(has(root, 'Edit Game')).toBe(true);
+    expect(hasLabelled(root, 'Cancel Game')).toBe(true);
+    expect(hasLabelled(root, 'Edit Game')).toBe(true);
     expect(has(root, 'Invite groups')).toBe(true);
     expect(has(root, 'Invite players')).toBe(true);
     expect(has(root, 'Decline')).toBe(false);
@@ -198,8 +250,8 @@ describe('organiser (organizer_id === signed-in user id)', () => {
 
   it('sees organiser actions for an in-progress (active) event', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me', status: 'active' }));
-    expect(has(root, 'Cancel Event')).toBe(true);
-    expect(has(root, 'Edit Game')).toBe(true);
+    expect(hasLabelled(root, 'Cancel Game')).toBe(true);
+    expect(hasLabelled(root, 'Edit Game')).toBe(true);
     expect(has(root, 'Invite groups')).toBe(true);
     expect(has(root, 'Invite players')).toBe(true);
   });
@@ -208,10 +260,10 @@ describe('organiser (organizer_id === signed-in user id)', () => {
     'sees neither organiser actions nor Join on a %s event',
     async status => {
       const root = await mount(rawEvent({ organizer_id: 'user-me', status }));
-      expect(has(root, 'Cancel Event')).toBe(false);
-      expect(has(root, 'Edit Game')).toBe(false);
-      expect(has(root, 'Invite Group')).toBe(false);
-      expect(has(root, 'Invite Individual')).toBe(false);
+      expect(hasLabelled(root, 'Cancel Game')).toBe(false);
+      expect(hasLabelled(root, 'Edit Game')).toBe(false);
+      expect(has(root, 'Invite groups')).toBe(false);
+      expect(has(root, 'Invite players')).toBe(false);
       expect(has(root, 'Register')).toBe(false);
     },
   );
@@ -329,328 +381,112 @@ describe('RSVP / withdraw contract', () => {
     await act(async () => {
       pressableLabelled(root, 'Register').props.onPress();
     });
-    expect(has(root, 'Could not join this event. Please try again.')).toBe(true);
+    expect(has(root, 'Could not join this game. Please try again.')).toBe(true);
   });
 });
 
-describe('BUILD 1: Event Cancel Flow', () => {
-  it('opens cancel form and rejects empty cancellation reason', async () => {
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    await act(async () => {
-      pressableLabelled(root, 'Cancel Event').props.onPress();
-    });
-    expect(has(root, 'Confirm Cancellation')).toBe(true);
-
-    // Try submitting without typing a reason
-    await act(async () => {
-      pressableLabelled(root, 'Confirm Cancellation').props.onPress();
-    });
-    expect(has(root, 'Please provide a reason for cancelling this event.')).toBe(true);
+describe('BUILD 1: Delete game flow (Cancel Game icon, DeleteGame board)', () => {
+  it('opens the delete sheet from the Cancel Game icon, with the title and the joined count', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me', going_count: 3 }));
+    expect(has(root, 'Delete game')).toBe(false);
+    await pressLabelled(root, 'Cancel Game');
+    expect(has(root, 'Delete Friday night doubles?')).toBe(true);
+    expect(has(root, 'Delete game')).toBe(true);
+    expect(has(root, 'Keep game')).toBe(true);
+    expect(texts(root).some(text => text.includes('3 players joined'))).toBe(true);
     expect(mockPost).not.toHaveBeenCalled();
   });
 
-  it('sends POST /events/{id}/cancel with { reason } and refreshes the event to cancelled', async () => {
+  it('Keep game closes the sheet without a request', async () => {
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    const cancelledRaw = rawEvent({ organizer_id: 'user-me', status: 'cancelled' });
-    mockPost.mockResolvedValueOnce({ data: cancelledRaw });
-    // Next GET returns cancelled event
-    mockGet.mockImplementation((url: string) => {
-      if (url.includes('/participants')) {
-        return Promise.resolve({ data: [] });
-      }
-      return Promise.resolve({ data: cancelledRaw });
-    });
-
-    await act(async () => {
-      pressableLabelled(root, 'Cancel Event').props.onPress();
-    });
-
-    const input = root.findByProps({ accessibilityLabel: 'Cancellation Reason' });
-    await act(async () => {
-      input.props.onChangeText('Heavy rainfall, pitch flooded');
-    });
-
-    await act(async () => {
-      pressableLabelled(root, 'Confirm Cancellation').props.onPress();
-    });
-
-    expect(mockPost).toHaveBeenCalledWith(
-      '/events/evt-1/cancel',
-      { reason: 'Heavy rainfall, pitch flooded' },
-      expect.any(Object),
-    );
-    expect(has(root, 'This event has been cancelled.')).toBe(true);
-    expect(has(root, 'Cancel Event')).toBe(false);
+    await pressLabelled(root, 'Cancel Game');
+    await pressText(root, 'Keep game');
+    expect(has(root, 'Delete game')).toBe(false);
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(hasLabelled(root, 'Cancel Game')).toBe(true);
   });
 
-  it('surfaces backend cancel error via getApiErrorMessage', async () => {
+  it('Delete game sends POST /events/{id}/cancel with the fixed host reason (no reason is typed) and closes the sheet', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    await pressLabelled(root, 'Cancel Game');
+    expect(textInputs(root)).toHaveLength(0);
+    await pressText(root, 'Delete game');
+
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    expect(mockPost).toHaveBeenCalledWith(
+      '/events/evt-1/cancel',
+      { reason: 'Deleted by host' },
+      expect.any(Object),
+    );
+    expect(has(root, 'Delete game')).toBe(false);
+  });
+
+  it('surfaces a backend cancel error via getApiErrorMessage', async () => {
     mockPost.mockRejectedValueOnce({
       response: { status: 400, data: { detail: 'Event is already cancelled' } },
     });
-
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    await act(async () => {
-      pressableLabelled(root, 'Cancel Event').props.onPress();
-    });
-
-    const input = root.findByProps({ accessibilityLabel: 'Cancellation Reason' });
-    await act(async () => {
-      input.props.onChangeText('Change of plans');
-    });
-
-    await act(async () => {
-      pressableLabelled(root, 'Confirm Cancellation').props.onPress();
-    });
-
+    await pressLabelled(root, 'Cancel Game');
+    await pressText(root, 'Delete game');
     expect(has(root, 'Event is already cancelled')).toBe(true);
-  });
-
-  it('closes cancel form on Close press', async () => {
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    await act(async () => {
-      pressableLabelled(root, 'Cancel Event').props.onPress();
-    });
-    expect(has(root, 'Confirm Cancellation')).toBe(true);
-
-    await act(async () => {
-      pressableLabelled(root, 'Close').props.onPress();
-    });
-    expect(has(root, 'Confirm Cancellation')).toBe(false);
-    expect(has(root, 'Cancel Event')).toBe(true);
   });
 });
 
-describe('BUILD 2: Event Edit Flow', () => {
-  it('opens edit form pre-populated with current event values', async () => {
-    const root = await mount(
-      rawEvent({
-        organizer_id: 'user-me',
-        title: 'Original Title',
-        venue_name: 'Original Venue',
-        venue_address: '100 Main St',
-        capacity: 16,
-      }),
-    );
+describe('BUILD 2: Edit game wizard (4 steps; sport and who can play are locked)', () => {
+  const NEXT = 'Next';
+  const openWizard = async (raw: Record<string, unknown> = {}): Promise<Instance> => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me', ...raw }));
+    await pressLabelled(root, 'Edit Game');
+    return root;
+  };
+  const toReview = async (root: Instance): Promise<void> => {
+    for (let step = 1; step < 4; step += 1) {
+      await pressLabelled(root, NEXT);
+    }
+  };
 
-    await act(async () => {
-      pressableLabelled(root, 'Edit Game').props.onPress();
-    });
-
-    expect(has(root, 'Save Changes')).toBe(true);
-    const titleInput = root.findByProps({ accessibilityLabel: 'Event Title' });
-    expect(titleInput.props.value).toBe('Original Title');
-
-    const venueNameInput = root.findByProps({ accessibilityLabel: 'Venue Name' });
-    expect(venueNameInput.props.value).toBe('Original Venue');
-
-    const venueAddressInput = root.findByProps({ accessibilityLabel: 'Venue Address' });
-    expect(venueAddressInput.props.value).toBe('100 Main St');
+  it('opens step 1 pre-populated with the current title and the sport and visibility locked', async () => {
+    const root = await openWizard({ title: 'Original Title' });
+    expect(has(root, 'Edit game')).toBe(true);
+    expect(has(root, 'Step 1 of 4')).toBe(true);
+    expect(has(root, 'Game details')).toBe(true);
+    expect(textInputs(root)[0].props.value).toBe('Original Title');
+    // Sport and Who can play show their value with the locked hint, not as controls.
+    expect(has(root, 'badminton')).toBe(true);
+    expect(has(root, 'Who can play')).toBe(true);
+    expect(texts(root).filter(text => text === "Can't be changed after creating")).toHaveLength(2);
   });
 
-  it('validates client-side constraints on edit fields before submitting', async () => {
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    await act(async () => {
-      pressableLabelled(root, 'Edit Game').props.onPress();
-    });
-
-    const titleInput = root.findByProps({ accessibilityLabel: 'Event Title' });
-    await act(async () => {
-      titleInput.props.onChangeText('   ');
-    });
-
-    await act(async () => {
-      pressableLabelled(root, 'Save Changes').props.onPress();
-    });
+  it('validates before moving on: an empty title stays on step 1, a capacity below the minimum stays on step 3', async () => {
+    const root = await openWizard();
+    await typeInto(textInputs(root)[0], '   ');
+    await pressLabelled(root, NEXT);
     expect(has(root, 'Title cannot be empty.')).toBe(true);
-    expect(mockPatch).not.toHaveBeenCalled();
+    expect(has(root, 'Step 1 of 4')).toBe(true);
 
-    await act(async () => {
-      titleInput.props.onChangeText('Valid Title');
-    });
+    await typeInto(textInputs(root)[0], 'Valid Title');
+    await pressLabelled(root, NEXT);
+    expect(has(root, 'Step 2 of 4')).toBe(true);
+    await pressLabelled(root, NEXT);
+    expect(has(root, 'Step 3 of 4')).toBe(true);
 
-    const sportInput = root.findByProps({ accessibilityLabel: 'Sport' });
-    await act(async () => {
-      sportInput.props.onChangeText('   ');
-    });
-    await act(async () => {
-      pressableLabelled(root, 'Save Changes').props.onPress();
-    });
-    expect(has(root, 'Sport cannot be empty.')).toBe(true);
-    expect(mockPatch).not.toHaveBeenCalled();
-
-    await act(async () => {
-      sportInput.props.onChangeText('badminton');
-    });
-
-    const capInput = root.findByProps({ accessibilityLabel: 'Capacity' });
-    await act(async () => {
-      capInput.props.onChangeText('0');
-    });
-
-    await act(async () => {
-      pressableLabelled(root, 'Save Changes').props.onPress();
-    });
-    expect(has(root, 'Capacity must be a positive number.')).toBe(true);
+    const capacity = root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.keyboardType === 'number-pad')[0];
+    await typeInto(capacity, '0');
+    await pressLabelled(root, NEXT);
+    expect(has(root, 'Step 3 of 4')).toBe(true);
     expect(mockPatch).not.toHaveBeenCalled();
   });
 
-  it('does not render cost or currency in edit form (hidden per BUILD B)', async () => {
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    await act(async () => {
-      pressableLabelled(root, 'Edit Game').props.onPress();
-    });
-
+  it('has no cost or currency field and no editable visibility or sport', async () => {
+    const root = await openWizard();
     expect(has(root, 'Estimated Cost')).toBe(false);
     expect(has(root, 'Currency')).toBe(false);
+    expect(has(root, 'Visibility')).toBe(false);
+    expect(has(root, 'Invite Only')).toBe(false);
+    expect(root.findAll(n => n.props.accessibilityLabel === 'Sport')).toHaveLength(0);
   });
 
-  it('submits PATCH /events/{id} with EventUpdate field set (omits immutable visibility and cost/currency)', async () => {
-    const updatedRaw = rawEvent({
-      organizer_id: 'user-me',
-      title: 'Edited Title',
-      sport: 'tennis',
-      venue_name: 'New Arena',
-      venue_address: '200 Arena Rd',
-      capacity: 20,
-      allow_waitlist: false,
-    });
-    mockPatch.mockResolvedValueOnce({ data: updatedRaw });
-
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    await act(async () => {
-      pressableLabelled(root, 'Edit Game').props.onPress();
-    });
-
-    const titleInput = root.findByProps({ accessibilityLabel: 'Event Title' });
-    await act(async () => {
-      titleInput.props.onChangeText('Edited Title');
-    });
-
-    const sportInput = root.findByProps({ accessibilityLabel: 'Sport' });
-    await act(async () => {
-      sportInput.props.onChangeText('tennis');
-    });
-
-    const venueNameInput = root.findByProps({ accessibilityLabel: 'Venue Name' });
-    await act(async () => {
-      venueNameInput.props.onChangeText('New Arena');
-    });
-
-    const capInput = root.findByProps({ accessibilityLabel: 'Capacity' });
-    await act(async () => {
-      capInput.props.onChangeText('20');
-    });
-
-    const allowWaitlistSwitch = root.findByProps({ accessibilityLabel: 'Allow Waitlist' });
-    await act(async () => {
-      allowWaitlistSwitch.props.onValueChange(false);
-    });
-
-    await act(async () => {
-      pressableLabelled(root, 'Save Changes').props.onPress();
-    });
-
-    expect(mockPatch).toHaveBeenCalledWith(
-      '/events/evt-1',
-      expect.objectContaining({
-        title: 'Edited Title',
-        sport: 'tennis',
-        venue_name: 'New Arena',
-        capacity: 20,
-        allow_waitlist: false,
-      }),
-      expect.any(Object),
-    );
-    expect(mockPatch.mock.calls[0][1]).not.toHaveProperty('visibility');
-    expect(mockPatch.mock.calls[0][1]).not.toHaveProperty('estimated_cost_cents');
-    expect(mockPatch.mock.calls[0][1]).not.toHaveProperty('estimated_cost_currency');
-    expect(has(root, 'Save Changes')).toBe(false);
-    expect(has(root, 'Edited Title')).toBe(true);
-  });
-
-  it('does not render visibility in edit form (immutable post-creation)', async () => {
-    const root = await mount(rawEvent({ organizer_id: 'user-me', visibility: 'public' }));
-    await act(async () => {
-      pressableLabelled(root, 'Edit Game').props.onPress();
-    });
-
-    const editFormCards = root.findAll(
-      node => texts(node).includes('Edit Event') && texts(node).includes('Save Changes'),
-    );
-    const editForm = editFormCards[editFormCards.length - 1];
-    expect(editForm).toBeDefined();
-    expect(texts(editForm).includes('Visibility')).toBe(false);
-    expect(texts(editForm).includes('Invite Only')).toBe(false);
-  });
-
-  it('surfaces 409 conflict when sport change is locked after participant joined', async () => {
-    mockPatch.mockRejectedValueOnce({
-      response: {
-        status: 409,
-        data: {
-          detail:
-            'Cannot change sport after a participant has joined (skill-level matching is sport-relative)',
-        },
-      },
-    });
-
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    await act(async () => {
-      pressableLabelled(root, 'Edit Game').props.onPress();
-    });
-
-    const sportInput = root.findByProps({ accessibilityLabel: 'Sport' });
-    await act(async () => {
-      sportInput.props.onChangeText('tennis');
-    });
-
-    await act(async () => {
-      pressableLabelled(root, 'Save Changes').props.onPress();
-    });
-
-    expect(
-      has(
-        root,
-        'Cannot change sport after a participant has joined (skill-level matching is sport-relative)',
-      ),
-    ).toBe(true);
-  });
-
-  it('surfaces 409 conflict when edit is locked after event start', async () => {
-    mockPatch.mockRejectedValueOnce({
-      response: {
-        status: 409,
-        data: { detail: 'Cannot edit an event that has already started' },
-      },
-    });
-
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    await act(async () => {
-      pressableLabelled(root, 'Edit Game').props.onPress();
-    });
-
-    await act(async () => {
-      pressableLabelled(root, 'Save Changes').props.onPress();
-    });
-
-    expect(has(root, 'Cannot edit an event that has already started')).toBe(true);
-  });
-
-  it('closes edit form on Cancel press without saving', async () => {
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    await act(async () => {
-      pressableLabelled(root, 'Edit Game').props.onPress();
-    });
-    expect(has(root, 'Save Changes')).toBe(true);
-
-    await act(async () => {
-      pressableLabelled(root, 'Cancel').props.onPress();
-    });
-    expect(has(root, 'Save Changes')).toBe(false);
-    expect(has(root, 'Edit Game')).toBe(true);
-  });
-
-  it('populates sportOptions and allows selecting sport from OptionChips', async () => {
+  it('shows the sport display name, locked, and offers no other sport (no sport chips)', async () => {
     mockGet.mockImplementation((url: string) => {
       if (url === '/admin/sports/public') {
         return Promise.resolve({
@@ -667,17 +503,57 @@ describe('BUILD 2: Event Edit Flow', () => {
       navigation: { goBack },
     } as unknown as React.ComponentProps<typeof EventDetailScreen>;
     const root = await renderAsync(<EventDetailScreen {...props} />);
+    await pressLabelled(root, 'Edit Game');
 
-    await act(async () => {
-      pressableLabelled(root, 'Edit Game').props.onPress();
-    });
+    expect(has(root, 'Badminton')).toBe(true);
+    expect(has(root, 'Squash')).toBe(false);
+  });
 
-    expect(has(root, 'Squash')).toBe(true);
-    await act(async () => {
-      pressableLabelled(root, 'Squash').props.onPress();
-    });
-    const sportInput = root.findByProps({ accessibilityLabel: 'Sport' });
-    expect(sportInput.props.value).toBe('squash');
+  it('saves with PATCH /events/{id}: the changed fields, never sport, visibility, waitlist, cost or an unchanged venue', async () => {
+    const root = await openWizard();
+    await typeInto(textInputs(root)[0], 'Edited Title');
+    await pressLabelled(root, NEXT); // step 2
+    await pressLabelled(root, NEXT); // step 3
+    const capacity = root.findAll(n => (n.type as unknown) === 'TextInput' && n.props.keyboardType === 'number-pad')[0];
+    await typeInto(capacity, '20');
+    await pressLabelled(root, NEXT); // step 4 (review)
+    expect(has(root, 'Review changes')).toBe(true);
+    await pressLabelled(root, 'Save changes');
+
+    expect(mockPatch).toHaveBeenCalledTimes(1);
+    expect(mockPatch).toHaveBeenCalledWith(
+      '/events/evt-1',
+      expect.objectContaining({ title: 'Edited Title', capacity: 20 }),
+      expect.any(Object),
+    );
+    const payload = mockPatch.mock.calls[0][1];
+    for (const key of ['sport', 'visibility', 'allow_waitlist', 'estimated_cost_cents', 'estimated_cost_currency', 'venue_name', 'venue_id']) {
+      expect(payload).not.toHaveProperty(key);
+    }
+    // The wizard closes on success.
+    expect(has(root, 'Edit game')).toBe(false);
+  });
+
+  it.each([
+    ['a 409 with a server message shows that message', { status: 409, data: { detail: 'Cannot edit an event that has already started' } }, 'Cannot edit an event that has already started'],
+    ['a 409 game_ended shows the closure label', { status: 409, data: { code: 'game_ended' } }, 'This game has ended and can no longer be changed'],
+    ['a 422 start_in_past shows the closure label', { status: 422, data: { code: 'start_in_past' } }, "Start time can't be in the past"],
+  ])('on save, %s', async (_name, response, message) => {
+    mockPatch.mockRejectedValueOnce({ response });
+    const root = await openWizard();
+    await toReview(root);
+    await pressLabelled(root, 'Save changes');
+    expect(has(root, message)).toBe(true);
+    expect(has(root, 'Review changes')).toBe(true);
+  });
+
+  it('Back on step 1 closes the wizard without saving', async () => {
+    const root = await openWizard();
+    expect(has(root, 'Edit game')).toBe(true);
+    await pressLabelled(root, 'Back');
+    expect(has(root, 'Edit game')).toBe(false);
+    expect(hasLabelled(root, 'Edit Game')).toBe(true);
+    expect(mockPatch).not.toHaveBeenCalled();
   });
 });
 
@@ -916,22 +792,21 @@ describe('BUILD C: Individual Invite Flow (invite picker, GV-5, AD-4)', () => {
   });
 });
 
-describe('Mobile Artboard Stacked Cards Layout', () => {
-  it('renders back navigation button and calls goBack on tap', async () => {
+describe('Game view layout (game-view-redesign: banner, details card, Remarks, Players)', () => {
+  it('renders the back button (label My Games) and calls goBack on tap', async () => {
     const root = await mount(rawEvent());
-    expect(has(root, '‹ My Games')).toBe(true);
-    act(() => pressableLabelled(root, 'My Games').props.onPress());
+    await pressLabelled(root, 'My Games');
     expect(goBack).toHaveBeenCalledTimes(1);
   });
 
-  it('renders Capacity Card with ratio, players going label, and remaining spots', async () => {
+  it('renders the Players block with "x of y joined" and one empty spot placeholder per remaining spot', async () => {
     const root = await mount(rawEvent({ capacity: 8, going_count: 7 }));
-    expect(has(root, '7 / 8')).toBe(true);
-    expect(has(root, 'players going')).toBe(true);
-    expect(has(root, '1 spot left')).toBe(true);
+    expect(has(root, 'Players')).toBe(true);
+    expect(has(root, '7 of 8 joined')).toBe(true);
+    expect(texts(root).filter(text => text === '?')).toHaveLength(1);
   });
 
-  it('renders "About this game" Card with description only', async () => {
+  it('shows the description under "Remarks" (no "About this game" card, no Cost row)', async () => {
     const root = await mount(
       rawEvent({
         description: 'Casual doubles, all skill levels welcome.',
@@ -939,70 +814,43 @@ describe('Mobile Artboard Stacked Cards Layout', () => {
         estimated_cost_currency: 'USD',
       }),
     );
-    expect(has(root, 'About this game')).toBe(true);
+    expect(has(root, 'Remarks')).toBe(true);
     expect(has(root, 'Casual doubles, all skill levels welcome.')).toBe(true);
+    expect(has(root, 'About this game')).toBe(false);
+    expect(has(root, 'Cost')).toBe(false);
   });
 
-  describe('Event Details Card', () => {
-    it('renders heading "Event Details" and row order: Visibility, Skill level, Waitlist', async () => {
-      const root = await mount(
-        rawEvent({
-          visibility: 'public',
-          skill_level_requirement: 'beginner',
-          allow_waitlist: true,
-        }),
-      );
-      expect(has(root, 'Event Details')).toBe(true);
-      expect(has(root, 'Visibility')).toBe(true);
-      expect(has(root, '🌍 Public')).toBe(true);
-      expect(has(root, 'Skill level')).toBe(true);
-      expect(has(root, 'Beginner')).toBe(true);
-      expect(has(root, 'Waitlist')).toBe(true);
-      expect(has(root, 'Open')).toBe(true);
-      expect(has(root, 'Cost')).toBe(false);
+  describe('Details card (GV-2, GV-3) and section order for a non-organizer (AD-9)', () => {
+    it('a public game shows the Invite type row as "Public", then Remarks, Players and the action, in that order', async () => {
+      const root = await mount(rawEvent({ visibility: 'public', skill_level_requirement: 'beginner' }));
+      expect(has(root, 'Invite type')).toBe(true);
+      expect(has(root, 'Public')).toBe(true);
+      expect(has(root, 'Event Details')).toBe(false);
+      expect(has(root, 'Visibility')).toBe(false);
+      expect(has(root, 'Waitlist')).toBe(false);
 
-      const allTexts = texts(root);
-      const visIdx = allTexts.indexOf('Visibility');
-      const skillIdx = allTexts.indexOf('Skill level');
-      const waitlistIdx = allTexts.indexOf('Waitlist');
-      expect(visIdx).toBeGreaterThan(-1);
-      expect(skillIdx).toBeGreaterThan(visIdx);
-      expect(waitlistIdx).toBeGreaterThan(skillIdx);
+      const all = texts(root);
+      const order = ['Invite type', 'Remarks', 'Players', 'Register'].map(label => all.indexOf(label));
+      expect(order.every(index => index > -1)).toBe(true);
+      expect([...order].sort((x, y) => x - y)).toEqual(order);
     });
 
-    it('renders 🔒 Invite Only when visibility is invite_only', async () => {
+    it('an invite-only game with no groups shows no Invite type row to a non-organizer (AD-2) and the Accept / Decline pair', async () => {
       const root = await mount(rawEvent({ visibility: 'invite_only' }));
-      expect(has(root, 'Visibility')).toBe(true);
-      expect(has(root, '🔒 Invite Only')).toBe(true);
+      expect(has(root, 'Invite type')).toBe(false);
+      expect(has(root, 'Accept')).toBe(true);
+      expect(has(root, 'Decline')).toBe(true);
     });
 
-    it('renders 👥 Group when visibility is group', async () => {
+    it('a group game with no group names shows no Invite type row to a non-organizer and the Join / Decline pair', async () => {
       const root = await mount(rawEvent({ visibility: 'group' }));
-      expect(has(root, 'Visibility')).toBe(true);
-      expect(has(root, '👥 Group')).toBe(true);
-    });
-
-    it('renders Cost row as last row when cost is present', async () => {
-      const root = await mount(
-        rawEvent({
-          visibility: 'public',
-          skill_level_requirement: 'beginner',
-          allow_waitlist: true,
-          estimated_cost_cents: 1000,
-          estimated_cost_currency: 'USD',
-        }),
-      );
-      expect(has(root, 'Cost')).toBe(true);
-      expect(has(root, '$10.00 USD')).toBe(true);
-
-      const allTexts = texts(root);
-      const waitlistIdx = allTexts.indexOf('Waitlist');
-      const costIdx = allTexts.indexOf('Cost');
-      expect(costIdx).toBeGreaterThan(waitlistIdx);
+      expect(has(root, 'Invite type')).toBe(false);
+      expect(has(root, 'Join')).toBe(true);
+      expect(has(root, 'Decline')).toBe(true);
     });
   });
 
-  it('renders Participants Card with participant names and roles', async () => {
+  it('shows the going players as avatars with initials under Players (the Players block, AD-3)', async () => {
     mockGet.mockImplementation((url: string) => {
       if (url === '/events/evt-1/participants') {
         return Promise.resolve({
@@ -1012,7 +860,10 @@ describe('Mobile Artboard Stacked Cards Layout', () => {
           ],
         });
       }
-      return Promise.resolve({ data: rawEvent({ organizer_id: 'user-me' }) });
+      if (url === '/config/client') {
+        return Promise.resolve({ data: {} });
+      }
+      return Promise.resolve({ data: rawEvent({ going_count: 2 }) });
     });
 
     const props = {
@@ -1021,24 +872,26 @@ describe('Mobile Artboard Stacked Cards Layout', () => {
     } as unknown as React.ComponentProps<typeof EventDetailScreen>;
     const root = await renderAsync(<EventDetailScreen {...props} />);
 
-    expect(has(root, 'Participants')).toBe(true);
-    expect(has(root, 'Pratheesh K')).toBe(true);
-    expect(has(root, 'Organizer')).toBe(true);
-    expect(has(root, 'Rahul S')).toBe(true);
-    expect(has(root, 'Going')).toBe(true);
+    expect(has(root, 'Players')).toBe(true);
+    expect(has(root, '2 of 12 joined')).toBe(true);
+    const avatars = root.findAll(n => n.props.testID === 'player-avatar' && typeof n.type === 'string');
+    expect(avatars).toHaveLength(2);
+    expect(texts(avatars[0])).toContain('P');
+    expect(texts(avatars[1])).toContain('R');
   });
 });
 
-describe('keyboard avoidance (same class of bug as Create Game — the Edit Event form has TextInputs and previously had no KeyboardAvoidingView wrapper at all)', () => {
+describe('keyboard avoidance (the Edit game wizard has TextInputs; the game view itself has none)', () => {
   const originalPlatform = Platform.OS;
 
   afterEach(() => {
     Platform.OS = originalPlatform;
   });
 
-  it('wraps the screen in a KeyboardAvoidingView with padding behavior on iOS', async () => {
+  it('wraps the wizard in a KeyboardAvoidingView with padding behavior on iOS', async () => {
     Platform.OS = 'ios';
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    await pressLabelled(root, 'Edit Game');
     const kav = root.find(n => n.props.behavior === 'padding');
     expect(kav).toBeDefined();
     expect(kav.props.behavior).toBe('padding');
@@ -1047,73 +900,96 @@ describe('keyboard avoidance (same class of bug as Create Game — the Edit Even
   it('handles the keyboard on Android through KeyboardAwareScreen (no KeyboardAvoidingView behavior prop)', async () => {
     Platform.OS = 'android';
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    await pressLabelled(root, 'Edit Game');
     expect(root.findAll(n => n.props.behavior === 'height')).toHaveLength(0);
     expect(root.findAll(n => n.props.behavior === 'padding')).toHaveLength(0);
     expect(root.findAll(n => n.props.keyboardShouldPersistTaps === 'handled').length).toBeGreaterThan(0);
   });
 
-  it('the Edit Event form (with its TextInputs) renders inside the keyboard-aware scroll view', async () => {
+  it('the Edit game wizard (with its TextInput) renders inside the keyboard-aware scroll view', async () => {
     Platform.OS = 'android';
     const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    act(() => pressableLabelled(root, 'Edit Game').props.onPress());
+    await pressLabelled(root, 'Edit Game');
     const scroll = root.findAll(n => n.props.keyboardShouldPersistTaps === 'handled')[0];
     expect(scroll.findAll(n => (n.type as unknown) === 'TextInput').length).toBeGreaterThan(0);
   });
 });
 
-describe('share event flow', () => {
-  it('opens ShareActionSheet when tapping "Share Event"', async () => {
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
-    expect(has(root, 'Share Event')).toBe(true);
+describe('share flow (organizer): invite message, then the game link', () => {
+  const CONFIG = {
+    android_store_url: 'https://play.example',
+    link_base_url: 'https://links.example',
+    app_links_enabled: true,
+  };
+  const MESSAGE =
+    'Join GameOn SG 📲\n🤖 https://play.example\n\nhttps://links.example/l/game/evt-1?ref=user-me';
 
-    act(() => pressableLabelled(root, 'Share Event').props.onPress());
+  beforeEach(() => {
+    mockShareLabels = {
+      'share.invite_message': 'Join GameOn SG 📲\n{store_links}',
+      'share.invite_android_line': '🤖 {url}',
+    };
+  });
+
+  it('opens the ShareActionSheet from the Share app link button on the Invite card', async () => {
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }), CONFIG);
+    expect(hasLabelled(root, 'Share app link')).toBe(true);
+
+    await pressLabelled(root, 'Share app link');
 
     expect(has(root, 'Share via WhatsApp')).toBe(true);
     expect(has(root, 'Share via other apps')).toBe(true);
     expect(has(root, 'Copy Link')).toBe(true);
   });
 
-  it('triggers generic share with composed message and URL with ?ref=', async () => {
+  it('system share: the invite message, a blank line, then the /l/ game link with ?ref= (message only, no url key)', async () => {
     const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
-    const root = await mount(rawEvent({ organizer_id: 'user-me', title: 'Casual Badminton' }));
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }), CONFIG);
 
-    act(() => pressableLabelled(root, 'Share Event').props.onPress());
+    await pressLabelled(root, 'Share app link');
+    await act(async () => {
+      await pressableLabelled(root, 'Share via other apps').props.onPress();
+    });
+
+    expect(spy).toHaveBeenCalledWith({ message: MESSAGE });
+  });
+
+  it('with the link switch off the game link is the hash form', async () => {
+    const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }), { ...CONFIG, app_links_enabled: false });
+
+    await pressLabelled(root, 'Share app link');
     await act(async () => {
       await pressableLabelled(root, 'Share via other apps').props.onPress();
     });
 
     expect(spy).toHaveBeenCalledWith({
-      message:
-        'Sam invited you to Casual Badminton on Shuttlr \u2014 https://meetups.duckdns.org/#event-detail/evt-1?ref=user-me',
-      url: 'https://meetups.duckdns.org/#event-detail/evt-1?ref=user-me',
+      message: 'Join GameOn SG 📲\n🤖 https://play.example\n\nhttps://links.example/#event-detail/evt-1?ref=user-me',
     });
   });
 
-  it('triggers WhatsApp share with composed message', async () => {
+  it('WhatsApp share carries the same message', async () => {
     const canOpenSpy = jest.spyOn(Linking, 'canOpenURL').mockResolvedValueOnce(true);
     const openSpy = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined as never);
-    const root = await mount(rawEvent({ organizer_id: 'user-me', title: 'Casual Badminton' }));
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }), CONFIG);
 
-    act(() => pressableLabelled(root, 'Share Event').props.onPress());
+    await pressLabelled(root, 'Share app link');
     await act(async () => {
       await pressableLabelled(root, 'Share via WhatsApp').props.onPress();
     });
 
-    const expectedMsg =
-      'Sam invited you to Casual Badminton on Shuttlr \u2014 https://meetups.duckdns.org/#event-detail/evt-1?ref=user-me';
     expect(canOpenSpy).toHaveBeenCalledWith('whatsapp://send');
-    expect(openSpy).toHaveBeenCalledWith(`whatsapp://send?text=${encodeURIComponent(expectedMsg)}`);
+    expect(openSpy).toHaveBeenCalledWith(`whatsapp://send?text=${encodeURIComponent(MESSAGE)}`);
   });
 
-  it('copies canonical event link with ?ref= to clipboard and displays toast', async () => {
+  it('Copy Link copies the app share URL (FEEDBACK-001 AD-6) and shows the confirmation toast', async () => {
     const setStringSpy = jest.spyOn(Clipboard, 'setString');
-    const root = await mount(rawEvent({ organizer_id: 'user-me' }));
+    const root = await mount(rawEvent({ organizer_id: 'user-me' }), CONFIG);
 
-    act(() => pressableLabelled(root, 'Share Event').props.onPress());
+    await pressLabelled(root, 'Share app link');
     act(() => pressableLabelled(root, 'Copy Link').props.onPress());
 
-    expect(setStringSpy).toHaveBeenCalledWith('https://meetups.duckdns.org/#event-detail/evt-1?ref=user-me');
+    expect(setStringSpy).toHaveBeenCalledWith(getShareUrl());
     expect(has(root, 'Link copied to clipboard')).toBe(true);
   });
 });
-

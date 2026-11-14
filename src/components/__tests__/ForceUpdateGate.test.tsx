@@ -23,7 +23,7 @@ import ForceUpdateGate from '../ForceUpdateGate';
 const STORE = 'https://play.google.com/store/apps/details?id=org.duckdns.meetups';
 const APP = 'APP CONTENT';
 const TITLE = 'Update required';
-const MESSAGE = 'Please update Shuttlr to continue.';
+const MESSAGE = 'Please update GameOn SG to continue.';
 const INSTALLED = 5;
 
 const policy = (min: number, storeUrl: unknown = STORE): FakeReply => ({
