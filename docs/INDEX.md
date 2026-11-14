@@ -64,3 +64,4 @@ Per-module files, one folder per kind so no folder is flooded. They describe wha
 ## Reference (search, do not read in full)
 - reports/: implementation, audit and diagnostic reports (about 110). rca/: root-cause analyses.
 - glossary.json, label-inventory-mobile.json: UI labels (`npm run check:labels` checks them).
+- DES-MEETUP-ADDENDUM-deep-links-desktop-ui.md: links that open the app (password reset with a new native reset screen, game, tournament, group invitation) on a new `/l/` link form with verification files, an admin link host and the `app_links_enabled` switch (default off); game and tournament shares carry a link again; twelve desktop web layout fixes on one shared page frame. Approved 2026-11-14 (v1.0.1). No boards (D-1): section 4.4 is the acceptance reference. Tasks per the build tracker (1.x backend/web, 3.x app). Briefs in chat only.
