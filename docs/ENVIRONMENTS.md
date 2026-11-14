@@ -9,10 +9,10 @@ Paths, hosts and commands only. No secrets, keys or passwords here. Prefix every
 - API target: set once in `config/env.ts` (`ENV.API_BASE_URL`). Leave `API_BASE_URL` in `.env` unset unless overriding. Production is https://meetupaws.duckdns.org.
 
 ## CI (GitHub Actions, `.github/workflows/`)
-- `ios-ci.yml`, `ios-testflight.yml`, `label-scan.yml`.
+- `ios-ci.yml`, `ios-testflight.yml`, `label-scan.yml`, `staging-release.yml` (manual; input platform both/android/ios; builds the staging apps `org.duckdns.meetups.staging` for Play internal testing and TestFlight, pointing at the staging API).
 
 ## Backend environments
-- The API runs on the AWS host described in `~/meetup/docs/ENVIRONMENTS.md`. Mobile builds, including Play Console test releases, point at that prod URL. There is no separate staging server.
+- The API runs on the AWS host described in `~/meetup/docs/ENVIRONMENTS.md`. Production mobile builds point at https://meetupaws.duckdns.org. A separate staging server exists at https://meetupstg.duckdns.org (staging env file and release steps: `~/meetup/docs/ENVIRONMENTS.md`); the staging apps point at it.
 
 ## Rules
 - Release builds: `npm run build:aab` bumps `versionCode` every run. Commit the bump immediately, or build with `SKIP_VERSION_BUMP=1`.
