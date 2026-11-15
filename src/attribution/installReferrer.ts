@@ -32,14 +32,19 @@ export async function readInstallReferrerOnce(): Promise<void> {
   if (!native) {
     return;
   }
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const value = await Promise.race([
       native.getAttributionCode(),
-      new Promise<null>(resolve => setTimeout(() => resolve(null), TIMEOUT_MS)),
+      new Promise<null>(resolve => {
+        timer = setTimeout(() => resolve(null), TIMEOUT_MS);
+      }),
     ]);
     code = typeof value === 'string' && CODE_SHAPE.test(value) ? value : null;
   } catch {
     code = null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
