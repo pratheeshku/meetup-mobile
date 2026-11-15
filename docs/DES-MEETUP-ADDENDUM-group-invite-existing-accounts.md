@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-GROUP-INVITE-EXISTING-ACCOUNTS
 
 **Doc ID:** DES-MEETUP-ADDENDUM-GROUP-INVITE-EXISTING-ACCOUNTS
-**Version:** v1.0
+**Version:** v1.0.1
 **Status:** APPROVED by the owner on 2026-11-15. Built on the owner's elicitation decisions of the same day. Architect decisions are listed in §10; the owner may overturn any.
 **Owner:** Pratheesh
 **Date:** 2026-11-15
@@ -57,7 +57,7 @@ One database migration (four additive columns). One new API endpoint. One new sc
 
 **AD-1: One join endpoint for signed-in accounts (GI-01, GI-02).** `POST /groups/invitations/join`, body `{ "token": "<uuid>" }`. It needs a signed-in caller. Its access rule is declared in `groups/policies.py` as "any authenticated account"; the token is the capability, exactly as it is at sign-up. The inviter's authority was checked when the invitation was created, so it is not rechecked. Rejected: honouring `invitation_token` at ordinary sign-in. That would join on a tap plus a login with no explicit consent, and it contradicts the owner rule that links navigate and grant nothing.
 
-**AD-2: Outcomes and neutral failure (GI-02, GI-03, GI-04).** Success is `200` with `group_id` and `outcome`, where `outcome` is `joined` or `already_member`. Every failure caused by the token (unknown, already used, group deleted) is one `404` with one fixed message and error code. The caller cannot tell the cases apart. A malformed token is a `422` from schema validation.
+**AD-2: Outcomes and neutral failure (GI-02, GI-03, GI-04).** Success is `200` with `group_id` and `outcome`, where `outcome` is `joined` or `already_member`. Every failure caused by the token (unknown, already used, group deleted) is one `404` with one fixed message and error code. The error code is `invitation_unavailable`. The caller cannot tell the cases apart. A malformed token is a `422` from schema validation.
 
 **AD-3: Order of checks and atomic claim (GI-02, GI-03, P5).**
 - The invitation and its group are resolved first. Missing either: the neutral `404`.
@@ -67,15 +67,15 @@ One database migration (four additive columns). One new API endpoint. One new sc
 
 **AD-4: Confirm before joining (GI-01).** Opening the link never joins. The app and the web both show the group name from the existing `GET /public/groups/invitations/{token}` and wait for Join. Not now leaves the token unused and opens the Groups list.
 
-**AD-5: The token survives sign-in, in memory only (GI-05).** App: the existing pending target `group_invite` in `src/links/linkStore.ts` is kept through sign-in and opens the confirm screen. This replaces the deep-links AD-10 behaviour of opening the Groups list. Web: the token is kept for the current tab only and is dropped after Join, Not now or a failure. Neither side writes it to persistent storage, logs or analytics.
+**AD-5: The token survives sign-in, in memory only (GI-05).** App: the existing pending target `group_invite` in `src/links/linkStore.ts` is kept through sign-in and opens the confirm screen. This replaces the deep-links AD-10 behaviour of opening the Groups list. Web: the token is kept for the current tab only (the browser's per-tab session storage, never `localStorage`), is taken out of the address bar once read, and is dropped after Join, Not now or a failure. Neither side writes it to persistent storage, logs or analytics.
 
 **AD-6: Join record on the invitation row (GI-08).** Two new columns on `group_invitations`: `consumed_by_user_id` and `joined_via`. Both are written once, in the same statement that sets `consumed_at`, by both join paths (sign-up and AD-1). `joined_via` takes one of three values: `signup_link`, `existing_account_link`, `android_install`. The inviter is the existing `inviter_user_id`; no new column is needed for it. Rows used before this release keep nulls in the new columns.
 
-**AD-7: Attribution code, separate from the token (GI-09).** Fact: `token` is the primary key of `group_invitations`; there is no other identifier. A Play Store address is not a fragment, so the token must not ride in it. New column `attribution_code`: a random, unguessable value created with each new invitation. It identifies an invitation for counting and grants nothing. It is returned as an additive field `attribution_code` (string or null) on `GET /public/groups/invitations/{token}`, so only a holder of the token can learn it. Invitations created before this release have no code and are not attributable.
+**AD-7: Attribution code, separate from the token (GI-09).** Fact: `token` is the primary key of `group_invitations`; there is no other identifier. A Play Store address is not a fragment, so the token must not ride in it. New column `attribution_code`: a random, unguessable value created with each new invitation. It identifies an invitation for counting and grants nothing. It is returned as an additive field `attribution_code` (string or null) on `GET /public/groups/invitations/{token}`, so only a holder of the token can learn it. Invitations created before this release have no code and are not attributable. Shape: URL-safe characters only (`A-Z a-z 0-9 _ -`), 22 characters as issued; the server accepts 8 to 64 and the app 1 to 128, and anything else is ignored.
 
-**AD-8: Referrer on the web invitation page (GI-09).** When the web invitation page offers the Play Store, it adds `referrer=gi%3D{attribution_code}` to the Play Store address. It does so only when the address host is `play.google.com` and a code exists. Nothing is added to the App Store address.
+**AD-8: Referrer on the web invitation page (GI-09).** The signed-out web invitation page shows one text link to the Play Store, to visitors on an Android browser only (the page had no store link before; found in the build). On that link it adds `referrer=gi%3D{attribution_code}` to the Play Store address. It does so only when the address host is `play.google.com` and a code exists. Nothing is added to the App Store address.
 
-**AD-9: Reading the referrer in the Android app (GI-09).** While signed out, the Android app asks the Play Install Referrer API for the referrer on a cold start and keeps a `gi` code in memory only. It sends it as an additive optional field `attribution_code` on the account-creation requests that already carry invitation fields (deep-links AD-8: `POST /auth/signup`, `POST /auth/oauth/{provider}/callback`, and through the sign-up ticket to `POST /auth/complete-signup`). It is not sent at ordinary sign-in. iOS never sends it.
+**AD-9: Reading the referrer in the Android app (GI-09).** While signed out, the Android app asks the Play Install Referrer API for the referrer on a cold start and keeps a `gi` code in memory only. It sends it as an additive optional field `attribution_code` on the account-creation requests that already carry invitation fields (deep-links AD-8: `POST /auth/signup`, `POST /auth/oauth/{provider}/callback`, and through the sign-up ticket to `POST /auth/complete-signup`). It is not sent at ordinary sign-in. The social callback serves sign-in and sign-up alike, so the app sends the code there too; the server ignores it for an account that already exists. iOS never sends it.
 
 **AD-10: Recording the attribution and the route (GI-08, GI-09).** New column `install_attributed_user_id`.
 - At account creation with a code that matches an invitation: that invitation's `install_attributed_user_id` is set to the new account if it is still null. First writer wins. Nobody is joined by this.
@@ -109,13 +109,13 @@ Account deletion in this system anonymises and soft-deletes the `users` row (`us
 
 | Area | Change |
 |---|---|
-| migrations | One script adding the four columns of 5.1 and the uniqueness of `attribution_code` |
+| migrations | `bb9a7fad474b` adds the four columns of 5.1 and the uniqueness of `attribution_code`; `c7d3a91e5f24` seeds the four mobile labels. Apply in that order |
 | groups/models, repository, service | New columns; code generated at invitation creation; claim records `consumed_by_user_id` and `joined_via`; join service for AD-1 to AD-3 |
 | groups/router, policies | `POST /groups/invitations/join` with its declared access rule |
 | auth | Optional `attribution_code` accepted on the three account-creation paths (AD-9); AD-10 applied in the same transaction as account creation |
 | public | `GET /public/groups/invitations/{token}` gains `attribution_code` (additive) |
 | frontend (`frontend/app.js`) | Confirm state for a signed-in person; token kept through sign-in for the tab; Play referrer (AD-8); PWA version bump |
-| labels | Seed of the new label keys reported by the app task |
+| labels | Mobile keys `mob.group_invite.join_question`, `join_question_generic`, `join`, `not_now` (the unavailable case reuses `mob.group_invite.invalid`); web keys under `web.group_invite_landing.*` |
 
 `POST /groups/invitations` is unchanged: its response stays exactly `token` and `invitation_url`.
 
@@ -198,3 +198,4 @@ GI-01: AD-1, AD-4. GI-02: AD-1, AD-2, AD-3. GI-03: AD-3. GI-04: AD-2. GI-05: AD-
 | Version | Date | Change |
 |---|---|---|
 | v1.0 | 2026-11-15 | Initial, from the elicitation of 2026-11-15. Approved by the owner the same day. Closes deep-links OI-8. |
+| v1.0.1 | 2026-11-15 | Write-back of the Task 1.1 and 3.1 reports (meetup PR 248, meetup-mobile PR 122). AD-2 error code; AD-5 web token storage; AD-7 code shape; AD-8 Play Store link added to the signed-out web page, Android browsers only; AD-9 social callback; 5.2 migration ids and label keys. No owner decision changed. |
