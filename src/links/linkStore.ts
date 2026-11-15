@@ -28,6 +28,7 @@ type Listener = () => void;
 let pending: PendingTarget | null = null;
 let resetToken: string | null = null;
 let authLanding: AuthLanding | null = null;
+let groupJoinToken: string | null = null;
 const listeners = new Set<Listener>();
 
 function emit(): void {
@@ -127,10 +128,28 @@ export function noteJoinedGroup(groupId: string | null | undefined): void {
   }
 }
 
+/**
+ * The group invitation token the signed-in confirm screen will offer to join with (group-invite-existing-accounts
+ * AD-4, AD-5). Memory only, like the pending target: never route params. Set when a signed-in person opens the link
+ * or signs in with a pending `group_invite`; dropped by the screen after Join, Not now or a failure.
+ */
+export function setGroupJoinToken(token: string): void {
+  groupJoinToken = token;
+}
+
+export function getGroupJoinToken(): string | null {
+  return groupJoinToken;
+}
+
+export function clearGroupJoinToken(): void {
+  groupJoinToken = null;
+}
+
 /** Test helper. */
 export function _resetLinkStoreForTesting(): void {
   pending = null;
   resetToken = null;
   authLanding = null;
+  groupJoinToken = null;
   listeners.clear();
 }

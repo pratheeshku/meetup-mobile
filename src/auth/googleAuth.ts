@@ -42,6 +42,7 @@ import { Platform } from 'react-native';
 import { getTermsVersion } from './terms';
 import { ENV } from '../../config/env';
 import { apiClient } from '../api/client';
+import { clearAttributionCode, getAttributionFields } from '../attribution/installReferrer';
 import { getInvitationFields, noteJoinedGroup } from '../links/linkStore';
 import { clearCookieJar } from '../api/cookies';
 import { saveTokens, clearTokens } from '../storage/tokens';
@@ -129,7 +130,10 @@ export async function signIn(): Promise<SocialSignInResult> {
     terms_version: termsVersion,
     // Deep-links AD-8: only what a link supplied (empty otherwise). Sent on this callback only.
     ...getInvitationFields(),
+    // Android install attribution (AD-9): this callback only, and only when a code is held.
+    ...getAttributionFields(),
   });
+  clearAttributionCode();
 
   // NE-01: a new person while the phone is required gets a ticket and no session (tokens are saved only for a session).
   if (isSignupRequired(data)) {

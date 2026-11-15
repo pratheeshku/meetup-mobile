@@ -33,6 +33,7 @@ import type {
   Group,
   GroupDetail,
   GroupInvitationResponse,
+  GroupInviteJoinResponse,
   GroupMember,
   GroupMemberRole,
   GroupRole,
@@ -442,6 +443,23 @@ export async function createGroup(
     correlationId: options?.correlationId,
   });
   return mapGroupApiItem(data, 'owner');
+}
+
+/**
+ * `POST /groups/invitations/join` (group-invite-existing-accounts AD-1, AD-2). Signed in; the token goes in the
+ * body only, never in a path or query, and is never logged. 200 `{ group_id, outcome }`; every token failure is
+ * one 404 (callers do not branch on a code).
+ */
+export async function joinGroupByInvitation(
+  token: string,
+  options?: RequestOptions,
+): Promise<GroupInviteJoinResponse> {
+  const { data } = await apiClient.post<GroupInviteJoinResponse>(
+    '/groups/invitations/join',
+    { token },
+    { correlationId: options?.correlationId },
+  );
+  return data;
 }
 
 /**

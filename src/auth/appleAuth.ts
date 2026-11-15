@@ -13,6 +13,7 @@ import { appleAuth } from '@invertase/react-native-apple-authentication';
 import { getTermsVersion } from './terms';
 import { apiClient } from '../api/client';
 import { saveTokens } from '../storage/tokens';
+import { clearAttributionCode, getAttributionFields } from '../attribution/installReferrer';
 import { getInvitationFields, noteJoinedGroup } from '../links/linkStore';
 import type { InvitationFields } from '../links/linkStore';
 import { isSignupRequired } from './types';
@@ -83,6 +84,8 @@ export async function signIn(): Promise<SocialSignInResult> {
     terms_version: termsVersion,
     // Deep-links AD-8: only what a link supplied (empty otherwise). Sent on this callback only.
     ...getInvitationFields(),
+    // iOS never holds a code, so nothing is added here (AD-9); kept symmetrical with the other callbacks.
+    ...getAttributionFields(),
   };
 
   if (fullNameString) {
@@ -94,6 +97,7 @@ export async function signIn(): Promise<SocialSignInResult> {
       '/auth/oauth/apple/callback',
       payload,
     );
+    clearAttributionCode();
     // NE-01: a new person while the phone is required gets a ticket and no session.
     if (isSignupRequired(data)) {
       return { kind: 'signup_required', signup: data };

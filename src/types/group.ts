@@ -126,6 +126,12 @@ export interface UpdateGroupInput {
   description?: string;
 }
 
+/** `POST /groups/invitations/join` (group-invite-existing-accounts AD-2). */
+export interface GroupInviteJoinResponse {
+  group_id: string;
+  outcome: 'joined' | 'already_member';
+}
+
 /**
  * Response from `POST /groups/invitations` (DES-MEETUP-ADDENDUM-shareable-links Decision 15).
  */

@@ -2,8 +2,8 @@
  * Group invitation landing for a signed-out person (deep-links AD-10). Shows the group name from
  * `GET /public/groups/invitations/{token}` (response: `group_name` only), then Sign up / Log in. The
  * join happens on the server at account creation, when the token is sent as `invitation_token`; a
- * person who already has an account is not joined by the link (OI-8) and lands on the Groups list
- * after sign-in. The token stays in memory (`links/linkStore`), never in route params or logs.
+ * person who already has an account is not joined by the link; after sign-in they see the confirm screen
+ * (GroupInviteJoinScreen, group-invite-existing-accounts AD-5). The token stays in memory (`links/linkStore`), never in route params or logs.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';

@@ -109,6 +109,7 @@ import {
 } from '../notifications/pushActions';
 
 import { createLinking } from '../links/linking';
+import { readInstallReferrerOnce } from '../attribution/installReferrer';
 import { consumeAuthLanding, subscribeToLinkStore, takePendingTarget } from '../links/linkStore';
 import { stateForPending } from '../links/resolveLink';
 import { claimAuthHandoff } from './showCompletion';
@@ -121,6 +122,7 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import GamePreviewScreen from '../screens/GamePreviewScreen';
 import GroupInviteScreen from '../screens/GroupInviteScreen';
+import GroupInviteJoinScreen from '../screens/GroupInviteJoinScreen';
 import GameLinkScreen from '../screens/GameLinkScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CreateGameScreen from '../screens/CreateGameScreen';
@@ -301,6 +303,11 @@ function GroupsStack(): React.JSX.Element {
   return (
     <GroupsStackNav.Navigator screenOptions={stackScreenOptions}>
       <GroupsStackNav.Screen name="GroupsList" component={GroupsScreen} options={{ title: t('mob.nav.title_groups') }} />
+      <GroupsStackNav.Screen
+        name="GroupInviteJoin"
+        component={GroupInviteJoinScreen}
+        options={{ title: t('mob.group_invite.title') }}
+      />
       <GroupsStackNav.Screen
         name="GroupDetail"
         component={GroupDetailScreen}
@@ -483,6 +490,13 @@ export default function RootNavigator(): React.JSX.Element {
   // -sign-ins. Set synchronously before the async call starts to avoid a
   // race between the `onReady` and `user`-change triggers below.
   const hasCheckedInitialNotification = useRef(false);
+
+  // Android install attribution (group-invite-existing-accounts AD-9): once, on a signed-out cold start.
+  useEffect(() => {
+    if (!isLoading && !user) {
+      readInstallReferrerOnce();
+    }
+  }, [isLoading, user]);
 
   // `isLoading` above already gates mount until auth state is resolved,
   // so by the time this reads `user` it is the settled value, not a
