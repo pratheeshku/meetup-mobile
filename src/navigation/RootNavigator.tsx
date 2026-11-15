@@ -121,6 +121,7 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import GamePreviewScreen from '../screens/GamePreviewScreen';
 import GroupInviteScreen from '../screens/GroupInviteScreen';
+import GroupInviteJoinScreen from '../screens/GroupInviteJoinScreen';
 import GameLinkScreen from '../screens/GameLinkScreen';
 import HomeScreen from '../screens/HomeScreen';
 import CreateGameScreen from '../screens/CreateGameScreen';
@@ -301,6 +302,11 @@ function GroupsStack(): React.JSX.Element {
   return (
     <GroupsStackNav.Navigator screenOptions={stackScreenOptions}>
       <GroupsStackNav.Screen name="GroupsList" component={GroupsScreen} options={{ title: t('mob.nav.title_groups') }} />
+      <GroupsStackNav.Screen
+        name="GroupInviteJoin"
+        component={GroupInviteJoinScreen}
+        options={{ title: t('mob.group_invite.title') }}
+      />
       <GroupsStackNav.Screen
         name="GroupDetail"
         component={GroupDetailScreen}
