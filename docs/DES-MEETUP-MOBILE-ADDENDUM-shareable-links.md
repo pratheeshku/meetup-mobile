@@ -1,7 +1,7 @@
 # DES-MEETUP-MOBILE-ADDENDUM-shareable-links
 
 **Doc ID:** DES-MEETUP-MOBILE-ADDENDUM-shareable-links
-**Version:** v1.1 — v1.0 (2026-09-27) APPROVED; v1.1 corrects Decision 2 with the exact canonical URL format after the original wording shipped a non-functional link (wrong path, missing hash-routing) — caught via live post-deploy testing, see `DES-MEETUP-ADDENDUM-shareable-links.md` Decision 21
+**Version:** v1.2 — v1.2 (2026-11-15) marks Decisions 2, 5 and 7 superseded (see CHANGELOG-DOCS.md); v1.0 (2026-09-27) APPROVED; v1.1 corrects Decision 2 with the exact canonical URL format after the original wording shipped a non-functional link (wrong path, missing hash-routing) — caught via live post-deploy testing, see `DES-MEETUP-ADDENDUM-shareable-links.md` Decision 21
 **Status:** APPROVED (2026-09-27)
 **Component:** Mobile (repo: `pratheeshku/meetup-mobile`)
 **Scale Tier:** T1
@@ -13,6 +13,8 @@
 **Plain-language summary:** The app itself barely changes. Organizers get a Share button on their events/groups that hands off to WhatsApp or the phone's normal share sheet, plus a copy-link button. Tapping a received link on a phone always opens the browser — the app does not intercept it, even if installed. That's a deliberate choice, not a gap.
 
 ---
+
+> **Superseded in part (v1.2, 2026-11-15).** Decisions 2, 5 and 7 describe the per-event link, a per-event Copy link and a "Shuttlr" message. DES-MEETUP-FEEDBACK-001 AD-6 and DES-MEETUP-ADDENDUM-deep-links-desktop-ui AD-11 replaced them: the share text is the admin-label invite message plus a blank line and the game or tournament link built from `GET /config/client` (`link_base_url`, `app_links_enabled`). Decision 1 (no native link interception) is replaced by the deep-links addendum. Read that addendum for current behaviour.
 
 ## 1. Executive Summary
 

@@ -4,6 +4,9 @@ One section per document. Version and amendment narrative belongs here; document
 ## DES-MEETUP-MOBILE.md and addenda
 Not yet migrated. Amendment narrative still sits in each document's header and review log and moves here in a separate architect edit.
 
+## DES-MEETUP-MOBILE-ADDENDUM-shareable-links.md
+- v1.2 (2026-11-15): architect note after the mobile test cleanup (PR 118): Decisions 2, 5 and 7 (per-event link, per-event Copy link, "Shuttlr" message) are superseded by DES-MEETUP-FEEDBACK-001 AD-6 and deep-links AD-11; Decision 1 (no native link interception) is replaced by the deep-links addendum. No requirement changed.
+
 ## Amendments by DES-MEETUP-ADDENDUM-decline-response (2026-10-20, owner approved)
 - closure-report v1.0 AD-4: decline is a locked game write, responses stay readable. dashboard v1.9 AD-20/21: declined items leave the default Games list and Public scope. invitation-response v1.0 AD-8 (new): decline is also recorded. Wording only on the approved versions; versions not bumped.
 
