@@ -1,7 +1,7 @@
 # DES-MEETUP-ADDENDUM-DEEP-LINKS-DESKTOP-UI
 
 **Doc ID:** DES-MEETUP-ADDENDUM-DEEP-LINKS-DESKTOP-UI
-**Version:** v1.0.3
+**Version:** v1.0.4
 **Status:** APPROVED on the owner's elicitation decisions of 2026-11-14 (standing instruction of 2026-10-28 for Meetup amendments). Architect decisions are listed in §10 for the owner's visibility; the owner may overturn any.
 **Owner:** Pratheesh
 **Date:** 2026-11-14
@@ -176,8 +176,8 @@ Old app versions keep working: they never receive `/l/` links as app links and t
 | OI-4 | Sport name "Picketball" is admin data, not code | Owner corrects it in the admin console |
 | OI-5 | About and Help point at `google.com` in admin data | Owner sets the real addresses, or clears them to hide the items, in the admin console |
 | OI-6 | Desktop pages not reviewed: wizard steps 4 to 6, tournament wizard, create group, edit profile, privacy and terms | Architect reviews after the shared frame lands; findings enter as v1.1 |
-| OI-7 | Device check that the fragment reaches the app on iOS and Android | Staging app build task, on the owner's phones (cloud agents have no devices). A failure is a Blocked Report against AD-2 and blocks the production switch |
-| OI-8 | A person who already has an account cannot join a group by tapping an invitation link (web and app, existing behaviour) | Owner decides whether to add it; it needs a new join rule and endpoint, so a separate addendum |
+| OI-7 | Device check that the fragment reaches the app on iOS and Android | **Closed 2026-11-14.** The owner's phone check with the staging builds passed |
+| OI-8 | A person who already has an account cannot join a group by tapping an invitation link (web and app) | **Closed 2026-11-15** by `DES-MEETUP-ADDENDUM-group-invite-existing-accounts` v1.0, which replaces the "existing account is not joined" sentences of DL-06 and AD-10 |
 | DF-1 | Deferred deep link through a store install | Revisit if more than 30% of `/l/` web opens over 30 days come from phone browsers |
 | DF-2 | Tournament public preview | Owner request only |
 
@@ -199,3 +199,4 @@ DL-01: AD-1, AD-2, AD-4, AD-6. DL-02: AD-2. DL-03: AD-7. DL-04: AD-8. DL-05: AD-
 | v1.0.1 | 2026-11-14 | OI-7 and its risk row: the device check moves from the first app coding task to the staging app build task, because coding agents run in the cloud without phones. No decision changed. |
 | v1.0.2 | 2026-11-14 | Write-back of the Task 3.1 Blocked Report (valid finding, HIGH: app contract not stated). AD-8 to AD-11 now name the fields, endpoints and behaviour verified in the code at `ed9187c`; `GET /config/client` gains two additive fields; app counters are diagnostic logs. Corrections of architect error: DL-06 said "signs in or signs up" (the server joins at account creation only; OI-8 added), and AD-11 named the wrong label placeholder. No owner decision changed. |
 | v1.0.3 | 2026-11-14 | Write-back of the Task 1.1 report. UI-05: the "Close game on an ended game" finding was an architect review error and is withdrawn (it contradicted the approved closure-report design). UI-12 and OI-5: About and Help are admin data, no code change. Section 6: the web counter endpoint `POST /public/link-opened`, added by the task, is accepted. The two `GET /config/client` fields were delivered in Task 1.1. No owner decision changed. |
+| v1.0.4 | 2026-11-15 | OI-7 closed (owner's phone check passed 2026-11-14). OI-8 closed by `DES-MEETUP-ADDENDUM-group-invite-existing-accounts` v1.0, which also allows one Android library for install attribution (its D-2) against DL-12 and §2. No other decision changed. |

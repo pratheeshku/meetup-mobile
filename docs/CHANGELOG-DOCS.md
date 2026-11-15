@@ -65,8 +65,12 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 ## DES-MEETUP-ADDENDUM-game-view-redesign.md
 - v1.0 (2026-10-21): first version, approved by the owner (boards of 2026-10-21). GV-1..GV-7, AD-1..AD-10, D-1 (supersedes user-details-menu v1.4 UM-06 two-step pop-up), D-2 (decline-response AD-5 display order: Declined above Pending), D-3 (dashboard AD-21 toggle placement), D-4 (tournament Registrations tab folded into Responses). Additive-only rule in §1/§4. Mobile task gv-mobile.
 
+## DES-MEETUP-ADDENDUM-group-invite-existing-accounts.md
+- v1.0 (2026-11-15, approved by the owner): new addendum. Closes deep-links OI-8. Supersedes in part deep-links DL-06 and AD-10 (existing accounts now join by link), and DL-12, DF-1 and the no-new-library constraint for Android install attribution only. Deviations D-1 (no board) and D-2 (Play Install Referrer library).
+
 ## DES-MEETUP-ADDENDUM-deep-links-desktop-ui.md
 - v1.0 (2026-11-14, approved on the owner's elicitation decisions): new addendum. Supersedes in part email-auth D1, shareable-links Decisions 15 and 21, and share-invite task 1.3 of 2026-11-07. Deviation D-1 (no boards).
 - v1.0.1 (2026-11-14): OI-7 device check moved to the staging app build task. No decision changed.
 - v1.0.2 (2026-11-14): write-back of the Task 3.1 Blocked Report. AD-8 to AD-11 name the verified fields and endpoints; GET /config/client gains link_base_url and app_links_enabled; DL-06 corrected (join at account creation only, OI-8 added). No owner decision changed.
 - v1.0.3 (2026-11-14): write-back of the Task 1.1 report. UI-05 close-action finding withdrawn (architect review error); UI-12 and OI-5 About/Help are admin data; POST /public/link-opened accepted. No owner decision changed.
+- v1.0.4 (2026-11-15): OI-7 closed (owner's phone check passed). OI-8 closed by the group-invite-existing-accounts addendum. No other decision changed.
