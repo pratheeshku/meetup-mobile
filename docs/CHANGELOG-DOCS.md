@@ -67,6 +67,7 @@ Not yet migrated. Amendment narrative still sits in each document's header and r
 
 ## DES-MEETUP-ADDENDUM-group-invite-existing-accounts.md
 - v1.0 (2026-11-15, approved by the owner): new addendum. Closes deep-links OI-8. Supersedes in part deep-links DL-06 and AD-10 (existing accounts now join by link), and DL-12, DF-1 and the no-new-library constraint for Android install attribution only. Deviations D-1 (no board) and D-2 (Play Install Referrer library).
+- v1.0.1 (2026-11-15): write-back of the Task 1.1 and 3.1 reports: error code, web token storage, attribution code shape, Play Store link on the signed-out web page (Android browsers only), social callback, migration ids and label keys. No owner decision changed.
 
 ## DES-MEETUP-ADDENDUM-deep-links-desktop-ui.md
 - v1.0 (2026-11-14, approved on the owner's elicitation decisions): new addendum. Supersedes in part email-auth D1, shareable-links Decisions 15 and 21, and share-invite task 1.3 of 2026-11-07. Deviation D-1 (no boards).
