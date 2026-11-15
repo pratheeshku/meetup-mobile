@@ -109,6 +109,7 @@ import {
 } from '../notifications/pushActions';
 
 import { createLinking } from '../links/linking';
+import { readInstallReferrerOnce } from '../attribution/installReferrer';
 import { consumeAuthLanding, subscribeToLinkStore, takePendingTarget } from '../links/linkStore';
 import { stateForPending } from '../links/resolveLink';
 import { claimAuthHandoff } from './showCompletion';
@@ -489,6 +490,13 @@ export default function RootNavigator(): React.JSX.Element {
   // -sign-ins. Set synchronously before the async call starts to avoid a
   // race between the `onReady` and `user`-change triggers below.
   const hasCheckedInitialNotification = useRef(false);
+
+  // Android install attribution (group-invite-existing-accounts AD-9): once, on a signed-out cold start.
+  useEffect(() => {
+    if (!isLoading && !user) {
+      readInstallReferrerOnce();
+    }
+  }, [isLoading, user]);
 
   // `isLoading` above already gates mount until auth state is resolved,
   // so by the time this reads `user` it is the settled value, not a

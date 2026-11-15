@@ -6,6 +6,7 @@
  * and are never stored, logged, or held anywhere beyond the call itself (R-111, P10).
  */
 import { apiClient } from '../api/client';
+import { clearAttributionCode, getAttributionFields } from '../attribution/installReferrer';
 import { saveTokens } from '../storage/tokens';
 import { getTermsVersion } from './terms';
 import { getInvitationFields, noteJoinedGroup } from '../links/linkStore';
@@ -48,6 +49,8 @@ export async function signup(params: SignupParams): Promise<void> {
   const termsVersion = params.terms_version ?? (await getTermsVersion());
   const { data } = await apiClient.post<{ joined_group_id?: string | null } | undefined>('/auth/signup', {
     ...getInvitationFields(),
+    // Android install attribution (AD-9): present only when the Play referrer supplied a code.
+    ...getAttributionFields(),
     email: params.email,
     password: params.password,
     display_name: params.display_name,
@@ -61,6 +64,7 @@ export async function signup(params: SignupParams): Promise<void> {
         }
       : {}),
   });
+  clearAttributionCode();
   noteJoinedGroup(data?.joined_group_id);
 }
 
