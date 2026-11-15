@@ -6,7 +6,8 @@
  *               GroupInvite; tournament -> Login with the target held (sign in first).
  *   signed in : reset -> ResetPassword (the device is signed out on success); game -> GameLink (opens
  *               the game, or the preview with the access notice); tournament -> TournamentDetail;
- *               group invitation -> Groups list (OI-8: the link joins nobody who has an account).
+ *               group invitation -> the confirm screen in the Groups tab (group-invite-existing-accounts AD-4,
+ *               AD-5: opening the link joins nobody; Join does).
  *   malformed or unknown: Home (Login when signed out), no error.
  *
  * Used both for a closed app (initial URL) and an open app (URL event) through the `linking` option
@@ -16,7 +17,7 @@ import type { NavigationState, PartialState } from '@react-navigation/native';
 
 import { countLinkOpened } from './linkCounters';
 import type { PendingTarget } from './linkStore';
-import { clearResetToken, setPendingTarget, setResetToken, takePendingTarget } from './linkStore';
+import { clearResetToken, setGroupJoinToken, setPendingTarget, setResetToken, takePendingTarget } from './linkStore';
 import type { ParsedLink } from './parseLink';
 
 export type LinkState = PartialState<NavigationState>;
@@ -32,7 +33,10 @@ export function homeState(signedIn: boolean): LinkState {
   return signedIn ? inTab('Home', { name: 'EventsList' }) : stack({ name: 'Login' });
 }
 
-/** Where a remembered target opens once the person is signed in (also used right after sign-in). */
+/**
+ * Where a remembered target opens once the person is signed in (also used right after sign-in). For a group
+ * invitation the token moves into the in-memory join slot the confirm screen reads (never route params).
+ */
 export function stateForPending(target: PendingTarget): LinkState {
   switch (target.kind) {
     case 'game':
@@ -46,7 +50,8 @@ export function stateForPending(target: PendingTarget): LinkState {
     case 'group':
       return inTab('Groups', { name: 'GroupsList' }, { name: 'GroupDetail', params: { groupId: target.groupId } });
     case 'group_invite':
-      return inTab('Groups', { name: 'GroupsList' });
+      setGroupJoinToken(target.token);
+      return inTab('Groups', { name: 'GroupsList' }, { name: 'GroupInviteJoin' });
   }
 }
 

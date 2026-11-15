@@ -1,7 +1,7 @@
 import { getActionFromState } from '@react-navigation/native';
 
 import { perfLog } from '../../diagnostics/perfLog';
-import { getInvitationFields, getResetToken, noteJoinedGroup, peekPendingTarget, _resetLinkStoreForTesting } from '../linkStore';
+import { getGroupJoinToken, getInvitationFields, getResetToken, noteJoinedGroup, peekPendingTarget, takePendingTarget, _resetLinkStoreForTesting } from '../linkStore';
 import { parseLinkPath } from '../parseLink';
 import { homeState, resolveLink, stateForPending } from '../resolveLink';
 import type { LinkState } from '../resolveLink';
@@ -101,10 +101,29 @@ describe('resolveLink: group invitation', () => {
     expect(JSON.stringify(state)).not.toContain(ID);
   });
 
-  it('signed in: the Groups list (no join call for an existing account, OI-8)', () => {
+  it('signed in: the confirm screen in the Groups tab; the token waits in memory, not in the state', () => {
     const state = resolve(path, true);
-    expect(focusedPath(state)).toEqual(['Tabs', 'Groups', 'GroupsList']);
+    expect(focusedPath(state)).toEqual(['Tabs', 'Groups', 'GroupInviteJoin']);
+    expect(getGroupJoinToken()).toBe(ID);
     expect(peekPendingTarget()).toBeNull();
+    expect(JSON.stringify(state)).not.toContain(ID);
+  });
+
+  it('after sign-in: a remembered group_invite opens the confirm screen; sign-up with the token is unchanged', () => {
+    resolve(path, false);
+    expect(getInvitationFields()).toEqual({ invitation_token: ID });
+    // What RootNavigator.resumePendingLink does once the person is signed in.
+    const target = takePendingTarget();
+    expect(target).toEqual({ kind: 'group_invite', token: ID });
+    expect(focusedPath(stateForPending(target!))).toEqual(['Tabs', 'Groups', 'GroupInviteJoin']);
+    expect(getGroupJoinToken()).toBe(ID);
+  });
+
+  it('after sign-up that joined the group: the group opens, not the confirm screen', () => {
+    resolve(path, false);
+    noteJoinedGroup(OTHER);
+    expect(focusedPath(stateForPending(takePendingTarget()!))).toEqual(['Tabs', 'Groups', 'GroupDetail']);
+    expect(getGroupJoinToken()).toBeNull();
   });
 });
 
@@ -154,7 +173,7 @@ describe('remembered targets after sign-in', () => {
       'TournamentDetail',
     ]);
     expect(focusedPath(stateForPending({ kind: 'group', groupId: ID }))).toEqual(['Tabs', 'Groups', 'GroupDetail']);
-    expect(focusedPath(stateForPending({ kind: 'group_invite', token: ID }))).toEqual(['Tabs', 'Groups', 'GroupsList']);
+    expect(focusedPath(stateForPending({ kind: 'group_invite', token: ID }))).toEqual(['Tabs', 'Groups', 'GroupInviteJoin']);
     expect(focusedPath(homeState(true))).toEqual(['Tabs', 'Home', 'EventsList']);
   });
 

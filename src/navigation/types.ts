@@ -62,6 +62,8 @@ export type GroupsStackParamList = {
   /** `section: 'teams'`: opens with the Tournament teams list selected (teams-payments AD-4, AD-15). */
   GroupsList: { refreshKey?: number; section?: 'groups' | 'teams' } | undefined;
   GroupDetail: { groupId: string };
+  /** Signed-in confirm for a group invitation link. The token is held in memory (`links/linkStore`), never in params. */
+  GroupInviteJoin: undefined;
   EditGroup: { groupId: string };
   /** `kind: 'team'` opens the form on Tournament team (the register flow's "Create a tournament team first" and the Tournament teams list). */
   CreateGroup: { kind?: 'group' | 'team' } | undefined;
