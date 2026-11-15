@@ -48,8 +48,9 @@ target.build_configurations.each do |config|
 end
 proj.save
 
-# Info.plist carries CFBundleDisplayName; make it follow the build setting, as the
-# TestFlight workflow's APP_DISPLAY_NAME override already expects.
+# Info.plist carries CFBundleDisplayName. If it is not already the $(APP_DISPLAY_NAME)
+# build-setting reference, write the staging display name into it as a literal (the checked-in
+# plist holds the literal production name).
 info_plist = File.join(IosProject::REPO_ROOT, IosProject.setting(target, 'INFOPLIST_FILE').then { |f| File.join('ios', f) })
 info = Xcodeproj::Plist.read_from_path(info_plist)
 if info['CFBundleDisplayName'] != '$(APP_DISPLAY_NAME)'
