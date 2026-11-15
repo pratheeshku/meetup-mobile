@@ -37,15 +37,20 @@ export default function GroupInviteJoinScreen({ navigation }: Props): React.JSX.
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The confirm screen is always opened on top of the Groups list: go back to that one, never push a second list.
   const toGroupsList = useCallback((): void => {
     clearGroupJoinToken();
-    navigation.replace('GroupsList');
+    navigation.popToTop();
   }, [navigation]);
+
+  // AD-5: the token does not outlive this screen, whatever way it is left (header back, hardware back, outcomes).
+  // A network or server error keeps the screen mounted, so the token stays for a retry.
+  useEffect(() => clearGroupJoinToken, []);
 
   useEffect(() => {
     if (!token) {
       // Nothing to confirm (the token was already used or dropped): the Groups list.
-      navigation.replace('GroupsList');
+      navigation.popToTop();
       return;
     }
     let active = true;

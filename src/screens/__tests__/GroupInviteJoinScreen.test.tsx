@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { Alert } from 'react-native';
+import ReactTestRenderer from 'react-test-renderer';
 
 import { joinGroupByInvitation } from '../../api/groups';
 import { getPublicGroupInvitation } from '../../api/publicLinks';
@@ -17,7 +18,7 @@ jest.mock('../../api/publicLinks', () => ({ getPublicGroupInvitation: jest.fn() 
 
 const TOKEN = '3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b';
 const GROUP = '11111111-2222-4333-8444-555555555555';
-const nav = { navigate: jest.fn(), replace: jest.fn() };
+const nav = { navigate: jest.fn(), replace: jest.fn(), popToTop: jest.fn() };
 const props = { navigation: nav } as unknown as React.ComponentProps<typeof GroupInviteJoinScreen>;
 const join = joinGroupByInvitation as jest.Mock;
 
@@ -57,7 +58,9 @@ describe('GroupInviteJoinScreen', () => {
     const root = await open();
     await act(async () => pressableWithText(root, 'Join').props.onPress());
     expect(join).toHaveBeenCalledWith(TOKEN, { correlationId: expect.any(String) });
+    expect(nav.replace).toHaveBeenCalledTimes(1);
     expect(nav.replace).toHaveBeenCalledWith('GroupDetail', { groupId: GROUP });
+    expect(nav.popToTop).not.toHaveBeenCalled();
     expect(getGroupJoinToken()).toBeNull();
   });
 
@@ -66,7 +69,8 @@ describe('GroupInviteJoinScreen', () => {
     const root = await open();
     await act(async () => pressableWithText(root, 'Join').props.onPress());
     expect(Alert.alert).toHaveBeenCalledWith('Group invitation', 'This invitation is not valid any more.');
-    expect(nav.replace).toHaveBeenCalledWith('GroupsList');
+    expect(nav.popToTop).toHaveBeenCalledTimes(1);
+    expect(nav.replace).not.toHaveBeenCalled();
     expect(getGroupJoinToken()).toBeNull();
   });
 
@@ -76,6 +80,7 @@ describe('GroupInviteJoinScreen', () => {
     await act(async () => pressableWithText(root, 'Join').props.onPress());
     expect(texts(root)).toContain('Unable to connect to server.');
     expect(nav.replace).not.toHaveBeenCalled();
+    expect(nav.popToTop).not.toHaveBeenCalled();
     expect(getGroupJoinToken()).toBe(TOKEN);
 
     await act(async () => pressableWithText(root, 'Join').props.onPress());
@@ -88,13 +93,27 @@ describe('GroupInviteJoinScreen', () => {
     const root = await open();
     await act(async () => pressableWithText(root, 'Not now').props.onPress());
     expect(join).not.toHaveBeenCalled();
-    expect(nav.replace).toHaveBeenCalledWith('GroupsList');
+    expect(nav.popToTop).toHaveBeenCalledTimes(1);
+    expect(nav.replace).not.toHaveBeenCalled();
+    expect(getGroupJoinToken()).toBeNull();
+  });
+
+  it('leaving by any other route (header or hardware back) clears the token on unmount', async () => {
+    setGroupJoinToken(TOKEN);
+    (getPublicGroupInvitation as jest.Mock).mockResolvedValue({ group_name: 'Sunday Smashers' });
+    let renderer!: ReactTestRenderer.ReactTestRenderer;
+    await act(async () => {
+      renderer = ReactTestRenderer.create(<GroupInviteJoinScreen {...props} />);
+    });
+    expect(getGroupJoinToken()).toBe(TOKEN);
+    await act(async () => renderer.unmount());
     expect(getGroupJoinToken()).toBeNull();
   });
 
   it('with no token in memory it goes to the Groups list', async () => {
     await renderAsync(<GroupInviteJoinScreen {...props} />);
-    expect(nav.replace).toHaveBeenCalledWith('GroupsList');
+    expect(nav.popToTop).toHaveBeenCalledTimes(1);
+    expect(nav.replace).not.toHaveBeenCalled();
     expect(getPublicGroupInvitation).not.toHaveBeenCalled();
   });
 });
