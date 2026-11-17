@@ -30,7 +30,7 @@
  *    - Drawer with Home, Groups, Tournament teams, Games, Tournaments, About links.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { useScrollToTop } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
@@ -118,7 +118,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     status: 'idle' | 'loading' | 'success' | 'error';
   }>({ items: null, status: 'loading' });
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   useScrollToTop(scrollRef);
   const unreadCount = useUnreadBadgeCount();
 

@@ -116,7 +116,7 @@ describe('Home: Create a game card removed, Book a court added', () => {
   });
 
   it('Book opens the provider link in the system browser and sends nothing about the user', async () => {
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     const root = await mount();
     const button = root.findAll(n => n.props.testID === 'court-book-p1' && typeof n.props.onPress === 'function')[0];
     expect(button.props.accessibilityLabel).toBe('Book a court with CourtHub');

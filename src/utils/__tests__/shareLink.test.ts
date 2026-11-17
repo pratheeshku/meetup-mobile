@@ -38,7 +38,7 @@ describe('shareLink utilities', () => {
 
   describe('shareGeneric', () => {
     it('calls Share.share with message only', async () => {
-      const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
+      const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction', activityType: undefined });
       await shareGeneric({
         message: 'Join us!',
       });

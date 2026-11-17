@@ -64,7 +64,7 @@ describe('Share: invite message plus the tournament link, and no tournament rout
     await act(async () => pressableLabelled(root, 'Copy Link').props.onPress());
     expect(setString).toHaveBeenCalledWith(getShareUrl());
 
-    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction', activityType: undefined });
     await act(async () => pressableLabelled(root, 'Share app link').props.onPress());
     await act(async () => {
       await pressableLabelled(root, 'Share via other apps').props.onPress();
@@ -88,7 +88,7 @@ describe('Share: invite message plus the tournament link, and no tournament rout
     mockGet.mockImplementation((url: string) =>
       Promise.resolve({ data: url === '/config/client' ? { ...CLIENT_CONFIG, app_links_enabled: false } : [] }),
     );
-    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction', activityType: undefined });
     await act(async () => pressableLabelled(root, 'Share app link').props.onPress());
     await act(async () => {
       await pressableLabelled(root, 'Share via other apps').props.onPress();

@@ -4,7 +4,7 @@
  * row sits in a fixed-size box so the glyph never shifts the text.
  */
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type TextInstance } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { useAccessibilityFocus } from '../../../hooks/useAccessibilityFocus';
@@ -49,7 +49,7 @@ export function tokenFor(focus: StepFocus | undefined, field: string): number {
 export function StepHeading({ children, focusToken }: { children: string; focusToken?: number }): React.JSX.Element {
   const focus = useAccessibilityFocus(focusToken);
   return (
-    <Text ref={focus.ref as React.RefObject<Text | null>} style={styles.heading} accessibilityRole="header">
+    <Text ref={focus.ref as React.RefObject<TextInstance | null>} style={styles.heading} accessibilityRole="header">
       {children}
     </Text>
   );
@@ -71,7 +71,7 @@ export function FieldError({
 }): React.JSX.Element | null {
   const focus = useAccessibilityFocus(message ? focusToken : 0);
   return message ? (
-    <Text ref={focus.ref as React.RefObject<Text | null>} style={styles.fieldError} accessibilityRole="alert" testID={testID}>
+    <Text ref={focus.ref as React.RefObject<TextInstance | null>} style={styles.fieldError} accessibilityRole="alert" testID={testID}>
       {message}
     </Text>
   ) : null;

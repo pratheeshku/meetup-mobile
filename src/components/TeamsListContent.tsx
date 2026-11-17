@@ -88,7 +88,7 @@ export default function TeamsListContent({ onCreateTeam, onOpenTeam, reloadKey, 
         />
       }
       ListHeaderComponent={
-        pending && pending.pending_count > 0 ? <TeamsPendingSection pending={pending} onChanged={refreshAfterAction} /> : null
+        pending && pending.pending_count > 0 ? <TeamsPendingSection pending={pending} onChanged={refreshAfterAction} /> : undefined
       }
       ListEmptyComponent={
         <EmptyState

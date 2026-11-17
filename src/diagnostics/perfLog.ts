@@ -388,7 +388,7 @@ export function startAppStateLogging(): void {
   if (_appStateSubscription) {
     return;
   }
-  let _previous: AppStateStatus = AppState.currentState;
+  let _previous: string | null | undefined = AppState.currentState;
   _appStateSubscription = AppState.addEventListener('change', (next: AppStateStatus) => {
     if (!effectiveOn) {
       return;

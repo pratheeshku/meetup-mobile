@@ -1,11 +1,5 @@
 import React, { useRef, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
@@ -46,7 +40,7 @@ export default function AccountDeletionCodeScreen({ navigation }: Props): React.
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   const handleResendCode = async (): Promise<void> => {
     setErrorMessage(null);

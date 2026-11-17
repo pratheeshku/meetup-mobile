@@ -10,7 +10,7 @@
  * text/placeholder colours here means no screen can forget them.
  */
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
-import { StyleSheet, TextInput } from 'react-native';
+import { StyleSheet, TextInput, type TextInputInstance } from 'react-native';
 import type { TextInputProps } from 'react-native';
 
 import { useKeyboardAwareScroll } from './KeyboardAwareScreen';
@@ -28,15 +28,15 @@ type ContentSizeHandler = NonNullable<TextInputProps['onContentSizeChange']>;
  * keyboard, and a focused multiline field keeps doing so as it grows. The
  * forwarded ref is the underlying `TextInput` (for focus chains).
  */
-const TextField = forwardRef<TextInput, TextInputProps>(function TextFieldInner(
+const TextField = forwardRef<TextInputInstance, TextInputProps>(function TextFieldInner(
   { style, onFocus, onBlur, onContentSizeChange, ...rest },
   forwardedRef,
 ): React.JSX.Element {
   const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const keyboardAware = useKeyboardAwareScroll();
 
-  useImperativeHandle(forwardedRef, () => inputRef.current as TextInput);
+  useImperativeHandle(forwardedRef, () => inputRef.current as TextInputInstance);
 
   const handleFocus: FocusHandler = event => {
     setIsFocused(true);

@@ -943,7 +943,7 @@ describe('share flow (organizer): invite message, then the game link', () => {
   });
 
   it('system share: the invite message, a blank line, then the /l/ game link with ?ref= (message only, no url key)', async () => {
-    const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
+    const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction', activityType: undefined });
     const root = await mount(rawEvent({ organizer_id: 'user-me' }), CONFIG);
 
     await pressLabelled(root, 'Share app link');
@@ -955,7 +955,7 @@ describe('share flow (organizer): invite message, then the game link', () => {
   });
 
   it('with the link switch off the game link is the hash form', async () => {
-    const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
+    const spy = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction', activityType: undefined });
     const root = await mount(rawEvent({ organizer_id: 'user-me' }), { ...CONFIG, app_links_enabled: false });
 
     await pressLabelled(root, 'Share app link');

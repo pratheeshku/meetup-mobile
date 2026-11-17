@@ -13,19 +13,7 @@
  * - Dot indicators below.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  Dimensions,
-  Image,
-  Linking,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { AccessibilityInfo, Dimensions, Image, Linking, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 
 import type { BannerFallback, BannerItem } from '../../api/home';
 import { useT } from '../../labels/LabelsContext';
@@ -57,7 +45,7 @@ export default function BannerCarousel({
     Dimensions.get('window').width - spacing.md * 2,
   );
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const jumpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentIndexRef = useRef(1);
   currentIndexRef.current = currentIndex;
