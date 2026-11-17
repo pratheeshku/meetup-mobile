@@ -30,13 +30,12 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type TextInputInstance, type ViewInstance, type ScrollViewInstance } from 'react-native';
 import type {
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
   StyleProp,
-  TextInput,
   ViewStyle,
 } from 'react-native';
 
@@ -74,9 +73,9 @@ export function computeScrollDelta({
 
 interface KeyboardAwareScroll {
   /** Scroll `input` into view; remembered while focused, so it is redone as the viewport/field resizes. */
-  scrollIntoView: (input: TextInput | null) => void;
+  scrollIntoView: (input: TextInputInstance | null) => void;
   /** Stop following `input` (it lost focus). */
-  clearFocus: (input: TextInput | null) => void;
+  clearFocus: (input: TextInputInstance | null) => void;
 }
 
 const KeyboardAwareScrollContext = createContext<KeyboardAwareScroll | null>(null);
@@ -102,11 +101,11 @@ export default function KeyboardAwareScreen({
   scrollToTopKey,
 }: Props): React.JSX.Element {
   const isIos = Platform.OS === 'ios';
-  const containerRef = useRef<View>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const containerRef = useRef<ViewInstance>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const scrollY = useRef(0);
   const viewportHeight = useRef(0);
-  const focused = useRef<TextInput | null>(null);
+  const focused = useRef<TextInputInstance | null>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const { overlap, remeasure } = useKeyboardOverlap(containerRef, !isIos);
 
@@ -126,7 +125,7 @@ export default function KeyboardAwareScreen({
     }
   }, [scrollToTopKey]);
 
-  const ensureVisible = useCallback((input: TextInput) => {
+  const ensureVisible = useCallback((input: TextInputInstance) => {
     const container = containerRef.current;
     if (!container || viewportHeight.current <= 0) {
       return;

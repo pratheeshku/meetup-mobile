@@ -143,7 +143,7 @@ export default function TeamsDiscoverContent({ onOpenTeam, reloadKey }: Props): 
               </View>
             ) : null}
           </View>
-        ) : null
+        ) : undefined
       }
       ListEmptyComponent={<EmptyState title={t('mob.teams.discover_empty')} />}
       renderItem={({ item }) => <UnifiedTeamCard team={item} onPress={() => onOpenTeam(item.id)} />}

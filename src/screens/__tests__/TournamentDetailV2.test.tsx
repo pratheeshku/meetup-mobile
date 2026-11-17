@@ -375,7 +375,7 @@ describe('Overview per status', () => {
 
 describe('Book a court closes the Overview (AD-T2)', () => {
   it('shows the providers and opens the link in the system browser', async () => {
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     const root = await mount();
     expect(byId(root, 'overview-court-booking')).toHaveLength(1);
     await press(root, 'court-book-p1');

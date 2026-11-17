@@ -10,7 +10,6 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import type { AppStateStatus } from 'react-native';
 
 import { fetchVersionPolicy } from '../api/versionPolicy';
 import { reportUpdatePolicy } from '../links/linkGate';
@@ -56,7 +55,7 @@ export function useForceUpdate(): ForceUpdateState {
     };
 
     // Launch. The listener is registered synchronously, before the first await.
-    let previous: AppStateStatus = AppState.currentState ?? 'active';
+    let previous: string = AppState.currentState ?? 'active';
     const subscription = AppState.addEventListener('change', next => {
       const returnedToForeground = next === 'active' && previous !== 'active';
       previous = next;

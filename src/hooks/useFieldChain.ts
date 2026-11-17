@@ -13,22 +13,22 @@
  * invalid field on submit.
  */
 import { useCallback, useMemo, useRef } from 'react';
-import { Keyboard } from 'react-native';
-import type { TextInput, TextInputProps } from 'react-native';
+import { Keyboard, type TextInputInstance } from 'react-native';
+import type { TextInputProps } from 'react-native';
 
 type ChainProps = Pick<TextInputProps, 'returnKeyType' | 'blurOnSubmit' | 'onSubmitEditing'> & {
-  ref: (node: TextInput | null) => void;
+  ref: (node: TextInputInstance | null) => void;
 };
 
 export interface FieldChain {
-  ref: (name: string) => (node: TextInput | null) => void;
+  ref: (name: string) => (node: TextInputInstance | null) => void;
   props: (name: string) => ChainProps;
   focus: (name: string) => void;
 }
 
 export function useFieldChain(order: readonly string[]): FieldChain {
-  const nodes = useRef<Record<string, TextInput | null>>({});
-  const refSetters = useRef<Record<string, (node: TextInput | null) => void>>({});
+  const nodes = useRef<Record<string, TextInputInstance | null>>({});
+  const refSetters = useRef<Record<string, (node: TextInputInstance | null) => void>>({});
   const orderKey = order.join('\u0000');
 
   const ref = useCallback((name: string) => {

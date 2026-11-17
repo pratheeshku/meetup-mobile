@@ -5,7 +5,7 @@
  * not use this: it is focused with `ref.focus()` so the keyboard opens.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, findNodeHandle, type TextInput, type View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, type ViewInstance, type TextInputInstance } from 'react-native';
 
 import { borderWidth, colors } from '../theme/tokens';
 
@@ -13,11 +13,11 @@ import { borderWidth, colors } from '../theme/tokens';
 export const focusRingStyle = { borderColor: colors.primary, borderWidth: borderWidth.thick } as const;
 
 export function useAccessibilityFocus(token: number | undefined): {
-  ref: React.RefObject<View | null>;
+  ref: React.RefObject<ViewInstance | null>;
   ringed: boolean;
   clear: () => void;
 } {
-  const ref = useRef<View | null>(null);
+  const ref = useRef<ViewInstance | null>(null);
   const [ringed, setRinged] = useState(false);
   useEffect(() => {
     if (!token) {
@@ -39,8 +39,8 @@ export function useAccessibilityFocus(token: number | undefined): {
 }
 
 /** Focus of a text field on a wizard step change (te-a4): a new non-zero `token` calls `focus()` so the keyboard opens. */
-export function useTextFocus(token: number | undefined): React.RefObject<TextInput | null> {
-  const ref = useRef<TextInput | null>(null);
+export function useTextFocus(token: number | undefined): React.RefObject<TextInputInstance | null> {
+  const ref = useRef<TextInputInstance | null>(null);
   useEffect(() => {
     if (token) {
       ref.current?.focus();

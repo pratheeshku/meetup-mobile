@@ -10,7 +10,7 @@
  * verified empirically rather than assumed.
  */
 import React from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, type ViewStyle } from 'react-native';
 import { createNavigationContainerRef, NavigationContainer } from '@react-navigation/native';
 import type { ParamListBase } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -58,7 +58,7 @@ describe('CreateTabButton', () => {
   it('is a 56dp primary circle raised above the bar', () => {
     const pressable = pressableLabelled(renderButton().root, 'Create');
     const style = StyleSheet.flatten(
-      (pressable.props.style as (s: { pressed: boolean }) => unknown)({ pressed: false }),
+      (pressable.props.style as (s: { pressed: boolean }) => ViewStyle)({ pressed: false }),
     ) as Record<string, unknown>;
     expect(style).toMatchObject({
       width: FAB_SIZE,

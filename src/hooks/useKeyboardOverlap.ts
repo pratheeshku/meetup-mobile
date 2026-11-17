@@ -15,12 +15,11 @@
  * can arrive before the window has been resized.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard } from 'react-native';
+import { Keyboard, type ViewInstance } from 'react-native';
 import type { RefObject } from 'react';
-import type { View } from 'react-native';
 
 export function useKeyboardOverlap(
-  containerRef: RefObject<View | null>,
+  containerRef: RefObject<ViewInstance | null>,
   enabled: boolean,
 ): { overlap: number; remeasure: () => void } {
   const keyboardTop = useRef<number | null>(null);
