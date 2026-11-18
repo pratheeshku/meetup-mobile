@@ -14,8 +14,8 @@ import SettingsScreen from '../SettingsScreen';
 
 type Props = React.ComponentProps<typeof SettingsScreen>;
 
-// The approved design names this row "Report a problem or content" (IOS-App §7). SettingsScreen renders
-// 'mob.settings.report_problem' = "Report a problem": a product label gap, so the row tests that find it fail on purpose.
+// The approved design names this row "Report a problem or content" (IOS-App §7); SettingsScreen renders it from
+// 'mob.settings.report_problem'.
 const ROW = 'Report a problem or content';
 const mockConfig = appConfig as { reportFormUrl: string };
 
