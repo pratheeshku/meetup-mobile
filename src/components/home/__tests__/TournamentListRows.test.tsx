@@ -8,6 +8,7 @@ import React from 'react';
 import { apiClient } from '../../../api/client';
 import { act, render, texts } from '../../../test-utils/render';
 import type { Instance } from '../../../test-utils/render';
+import { primeSportsCatalogForTests } from '../../../sports/catalog';
 import type { Tournament } from '../../../types/tournament';
 import { UnifiedTournamentCard } from '../UnifiedCard';
 
@@ -56,6 +57,10 @@ const pressById = async (root: Instance, id: string): Promise<void> => {
 
 beforeEach(() => {
   (apiClient.get as jest.Mock).mockReset();
+  // The card resolves its sport name from the shared catalog; prime it so no sports request is made by the row.
+  primeSportsCatalogForTests([
+    { name: 'badminton', display_name: 'Badminton', slug: 'badminton', icon_key: 'badminton', color: null },
+  ]);
 });
 
 describe('Venue line', () => {

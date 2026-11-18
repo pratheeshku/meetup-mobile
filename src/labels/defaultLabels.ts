@@ -573,7 +573,7 @@ export const DEFAULT_LABELS = {
   'mob.settings.email_notifications': 'Email notifications',
   'mob.settings.section_help': 'HELP',
   'mob.settings.contact_support': 'Contact support',
-  'mob.settings.report_problem': 'Report a problem',
+  'mob.settings.report_problem': 'Report a problem or content',
   'mob.settings.section_about': 'ABOUT',
   'mob.settings.privacy_policy': 'Privacy policy',
   'mob.settings.terms_conditions': 'Terms and conditions',

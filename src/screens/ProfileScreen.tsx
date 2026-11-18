@@ -16,7 +16,6 @@ import {
   Alert,
   Image,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -46,6 +45,7 @@ import {
   PinIcon,
 } from '../components/icons/SharedIcons';
 import ErrorView from '../components/ErrorView';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import LoadingView from '../components/LoadingView';
 import ScreenContainer from '../components/ScreenContainer';
 import { useSportDisplayName } from '../utils/labels';
@@ -306,11 +306,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
 
   return (
     <ScreenContainer edges="top" style={styles.screen}>
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
+    <KeyboardAwareScreen contentContainerStyle={styles.scrollContent}>
       {/* Cover banner */}
       <View style={styles.bannerContainer}>
         {coverUrl ? (
@@ -561,7 +557,7 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           )}
         </Pressable>
       </View>
-    </ScrollView>
+    </KeyboardAwareScreen>
     </ScreenContainer>
   );
 }

@@ -717,7 +717,11 @@ describe('Results and Close tournament (TV2MobDoneResults, TV2MobClose)', () => 
 
 describe('Media upload rights and read-only (tournament-registration AD-6)', () => {
   const mediaItems = { items: [{ id: 'm1', kind: 'photo', url: 'https://cdn.example/1.jpg', created_at: 'x', uploaded_by: 'Ravi K.', can_remove: false }], total: 1 };
-  const uploadButtons = (root: Instance) => root.findAll(n => n.props.testID === 'media-upload' && typeof n.props.onPress === 'function');
+  // Button forwards testID and onPress to the Pressable it renders: count each control once (outermost match only).
+  const uploadButtons = (root: Instance) => {
+    const matches = root.findAll(n => n.props.testID === 'media-upload' && typeof n.props.onPress === 'function');
+    return matches.filter(n => !matches.includes(n.parent as Instance));
+  };
 
   it('a registered participant sees the photos but no upload control', async () => {
     reset({ media: mediaItems });

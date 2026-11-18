@@ -1,6 +1,11 @@
 /**
  * Profile: `display_name` is the editable name used to address the user;
  * `nickname` is unique, read-only, and must never be editable or PATCHed.
+ *
+ * Editing lives on the screens the Profile screen links to: display name and
+ * photo on `EditProfileScreen`, skill levels (add, change, delete) on
+ * `EditSkillLevelsScreen`. Those flows are exercised here by rendering the
+ * screen that now owns them.
  */
 import React from 'react';
 import { Alert } from 'react-native';
@@ -9,6 +14,7 @@ import {
   deleteAvatar,
   deleteSkillLevel,
   getProfile,
+  getSkillLevels,
   updateProfile,
   updateSkillLevel,
   uploadAvatar,
@@ -19,9 +25,13 @@ import { act, pressableLabelled, pressableWithText, renderAsync, texts } from '.
 import type { Instance } from '../../test-utils/render';
 import { __resetSportDisplayNamesCacheForTests } from '../../utils/labels';
 import type { UserProfile } from '../../types/user';
+import EditProfileScreen from '../EditProfileScreen';
+import EditSkillLevelsScreen from '../EditSkillLevelsScreen';
 import ProfileScreen from '../ProfileScreen';
 
 type Props = React.ComponentProps<typeof ProfileScreen>;
+type EditProps = React.ComponentProps<typeof EditProfileScreen>;
+type SkillProps = React.ComponentProps<typeof EditSkillLevelsScreen>;
 
 const mockUpdateUser = jest.fn();
 // Mobile number card (profile-onboarding addendum): its own endpoints are covered in
@@ -35,8 +45,15 @@ jest.mock('../../api/mobileNumber', () => ({
 jest.mock('../../auth/AuthContext', () => ({
   useAuth: () => ({ signOut: jest.fn(), updateUser: mockUpdateUser }),
 }));
+const mockShowCompletion = jest.fn();
+jest.mock('../../navigation/showCompletion', () => ({
+  showCompletion: (...args: unknown[]) => mockShowCompletion(...args),
+}));
 jest.mock('../../api/profile', () => ({
   getProfile: jest.fn(),
+  getSkillLevels: jest.fn(),
+  uploadCover: jest.fn(),
+  deleteCover: jest.fn(),
   getProfileSummary: jest.fn().mockResolvedValue({ games_played: 0, games_hosted: 0, groups_count: 0, recent_games: [] }),
   updateProfile: jest.fn(),
   updateSkillLevel: jest.fn(),
@@ -58,6 +75,7 @@ const mockGetProfile = getProfile as jest.MockedFunction<typeof getProfile>;
 const mockUpdateProfile = updateProfile as jest.MockedFunction<typeof updateProfile>;
 const mockUpdateSkillLevel = updateSkillLevel as jest.MockedFunction<typeof updateSkillLevel>;
 const mockDeleteSkillLevel = deleteSkillLevel as jest.MockedFunction<typeof deleteSkillLevel>;
+const mockGetSkillLevels = getSkillLevels as jest.MockedFunction<typeof getSkillLevels>;
 const mockGetSports = getSports as jest.MockedFunction<typeof getSports>;
 const mockUploadAvatar = uploadAvatar as jest.MockedFunction<typeof uploadAvatar>;
 const mockDeleteAvatar = deleteAvatar as jest.MockedFunction<typeof deleteAvatar>;
@@ -95,8 +113,25 @@ const SPORTS = [
 const mount = (): Promise<Instance> =>
   renderAsync(<ProfileScreen {...({ navigation: { navigate: jest.fn() }, route: {} } as unknown as Props)} />);
 
+const mountEditProfile = (): Promise<Instance> =>
+  renderAsync(
+    <EditProfileScreen
+      {...({ navigation: { navigate: jest.fn(), goBack: mockGoBack }, route: {} } as unknown as EditProps)}
+    />,
+  );
+
+const mountEditSkills = (): Promise<Instance> =>
+  renderAsync(
+    <EditSkillLevelsScreen
+      {...({ navigation: { navigate: jest.fn(), goBack: mockGoBack }, route: {} } as unknown as SkillProps)}
+    />,
+  );
+
+const mockGoBack = jest.fn();
+
+/** The Edit profile form has a single text field, the display name. */
 const displayNameInput = (root: Instance): Instance =>
-  root.find(node => (node.type as unknown) === 'TextInput' && node.props.accessibilityLabel === 'Display name');
+  root.find(node => (node.type as unknown) === 'TextInput' && node.props.placeholder === 'Display name');
 
 /** A control found by role + accessibility label (tiles are checkboxes, level segments are radios). */
 const control = (root: Instance, role: string, label: string): Instance => {
@@ -114,9 +149,6 @@ const control = (root: Instance, role: string, label: string): Instance => {
 const tap = (root: Instance, role: string, label: string): void => {
   act(() => control(root, role, label).props.onPress());
 };
-const openRow = (root: Instance, label: string): void => {
-  act(() => pressableLabelled(root, label).props.onPress());
-};
 
 beforeEach(() => {
   mockUpdateUser.mockReset();
@@ -125,6 +157,9 @@ beforeEach(() => {
   mockUpdateSkillLevel.mockReset().mockResolvedValue(undefined);
   mockDeleteSkillLevel.mockReset().mockResolvedValue(undefined);
   mockGetSports.mockReset().mockResolvedValue(SPORTS);
+  mockGetSkillLevels.mockReset().mockResolvedValue([]);
+  mockShowCompletion.mockReset();
+  mockGoBack.mockReset();
   mockUploadAvatar.mockReset().mockResolvedValue(undefined);
   mockDeleteAvatar.mockReset().mockResolvedValue(undefined);
   const cancelledError: any = new Error('User cancelled image selection');
@@ -141,11 +176,11 @@ describe('ProfileScreen names', () => {
     expect(texts(root)).toContain('Sam Smith');
   });
 
-  it('shows nickname as a labelled, read-only line — not the title', async () => {
+  it('shows the nickname as a read-only @ line, not the title', async () => {
     const root = await mount();
     const t = texts(root);
-    expect(t).toContain('Nickname: sam99 ');
-    expect(t).toContain("(can't be changed)");
+    // The nickname is a separate '@' line under the title (no longer a "Nickname: ... (can't be changed)" caption).
+    expect(t).toContain('@sam99');
     expect(t).not.toContain('sam99');
   });
 
@@ -155,41 +190,60 @@ describe('ProfileScreen names', () => {
   });
 });
 
-describe('ProfileScreen display name editing', () => {
-  async function startEdit(): Promise<Instance> {
+describe('ProfileScreen links to the editing screens', () => {
+  it('offers Edit profile and Settings, and has no inline editing controls', async () => {
     const root = await mount();
-    await act(async () => pressableWithText(root, 'Edit').props.onPress());
-    return root;
+    expect(pressableLabelled(root, 'Edit profile')).toBeTruthy();
+    expect(pressableLabelled(root, 'Settings')).toBeTruthy();
+    expect(root.findAll(node => (node.type as unknown) === 'TextInput')).toHaveLength(0);
+    expect(texts(root)).not.toContain('Save');
+  });
+});
+
+describe('EditProfileScreen display name editing', () => {
+  async function startEdit(): Promise<Instance> {
+    return mountEditProfile();
   }
 
   it('edits display_name (prefilled), never nickname', async () => {
     const root = await startEdit();
     expect(displayNameInput(root).props.value).toBe('Sam Smith');
-    // Nickname is text, not an input: the only text field is the display name.
+    // Nickname is read-only text, not an input: the only text field is the display name.
+    expect(texts(root)).toContain('sam99');
     expect(root.findAll(node => (node.type as unknown) === 'TextInput')).toHaveLength(1);
   });
 
-  it('saves via PATCH { display_name } only, refreshes the profile and the auth user', async () => {
-    mockGetProfile
-      .mockResolvedValueOnce(PROFILE)
-      .mockResolvedValueOnce({ ...PROFILE, display_name: 'Sammy' });
+  it('saves via PATCH { display_name } only', async () => {
     const root = await startEdit();
     act(() => displayNameInput(root).props.onChangeText('  Sammy '));
     await act(async () => pressableWithText(root, 'Save').props.onPress());
 
     expect(mockUpdateProfile).toHaveBeenCalledTimes(1);
     expect(mockUpdateProfile.mock.calls[0][0]).toEqual({ display_name: 'Sammy' });
+    expect(mockShowCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ flow: 'profile_updated', rows: [{ label: 'Display name', value: 'Sammy' }] }),
+    );
+  });
+
+  // Product regression, left failing on purpose: EditProfileScreen never calls `updateUser`, so the
+  // Home greeting (reads the cached auth user) stays stale after a rename.
+  // Source: docs/reports/IMPL-DES-MEETUP-MOBILE-fixes-hooks-fab-displayname.md, P1.
+  it('refreshes the auth user after a successful save', async () => {
+    const root = await startEdit();
+    act(() => displayNameInput(root).props.onChangeText('Sammy'));
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
     expect(mockUpdateUser).toHaveBeenCalledWith({ display_name: 'Sammy' });
-    expect(texts(root)).toContain('Sammy');
   });
 
   it('rejects an empty display name without calling the API', async () => {
     const root = await startEdit();
     act(() => displayNameInput(root).props.onChangeText('   '));
     await act(async () => pressableWithText(root, 'Save').props.onPress());
-    expect(texts(root)).toContain('Display name cannot be empty.');
+    // An empty name is never sent; the form leaves without a PATCH or a completion screen.
     expect(mockUpdateProfile).not.toHaveBeenCalled();
     expect(mockUpdateUser).not.toHaveBeenCalled();
+    expect(mockShowCompletion).not.toHaveBeenCalled();
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 
   it('shows an error and leaves the auth user alone when the save fails', async () => {
@@ -197,77 +251,70 @@ describe('ProfileScreen display name editing', () => {
     const root = await startEdit();
     act(() => displayNameInput(root).props.onChangeText('Sammy'));
     await act(async () => pressableWithText(root, 'Save').props.onPress());
-    expect(texts(root)).toContain('Could not save your display name. Please try again.');
+    expect(texts(root)).toContain('Could not save profile. Please try again.');
+    expect(mockShowCompletion).not.toHaveBeenCalled();
     expect(mockUpdateUser).not.toHaveBeenCalled();
   });
 });
 
-describe('ProfileScreen add sport (BUG-M05, skill-level redesign)', () => {
-  async function startAdd(): Promise<Instance> {
-    const root = await mount();
-    await act(async () => pressableWithText(root, 'Add sport').props.onPress());
-    return root;
-  }
-
-  it('offers the sport list from GET /admin/sports/public as checkbox tiles, not a free-text field', async () => {
-    const root = await startAdd();
-    expect(control(root, 'checkbox', 'Table Tennis')).toBeTruthy();
-    expect(control(root, 'checkbox', 'Badminton')).toBeTruthy();
+describe('EditSkillLevelsScreen add sport (BUG-M05, skill-level redesign)', () => {
+  it('offers the sport list from GET /admin/sports/public as level radios, not a free-text field', async () => {
+    const root = await mountEditSkills();
+    expect(control(root, 'radio', 'Table Tennis, Beginner')).toBeTruthy();
+    expect(control(root, 'radio', 'Badminton, Expert')).toBeTruthy();
     expect(root.findAll(node => (node.type as unknown) === 'TextInput')).toHaveLength(0);
   });
 
-  it('limits the picker to sports not yet set', async () => {
-    mockGetProfile.mockResolvedValue({
-      ...PROFILE,
-      skill_levels: [{ sport: 'table_tennis', skill_level: 'beginner' }],
-    });
-    const root = await startAdd();
-    expect(control(root, 'checkbox', 'Badminton')).toBeTruthy();
-    expect(
-      root.findAll(node => node.props.accessibilityRole === 'checkbox' && node.props.accessibilityLabel === 'Table Tennis'),
-    ).toHaveLength(0);
+  it('lists every sport; a sport already set shows its level selected and Clear, the rest show Not set', async () => {
+    mockGetSkillLevels.mockResolvedValue([{ sport: 'table_tennis', skill_level: 'beginner' }]);
+    const root = await mountEditSkills();
+    const selected = root.findAll(
+      node =>
+        node.props.accessibilityRole === 'radio' &&
+        typeof node.props.onPress === 'function' &&
+        node.props.accessibilityState?.selected === true,
+    );
+    expect(selected.map(node => node.props.accessibilityLabel)).toEqual(['Table Tennis, Beginner']);
+    expect(control(root, 'radio', 'Badminton, Beginner')).toBeTruthy();
+    expect(texts(root).filter(text => text === 'Clear')).toHaveLength(1);
+    expect(texts(root).filter(text => text === 'Not set')).toHaveLength(1);
   });
 
   it('saves the chosen sport’s name (not its display label) with the chosen level', async () => {
-    mockGetProfile.mockResolvedValueOnce(PROFILE).mockResolvedValueOnce({
-      ...PROFILE,
-      skill_levels: [{ sport: 'table_tennis', skill_level: 'intermediate' }],
-    });
-    const root = await startAdd();
-    tap(root, 'checkbox', 'Table Tennis');
-    act(() => pressableWithText(root, 'Next').props.onPress());
+    const root = await mountEditSkills();
     tap(root, 'radio', 'Table Tennis, Intermediate');
-    await act(async () => pressableWithText(root, 'Save').props.onPress());
-    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'intermediate', expect.anything());
-    expect(mockGetProfile).toHaveBeenCalledTimes(2);
-    // Sheet closed, new row listed.
-    expect(texts(root)).not.toContain('Save');
-    expect(texts(root)).toContain('Intermediate');
+    await act(async () => pressableWithText(root, 'Done').props.onPress());
+    expect(mockUpdateSkillLevel).toHaveBeenCalledTimes(1);
+    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'intermediate');
+    expect(mockShowCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flow: 'skills_updated',
+        rows: [{ label: 'Table Tennis', value: 'Intermediate' }],
+      }),
+    );
   });
 
-  it('does not save a sport that has no level, and shows the inline hint', async () => {
-    const root = await startAdd();
-    tap(root, 'checkbox', 'Table Tennis');
-    act(() => pressableWithText(root, 'Next').props.onPress());
-    await act(async () => pressableWithText(root, 'Save').props.onPress());
+  it('does not save a sport that has no level', async () => {
+    const root = await mountEditSkills();
+    await act(async () => pressableWithText(root, 'Done').props.onPress());
     expect(mockUpdateSkillLevel).not.toHaveBeenCalled();
-    expect(root.findAll(node => node.props.accessibilityRole === 'alert', { deep: false })).toHaveLength(1);
+    expect(mockDeleteSkillLevel).not.toHaveBeenCalled();
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 
   it('shows a hint instead of a broken empty picker when no sports are available', async () => {
     mockGetSports.mockResolvedValue([]);
-    const root = await startAdd();
+    const root = await mountEditSkills();
     expect(texts(root)).toContain('No sports are available right now.');
   });
 
-  it('shows the save error inside the sheet when the PUT fails', async () => {
+  it('shows the save error on the screen when the PUT fails', async () => {
     mockUpdateSkillLevel.mockRejectedValue(new Error('down'));
-    const root = await startAdd();
-    tap(root, 'checkbox', 'Badminton');
-    act(() => pressableWithText(root, 'Next').props.onPress());
+    const root = await mountEditSkills();
     tap(root, 'radio', 'Badminton, Beginner');
-    await act(async () => pressableWithText(root, 'Save').props.onPress());
+    await act(async () => pressableWithText(root, 'Done').props.onPress());
     expect(texts(root)).toContain('Could not save your skill level. Please try again.');
+    expect(mockShowCompletion).not.toHaveBeenCalled();
   });
 });
 
@@ -292,221 +339,174 @@ describe('ProfileScreen skill-levels list sport display name (BUG-M02)', () => {
   });
 });
 
-describe('ProfileScreen My sports rows and edit sheet', () => {
+describe('ProfileScreen skills card and EditSkillLevelsScreen changes', () => {
   const WITH_ONE_SKILL_LEVEL: UserProfile = {
     ...PROFILE,
     skill_levels: [{ sport: 'table_tennis', skill_level: 'intermediate' }],
   };
 
-  it('lists read-only rows: no editing controls until a row is tapped', async () => {
+  it('lists read-only rows on Profile: no editing controls', async () => {
     mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
     const root = await mount();
-    expect(texts(root)).toContain('My sports');
+    expect(texts(root)).toContain('Skills');
     expect(texts(root)).toEqual(expect.arrayContaining(['Table Tennis', 'Intermediate']));
     expect(texts(root)).not.toContain('Save');
     expect(texts(root)).not.toContain('Remove');
-    // Three dots on every pill: two filled (Intermediate), one empty.
-    expect(root.findAll(node => (node.type as unknown) === 'View' && node.props.testID === 'level-dot-filled')).toHaveLength(2);
-    expect(root.findAll(node => (node.type as unknown) === 'View' && node.props.testID === 'level-dot-empty')).toHaveLength(1);
+    expect(texts(root)).not.toContain('Clear');
   });
 
-  it('tapping a row opens a sheet for that sport only, prefilled with its level', async () => {
-    mockGetProfile.mockResolvedValue({
-      ...PROFILE,
-      skill_levels: [
-        { sport: 'table_tennis', skill_level: 'intermediate' },
-        { sport: 'badminton', skill_level: 'beginner' },
-      ],
-    });
-    const root = await mount();
-    openRow(root, 'Table Tennis, Intermediate');
-    expect(texts(root)).toEqual(expect.arrayContaining(['Save', 'Remove']));
+  it('opens the skill screen for one sport with its stored level selected and the others unselected', async () => {
+    mockGetSkillLevels.mockResolvedValue([
+      { sport: 'table_tennis', skill_level: 'intermediate' },
+      { sport: 'badminton', skill_level: 'beginner' },
+    ]);
+    const root = await mountEditSkills();
     const selected = root.findAll(
       node =>
         node.props.accessibilityRole === 'radio' &&
         typeof node.props.onPress === 'function' &&
         node.props.accessibilityState?.selected === true,
     );
-    expect(selected.map(node => node.props.accessibilityLabel)).toEqual(['Table Tennis, Intermediate']);
-    // Only the tapped sport has radios in the sheet.
-    expect(
-      root.findAll(node => node.props.accessibilityRole === 'radio' && String(node.props.accessibilityLabel).startsWith('Badminton')),
-    ).toHaveLength(0);
+    expect(selected.map(node => node.props.accessibilityLabel)).toEqual([
+      'Table Tennis, Intermediate',
+      'Badminton, Beginner',
+    ]);
   });
 
-  it('changes the level: PUTs the new level for that sport and re-fetches', async () => {
-    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
-    const root = await mount();
-    openRow(root, 'Table Tennis, Intermediate');
+  it('changes the level: PUTs the new level for that sport only', async () => {
+    mockGetSkillLevels.mockResolvedValue([{ sport: 'table_tennis', skill_level: 'intermediate' }]);
+    const root = await mountEditSkills();
     tap(root, 'radio', 'Table Tennis, Expert');
-    await act(async () => pressableWithText(root, 'Save').props.onPress());
-    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'expert', expect.anything());
-    expect(mockGetProfile).toHaveBeenCalledTimes(2);
-    expect(texts(root)).not.toContain('Save');
+    await act(async () => pressableWithText(root, 'Done').props.onPress());
+    expect(mockUpdateSkillLevel).toHaveBeenCalledTimes(1);
+    expect(mockUpdateSkillLevel).toHaveBeenCalledWith('table_tennis', 'expert');
+    expect(mockDeleteSkillLevel).not.toHaveBeenCalled();
   });
 
-  it('hardware Back (Modal onRequestClose) closes the sheet without saving', async () => {
-    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
-    const root = await mount();
-    openRow(root, 'Table Tennis, Intermediate');
-    expect(texts(root)).toContain('Save');
-    const modal = root.findAll(node => typeof node.props.onRequestClose === 'function')[0];
-    act(() => modal.props.onRequestClose());
-    expect(texts(root)).not.toContain('Save');
+  it('Back leaves the screen without saving', async () => {
+    mockGetSkillLevels.mockResolvedValue([{ sport: 'table_tennis', skill_level: 'intermediate' }]);
+    const root = await mountEditSkills();
+    tap(root, 'radio', 'Table Tennis, Expert');
+    act(() => pressableLabelled(root, 'Back').props.onPress());
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
     expect(mockUpdateSkillLevel).not.toHaveBeenCalled();
   });
 });
 
-describe('ProfileScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001), from the edit sheet', () => {
-  const WITH_ONE_SKILL_LEVEL: UserProfile = {
-    ...PROFILE,
-    skill_levels: [{ sport: 'table_tennis', skill_level: 'intermediate' }],
-  };
+describe('EditSkillLevelsScreen skill-level delete (ADDENDUM-MOBILE-SKILL-DELETE-001)', () => {
+  beforeEach(() => {
+    mockGetSkillLevels.mockResolvedValue([{ sport: 'table_tennis', skill_level: 'intermediate' }]);
+  });
 
-  it('asks for confirmation before deleting', async () => {
-    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
-    const root = await mount();
-    openRow(root, 'Table Tennis, Intermediate');
-    act(() => {
-      pressableWithText(root, 'Remove').props.onPress();
-    });
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Remove Skill Level',
-      'Remove your Table Tennis skill level?',
-      expect.anything(),
-    );
+  it('Clear only stages the removal: nothing is DELETEd until Done', async () => {
+    const root = await mountEditSkills();
+    await act(async () => pressableLabelled(root, 'Table Tennis Clear').props.onPress());
     expect(mockDeleteSkillLevel).not.toHaveBeenCalled();
+    expect(texts(root)).toContain('Not set');
   });
 
-  it('on confirm: DELETEs the entry, closes the sheet and removes the row via a re-fetch', async () => {
-    mockGetProfile.mockResolvedValueOnce(WITH_ONE_SKILL_LEVEL).mockResolvedValueOnce(PROFILE);
-    const root = await mount();
-    openRow(root, 'Table Tennis, Intermediate');
-    act(() => {
-      pressableWithText(root, 'Remove').props.onPress();
-    });
-    await act(async () => {
-      await confirmAlert('Remove');
-    });
+  it('on Done: DELETEs the entry and shows the removal on the completion screen', async () => {
+    const root = await mountEditSkills();
+    await act(async () => pressableLabelled(root, 'Table Tennis Clear').props.onPress());
+    await act(async () => pressableWithText(root, 'Done').props.onPress());
 
-    expect(mockDeleteSkillLevel).toHaveBeenCalledWith('table_tennis', expect.anything());
-    expect(mockGetProfile).toHaveBeenCalledTimes(2);
-    expect(texts(root)).not.toContain('Table Tennis');
-    expect(texts(root)).not.toContain('Save');
-    expect(texts(root)).toContain('No skill levels declared yet.');
+    expect(mockDeleteSkillLevel).toHaveBeenCalledWith('table_tennis');
+    expect(mockShowCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flow: 'skills_updated',
+        rows: [{ label: 'Table Tennis', value: 'Removed' }],
+      }),
+    );
   });
 
-  it('tournament lock (409): shows the backend message verbatim inside the sheet; entry stays; no extra fetch', async () => {
-    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
+  it('tournament lock (409): shows the backend message verbatim; the entry stays; no completion screen', async () => {
     mockDeleteSkillLevel.mockRejectedValue({
       response: {
         status: 409,
         data: { detail: 'Cannot remove: you have an active tournament registration for this sport.' },
       },
     });
-    const root = await mount();
-    openRow(root, 'Table Tennis, Intermediate');
-    act(() => {
-      pressableWithText(root, 'Remove').props.onPress();
-    });
-    await act(async () => {
-      await confirmAlert('Remove');
-    });
+    const root = await mountEditSkills();
+    await act(async () => pressableLabelled(root, 'Table Tennis Clear').props.onPress());
+    await act(async () => pressableWithText(root, 'Done').props.onPress());
 
-    const alerts = root.findAll(node => node.props.accessibilityRole === 'alert', { deep: false });
-    expect(alerts.map(node => texts(node)[0])).toEqual([
-      'Cannot remove: you have an active tournament registration for this sport.',
-    ]);
-    // Sheet still open, entry still listed, no padlock/locked state anywhere.
-    expect(texts(root)).toContain('Save');
-    expect(pressableLabelled(root, 'Table Tennis, Intermediate')).toBeTruthy();
-    // Only the initial mount fetch — the guarded delete never re-fetches.
-    expect(mockGetProfile).toHaveBeenCalledTimes(1);
+    expect(texts(root)).toContain('Cannot remove: you have an active tournament registration for this sport.');
+    expect(mockShowCompletion).not.toHaveBeenCalled();
+    expect(mockGoBack).not.toHaveBeenCalled();
   });
 
   it('falls back to a generic message when the failure carries no usable detail (e.g. network error)', async () => {
-    mockGetProfile.mockResolvedValue(WITH_ONE_SKILL_LEVEL);
     mockDeleteSkillLevel.mockRejectedValue(new Error('network down'));
-    const root = await mount();
-    openRow(root, 'Table Tennis, Intermediate');
-    act(() => {
-      pressableWithText(root, 'Remove').props.onPress();
-    });
-    await act(async () => {
-      await confirmAlert('Remove');
-    });
+    const root = await mountEditSkills();
+    await act(async () => pressableLabelled(root, 'Table Tennis Clear').props.onPress());
+    await act(async () => pressableWithText(root, 'Done').props.onPress());
 
     expect(texts(root)).toContain('Could not remove this skill level. Please try again.');
-    expect(pressableLabelled(root, 'Table Tennis, Intermediate')).toBeTruthy();
+    expect(mockShowCompletion).not.toHaveBeenCalled();
   });
 });
 
-describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => {
+describe('EditProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => {
   const PROFILE_WITH_AVATAR: UserProfile = {
     ...PROFILE,
     avatar_url: 'https://meetup.hel1.your-objectstorage.com/avatars/u-1.png',
   };
+  const fastImageUris = (root: Instance): unknown[] =>
+    root.findAll(node => node.props.testID === 'fastImage').map(node => node.props.source?.uri);
+  /** The avatar itself and the "Change photo" link both open the photo menu; this is the avatar. */
+  const avatarPressable = (root: Instance): Instance => {
+    const matches = root.findAll(
+      node =>
+        node.props.accessibilityRole === 'button' &&
+        node.props.accessibilityLabel === 'Change photo' &&
+        typeof node.props.onPress === 'function' &&
+        texts(node).every(text => text !== 'Change photo'),
+    );
+    expect(matches.length).toBeGreaterThan(0);
+    return matches[0];
+  };
+  const openPhotoMenu = (root: Instance): void => {
+    act(() => {
+      avatarPressable(root).props.onPress();
+    });
+  };
+  const photoPickerOptions = {
+    mediaType: 'photo',
+    cropping: true,
+    width: 500,
+    height: 500,
+    compressImageQuality: 0.8,
+    cropperToolbarTitle: 'Edit Photo',
+  };
 
-  it('renders placeholder when avatar_url is null', async () => {
-    const root = await mount();
-    // Placeholder should show the first letter of display name
-    expect(texts(root)).toContain('S');
+  it('renders the initials placeholder when avatar_url is null', async () => {
+    const root = await mountEditProfile();
+    expect(texts(root)).toContain('SS');
+    expect(fastImageUris(root)).toHaveLength(0);
   });
 
   it('renders the avatar photo when avatar_url is present', async () => {
     mockGetProfile.mockResolvedValue(PROFILE_WITH_AVATAR);
-    const root = await mount();
-    // Should render a FastImage with the avatar URL (no placeholder letter visible as the primary display)
-    const fastImages = root.findAll(
-      node => node.props.testID === 'fastImage' && node.props.source?.uri === PROFILE_WITH_AVATAR.avatar_url,
-    );
-    expect(fastImages.length).toBeGreaterThan(0);
+    const root = await mountEditProfile();
+    expect(fastImageUris(root)).toContain(PROFILE_WITH_AVATAR.avatar_url);
   });
 
-  it('shows the "Change profile photo" pressable', async () => {
-    const root = await mount();
-    // The avatar area should be tappable
-    const avatarPressable = pressableLabelled(root, 'Change profile photo');
-    expect(avatarPressable).toBeDefined();
-  });
-
-  it('renders edit-icon overlay badge on placeholder avatar as decorative affordance', async () => {
-    const root = await mount();
-    const avatarPressable = pressableLabelled(root, 'Change profile photo');
-    expect(avatarPressable).toBeDefined();
-
-    // Edit badge should be present inside the avatar pressable (not a separate touch target)
-    const editBadges = avatarPressable.findAll(
-      node => (node.type as unknown) === 'View' && node.props.testID === 'avatar-edit-badge',
+  it('shows the "Change photo" pressable, with a decorative camera badge that is not a separate touch target', async () => {
+    const root = await mountEditProfile();
+    const avatar = avatarPressable(root);
+    // The Pressable renders its own wrapper nodes (same label); a different button inside would be a second target.
+    const nested = avatar.findAll(
+      node => node.props.accessibilityRole === 'button' && node.props.accessibilityLabel !== 'Change photo',
     );
-    expect(editBadges).toHaveLength(1);
-
-    const badge = editBadges[0];
-    expect(badge.props.accessibilityElementsHidden).toBe(true);
-    expect(badge.props.importantForAccessibility).toBe('no');
-  });
-
-  it('renders edit-icon overlay badge when photo is set', async () => {
-    mockGetProfile.mockResolvedValue(PROFILE_WITH_AVATAR);
-    const root = await mount();
-    const avatarPressable = pressableLabelled(root, 'Change profile photo');
-    expect(avatarPressable).toBeDefined();
-
-    // Edit badge should be present even when photo is set
-    const editBadges = avatarPressable.findAll(
-      node => (node.type as unknown) === 'View' && node.props.testID === 'avatar-edit-badge',
-    );
-    expect(editBadges).toHaveLength(1);
+    expect(nested).toHaveLength(0);
   });
 
   it('tapping the avatar when no photo shows camera/library options without Remove', async () => {
-    const root = await mount();
-    act(() => {
-      pressableLabelled(root, 'Change profile photo').props.onPress();
-    });
+    const root = await mountEditProfile();
+    openPhotoMenu(root);
     const alertSpy = Alert.alert as unknown as jest.Mock;
     const [title, , buttons] = alertSpy.mock.calls[alertSpy.mock.calls.length - 1];
-    expect(title).toBe('Profile Photo');
+    expect(title).toBe('Profile photo');
     const buttonTexts = (buttons as { text: string }[]).map(b => b.text);
     expect(buttonTexts).toContain('Take Photo');
     expect(buttonTexts).toContain('Choose from Library');
@@ -515,10 +515,8 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
 
   it('tapping the avatar when photo exists shows camera/library/remove options', async () => {
     mockGetProfile.mockResolvedValue(PROFILE_WITH_AVATAR);
-    const root = await mount();
-    act(() => {
-      pressableLabelled(root, 'Change profile photo').props.onPress();
-    });
+    const root = await mountEditProfile();
+    openPhotoMenu(root);
     const alertSpy = Alert.alert as unknown as jest.Mock;
     const [, , buttons] = alertSpy.mock.calls[alertSpy.mock.calls.length - 1];
     const buttonTexts = (buttons as { text: string }[]).map(b => b.text);
@@ -527,12 +525,7 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
     expect(buttonTexts).toContain('Remove Photo');
   });
 
-  it('choosing from library → crop/zoom/rotate options passed → upload → re-fetch → avatar updates', async () => {
-    const UPDATED_PROFILE: UserProfile = {
-      ...PROFILE,
-      avatar_url: 'https://meetup.hel1.your-objectstorage.com/avatars/u-1-v2.png',
-    };
-    mockGetProfile.mockResolvedValueOnce(PROFILE).mockResolvedValueOnce(UPDATED_PROFILE);
+  it('choosing from library → crop options passed → preview shown → Save uploads', async () => {
     mockOpenPicker.mockResolvedValue({
       path: 'file:///local/photo-cropped.jpg',
       filename: 'photo-cropped.jpg',
@@ -542,48 +535,25 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
       size: 102400,
     } as any);
 
-    const root = await mount();
-    act(() => {
-      pressableLabelled(root, 'Change profile photo').props.onPress();
-    });
-    // Confirm the "Choose from Library" action
+    const root = await mountEditProfile();
+    openPhotoMenu(root);
     await act(async () => {
       await confirmAlert('Choose from Library');
     });
 
-    expect(mockOpenPicker).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mediaType: 'photo',
-        cropping: true,
-        width: 500,
-        height: 500,
-        compressImageQuality: 0.8,
-        cropperToolbarTitle: 'Edit Photo',
-        hideBottomControls: false,
-        enableRotationGesture: true,
-        cropperRotateButtonsHidden: false,
-      }),
+    expect(mockOpenPicker).toHaveBeenCalledWith(expect.objectContaining(photoPickerOptions));
+    // The new photo is a local preview until Save.
+    expect(fastImageUris(root)).toContain('file:///local/photo-cropped.jpg');
+    expect(mockUploadAvatar).not.toHaveBeenCalled();
+
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
+    expect(mockUploadAvatar).toHaveBeenCalledWith('file:///local/photo-cropped.jpg', 'photo-cropped.jpg', 'image/jpeg');
+    expect(mockShowCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ flow: 'profile_updated', rows: [{ label: 'Profile photo', value: 'Updated' }] }),
     );
-    expect(mockUploadAvatar).toHaveBeenCalledWith(
-      'file:///local/photo-cropped.jpg',
-      'photo-cropped.jpg',
-      'image/jpeg',
-      expect.objectContaining({ correlationId: expect.any(String) }),
-    );
-    expect(mockGetProfile).toHaveBeenCalledTimes(2);
-    // FastImage should now render the updated avatar URL
-    const fastImages = root.findAll(
-      node => node.props.testID === 'fastImage' && node.props.source?.uri === UPDATED_PROFILE.avatar_url,
-    );
-    expect(fastImages.length).toBeGreaterThan(0);
   });
 
-  it('taking photo with camera → crop/zoom/rotate options passed → upload → re-fetch → avatar updates', async () => {
-    const UPDATED_PROFILE: UserProfile = {
-      ...PROFILE,
-      avatar_url: 'https://meetup.hel1.your-objectstorage.com/avatars/u-camera.png',
-    };
-    mockGetProfile.mockResolvedValueOnce(PROFILE).mockResolvedValueOnce(UPDATED_PROFILE);
+  it('taking photo with camera → crop options passed → Save uploads', async () => {
     mockOpenCamera.mockResolvedValue({
       path: 'file:///local/camera-cropped.jpg',
       filename: 'camera-cropped.jpg',
@@ -593,39 +563,18 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
       size: 102400,
     } as any);
 
-    const root = await mount();
-    act(() => {
-      pressableLabelled(root, 'Change profile photo').props.onPress();
-    });
-    // Confirm the "Take Photo" action
+    const root = await mountEditProfile();
+    openPhotoMenu(root);
     await act(async () => {
       await confirmAlert('Take Photo');
     });
 
-    expect(mockOpenCamera).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mediaType: 'photo',
-        cropping: true,
-        width: 500,
-        height: 500,
-        compressImageQuality: 0.8,
-        cropperToolbarTitle: 'Edit Photo',
-        hideBottomControls: false,
-        enableRotationGesture: true,
-        cropperRotateButtonsHidden: false,
-      }),
-    );
-    expect(mockUploadAvatar).toHaveBeenCalledWith(
-      'file:///local/camera-cropped.jpg',
-      'camera-cropped.jpg',
-      'image/jpeg',
-      expect.objectContaining({ correlationId: expect.any(String) }),
-    );
-    expect(mockGetProfile).toHaveBeenCalledTimes(2);
+    expect(mockOpenCamera).toHaveBeenCalledWith(expect.objectContaining(photoPickerOptions));
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
+    expect(mockUploadAvatar).toHaveBeenCalledWith('file:///local/camera-cropped.jpg', 'camera-cropped.jpg', 'image/jpeg');
   });
 
-  it('upload failure reverts preview and shows error message', async () => {
-    mockGetProfile.mockResolvedValue(PROFILE);
+  it('upload failure on Save shows the server message and does not complete', async () => {
     mockUploadAvatar.mockRejectedValue({
       response: { status: 413, data: { detail: 'File too large.' } },
     });
@@ -638,75 +587,67 @@ describe('ProfileScreen avatar (DES-MEETUP-ADDENDUM-profile-photo §10)', () => 
       size: 10485760,
     } as any);
 
-    const root = await mount();
-    act(() => {
-      pressableLabelled(root, 'Change profile photo').props.onPress();
-    });
+    const root = await mountEditProfile();
+    openPhotoMenu(root);
     await act(async () => {
       await confirmAlert('Choose from Library');
     });
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
 
     // Error message surfaced via getApiErrorMessage (same pattern as skill-level 409)
     expect(texts(root)).toContain('File too large.');
-    // No re-fetch after failure
-    expect(mockGetProfile).toHaveBeenCalledTimes(1);
+    expect(mockShowCompletion).not.toHaveBeenCalled();
   });
 
-  it('removing avatar → DELETE → re-fetch → placeholder renders', async () => {
-    mockGetProfile
-      .mockResolvedValueOnce(PROFILE_WITH_AVATAR)
-      .mockResolvedValueOnce(PROFILE);
+  it('removing avatar → placeholder renders → Save DELETEs', async () => {
+    mockGetProfile.mockResolvedValue(PROFILE_WITH_AVATAR);
 
-    const root = await mount();
+    const root = await mountEditProfile();
+    openPhotoMenu(root);
     act(() => {
-      pressableLabelled(root, 'Change profile photo').props.onPress();
-    });
-    await act(async () => {
-      await confirmAlert('Remove Photo');
+      confirmAlert('Remove Photo');
     });
 
-    expect(mockDeleteAvatar).toHaveBeenCalledWith(
-      expect.objectContaining({ correlationId: expect.any(String) }),
+    expect(fastImageUris(root)).not.toContain(PROFILE_WITH_AVATAR.avatar_url);
+    expect(texts(root)).toContain('SS');
+    expect(mockDeleteAvatar).not.toHaveBeenCalled();
+
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
+    expect(mockDeleteAvatar).toHaveBeenCalledTimes(1);
+    expect(mockShowCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ flow: 'profile_updated', rows: [{ label: 'Profile photo', value: 'Removed' }] }),
     );
-    expect(mockGetProfile).toHaveBeenCalledTimes(2);
-    // After removal, placeholder should be visible
-    expect(texts(root)).toContain('S');
   });
 
-  it('remove failure shows error and keeps the avatar', async () => {
+  it('remove failure on Save shows an error and does not complete', async () => {
     mockGetProfile.mockResolvedValue(PROFILE_WITH_AVATAR);
     mockDeleteAvatar.mockRejectedValue(new Error('network error'));
 
-    const root = await mount();
+    const root = await mountEditProfile();
+    openPhotoMenu(root);
     act(() => {
-      pressableLabelled(root, 'Change profile photo').props.onPress();
+      confirmAlert('Remove Photo');
     });
-    await act(async () => {
-      await confirmAlert('Remove Photo');
-    });
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
 
-    expect(texts(root)).toContain('Could not remove your photo. Please try again.');
-    // Avatar should still be rendered
-    const fastImages = root.findAll(
-      node => node.props.testID === 'fastImage' && node.props.source?.uri === PROFILE_WITH_AVATAR.avatar_url,
-    );
-    expect(fastImages.length).toBeGreaterThan(0);
+    expect(texts(root)).toContain('Could not save profile. Please try again.');
+    expect(mockShowCompletion).not.toHaveBeenCalled();
   });
 
-  it('cancelled image picker does not trigger upload', async () => {
+  it('cancelled image picker does not stage or upload anything', async () => {
     const error: any = new Error('User cancelled image selection');
     error.code = 'E_PICKER_CANCELLED';
     mockOpenPicker.mockRejectedValue(error);
 
-    const root = await mount();
-    act(() => {
-      pressableLabelled(root, 'Change profile photo').props.onPress();
-    });
+    const root = await mountEditProfile();
+    openPhotoMenu(root);
     await act(async () => {
       await confirmAlert('Choose from Library');
     });
+    await act(async () => pressableWithText(root, 'Save').props.onPress());
 
     expect(mockUploadAvatar).not.toHaveBeenCalled();
-    expect(mockGetProfile).toHaveBeenCalledTimes(1); // only initial load
+    expect(mockShowCompletion).not.toHaveBeenCalled();
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 });

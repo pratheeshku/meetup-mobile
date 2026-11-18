@@ -11,7 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { makeEvent } from '../../../test-utils/makeEvent';
 import { act, pressableLabelled, pressables, render, texts } from '../../../test-utils/render';
 import type { Instance } from '../../../test-utils/render';
-import { brandBlock, dash, dashRadius, dashSize, sportTileColors } from '../../../theme/dashboardTheme';
+import { dash, dashRadius, dashSize, sportTileColors } from '../../../theme/dashboardTheme';
 import { invalidateSportsCatalog, primeSportsCatalogForTests } from '../../../sports/catalog';
 import type { Group } from '../../../types/group';
 import { FootballIcon, GroupsIcon, SportIcon } from '../../icons/DashboardIcons';
@@ -81,79 +81,35 @@ describe('DashboardBanner', () => {
 
   // NOTE: react-test-renderer does not run layout, so overlap/clipping at 360dp
   // cannot be measured here; these cases assert the style props that produce it.
-  it('brand block: icon is the AD-18 header variant (not the original) at 52x52, radius 12, overflow hidden', () => {
-    const icon = hostByTestId(banner(), 'banner-app-icon');
-    expect(icon.props.source).toBe(require('../../../assets/shuttlr-icon-header.png'));
-    expect(icon.props.source).not.toBe(require('../../../assets/shuttlr-icon.png'));
-    expect(flat(icon)).toMatchObject({ width: 52, height: 52, borderRadius: 12, overflow: 'hidden' });
-  });
-
-  it('brand block: no ancestor of the icon has a white (or any) background', () => {
-    const icon = hostByTestId(banner(), 'banner-app-icon');
-    let node = icon.parent;
-    let checked = 0;
-    while (node && node.props.testID !== 'dashboard-banner') {
-      if (typeof node.type === 'string') {
-        const bg = flat(node)?.backgroundColor;
-        expect(bg).toBeUndefined();
-        checked += 1;
-      }
-      node = node.parent;
-    }
-    expect(checked).toBeGreaterThan(0);
-    expect(flat(icon)?.backgroundColor).toBeUndefined();
-  });
-
-  it('brand block: "Shuttl" is white, bold 26/28, letterSpacing -0.3, with the "r" in #FDE68A', () => {
+  it('brand block: shows the GameOn SG wordmark image (not the retired Shuttlr icon) on a white pill', () => {
     const root = banner();
-    const word = root.findAll(
-      n => (n.type as unknown) === 'Text' && n.props.children?.[0] === 'Shuttl',
-    )[0];
-    expect(flat(word)).toMatchObject({
-      color: '#FFFFFF',
-      fontSize: 26,
-      lineHeight: 28,
-      fontWeight: '700',
-      letterSpacing: -0.3,
-    });
-    expect(flat(word)?.fontFamily).toBeUndefined();
-    const r = root.findAll(n => (n.type as unknown) === 'Text' && n.props.children === 'r')[0];
-    expect(flat(r)?.color).toBe('#FDE68A');
+    const wordmark = hostByTestId(root, 'banner-app-icon');
+    expect(wordmark.props.source).toBe(require('../../../assets/gameonsg-wordmark.png'));
+    expect(wordmark.props.resizeMode).toBe('contain');
+    expect(flat(wordmark)).toMatchObject({ width: 96, height: 36 });
+    const pill = flat(hostByTestId(root, 'banner-brand-block'));
+    expect(pill).toMatchObject({ backgroundColor: dash.white, borderRadius: 14 });
   });
 
-  it('brand block: tagline "PLAY TOGETHER" is 9px bold, spacing 2.5, #DBEAFE, marginTop 2', () => {
-    const root = banner();
-    const tag = root.findAll(
-      n => (n.type as unknown) === 'Text' && n.props.children === 'PLAY TOGETHER',
+  it('brand block: tagline is the mob.brand.tagline label, 9px bold, one line, ignores font scaling', () => {
+    const tag = banner().findAll(
+      n => (n.type as unknown) === 'Text' && n.props.children === 'Create. Connect. Play.',
     )[0];
     expect(flat(tag)).toMatchObject({
-      color: '#DBEAFE',
+      color: dash.text,
       fontSize: 9,
       fontWeight: '700',
-      letterSpacing: 2.5,
+      letterSpacing: 1,
       marginTop: 2,
     });
+    expect(tag.props.allowFontScaling).toBe(false);
+    expect(tag.props.numberOfLines).toBe(1);
   });
 
-  it('brand block: wordmark and tagline ignore system font scaling and stay on one line', () => {
-    const root = banner();
-    const word = root.findAll(
-      n => (n.type as unknown) === 'Text' && n.props.children?.[0] === 'Shuttl',
-    )[0];
-    const tag = root.findAll(
-      n => (n.type as unknown) === 'Text' && n.props.children === 'PLAY TOGETHER',
-    )[0];
-    for (const t of [word, tag]) {
-      expect(t.props.allowFontScaling).toBe(false);
-      expect(t.props.numberOfLines).toBe(1);
-      expect(t.props.maxFontSizeMultiplier).toBe(1);
-    }
-  });
-
-  it('brand block: labelled "Shuttlr" and not a touch target (no onPress, pointerEvents none)', () => {
+  it('brand block: labelled "GameOn SG" and not a touch target (no onPress, pointerEvents none)', () => {
     const root = banner();
     const block = hostByTestId(root, 'banner-brand-block');
-    expect(block.props.accessibilityLabel).toBe('Shuttlr');
+    expect(block.props.accessibilityLabel).toBe('GameOn SG');
     expect(block.props.accessible).toBe(true);
     expect(block.props.pointerEvents).toBe('none');
     const inside = block.findAll(
@@ -161,26 +117,7 @@ describe('DashboardBanner', () => {
     );
     expect(inside).toHaveLength(0);
     expect(typeof block.props.onPress).toBe('undefined');
-    expect(pressables(root).map(p => p.props.accessibilityLabel)).not.toContain('Shuttlr');
-  });
-
-  it('brand block: strings and colours come from the theme constant', () => {
-    expect(brandBlock).toMatchObject({
-      accessibilityLabel: 'Shuttlr',
-      wordmarkLead: 'Shuttl',
-      wordmarkAccent: 'r',
-      tagline: 'PLAY TOGETHER',
-      accent: '#FDE68A',
-      taglineColor: '#DBEAFE',
-    });
-    const root = banner();
-    const all = texts(root);
-    expect(all).toContain(brandBlock.wordmarkLead);
-    expect(all).toContain(brandBlock.wordmarkAccent);
-    expect(all).toContain(brandBlock.tagline);
-    expect(hostByTestId(root, 'banner-brand-block').props.accessibilityLabel).toBe(
-      brandBlock.accessibilityLabel,
-    );
+    expect(pressables(root).map(p => p.props.accessibilityLabel)).not.toContain('GameOn SG');
   });
 
   it('keeps the bell and avatar on the right and the greeting below the top row (style props)', () => {

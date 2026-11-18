@@ -26,7 +26,12 @@ const read = (path: string): string => fs.readFileSync(path, 'utf8');
 const INPUT_SCREENS = [
   'src/screens/LoginScreen.tsx',
   'src/screens/RegisterScreen.tsx',
-  'src/screens/VerifyScreen.tsx',
+  // VerifyScreen renders its input through VerificationCodeForm, which owns the KeyboardAwareScreen.
+  'src/components/auth/VerificationCodeForm.tsx',
+  'src/screens/CompleteAccountScreen.tsx',
+  'src/screens/ResetPasswordScreen.tsx',
+  'src/screens/TournamentEditScreen.tsx',
+  'src/screens/TeamDetailScreen.tsx',
   'src/screens/ForgotPasswordScreen.tsx',
   'src/screens/CreateGameScreen.tsx',
   'src/screens/CreateGroupScreen.tsx',
@@ -48,6 +53,37 @@ const SHARED_INPUT_COMPONENTS = [
   'src/components/UserSearchPicker.tsx',
   // te-a2: the search box of Participants, inside the version 2 tournament page (a KeyboardAwareScreen)
   'src/components/tournament/v2/tabs/ParticipantsTab.tsx',
+  // Form parts and sheets used inside the wrapped create/edit screens above (wizard steps, fees, series, teams).
+  'src/components/GameFeeFields.tsx',
+  'src/components/RepeatWeeklyControl.tsx',
+  'src/components/TeamsDiscoverContent.tsx',
+  'src/components/series/SeriesParts.tsx',
+  'src/components/tournament/FeeEditSheet.tsx',
+  'src/components/tournament/participants/AddTeamSheet.tsx',
+  'src/components/tournament/wizard/BasicsStep.tsx',
+  'src/components/tournament/wizard/CommitteeStep.tsx',
+  'src/components/tournament/wizard/RegistrationStep.tsx',
+  'src/components/tournament/wizard/VisibilityStep.tsx',
+  'src/components/tournament/wizard/WhenWhereStep.tsx',
+];
+
+/**
+ * Files that render a bare TextInput besides the TextField primitive: input primitives, pickers and search
+ * boxes that already sit inside a KeyboardAwareScreen screen (or a modal), plus the screens that mix several inputs.
+ */
+const BARE_TEXT_INPUT_FILES = [
+  'src/components/GroupMultiSelect.tsx',
+  'src/components/NumberField.tsx',
+  'src/components/TextField.tsx',
+  'src/components/tournament/participants/parts.tsx',
+  'src/components/venue/OthersVenueModal.tsx',
+  'src/components/venue/VenueDetailCard.tsx',
+  'src/components/venue/VenuePicker.tsx',
+  'src/screens/AccountDeletionCodeScreen.tsx',
+  'src/screens/CreateGameScreen.tsx',
+  'src/screens/EditProfileScreen.tsx',
+  'src/screens/EventDetailScreen.tsx',
+  'src/screens/TransferGroupOwnershipScreen.tsx',
 ];
 
 const files = sourceFiles('src');
@@ -67,7 +103,7 @@ it('only KeyboardAwareScreen uses KeyboardAvoidingView', () => {
   expect(users).toEqual(['src/components/KeyboardAwareScreen.tsx']);
 });
 
-it('only TextField renders a bare TextInput', () => {
+it('only TextField and the listed input primitives render a bare TextInput', () => {
   const users = files.filter(path => /(^|\n)\s*<TextInput\b/.test(read(path)));
-  expect(users).toEqual(['src/components/TextField.tsx']);
+  expect(users.sort()).toEqual([...BARE_TEXT_INPUT_FILES].sort());
 });

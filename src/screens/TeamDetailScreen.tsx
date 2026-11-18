@@ -6,7 +6,7 @@
  * notice. A failed read shows a retry state, never a stale detail. Role checks here are UX only: the server is the authority.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { withCorrelationId } from '../api/correlationId';
@@ -24,6 +24,7 @@ import { useAuth } from '../auth/AuthContext';
 import Badge from '../components/Badge';
 import Button from '../components/Button';
 import ErrorView from '../components/ErrorView';
+import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import InlineError from '../components/InlineError';
 import LoadingView from '../components/LoadingView';
 import OptionChips from '../components/OptionChips';
@@ -195,7 +196,7 @@ function TeamDetailBody({ team, roster, userId, reload, onLeft }: BodyProps): Re
 
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <KeyboardAwareScreen contentContainerStyle={styles.content}>
         <View style={styles.headerCard}>
           <Text style={styles.title} accessibilityRole="header">
             {team.name}
@@ -404,7 +405,7 @@ function TeamDetailBody({ team, roster, userId, reload, onLeft }: BodyProps): Re
             />
           </View>
         ) : null}
-      </ScrollView>
+      </KeyboardAwareScreen>
       <Toast message={notice} onDismiss={dismissNotice} />
     </View>
   );
@@ -412,7 +413,6 @@ function TeamDetailBody({ team, roster, userId, reload, onLeft }: BodyProps): Re
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  scroll: { flex: 1 },
   content: { padding: spacing.md },
   headerCard: {
     backgroundColor: colors.surface,

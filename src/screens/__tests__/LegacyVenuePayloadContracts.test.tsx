@@ -269,6 +269,8 @@ describe('Legacy Venue Flow Verification (Isolated Suite)', () => {
           visibility: 'public',
           skill_level_requirement: 'all_levels',
           capacity: 4,
+          // Remarks (team-screens-remarks AD-4): optional `description`, sent as null when left empty.
+          description: null,
           starts_at: expect.any(String),
           // Duration (default 2 hrs) replaced the old `ends_at: null`.
           ends_at: expect.any(String),

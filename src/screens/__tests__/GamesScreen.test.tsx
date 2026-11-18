@@ -147,14 +147,15 @@ describe('switch', () => {
     expect(mockGetTournaments).not.toHaveBeenCalled();
   });
 
-  it('Tournaments shows the existing tournaments list unchanged (name, format, registration badge, counts)', async () => {
+  it('Tournaments shows the existing tournaments list unchanged (name, format, registration badge, count)', async () => {
     const root = await mount();
     await tapSegment(root, 'Tournaments');
     const all = texts(root);
     expect(all).toContain('Summer Smash');
     expect(all).toContain('Registered');
     expect(all).toContain('Status: upcoming');
-    expect(all).toContain('4/8 registered');
+    // tournament-edit-recurring AD (line 98): lists show "{count} registered"; the cap is shown on the organizer participants screen only.
+    expect(all).toContain('4 registered');
     expect(mockGetTournaments).toHaveBeenCalledTimes(1);
   });
 
