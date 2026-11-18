@@ -158,7 +158,10 @@ describe('displayPushActionNotification (Android)', () => {
 });
 
 describe('iOS categories (AD-5, DR-08)', () => {
-  it('registers invite_game, invite_tournament and group_added, background actions', async () => {
+  // tournament-registration AD-3/TR-T10 and teams-payments AD-8 add the server-chosen register/confirm categories.
+  const CONFIRM_IDS = ['invite_tournament_confirm', 'invite_game_confirm'];
+
+  it('registers invite_game, invite_tournament and group_added plus the register/confirm categories; only confirm primaries open the app', async () => {
     jest.replaceProperty(Platform, 'OS', 'ios');
 
     await registerPushActionCategories();
@@ -168,11 +171,14 @@ describe('iOS categories (AD-5, DR-08)', () => {
       'invite_game',
       'invite_tournament',
       'group_added',
+      'invite_tournament_register',
+      'invite_tournament_confirm',
+      'invite_game_confirm',
     ]);
     for (const category of categories) {
-      for (const action of category.actions) {
-        expect(action.foreground).toBe(false);
-      }
+      const [primary, secondary] = category.actions;
+      expect(primary.foreground).toBe(CONFIRM_IDS.includes(category.id));
+      expect(secondary.foreground).toBe(false);
     }
     const byId = Object.fromEntries(categories.map((c: { id: string }) => [c.id, c]));
     expect(byId.invite_game.actions.map((a: { title: string }) => a.title)).toEqual(['Accept', 'Decline']);
@@ -191,7 +197,8 @@ describe('iOS categories (AD-5, DR-08)', () => {
 
     for (const category of mockSetCategories.mock.calls[0][0]) {
       const [primary, secondary] = category.actions;
-      expect(primary.authenticationRequired).toBe(true);
+      // A confirm primary opens the app, so it needs no lock-screen authentication.
+      expect(primary.authenticationRequired).toBe(CONFIRM_IDS.includes(category.id) ? undefined : true);
       expect(secondary.authenticationRequired).toBeUndefined();
     }
   });

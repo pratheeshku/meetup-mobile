@@ -33,9 +33,14 @@ describe('getTournamentStandings', () => {
 describe('getTournamentScoringState', () => {
   beforeEach(() => get.mockReset());
 
-  it('calls the state route and keeps only enabled and applicable', async () => {
+  it('calls the state route and carries the additive committee fields as the server sent them', async () => {
     get.mockResolvedValue({ data: { enabled: true, applicable: true, committee: { points: null }, is_committee: true } });
-    expect(await getTournamentScoringState('t-1', { correlationId: 'c-1' })).toEqual({ enabled: true, applicable: true });
+    expect(await getTournamentScoringState('t-1', { correlationId: 'c-1' })).toEqual({
+      enabled: true,
+      applicable: true,
+      is_committee: true,
+      committee: { points: null, latest_draft: null, group_options: null },
+    });
     expect(get).toHaveBeenCalledWith('/tournaments/t-1/scoring/state', { correlationId: 'c-1' });
   });
 

@@ -77,7 +77,7 @@ describe('App with the force-update gate', () => {
     await mountApp();
 
     const visible = texts(root());
-    expect(visible).toEqual(expect.arrayContaining(['Update required', 'Please update Shuttlr to continue.', 'Update']));
+    expect(visible).toEqual(expect.arrayContaining(['Update required', 'Please update GameOn SG to continue.', 'Update']));
     expect(visible).not.toContain('Sign In'); // the login screen is not reachable
     expect(visible).not.toContain("Don't have an account? Register");
     expect(pressables(root())).toHaveLength(1); // only "Update": no tabs, links or sign-in controls
