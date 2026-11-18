@@ -685,7 +685,8 @@ describe('CreateGameScreen — keyboard avoidance and date/time picker integrati
 });
 
 // Restored from origin/main and re-driven through the six-step wizard. Each test below FAILS on purpose: it asserts
-// DES-MEETUP-MOBILE §4.3 (approved 2026-09-22), which no approved design removes or amends. Reported as case (c),
+// DES-MEETUP-MOBILE §4.3 (approved 2026-09-22), which no approved design removes or amends (the cost tests cover
+// EventCreate.estimated_cost_*, which §4.3's field list does not name and no design removes). Reported as case (c),
 // pending the owner's ruling. CreateGameScreen is not changed to suit them.
 describe('CreateGameScreen — DES §4.3 behaviour pending owner ruling (case c)', () => {
   it('fills the date portion of Start Date & Time from the quick-select chips, keeping any selected time (DES §4.3)', async () => {
@@ -708,7 +709,7 @@ describe('CreateGameScreen — DES §4.3 behaviour pending owner ruling (case c)
     expect(mockCreateTournament).not.toHaveBeenCalled();
   });
 
-  describe('estimated cost and currency (EventCreate.estimated_cost_cents / estimated_cost_currency, DES §4.3)', () => {
+  describe('estimated cost and currency (EventCreate.estimated_cost_cents / estimated_cost_currency; not listed in DES §4.3, no design removes it)', () => {
     it('omits cost/currency from the payload when left blank', async () => {
       mockCreateEvent.mockResolvedValueOnce({} as never);
       const root = await mount();
