@@ -683,3 +683,72 @@ describe('CreateGameScreen — keyboard avoidance and date/time picker integrati
     );
   });
 });
+
+// Restored from origin/main and re-driven through the six-step wizard. Each test below FAILS on purpose: it asserts
+// DES-MEETUP-MOBILE §4.3 (approved 2026-09-22), which no approved design removes or amends. Reported as case (c),
+// pending the owner's ruling. CreateGameScreen is not changed to suit them.
+describe('CreateGameScreen — DES §4.3 behaviour pending owner ruling (case c)', () => {
+  it('fills the date portion of Start Date & Time from the quick-select chips, keeping any selected time (DES §4.3)', async () => {
+    const root = await mount();
+    await advance(root, 2);
+    pick(root, 'Start time', new Date(2000, 0, 1, 20, 15));
+    await press(byText(root, 'Today'));
+    const text = texts(root).join(' ');
+    expect(text).toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(text).toContain('20:15');
+  });
+
+  it('tournament: no sport chosen is rejected with "Choose a sport." (DES §4.3)', async () => {
+    mockCreateTournament.mockResolvedValue({ id: 't-1' } as never);
+    const root = await mount();
+    await chooseTournament(root);
+    await fillGameToReview(root, 8);
+    await submit(root);
+    expect(texts(root)).toContain('Choose a sport.');
+    expect(mockCreateTournament).not.toHaveBeenCalled();
+  });
+
+  describe('estimated cost and currency (EventCreate.estimated_cost_cents / estimated_cost_currency, DES §4.3)', () => {
+    it('omits cost/currency from the payload when left blank', async () => {
+      mockCreateEvent.mockResolvedValueOnce({} as never);
+      const root = await mount();
+      await fillGameToReview(root);
+      input(root, 'e.g. 15.00'); // the cost field must exist on the form
+      await submit(root);
+      const [payload] = mockCreateEvent.mock.calls[0];
+      expect(payload).not.toHaveProperty('estimated_cost_cents');
+      expect(payload).not.toHaveProperty('estimated_cost_currency');
+    });
+
+    it('converts a typed cost to integer cents and uppercases the currency code', async () => {
+      mockCreateEvent.mockResolvedValueOnce({} as never);
+      const root = await mount();
+      await fillGameToReview(root);
+      type(input(root, 'e.g. 15.00'), '12.5');
+      type(input(root, 'USD'), 'sgd');
+      await submit(root);
+      expect(mockCreateEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ estimated_cost_cents: 1250, estimated_cost_currency: 'SGD' }),
+        { correlationId: expect.any(String) },
+      );
+    });
+
+    it('rejects a negative or non-numeric cost', async () => {
+      const root = await mount();
+      await fillGameToReview(root);
+      type(input(root, 'e.g. 15.00'), '-5');
+      await submit(root);
+      expect(texts(root)).toContain('Estimated cost must be a non-negative number.');
+      expect(mockCreateEvent).not.toHaveBeenCalled();
+    });
+
+    it('rejects a currency code that is not exactly 3 letters', async () => {
+      const root = await mount();
+      await fillGameToReview(root);
+      type(input(root, 'USD'), 'US');
+      await submit(root);
+      expect(texts(root)).toContain('Currency code must be 3 letters (e.g. USD, SGD).');
+      expect(mockCreateEvent).not.toHaveBeenCalled();
+    });
+  });
+});
