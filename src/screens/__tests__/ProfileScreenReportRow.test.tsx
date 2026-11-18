@@ -1,20 +1,21 @@
 /**
- * "Report a problem or content" row on Profile (DES-MEETUP-ADDENDUM-IOS-App.md
- * §7): shown only for a valid https URL in `config/appConfig.json`, opened
- * with `Linking.openURL`, platform-blind (run as both Android and iOS).
+ * "Report a problem or content" row (DES-MEETUP-ADDENDUM-IOS-App.md §7): shown only for a
+ * valid https URL in `config/appConfig.json`, opened with `Linking.openURL`, platform-blind
+ * (run as both Android and iOS). The row now lives on the Settings screen (HELP section).
  */
 import React from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 
 import appConfig from '../../../config/appConfig.json';
-import { getProfile } from '../../api/profile';
-import { getSports } from '../../api/sports';
+import { getNotificationSettings } from '../../api/profile';
 import { act, pressableWithText, renderAsync, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
-import ProfileScreen from '../ProfileScreen';
+import SettingsScreen from '../SettingsScreen';
 
-type Props = React.ComponentProps<typeof ProfileScreen>;
+type Props = React.ComponentProps<typeof SettingsScreen>;
 
+// The approved design names this row "Report a problem or content" (IOS-App §7). SettingsScreen renders
+// 'mob.settings.report_problem' = "Report a problem": a product label gap, so the row tests that find it fail on purpose.
 const ROW = 'Report a problem or content';
 const mockConfig = appConfig as { reportFormUrl: string };
 
@@ -22,37 +23,16 @@ jest.mock('../../../config/appConfig.json', () => ({
   __esModule: true,
   default: { reportFormUrl: '' },
 }));
-jest.mock('../../api/mobileNumber', () => ({
-  getMobileConsent: jest.fn(() => Promise.reject(new Error('unavailable'))),
-  getCountryCodes: jest.fn(() => Promise.reject(new Error('unavailable'))),
-  updateMobileNumber: jest.fn(),
-  classifyMobileNumberError: jest.fn(() => 'other'),
-}));
-jest.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ signOut: jest.fn(), updateUser: jest.fn() }),
-}));
 jest.mock('../../api/profile', () => ({
-  getProfile: jest.fn(),
-  getProfileSummary: jest.fn().mockResolvedValue({ games_played: 0, games_hosted: 0, groups_count: 0, recent_games: [] }),
-  updateProfile: jest.fn(),
-  updateSkillLevel: jest.fn(),
-  deleteSkillLevel: jest.fn(),
+  getNotificationSettings: jest.fn(),
+  updateNotificationSettings: jest.fn(),
   requestDeletion: jest.fn(),
-  confirmDeletion: jest.fn(),
-  uploadAvatar: jest.fn(),
-  deleteAvatar: jest.fn(),
+  parseOwnsGroupsError: jest.fn(),
 }));
-jest.mock('../../api/groups', () => ({
-  getMyGroups: jest.fn().mockResolvedValue({ items: [], total: 0 }),
-}));
-jest.mock('../../api/home', () => ({
-  getCachedBanners: jest.fn().mockResolvedValue(null),
-}));
-jest.mock('../../api/sports', () => ({ getSports: jest.fn() }));
 
 const mount = (): Promise<Instance> =>
   renderAsync(
-    <ProfileScreen {...({ navigation: { navigate: jest.fn() }, route: {} } as unknown as Props)} />,
+    <SettingsScreen {...({ navigation: { navigate: jest.fn(), goBack: jest.fn() }, route: {} } as unknown as Props)} />,
   );
 
 let openURL: jest.SpyInstance;
@@ -61,14 +41,7 @@ let alertSpy: jest.SpyInstance;
 beforeEach(() => {
   jest.clearAllMocks();
   mockConfig.reportFormUrl = '';
-  (getProfile as jest.Mock).mockReset().mockResolvedValue({
-    id: 'u-1',
-    email: 'sam@example.com',
-    nickname: 'sam99',
-    display_name: 'Sam Smith',
-    skill_levels: [],
-  });
-  (getSports as jest.Mock).mockReset().mockResolvedValue([]);
+  (getNotificationSettings as jest.Mock).mockReset().mockResolvedValue({ push_enabled: true, email_enabled: true });
   openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 });
