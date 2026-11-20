@@ -30,13 +30,15 @@ const ADDED_TYPES = [
   'tournament_registration_removed',
   'tournament_updated',
   'tournament_registration_added',
+  'event_response',
+  'tournament_response',
 ] as const;
 
 describe('type list', () => {
-  it('contains the added types alongside the original 12 (25 total, no duplicates)', () => {
+  it('contains the added types alongside the original 12 (27 total, no duplicates)', () => {
     expect(NOTIFICATION_TYPES).toEqual(expect.arrayContaining([...ADDED_TYPES]));
-    expect(NOTIFICATION_TYPES).toHaveLength(25);
-    expect(new Set(NOTIFICATION_TYPES).size).toBe(25);
+    expect(NOTIFICATION_TYPES).toHaveLength(27);
+    expect(new Set(NOTIFICATION_TYPES).size).toBe(27);
   });
 
   it('resolves every listed type without throwing (list and switch cannot drift)', () => {
@@ -217,5 +219,19 @@ describe('tournament_updated and tournament_registration_added (er-m-series, AD-
   it('series actions keep reusing event_changed and event_cancelled, which open the game', () => {
     expect(resolveNotificationTarget('event_changed', 'evt-1')).toEqual({ tab: 'Home', screen: 'EventDetail', params: { eventId: 'evt-1' } });
     expect(resolveNotificationTarget('event_cancelled', 'evt-1')).toEqual({ tab: 'Home', screen: 'EventDetail', params: { eventId: 'evt-1' } });
+  });
+});
+
+describe('event_response and tournament_response (rn-t3, response-notice v1.0.1)', () => {
+  it('event_response opens the game for the entity id', () => {
+    expect(resolveNotificationTarget('event_response', 'evt-7')).toEqual({ tab: 'Home', screen: 'EventDetail', params: { eventId: 'evt-7' } });
+  });
+
+  it('tournament_response opens the tournament for the entity id', () => {
+    expect(resolveNotificationTarget('tournament_response', 't-7')).toEqual({
+      tab: 'Tournaments',
+      screen: 'TournamentDetail',
+      params: { tournamentId: 't-7' },
+    });
   });
 });

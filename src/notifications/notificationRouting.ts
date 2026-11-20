@@ -65,6 +65,7 @@ export function resolveNotificationTarget(
     case 'waitlist_promoted':
     case 'group_event_created':
     case 'event_reminder':
+    case 'event_response': // response-notice v1.0.1: a guest's reply to the organizer's game; entity_id = the event id
       return {
         tab: 'Home',
         screen: 'EventDetail',
@@ -115,6 +116,7 @@ export function resolveNotificationTarget(
     case 'tournament_standings_published':
     case 'tournament_advanced': // match scoring (v1.2 AD-S8): entity_id = the tournament id
     case 'tournament_result_corrected':
+    case 'tournament_response': // response-notice v1.0.1: a guest's reply to the organizer's tournament; entity_id = the tournament id
       return {
         tab: 'Tournaments',
         screen: 'TournamentDetail',

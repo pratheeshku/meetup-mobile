@@ -1943,6 +1943,9 @@ export const DEFAULT_LABELS = {
   'mob.notif_pref.type_tournament_registration_removed': "Removed from a tournament",
   'mob.notif_pref.type_tournament_updated': "Tournament dates or venue changed",
   'mob.notif_pref.type_tournament_registration_added': "Added to a tournament",
+  // rn-t3 (response-notice v1.0.1): organizer-only reply notices (new, not seeded: listed in the report).
+  'mob.notif_pref.type_event_response': "Guest replies to your games",
+  'mob.notif_pref.type_tournament_response': "Guest replies to your tournaments",
 
   // tp-mobile: Groups | Tournament teams (AD-4) (new, not seeded: listed in the report).
   'mob.groups.switch_groups': 'Groups',
