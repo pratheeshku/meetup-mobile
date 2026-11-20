@@ -20,4 +20,4 @@ Source: DES-MEETUP-ADDENDUM-response-notice v1.0.1 (contract block in the task).
 - "Land where Responses is visible": EventDetail/TournamentDetail render the Responses section inline and have no scroll-to-section param, so no new UI was added; the tap opens the detail screen.
 - New label keys are not seeded server-side (listed for the owner).
 - Push `data.entity_id` for these types is assumed to carry the id (contract only shows entity_ref); not verifiable without a live push.
-- Device test and screenshots: pending.
+- Device test and screenshots: NOT DONE. No Android SDK/AVD on this Mac. `npm run ios` on the booted simulator GameOnTest failed before building (`Simulator.app` not found at /Applications/Xcode.app/Contents/Developer/Applications/). The simulator still runs an older build, so no screenshot of this branch exists. Push delivery cannot be tested on the iOS simulator, and a real notice needs a second account to answer a game on production.
