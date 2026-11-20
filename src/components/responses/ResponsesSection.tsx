@@ -307,13 +307,14 @@ export default function ResponsesSection({
           return null;
       }
     };
+    // Sending needs a user id; a blocked row (for example `no_account`, an email invitee with no user id yet)
+    // still shows, disabled, with its reason.
     const showRemindControl =
       Boolean(remind) &&
       isPending &&
-      Boolean(person.user_id) &&
       !rowState?.hidden &&
       !rowState?.notPending &&
-      (person.can_remind === true || blockedReason !== null);
+      ((person.can_remind === true && Boolean(person.user_id)) || blockedReason !== null);
     const remindDisabled = blockedReason !== null || rowState?.phase === 'sent';
     const remindStatus: { text: string; tone: 'ok' | 'error' | 'muted' } | null = !isPending || !remind
       ? null
@@ -393,7 +394,7 @@ export default function ResponsesSection({
               <Text style={styles.viaText}>{t('mob.gv.via_email')}</Text>
             </View>
           ) : null}
-          {showRemindControl && person.user_id ? (
+          {showRemindControl ? (
             <Button
               label={t('mob.remind.button')}
               size="sm"
@@ -401,7 +402,11 @@ export default function ResponsesSection({
               style={styles.remindButton}
               loading={rowState?.phase === 'sending'}
               disabled={remindDisabled}
-              onPress={() => sendReminder(person.user_id as string)}
+              onPress={() => {
+                if (person.user_id) {
+                  sendReminder(person.user_id);
+                }
+              }}
               testID={`remind-button-${index}`}
             />
           ) : null}

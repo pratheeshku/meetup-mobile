@@ -198,7 +198,7 @@ describe('Remind control on Pending rows', () => {
     expect(status(root, 0)).toBe('Reminder sent');
   });
 
-  it('a person without a user id (email-only) gets no control', () => {
+  it('a person without a user id cannot be sent a reminder, even if can_remind says true', () => {
     const root = render(
       <ResponsesSection
         responses={responsesWith([{ user_id: null, display_name: '', email: 'x@example.com', can_remind: true }])}
@@ -206,5 +206,21 @@ describe('Remind control on Pending rows', () => {
       />,
     );
     expect(button(root, 0)).toBeUndefined();
+  });
+
+  it('an email invitee with no account yet shows Remind disabled with the reason, without a user id', () => {
+    const remind = makeRemind(jest.fn());
+    const root = render(
+      <ResponsesSection
+        responses={responsesWith([
+          { user_id: null, display_name: '', email: 'x@example.com', can_remind: false, remind_blocked_reason: 'no_account' },
+        ])}
+        remind={remind}
+      />,
+    );
+    expect(button(root, 0)).toBeDefined();
+    expect(buttonState(root, 0)?.disabled).toBe(true);
+    expect(status(root, 0)).toBe('This person has no account yet');
+    expect(remind.send).not.toHaveBeenCalled();
   });
 });
