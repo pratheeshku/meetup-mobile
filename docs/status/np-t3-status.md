@@ -13,8 +13,11 @@ Source: task brief (DES-MEETUP-ADDENDUM-notification-preferences-access v1.0). N
 - `npx tsc --noEmit` clean; `npm run check:labels` OK; eslint clean on touched files.
 - Device (iOS simulator GameOnTest, iOS 27.0, Release build of this branch, test account): Profile > Settings shows the Notifications row under Push and Email with its caption; tapping it opens the Notification Preferences list (screen title "Notification Preferences", all types on). Screenshots in the report.
 
+## Persistence check (device): DONE
+iOS simulator GameOnTest, Release build of np-t3, test account. Settings > Notifications opened the per-type list; "Game reminders" was switched off (it showed off); the app was terminated and relaunched as a new process; after navigating Profile > Settings > Notifications again the list (loaded from the server) still showed "Game reminders" off and every other type on. The switch was then turned back on (it shows on, no error text) so the test account is as found. Persistence is the existing `updatePreference` / `getPreferences` round trip, unchanged by this task.
+Note: simulator input was unreliable (dropped taps, frames lagging one step); the toggle only registered reliably with a touch_path tap, and the result was confirmed from a fresh frame after the restart.
+
 ## NOT verified
-- Toggle a type, restart the app, confirm it persisted: NOT DONE. On the simulator the taps on the type switch did not produce a visible change (three single taps, the screen showed every type on each time, no error text), and input to this simulator was unreliable throughout (many taps dropped, frames lagging a step behind). I could not tell whether a tap was dropped or toggled and reverted, so I did not restart-test. The toggle state of "Game reminders" on the test account is believed unchanged (on) but not confirmed. Toggle/persist behaviour is existing code (`NotificationPreferencesList`, `updatePreference`/`getPreferences`) not changed by this task.
 - Android: no SDK/AVD on this Mac.
 
 ## Environment notes (see rn-t3 status for the Debug-build evidence)
