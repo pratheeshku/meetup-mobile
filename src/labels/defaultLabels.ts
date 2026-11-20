@@ -1100,6 +1100,17 @@ export const DEFAULT_LABELS = {
   'mob.respond.via.invitation': 'Invited',
   'mob.respond.via.public': 'Public',
   'mob.respond.via.joined': 'Joined',
+  // ir-t3 (invite-reminder v1.0.2): new, not seeded: listed in the report.
+  'mob.remind.button': 'Remind',
+  'mob.remind.reminded': 'Reminded {when}',
+  'mob.remind.sent': 'Reminder sent',
+  'mob.remind.failed': 'Could not send reminder',
+  'mob.remind.no_account': 'This person has no account yet',
+  'mob.remind.limit': 'Reminder limit reached',
+  'mob.remind.too_soon': 'Try again in {minutes} minutes',
+  'mob.remind.off': 'Reminders are switched off',
+  'mob.remind.not_pending': 'This person has already replied',
+  'mob.remind.item_closed': 'This invitation is closed',
 
   // Game and tournament view redesign (gv-mobile / DES-MEETUP-ADDENDUM-game-view-redesign §6)
   'mob.gv.invite_type': 'Invite type',

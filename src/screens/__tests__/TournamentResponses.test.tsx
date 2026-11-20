@@ -111,4 +111,44 @@ describe('TournamentDetailScreen decline and responses', () => {
     expect(content).toContain('Declined');
     expect(content).toContain('Bob');
   });
+
+  it('Remind on a Pending row posts to /tournaments/{id}/reminders and shows the sent row', async () => {
+    mockGet.mockReset().mockImplementation((url: string) => {
+      if (url === '/tournaments/t-1') {
+        return Promise.resolve({ data: rawTournament({ organizer_id: 'user-me' }) });
+      }
+      if (url === '/tournaments/t-1/responses') {
+        return Promise.resolve({
+          data: {
+            accepted: { total: 0, items: [] },
+            pending: {
+              total: 1,
+              items: [{ user_id: 'p1', display_name: 'Priya', can_remind: true, reminder_count: 0, last_reminded_at: null }],
+            },
+            declined: { total: 0, items: [] },
+          },
+        });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    const now = new Date().toISOString();
+    mockPost.mockReset().mockResolvedValue({ data: { sent_at: now, last_reminded_at: now, reminder_count: 1 } });
+
+    const props = {
+      route: { key: 'k', name: 'TournamentDetail', params: { tournamentId: 't-1' } },
+      navigation: {},
+    } as any;
+    const root = await renderAsync(<TournamentDetailScreen {...props} />);
+    const button = root.find(n => n.props.testID === 'remind-button-0' && typeof n.props.onPress === 'function');
+    await act(async () => button.props.onPress());
+
+    expect(mockPost).toHaveBeenCalledWith(
+      '/tournaments/t-1/reminders',
+      { user_id: 'p1' },
+      { correlationId: expect.any(String) },
+    );
+    const content = texts(root).join(' | ');
+    expect(content).toContain('Reminder sent');
+    expect(content).toContain('Reminded Just now');
+  });
 });

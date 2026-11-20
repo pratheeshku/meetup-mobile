@@ -312,6 +312,24 @@ export interface ResponsePerson {
   declined_at?: string | null;
   via?: 'invitation' | 'public' | 'joined' | string | null;
   waitlisted?: boolean;
+  /**
+   * Pending rows only (DES-MEETUP-ADDENDUM-invite-reminder v1.0.2, additive). The server decides `can_remind`;
+   * the app never computes it. Absent on other sections and from older servers.
+   */
+  last_reminded_at?: string | null;
+  reminder_count?: number;
+  can_remind?: boolean;
+  /** null, or `no_account`, `limit`, `too_soon`, `item_closed`. */
+  remind_blocked_reason?: 'no_account' | 'limit' | 'too_soon' | 'item_closed' | string | null;
+  /** Seconds; set only when `remind_blocked_reason` is `too_soon`. */
+  remind_retry_after_seconds?: number | null;
+}
+
+/** `POST /events|tournaments/{id}/reminders` 200 (invite-reminder v1.0.2); a repeat tap within 60 s returns the same shape. */
+export interface ReminderAck {
+  sent_at: string;
+  last_reminded_at: string;
+  reminder_count: number;
 }
 
 export interface ResponseSection {

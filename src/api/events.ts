@@ -33,6 +33,7 @@ import type {
   EventStatus,
   GameDisplayStatus,
   LifecycleStatus,
+  ReminderAck,
   ResponsesResponse,
   RsvpStatus,
   UpdateEventInput,
@@ -618,6 +619,25 @@ export async function getEventResponses(
   return data;
 }
 
+
+/**
+ * `POST /events/{id}/reminders` with `{"user_id"}` (DES-MEETUP-ADDENDUM-invite-reminder v1.0.2). Organizer only.
+ * 200 `{sent_at, last_reminded_at, reminder_count}` (also a repeat tap within 60 s). Errors: 403, 404 (no access,
+ * not invited, or the feature is off), 409 `REMINDER_NOT_PENDING` / `REMINDER_NO_ACCOUNT` / `REMINDER_LIMIT` /
+ * `REMINDER_TOO_SOON` (with `retry_after_seconds`) / `game_ended`; see `parseReminderError`.
+ */
+export async function remindEventInvitee(
+  id: string,
+  userId: string,
+  options?: RequestOptions,
+): Promise<ReminderAck> {
+  const { data } = await apiClient.post<ReminderAck>(
+    `/events/${id}/reminders`,
+    { user_id: userId },
+    { correlationId: options?.correlationId },
+  );
+  return data;
+}
 
 /** `POST /events/{id}/series/leave` (AD-8): the member is withdrawn from every future game. The organizer is refused (409 `SERIES_ORGANIZER_CANNOT_LEAVE`). */
 export async function leaveEventSeries(id: string, options?: RequestOptions): Promise<{ gamesLeft: number | null }> {
