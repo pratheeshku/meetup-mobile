@@ -60,14 +60,21 @@ target 'MeetupMobile' do
       raise_deployment_target.call(target.build_configurations)
     end
 
-    # React-Core-prebuilt is built in release mode (with REACT_NATIVE_PRODUCTION / NDEBUG).
-    # When compiling third-party pods in Debug configuration, ensure REACT_NATIVE_PRODUCTION
-    # is defined so Fabric headers don't emit debug-only symbols (Sealable, ShadowNode::getDebug*, etc.)
-    # that are not exported by the prebuilt binary.
+    # React-Core-prebuilt ships a Debug and a Release flavor and swaps between them per build
+    # configuration (its "[RNCore] Replace React Native Core" script phase). The Debug flavor is
+    # built with REACT_NATIVE_DEBUG, which changes the layout of Props, Sealable and
+    # DebugStringConvertible (sizeof(Props) is 40 with REACT_NATIVE_DEBUG, 32 with
+    # REACT_NATIVE_PRODUCTION). Pod code must therefore see the same macro as the flavor it links:
+    # Debug pods keep React Native's default (REACT_NATIVE_DEBUG, derived from the absence of
+    # NDEBUG), and only non-Debug configurations get REACT_NATIVE_PRODUCTION=1. Defining it in Debug
+    # compiled pods with the 32-byte layout against the 40-byte binary and crashed at launch in
+    # Props::Props() (RNCSafeAreaProviderProps). Release configurations are unchanged.
     rn_prod_flag = ' -DREACT_NATIVE_PRODUCTION=1'
 
     installer.aggregate_targets.each do |aggregate_target|
       aggregate_target.xcconfigs.each do |config_name, config_file|
+        next if aggregate_target.user_build_configurations[config_name] == :debug
+
         ReactNativePodsUtils.add_flag_to_map_with_inheritance(config_file.attributes, 'OTHER_CPLUSPLUSFLAGS', rn_prod_flag)
         ReactNativePodsUtils.add_flag_to_map_with_inheritance(config_file.attributes, 'OTHER_CFLAGS', rn_prod_flag)
         config_file.save_as(aggregate_target.xcconfig_path(config_name))
@@ -76,6 +83,9 @@ target 'MeetupMobile' do
 
     installer.pod_targets.each do |pod_target|
       pod_target.build_settings.each do |config_name, _|
+        # build_settings is keyed by the configuration type (:debug / :release).
+        next if config_name == :debug
+
         xcconfig_path = pod_target.xcconfig_path(config_name)
         next unless File.exist?(xcconfig_path)
 
@@ -88,6 +98,8 @@ target 'MeetupMobile' do
 
     installer.target_installation_results.pod_target_installation_results.each do |pod_name, target_installation_result|
       target_installation_result.native_target.build_configurations.each do |cfg|
+        next if cfg.type == :debug
+
         ReactNativePodsUtils.add_flag_to_map_with_inheritance(cfg.build_settings, 'OTHER_CPLUSPLUSFLAGS', rn_prod_flag)
         ReactNativePodsUtils.add_flag_to_map_with_inheritance(cfg.build_settings, 'OTHER_CFLAGS', rn_prod_flag)
       end
