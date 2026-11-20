@@ -22,5 +22,13 @@ Backend: `GET /api/version` = 199 (release r17-1-a151004). Source: DES-MEETUP-AD
 - `too_soon` text "Try again in {minutes} minutes" reads "1 minutes" for under a minute (the fallback text is as specified); minutes are rounded up.
 - New label keys are not seeded server-side.
 
-## Still to do
-Device check (UI on the simulator, reminder-push buttons), report.
+## Device check (iOS simulator GameOnTest, Release build of this branch) - IN PROGRESS
+- Backend vs contract: the live `/openapi.json` (version 199) has `POST /events/{id}/reminders` and `POST /tournaments/{id}/reminders` with `{user_id: uuid}` -> `{sent_at, last_reminded_at, reminder_count}`, and `ResponsePerson` with `last_reminded_at`, `reminder_count`, `can_remind`, `remind_blocked_reason`, `remind_retry_after_seconds`. Matches the contract; no Blocked Report.
+- Real data: the test account's only hosted game ("Sunday Doubles", public, closed) shows the Responses section with Accepted 1, Declined 0, Pending 0, so no Remind row can appear there (correct: the server lists nobody). No game was created and no one was invited on production (it could notify real people). No real reminder was sent.
+- To see every Remind state without touching production, a local pass-through proxy (not in the repo) forwards everything to production unchanged except: it injects scripted Pending rows into `GET /events/{id}/responses`, and answers `POST /events/{id}/reminders` itself (200, TOO_SOON with seconds, NOT_PENDING, 503 then 200, and list-level limit / too_soon / item_closed / no_account rows). A Release build with `API_BASE_URL=http://localhost:8765` (gitignored `.env`, backed up, to be restored) is installed.
+- BLOCKED: on first launch against the proxy the app showed "Session expired. Please sign in again." (`GET /users/me`, then `POST /auth/refresh`, then sign-out). It is not known whether the saved refresh token had simply expired or the proxy hop broke it (status codes were not logged at the time; they are now). The test account must be signed in again on the simulator by its owner (passwords are not entered by the agent).
+- NOT DONE yet: screenshots of the Remind row states; the reminder-push buttons check (inject an invitation push with `aps.category` `invite_game` and look for Accept and Decline); Accept/Decline completing a real response needs a real invitation to the test account.
+- Local housekeeping still to do at the end: restore `.env` from backup, stop the proxy, revert the `pod install` side effects (`Podfile.lock`, `project.pbxproj`, `PrivacyInfo.xcprivacy`) so only branch changes are committed.
+
+## Fix found during the check
+An email invitee with no account yet has no `user_id` but the contract gives them `remind_blocked_reason: no_account`; the first version hid that row. Now a blocked row shows disabled with its reason without a user id (commit 1c9e3ee, test added). Sending still requires a user id.
