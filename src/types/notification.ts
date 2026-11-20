@@ -48,9 +48,11 @@ export type NotificationType =
   | 'tournament_updated'
   | 'tournament_registration_added'
   | 'group_deleted'
-  | 'group_ownership_transferred';
+  | 'group_ownership_transferred'
+  | 'event_response'
+  | 'tournament_response';
 
-/** All 25 known notification types (tournament-edit-recurring AD-9 added `tournament_updated`, `tournament_registration_added`; match-scoring v1.2 AD-S8 added `tournament_advanced`, `tournament_result_corrected`; teams-payments AD-12, AD-14 added `tournament_registration_removed`, `team_join_request`). */
+/** All 27 known (response-notice v1.0.1 added `event_response`, `tournament_response`: organizer-only, informational; entity_id = the game / tournament id). Earlier: 25 known notification types (tournament-edit-recurring AD-9 added `tournament_updated`, `tournament_registration_added`; match-scoring v1.2 AD-S8 added `tournament_advanced`, `tournament_result_corrected`; teams-payments AD-12, AD-14 added `tournament_registration_removed`, `team_join_request`). */
 export const NOTIFICATION_TYPES: NotificationType[] = [
   'global',
   'event_invite',
@@ -77,6 +79,8 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   'tournament_registration_added',
   'group_deleted',
   'group_ownership_transferred',
+  'event_response',
+  'tournament_response',
 ];
 
 /**

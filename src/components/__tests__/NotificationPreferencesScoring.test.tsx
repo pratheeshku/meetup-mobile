@@ -26,4 +26,11 @@ describe('NotificationPreferencesList (match scoring types)', () => {
     expect(all).toContain('Tournament advancement');
     expect(all).toContain('Tournament result changes');
   });
+
+  it('shows the two organizer reply types, default on, when the backend has not returned them (rn-t3)', async () => {
+    (getPreferences as jest.Mock).mockResolvedValue([]);
+    const all = texts(await renderAsync(<NotificationPreferencesList />));
+    expect(all).toContain('Guest replies to your games');
+    expect(all).toContain('Guest replies to your tournaments');
+  });
 });

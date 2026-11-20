@@ -71,6 +71,8 @@ const NOTIFICATION_TYPE_LABEL_KEYS: Record<NotificationType, LabelKey> = {
   tournament_registration_added: 'mob.notif_pref.type_tournament_registration_added',
   group_deleted: 'mob.notif_pref.type_group_deleted',
   group_ownership_transferred: 'mob.notif_pref.type_group_ownership_transferred',
+  event_response: 'mob.notif_pref.type_event_response',
+  tournament_response: 'mob.notif_pref.type_tournament_response',
 };
 
 interface NotificationPreferencesListProps {
