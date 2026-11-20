@@ -570,6 +570,9 @@ export const DEFAULT_LABELS = {
   'mob.settings.title': 'Settings',
   'mob.settings.section_notifications': 'NOTIFICATIONS',
   'mob.settings.push_notifications': 'Push notifications',
+  // np-t3 (notification-preferences-access v1.0): new, not seeded: listed in the report.
+  'mob.settings.notifications': 'Notifications',
+  'mob.settings.notifications_sub': 'Choose which notifications you get',
   'mob.settings.email_notifications': 'Email notifications',
   'mob.settings.section_help': 'HELP',
   'mob.settings.contact_support': 'Contact support',

@@ -2,7 +2,7 @@
  * Settings screen (Phase 2 revamp, Settings.png).
  *
  * Controls:
- * - NOTIFICATIONS: Push notifications switch, Email notifications switch
+ * - NOTIFICATIONS: Push notifications switch, Email notifications switch, Notifications row (per-type preferences)
  * - HELP: Contact support, Report a problem
  * - ABOUT: Privacy policy, Terms and conditions
  * - DANGER ZONE: Delete account card linking to Phase 1 deletion flow
@@ -223,6 +223,26 @@ export default function SettingsScreen({ navigation }: Props): React.JSX.Element
                 thumbColor={colors.white}
               />
             </View>
+
+            <View style={styles.divider} />
+
+            {/* np-t3: per-type preferences, shown whatever the two master toggles say. */}
+            <Pressable
+              style={styles.clickableRow}
+              onPress={() => navigation.navigate('NotificationPreferences')}
+              accessibilityRole="button"
+              accessibilityLabel={t('mob.settings.notifications')}
+              testID="settings-notifications-row"
+            >
+              <IconBadge color="purple" size={40} borderRadius={12}>
+                <BellIcon size={20} />
+              </IconBadge>
+              <View style={styles.dangerTextCol}>
+                <Text style={styles.rowTitle}>{t('mob.settings.notifications')}</Text>
+                <Text style={styles.dangerSubtitle}>{t('mob.settings.notifications_sub')}</Text>
+              </View>
+              <ArrowRightIcon size={18} />
+            </Pressable>
           </View>
         </View>
 
