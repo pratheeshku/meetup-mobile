@@ -9,6 +9,10 @@
          (DES-MEETUP-MOBILE.md; Game3When board "Use my current location"). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
+    <!-- react-native-blob-util adds ACCESS_WIFI_STATE, which implies android.hardware.wifi as
+         required. Mark it optional so Play does not restrict availability. -->
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
