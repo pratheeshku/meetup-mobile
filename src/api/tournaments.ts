@@ -29,6 +29,7 @@ import type {
   CommitteeMember,
   CreateTournamentInput,
   DeclineAck,
+  ReminderAck,
   ResponsesResponse,
   TournamentClosurePut,
   TournamentEditBody,
@@ -663,6 +664,23 @@ export async function getTournamentResponses(
   const { data } = await apiClient.get<ResponsesResponse>(`/tournaments/${id}/responses`, {
     correlationId: options?.correlationId,
   });
+  return data;
+}
+
+/**
+ * `POST /tournaments/{id}/reminders` with `{"user_id"}` (DES-MEETUP-ADDENDUM-invite-reminder v1.0.2). Same
+ * contract and errors as `remindEventInvitee`; the closed-item 409 code is the tournament equivalent of `game_ended`.
+ */
+export async function remindTournamentInvitee(
+  id: string,
+  userId: string,
+  options?: RequestOptions,
+): Promise<ReminderAck> {
+  const { data } = await apiClient.post<ReminderAck>(
+    `/tournaments/${id}/reminders`,
+    { user_id: userId },
+    { correlationId: options?.correlationId },
+  );
   return data;
 }
 

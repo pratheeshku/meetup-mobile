@@ -50,6 +50,7 @@ import {
   getTournamentResponses,
   getTournamentScoringState,
   putTournamentClosure,
+  remindTournamentInvitee,
   withdrawFromTournament,
 } from '../api/tournaments';
 import { getClientConfig } from '../api/config';
@@ -62,6 +63,7 @@ import { useUserMenu } from '../hooks/useUserMenu';
 import Card from '../components/Card';
 import LifecycleStatusChip from '../components/LifecycleStatusChip';
 import ResponsesSection from '../components/responses/ResponsesSection';
+import { applyReminderAck } from '../utils/reminderError';
 import ClosureSummaryCard from '../components/closure/ClosureSummaryCard';
 import ClosureModal, { type CandidateItem } from '../components/closure/ClosureModal';
 import VenueRow from '../components/venue/VenueRow';
@@ -328,6 +330,23 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
       }
     },
     [tournamentId, unavailable, loadCommitteeSummary],
+  );
+
+  // Organizer or committee reminder to a Pending invitee (invite-reminder v1.0.2); see EventDetailScreen.
+  const remindApi = useMemo(
+    () => ({
+      send: async (userId: string) => {
+        const ack = await withCorrelationId(correlationId =>
+          remindTournamentInvitee(tournamentId, userId, { correlationId }),
+        );
+        setResponses(previous => applyReminderAck(previous, userId, ack));
+        return ack;
+      },
+      refresh: () => {
+        loadAll(true);
+      },
+    }),
+    [tournamentId, loadAll],
   );
 
   // Fetch on every focus and app foreground (AC-10), including a push that opens a tournament
@@ -854,6 +873,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
                 })}
                 organizerId={tournament.organiser_id}
                 registrations={registrations}
+                remind={remindApi}
               />
             </View>
           ) : null
@@ -971,6 +991,7 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             })}
             organizerId={tournament.organiser_id}
             registrations={registrations}
+            remind={remindApi}
           />
         </View>
       ) : null}

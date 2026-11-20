@@ -32,6 +32,7 @@ import {
   inviteEmailToEvent,
   inviteGroupToEvent,
   inviteUserToEvent,
+  remindEventInvitee,
   putEventClosure,
   respondToEventInvitation,
   rsvpEvent,
@@ -96,6 +97,7 @@ import {
 import { useT } from '../labels/LabelsContext';
 import LifecycleStatusChip from '../components/LifecycleStatusChip';
 import ResponsesSection from '../components/responses/ResponsesSection';
+import { applyReminderAck } from '../utils/reminderError';
 import ClosureSummaryCard from '../components/closure/ClosureSummaryCard';
 import ClosureModal, { type CandidateItem } from '../components/closure/ClosureModal';
 import SkillRequirementPicker from '../components/SkillRequirementPicker';
@@ -299,6 +301,24 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
       }
     },
     [eventId, t, unavailable],
+  );
+
+  // Organizer reminder to a Pending invitee (invite-reminder v1.0.2): one correlation id per tap; the row's
+  // last_reminded_at and reminder_count come from the 200; "already replied" reloads the list.
+  const remindApi = useMemo(
+    () => ({
+      send: async (userId: string) => {
+        const ack = await withCorrelationId(correlationId =>
+          remindEventInvitee(eventId, userId, { correlationId }),
+        );
+        setResponses(previous => applyReminderAck(previous, userId, ack));
+        return ack;
+      },
+      refresh: () => {
+        loadEvent(true);
+      },
+    }),
+    [eventId, loadEvent],
   );
 
   // Fetch on every focus and app foreground, including a push or deep link that opens a game
@@ -1706,6 +1726,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               summary={t('mob.gv.joined_of', { joined: joinedCount, capacity: totalCapacity })}
               organizerId={event.organiser_id}
               nicknames={nicknames}
+              remind={remindApi}
             />
           ) : null}
 

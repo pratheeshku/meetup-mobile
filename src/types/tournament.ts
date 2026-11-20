@@ -11,8 +11,8 @@
  */
 
 import type { OthersVenueInput, VenueSnapshot } from './venue';
-import type { DeclineAck, LifecycleStatus, ResponsePerson, ResponseSection, ResponsesResponse } from './event';
-export type { DeclineAck, ResponsePerson, ResponseSection, ResponsesResponse };
+import type { DeclineAck, LifecycleStatus, ReminderAck, ResponsePerson, ResponseSection, ResponsesResponse } from './event';
+export type { DeclineAck, ReminderAck, ResponsePerson, ResponseSection, ResponsesResponse };
 
 /**
  * Proposed Assumption: not specified anywhere for Tournaments. Reused
