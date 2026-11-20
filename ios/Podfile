@@ -70,6 +70,19 @@ target 'MeetupMobile' do
     # compiled pods with the 32-byte layout against the 40-byte binary and crashed at launch in
     # Props::Props() (RNCSafeAreaProviderProps). Release configurations are unchanged.
     rn_prod_flag = ' -DREACT_NATIVE_PRODUCTION=1'
+    # TEMP-DIAG (db-t3): which prebuilt flavors are actually installed in Pods (remove once CI is understood).
+    pods_root = installer.sandbox.root.to_s
+    %w[React-Core-prebuilt ReactNativeDependencies hermes-engine].each do |pod_name|
+      marker_file = File.join(pods_root, pod_name, '.last_build_configuration')
+      puts "DIAG #{pod_name} marker=#{File.exist?(marker_file) ? File.read(marker_file).strip : 'none'}"
+    end
+    react_bin = File.join(pods_root, 'React-Core-prebuilt/React.xcframework/ios-arm64_x86_64-simulator/React.framework/React')
+    if File.exist?(react_bin)
+      puts "DIAG React simulator binary: size=#{File.size(react_bin)} mtime=#{File.mtime(react_bin)} exports_Sealable_ctor=#{`nm -gU "#{react_bin}" 2>/dev/null | grep -c _ZN8facebook5react8SealableC`.strip}"
+    else
+      puts "DIAG React simulator binary: missing at #{react_bin}"
+    end
+    puts "DIAG xcode=#{`xcodebuild -version 2>&1 | head -1`.strip}"
 
     installer.aggregate_targets.each do |aggregate_target|
       aggregate_target.xcconfigs.each do |config_name, config_file|
