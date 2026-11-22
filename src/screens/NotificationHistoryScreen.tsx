@@ -35,7 +35,6 @@ import {
 import { getAllowedLinkHostnames } from '../../config/env';
 import {
   getNotificationHistory,
-  getUnreadCount,
   markAllNotificationsRead,
   markNotificationRead,
   markNotificationUnread,
@@ -52,7 +51,8 @@ import {
   navigateToNotificationTarget,
   resolveNotificationTarget,
 } from '../notifications/notificationRouting';
-import { setUnreadBadgeCount } from '../notifications/unreadCountStore';
+import { refreshUnreadCount, useUnreadBadgeCount } from '../hooks/useUnreadCount';
+import { adjustUnreadBadgeCount, setUnreadBadgeCount } from '../notifications/unreadCountStore';
 import { NOTIFICATION_TYPES } from '../types/notification';
 import type {
   NotificationHistoryItem,
@@ -132,7 +132,8 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
   const [items, setItems] = useState<NotificationHistoryItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [retentionDays, setRetentionDays] = useState<number>(90);
-  const [unreadCount, setUnreadCountState] = useState<number>(0);
+  // The one app-level count (also read by the bell); only the server value ever replaces it.
+  const unreadCount = useUnreadBadgeCount();
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -146,26 +147,8 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
   // Synchronous guard for onEndReached
   const loadingMoreRef = useRef(false);
 
-  // Synchronize unread badge with local state
-  const updateUnreadCount = useCallback((count: number) => {
-    const validCount = Math.max(0, count);
-    setUnreadCountState(validCount);
-    setUnreadBadgeCount(validCount);
-  }, []);
-
-  // The unread count always comes from the server (`GET /notifications/unread-count`); it is never
-  // derived from the rows on screen or adjusted locally. A failed read keeps the last count.
-  const syncUnreadCount = useCallback(async () => {
-    if (typeof getUnreadCount !== 'function') {
-      return;
-    }
-    try {
-      const { count } = await getUnreadCount();
-      updateUnreadCount(count);
-    } catch {
-      // Keep the previous count; nothing user-actionable.
-    }
-  }, [updateUnreadCount]);
+  // Reconcile with the server after a change: one shared read, last value kept on failure.
+  const syncUnreadCount = refreshUnreadCount;
 
   // Renders exactly what the API returns (retracted notifications are already hidden by the
   // server). Every load starts from nothing: no rows are kept across opens (AC-10).
@@ -241,6 +224,7 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
         setItems(current =>
           current.map(it => (it.id === item.id ? { ...it, read_at: optimisticReadAt } : it)),
         );
+        adjustUnreadBadgeCount(-1);
 
         markNotificationRead(item.id)
           .catch(() => {
@@ -274,6 +258,7 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
         setItems(current =>
           current.map(it => (it.id === item.id ? { ...it, read_at: optimisticReadAt } : it)),
         );
+        adjustUnreadBadgeCount(-1);
 
         showToast({
           type: 'single_read',
@@ -302,6 +287,7 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
         setItems(current =>
           current.map(it => (it.id === item.id ? { ...it, read_at: null } : it)),
         );
+        adjustUnreadBadgeCount(1);
 
         showToast({
           type: 'single_unread',
@@ -344,6 +330,8 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
 
     const optimisticReadAt = new Date().toISOString();
     setItems(current => current.map(it => ({ ...it, read_at: it.read_at ?? optimisticReadAt })));
+    // All-read: nothing is unread any more, wherever the rows are (the server value follows).
+    setUnreadBadgeCount(0);
 
     showToast({
       type: 'mark_all',
@@ -379,6 +367,7 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
       setItems(current =>
         current.map(it => (it.id === id ? { ...it, read_at: null } : it)),
       );
+      adjustUnreadBadgeCount(1);
       markNotificationUnread(id)
         .catch(() => {
           // Rollback undo if opposite fails
@@ -395,6 +384,7 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
       setItems(current =>
         current.map(it => (it.id === id ? { ...it, read_at: prevReadAt } : it)),
       );
+      adjustUnreadBadgeCount(-1);
       markNotificationRead(id)
         .catch(() => {
           setItems(current =>
@@ -412,6 +402,7 @@ export default function NotificationHistoryScreen({ navigation }: Props = {}): R
             : it,
         ),
       );
+      adjustUnreadBadgeCount(itemIds.filter(id => previousReadAtMap[id] === null).length);
       // Call unread for restored items, then read the count back from the server
       Promise.all(itemIds.map(id => markNotificationUnread(id).catch(() => undefined))).then(() => {
         syncUnreadCount();

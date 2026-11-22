@@ -271,10 +271,11 @@ describe('banner (AD-12, AD-13)', () => {
     expect(texts(failed)).toContain('Ready to play, Sam Smith!');
   });
 
-  it('shows the unread dot on the bell, opens notifications and Profile', async () => {
+  it('shows the unread count badge on the bell, opens notifications and Profile', async () => {
     mockUnread.count = 4;
     const root = await mount();
-    expect(root.findAll(node => node.props.testID === 'bell-unread-dot')).not.toHaveLength(0);
+    expect(root.findAll(node => node.props.testID === 'notification-badge')).not.toHaveLength(0);
+    expect(texts(root)).toContain('4');
     await tap(root, 'Notifications, 4 unread');
     expect(navigate).toHaveBeenCalledWith('NotificationHistory');
     await tap(root, 'Profile');

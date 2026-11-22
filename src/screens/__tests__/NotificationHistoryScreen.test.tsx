@@ -23,6 +23,7 @@ import {
 } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
 import NotificationHistoryScreen from '../NotificationHistoryScreen';
+import { getUnreadBadgeCount } from '../../notifications/unreadCountStore';
 
 jest.mock('../../api/notifications', () => ({
   getNotificationHistory: jest.fn(),
@@ -457,5 +458,48 @@ describe('Swipe actions and Undo toast', () => {
     });
 
     expect(texts(root)).not.toContain('Undo');
+  });
+});
+
+describe('bell badge store (NB-03)', () => {
+  it('drops by one at once on tap, before the server answers, then takes the server value', async () => {
+    let settleRead!: () => void;
+    mockMarkRead.mockReturnValue(new Promise<void>(r => (settleRead = r)));
+    mockUnreadCount.mockResolvedValue({ count: 3 });
+    mockHistory.mockResolvedValue({ items: [makeItem()] });
+    const root = await renderAsync(<NotificationHistoryScreen />);
+    expect(getUnreadBadgeCount()).toBe(3);
+
+    await act(async () => pressableWithText(root, 'Event updated').props.onPress());
+    expect(getUnreadBadgeCount()).toBe(2); // immediate, mark call still pending
+
+    mockUnreadCount.mockResolvedValue({ count: 5 }); // server disagrees
+    await act(async () => settleRead());
+    expect(getUnreadBadgeCount()).toBe(5);
+  });
+
+  it('goes to 0 at once on mark all read', async () => {
+    let settleAll!: () => void;
+    mockMarkAllRead.mockReturnValue(new Promise<void>(r => (settleAll = r)));
+    mockUnreadCount.mockResolvedValue({ count: 2 });
+    mockHistory.mockResolvedValue({ items: [makeItem({ id: 'a' }), makeItem({ id: 'b' })] });
+    const root = await renderAsync(<NotificationHistoryScreen />);
+    expect(getUnreadBadgeCount()).toBe(2);
+
+    await act(async () => pressables(root).find(p => texts(p).includes('Mark all as read'))!.props.onPress());
+    expect(getUnreadBadgeCount()).toBe(0);
+    mockUnreadCount.mockResolvedValue({ count: 0 });
+    await act(async () => settleAll());
+    expect(getUnreadBadgeCount()).toBe(0);
+  });
+
+  it('keeps the last count when the server read fails', async () => {
+    mockUnreadCount.mockResolvedValueOnce({ count: 4 });
+    mockHistory.mockResolvedValue({ items: [makeItem()] });
+    await renderAsync(<NotificationHistoryScreen />);
+    expect(getUnreadBadgeCount()).toBe(4);
+    mockUnreadCount.mockRejectedValue(new Error('offline'));
+    await renderAsync(<NotificationHistoryScreen />);
+    expect(getUnreadBadgeCount()).toBe(4);
   });
 });

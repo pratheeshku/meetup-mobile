@@ -48,7 +48,6 @@ jest.mock('../../api/home', () => ({
   getHomeMenu: jest.fn().mockResolvedValue(null),
   getHomeSummary: jest.fn().mockRejectedValue(new Error('offline')),
 }));
-jest.mock('../../hooks/useUnreadCount', () => ({ refreshUnreadCount: jest.fn(), useUnreadBadgeCount: () => 0 }));
 jest.mock('../../auth/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'me', nickname: 'sam', display_name: 'Sam' } }),
 }));

@@ -1,7 +1,7 @@
 /**
  * Home top bar and greeting.
  *
- * - Top bar: hamburger, wordmark and tagline, bell with unread dot, profile photo.
+ * - Top bar: hamburger, wordmark and tagline, bell with unread count badge, profile photo.
  * - Greeting on the left.
  * - Sport selector at top right below the profile photo (multi-select, filters
  *   content, defaults to sports the user has a skill level for).
@@ -22,7 +22,8 @@ import { BellGoldIcon } from '../icons/HomeV2Icons';
 import UserAvatar from '../UserAvatar';
 import { useT } from '../../labels/LabelsContext';
 import { dash, dashRadius, sportTileColors } from '../../theme/dashboardTheme';
-import { colors, spacing, typography } from '../../theme/tokens';
+import { colors, sizes, spacing, typography } from '../../theme/tokens';
+import { formatBadgeCount } from '../../utils/badgeCount';
 import type { SportOption } from '../../utils/gameLists';
 
 const WORDMARK_ASSET = require('../../assets/gameonsg-wordmark.png');
@@ -62,7 +63,8 @@ export default function HomeTopBar({
     ? t('mob.home.greeting_line', { name: trimmed })
     : t('mob.dashboard.headline');
 
-  const hasUnread = unreadCount > 0;
+  const badgeText = formatBadgeCount(unreadCount);
+  const hasUnread = badgeText !== null;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + spacing.xs }]}>
@@ -115,7 +117,13 @@ export default function HomeTopBar({
             style={({ pressed }) => [styles.bellTouch, pressed ? styles.pressed : null]}
           >
             <BellGoldIcon size={24} />
-            {hasUnread ? <View style={styles.unreadDot} testID="bell-unread-dot" /> : null}
+            {badgeText !== null ? (
+              <View style={styles.badge} testID="notification-badge">
+                <Text style={styles.badgeText} allowFontScaling={false}>
+                  {badgeText}
+                </Text>
+              </View>
+            ) : null}
           </Pressable>
 
           <Pressable
@@ -258,17 +266,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  unreadDot: {
+  badge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: '#E24B4A',
-    borderWidth: 2,
-    borderColor: '#ffffff',
+    top: 2,
+    right: 0,
+    minWidth: sizes.notificationBadge,
+    height: sizes.notificationBadge,
+    paddingHorizontal: 4,
+    borderRadius: dashRadius.circle,
+    backgroundColor: dash.badgeRed,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  badgeText: { ...typography.label, fontSize: 11, color: colors.white, lineHeight: 14 },
   avatarTouch: {
     borderRadius: dashRadius.circle,
   },
