@@ -238,12 +238,12 @@ jobs:
   ios:
     name: iOS staging to TestFlight
     if: ${{ inputs.platform == 'ios' || inputs.platform == 'both' }}
-    runs-on: macos-26
+    runs-on: xcode-27
     environment: staging
     timeout-minutes: 90
     env:
       BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
-      MIN_XCODE_MAJOR: '26' # Apple's current upload requirement, see ios-testflight.yml
+      MIN_XCODE_MAJOR: '27' # Apple's upload requirement from April 2027, see ios-testflight.yml
     steps:
       - name: Derive the build number
         run: |
@@ -304,16 +304,19 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          # Same pin as ios-testflight.yml: newest Xcode 26.x, never 27+ until UIScene is signed off.
-          xcode_app=""
-          for candidate in /Applications/Xcode_26*.app; do
-            case "$candidate" in
-              *[Bb]eta*) ;;
-              *) [ -d "$candidate" ] && xcode_app="$candidate" ;;
+          # Same selection as ios-testflight.yml: newest non-beta Xcode 27.x (iOS 27 SDK).
+          xcode_app="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)"
+          if [ -z "$xcode_app" ] && [ -d /Applications/Xcode.app ]; then
+            # Fall back to the default app only if it is major 27 and not a beta.
+            default_major="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Applications/Xcode.app/Contents/Info.plist 2>/dev/null | cut -d. -f1 || true)"
+            default_build="$(/usr/libexec/PlistBuddy -c 'Print :ProductBuildVersion' /Applications/Xcode.app/Contents/version.plist 2>/dev/null || true)"
+            case "$default_build" in
+              *[a-z]) ;; # a trailing lowercase letter in the build id marks a beta
+              *) [ "$default_major" = "27" ] && xcode_app="/Applications/Xcode.app" ;;
             esac
-          done
+          fi
           if [ -z "$xcode_app" ]; then
-            echo "::error::No Xcode 26.x (/Applications/Xcode_26*.app) is installed on this runner image."
+            echo "::error::No non-beta Xcode 27 (/Applications/Xcode_27*.app, or /Applications/Xcode.app at major 27) is installed on this runner image."
             echo "Installed Xcode apps:"; ls -d /Applications/Xcode*.app 2>/dev/null || true
             exit 1
           fi
