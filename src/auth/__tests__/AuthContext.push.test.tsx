@@ -11,6 +11,7 @@ import { authEvents } from '../../api/authEvents';
 import { getAccessToken } from '../../storage/tokens';
 import { startPushRegistration } from '../../notifications/pushRegistration';
 import { renderAsync, act } from '../../test-utils/render';
+import { getUnreadBadgeCount, setUnreadBadgeCount } from '../../notifications/unreadCountStore';
 import { AuthProvider, useAuth } from '../AuthContext';
 import { signOut as sharedSignOut } from '../googleAuth';
 import { login as emailLogin } from '../emailAuth';
@@ -166,6 +167,22 @@ describe('stop', () => {
     });
 
     expect(auth.user).toBeNull();
+  });
+
+  it('clears the bell unread count on sign-out and on session expiry (NB-04)', async () => {
+    await mount();
+    setUnreadBadgeCount(6);
+    await act(async () => {
+      await auth.signOut();
+    });
+    expect(getUnreadBadgeCount()).toBe(0);
+
+    await mount();
+    setUnreadBadgeCount(6);
+    await act(async () => {
+      authEvents.emit('auth-expired');
+    });
+    expect(getUnreadBadgeCount()).toBe(0);
   });
 
   it('stops when the session expires (auth-expired)', async () => {

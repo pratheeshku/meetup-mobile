@@ -59,6 +59,7 @@ import { signIn as appleSignIn } from './appleAuth';
 import { completeSignup as completeSignupRequest, login as emailLogin } from './emailAuth';
 import type { SignupRequiredResponse, SocialSignInResult } from './types';
 import { startPushRegistration } from '../notifications/pushRegistration';
+import { resetUnreadCount } from '../hooks/useUnreadCount';
 import type { UserProfile } from '../types/user';
 import { perfLog, startSpan, logSessionHeader } from '../diagnostics/perfLog';
 import { ENV } from '../../config/env';
@@ -149,6 +150,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
   const runIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const userId = user?.id ?? null;
+  // Bell badge (NB-04): sign-out, session expiry and an account switch all change the user id,
+  // so the previous user's unread count is cleared (and any response still in flight dropped).
+  useEffect(() => {
+    resetUnreadCount();
+  }, [userId]);
 
   const runSessionRestore = useCallback(async (signal: AbortSignal) => {
     const runId = ++runIdRef.current;

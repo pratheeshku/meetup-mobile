@@ -30,6 +30,20 @@ export function setUnreadBadgeCount(next: number): void {
   emit();
 }
 
+/**
+ * Immediate adjustment after a mark action (NB-03): the caller then reconciles with the server
+ * value. Never goes below zero.
+ */
+export function adjustUnreadBadgeCount(delta: number): void {
+  setUnreadBadgeCount(Math.max(0, count + delta));
+}
+
+/** Sign-out / account switch (NB-04). */
+export function clearUnreadBadgeCount(): void {
+  count = 0;
+  emit();
+}
+
 export function subscribeToUnreadBadgeCount(listener: Listener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

@@ -22,10 +22,9 @@ import { BannerBackground } from '../icons/DashboardIcons';
 import { dash, dashRadius, dashSize } from '../../theme/dashboardTheme';
 import { spacing, typography } from '../../theme/tokens';
 import { useT } from '../../labels/LabelsContext';
+import { formatBadgeCount } from '../../utils/badgeCount';
 
 const WORDMARK = require('../../assets/gameonsg-wordmark.png');
-
-const MAX_BADGE_COUNT = 99;
 
 interface DashboardBannerProps {
   name: string;
@@ -54,8 +53,8 @@ export default function DashboardBanner({
   const headline = trimmed
     ? t('mob.dashboard.headline_named', { name: trimmed })
     : t('mob.dashboard.headline');
-  const hasUnread = unreadCount > 0;
-  const badgeLabel = unreadCount > MAX_BADGE_COUNT ? `${MAX_BADGE_COUNT}+` : String(unreadCount);
+  const badgeLabel = formatBadgeCount(unreadCount);
+  const hasUnread = badgeLabel !== null;
   const showPhoto = Boolean(photoUrl) && !photoFailed;
   const initial = (trimmed.charAt(0) || '?').toUpperCase();
 
