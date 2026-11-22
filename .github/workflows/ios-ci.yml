@@ -33,7 +33,7 @@ concurrency:
 jobs:
   build:
     name: Simulator build (Debug, unsigned)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     env:
       BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile

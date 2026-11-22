@@ -19,10 +19,12 @@
 # Signing is Xcode automatic and cloud-managed through the App Store Connect API
 # key; no certificate or provisioning-profile files are used.
 #
-# Xcode: Apple requires uploads to be built with Xcode 26 or later (iOS 26 SDK) since
-# 2026-04-28 (https://developer.apple.com/news/upcoming-requirements/). The newest
-# Xcode 26.x installed on the runner is selected (pinned, not the highest installed)
-# and checked against that minimum.
+# Xcode: Apple requires uploads to be built with Xcode 27 or later (iOS 27 SDK) from
+# April 2027 (App Store Connect warning ITMS-90725; https://developer.apple.com/news/upcoming-requirements/).
+# The job runs on the xcode-27 runner image (arm64 only) and selects the newest non-beta
+# Xcode 27.x installed there, then checks it against that minimum. The earlier Xcode 26 pin
+# (waiting for UIScene lifecycle) is resolved: UIScene is adopted in code (SceneDelegate.swift);
+# the owner still confirms ios/UISCENE_MANUAL_TEST_CHECKLIST.md on an Xcode 27 build.
 name: iOS TestFlight
 
 on:
@@ -44,13 +46,13 @@ concurrency:
 jobs:
   testflight:
     name: Archive and upload to TestFlight
-    runs-on: macos-26
+    runs-on: xcode-27
     environment: testflight
     timeout-minutes: 90
     env:
       BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
       USE_FRAMEWORKS_INPUT: ${{ inputs.use_frameworks || 'none' }}
-      MIN_XCODE_MAJOR: '26' # Apple's current upload requirement, see header
+      MIN_XCODE_MAJOR: '27' # Apple's upload requirement from April 2027, see header
     steps:
       - name: Fail fast if a secret is missing
         env:
@@ -102,14 +104,19 @@ jobs:
       - name: Select Xcode
         run: |
           set -euo pipefail
-          # Xcode 27+ (iOS 27 SDK) crashes at launch until UIScene lifecycle
-          # is adopted; unpin after that.
-          # The UIScene lifecycle is now adopted in code (SceneDelegate.swift), but keep
-          # this pin: unpin ONLY after the owner confirms ios/UISCENE_MANUAL_TEST_CHECKLIST.md
-          # passes on an Xcode 27 build (iOS 27 simulator and a device).
-          xcode_app="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)"
+          # Newest non-beta Xcode 27.x (iOS 27 SDK, required by Apple for uploads from April 2027).
+          xcode_app="$(ls -d /Applications/Xcode_27*.app 2>/dev/null | grep -vi beta | sort -V | tail -n 1 || true)"
+          if [ -z "$xcode_app" ] && [ -d /Applications/Xcode.app ]; then
+            # Fall back to the default app only if it is major 27 and not a beta.
+            default_major="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Applications/Xcode.app/Contents/Info.plist 2>/dev/null | cut -d. -f1 || true)"
+            default_build="$(/usr/libexec/PlistBuddy -c 'Print :ProductBuildVersion' /Applications/Xcode.app/Contents/version.plist 2>/dev/null || true)"
+            case "$default_build" in
+              *[a-z]) ;; # a trailing lowercase letter in the build id marks a beta
+              *) [ "$default_major" = "27" ] && xcode_app="/Applications/Xcode.app" ;;
+            esac
+          fi
           if [ -z "$xcode_app" ]; then
-            echo "::error::No Xcode 26.x (/Applications/Xcode_26*.app) is installed on this runner image. Xcode 27+ is deliberately not used until UIScene lifecycle is adopted."
+            echo "::error::No non-beta Xcode 27 (/Applications/Xcode_27*.app, or /Applications/Xcode.app at major 27) is installed on this runner image."
             echo "Installed Xcode apps:"; ls -d /Applications/Xcode*.app 2>/dev/null || true
             exit 1
           fi
