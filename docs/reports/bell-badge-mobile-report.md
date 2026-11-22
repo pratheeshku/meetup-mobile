@@ -64,3 +64,5 @@ Coverage delta: baseline was not measured (no pre-change coverage run), so there
 
 ## Git
 Push evidence is appended below after the push.
+
+Push evidence: `git push -u origin claude/inspiring-keller-rmeu33` -> new branch created on origin, commit 106dbcb (`feat(notifications): bell unread count badge (NB-01..NB-07)`).
