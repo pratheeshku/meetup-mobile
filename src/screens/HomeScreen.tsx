@@ -18,7 +18,7 @@
  *      Create Game card stays visible on both tabs.
  *      - Upcoming tile count = games in next 7 days; list = next 2 upcoming games, earliest first,
  *        View all goes to Games tab; sport filter applies.
- *      - Groups tile count = active groups; list = up to 3 groups, View all goes to Groups tab;
+ *      - Groups tile count = active groups; list = 4 of the user's groups at random (priority1-nov23 P1-02), View all goes to Groups tab;
  *        sport filter does not apply.
  *      - Empty state for each tab.
  *    - Game cards and group cards share one layout: left tile (date block, or group logo),
@@ -39,6 +39,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { withCorrelationId } from '../api/correlationId';
 import { getEvents, rsvpEvent } from '../api/events';
 import { getGroups } from '../api/groups';
+import { pickRandom } from '../utils/shuffle';
 import {
   BUNDLED_FALLBACK_BANNER,
   getCachedBanners,
@@ -93,6 +94,10 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<AppTabParamList, 'Home'>
 >;
 
+/** priority1-nov23 P1-02: the panel shows 4 groups, picked at random from up to the server's cap. */
+const HOME_GROUPS_SHOWN = 4;
+const HOME_GROUPS_FETCH_LIMIT = 100;
+
 export default function HomeScreen({ navigation, route }: Props): React.JSX.Element {
   const { user } = useAuth();
   const t = useT();
@@ -115,6 +120,8 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
 
   const [liveGroups, setLiveGroups] = useState<{
     items: Group[] | null;
+    /** How many groups the read returned (the tile count when the summary is missing); `items` holds the random 4. */
+    fetched?: number;
     status: 'idle' | 'loading' | 'success' | 'error';
   }>({ items: null, status: 'loading' });
 
@@ -270,14 +277,15 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     [],
   );
 
-  // Live groups: GET /groups?mine=true&limit=3
+  // Live groups (priority1-nov23 P1-02): GET /groups?mine=true&limit=100 (the server cap), then 4 picked at random on
+  // every load, so the panel changes on each refresh. The tile count still comes from the summary.
   const loadLiveGroups = useCallback(async (correlationId?: string, fresh: boolean = false) => {
     const seq = ++groupsSeqRef.current;
     setLiveGroups(prev => (fresh ? { items: null, status: 'loading' } : { ...prev, status: 'loading' }));
     try {
-      const res = await getGroups({ mine: true, limit: 3 }, { correlationId });
+      const res = await getGroups({ mine: true, limit: HOME_GROUPS_FETCH_LIMIT }, { correlationId });
       if (seq === groupsSeqRef.current) {
-        setLiveGroups({ items: res.items, status: 'success' });
+        setLiveGroups({ items: pickRandom(res.items, HOME_GROUPS_SHOWN), fetched: res.items.length, status: 'success' });
       }
     } catch {
       if (seq === groupsSeqRef.current) {
@@ -446,7 +454,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       (displayedUpcoming ? displayedUpcoming.length : null);
   const groupsCount =
     summaryData?.active_groups ??
-    (liveGroups.items ? liveGroups.items.length : null);
+    (liveGroups.items ? liveGroups.fetched ?? liveGroups.items.length : null);
 
   const isUpcomingLoading =
     liveUpcoming.status === 'loading' && displayedUpcoming === null;
@@ -570,6 +578,10 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
               gamesHosted={statsSummary.games_hosted ?? 0}
               groupsCount={statsSummary.groups_count ?? 0}
               gamesWon={statsSummary.games_won}
+              onPressPlayed={() => navigation.navigate('StatGames', { stat: 'played' })}
+              onPressWon={() => navigation.navigate('StatGames', { stat: 'won' })}
+              onPressHosted={() => navigation.navigate('StatGames', { stat: 'hosted' })}
+              onPressGroups={() => navigation.navigate('Groups', { screen: 'GroupsList' })}
             />
           </View>
         ) : null}

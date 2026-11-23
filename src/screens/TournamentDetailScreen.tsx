@@ -34,6 +34,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useStatusShare } from '../hooks/useStatusShare';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../auth/AuthContext';
@@ -688,6 +689,10 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
     }
   };
 
+  // priority1-nov23 P1-06: the page as this viewer sees it, shared to WhatsApp from the Participants tab.
+  const shareTargetRef = useRef<View>(null);
+  const statusShare = useStatusShare(shareTargetRef, tournament?.name ?? '');
+
   if (isLoading) {
     return <LoadingView />;
   }
@@ -860,9 +865,23 @@ export default function TournamentDetailScreen({ navigation, route }: Props): Re
             onSent={() => loadAll(true)}
           />
         }
+        captureRef={shareTargetRef}
         responses={
           responses ? (
             <View style={styles.block}>
+              <Button
+                label={t('mob.share_status.button')}
+                accessibilityLabel={t('mob.share_status.a11y')}
+                variant="secondary"
+                onPress={statusShare.share}
+                loading={statusShare.sharing}
+                testID="tournament-share-status-button"
+              />
+              {statusShare.error ? (
+                <Text style={styles.shareError} accessibilityRole="alert">
+                  {statusShare.error}
+                </Text>
+              ) : null}
               <ResponsesSection
                 responses={responses}
                 entity="tournament"
@@ -1205,6 +1224,7 @@ const styles = StyleSheet.create({
   container: { padding: spacing.md },
   infoCard: { marginBottom: spacing.md },
   block: { marginBottom: spacing.md },
+  shareError: { ...typography.caption, color: colors.error, marginTop: spacing.xs },
   sectionTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.sm },
   title: { ...typography.h2, color: colors.textPrimary, marginBottom: spacing.sm },
   statusChipRow: {

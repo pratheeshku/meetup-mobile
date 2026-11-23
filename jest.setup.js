@@ -323,3 +323,19 @@ jest.mock('@react-navigation/native', () => {
     }),
   };
 });
+
+// priority1-nov23 P1-06: react-native-view-shot and react-native-share are native-only (screenshot capture and the
+// share intent). Centralised mocks per this file's convention; tests read the calls through `jest.requireMock`.
+jest.mock('react-native-view-shot', () => ({
+  __esModule: true,
+  captureRef: jest.fn(() => Promise.resolve('file:///tmp/status.png')),
+}));
+jest.mock('react-native-share', () => {
+  const api = {
+    Social: { WHATSAPP: 'whatsapp', WHATSAPPBUSINESS: 'whatsappbusiness' },
+    open: jest.fn(() => Promise.resolve({ success: true })),
+    shareSingle: jest.fn(() => Promise.resolve({ success: true })),
+    isPackageInstalled: jest.fn(() => Promise.resolve({ isInstalled: false })),
+  };
+  return { __esModule: true, default: api, Social: api.Social };
+});

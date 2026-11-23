@@ -143,6 +143,7 @@ import EditProfileScreen from '../screens/EditProfileScreen';
 import EditSkillLevelsScreen from '../screens/EditSkillLevelsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import NotificationPreferencesScreen from '../screens/NotificationPreferencesScreen';
+import StatGamesScreen from '../screens/StatGamesScreen';
 import NotificationHistoryScreen from '../screens/NotificationHistoryScreen';
 import EditGroupScreen from '../screens/EditGroupScreen';
 import AccountDeletionBlockedScreen from '../screens/AccountDeletionBlockedScreen';
@@ -293,6 +294,11 @@ function HomeStack(): React.JSX.Element {
         name="NotificationHistory"
         component={NotificationHistoryScreen}
         options={{ title: t('mob.nav.title_notifications') }}
+      />
+      <HomeStackNav.Screen
+        name="StatGames"
+        component={StatGamesScreen}
+        options={{ title: t('mob.nav.title_stats') }}
       />
     </HomeStackNav.Navigator>
   );

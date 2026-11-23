@@ -5,9 +5,12 @@
  * Missing, null or NaN values show 0 (Won included): no spinner, dash or NaN.
  * Sizes are fixed (no content-driven sizing); text is one line and fits
  * its cell, including at a 1.3 system font scale on a 360dp phone.
+ *
+ * priority1-nov23 P1-03: when the screen passes a handler, a cell is a button (Played, Won and Hosted open their game
+ * lists, Groups opens the Groups screen). Without a handler the cell stays plain, as before.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import IconBadge from './IconBadge';
 import { MedalIcon, PeopleIcon, StarIcon, TrophyIcon } from './icons/SharedIcons';
@@ -19,6 +22,10 @@ export interface ProfileStatsStripProps {
   gamesHosted?: number | null;
   groupsCount?: number | null;
   gamesWon?: number | null;
+  onPressPlayed?: () => void;
+  onPressWon?: () => void;
+  onPressHosted?: () => void;
+  onPressGroups?: () => void;
 }
 
 const STRIP_HEIGHT = 56;
@@ -37,11 +44,13 @@ interface CellProps {
   value: number;
   valueColor: string;
   label: string;
+  onPress?: () => void;
 }
 
-function Cell({ testID, badge, glyph, value, valueColor, label }: CellProps): React.JSX.Element {
-  return (
-    <View style={styles.cell} testID={testID}>
+function Cell({ testID, badge, glyph, value, valueColor, label, onPress }: CellProps): React.JSX.Element {
+  const t = useT();
+  const content = (
+    <>
       <IconBadge color={badge} size={BADGE_SIZE} borderRadius={BADGE_SIZE / 2}>
         {glyph}
       </IconBadge>
@@ -63,7 +72,25 @@ function Cell({ testID, badge, glyph, value, valueColor, label }: CellProps): Re
           {label}
         </Text>
       </View>
-    </View>
+    </>
+  );
+  if (!onPress) {
+    return (
+      <View style={styles.cell} testID={testID}>
+        {content}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('mob.stats.open_a11y', { label, count: value })}
+      onPress={onPress}
+      style={({ pressed }) => [styles.cell, pressed ? styles.pressed : null]}
+      testID={testID}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -74,6 +101,10 @@ export default function ProfileStatsStrip({
   gamesHosted,
   groupsCount,
   gamesWon,
+  onPressPlayed,
+  onPressWon,
+  onPressHosted,
+  onPressGroups,
 }: ProfileStatsStripProps): React.JSX.Element {
   const t = useT();
 
@@ -81,6 +112,7 @@ export default function ProfileStatsStrip({
     <View style={styles.container} testID="profile-stats-strip">
       <Cell
         testID="profile-stat-played"
+        onPress={onPressPlayed}
         badge="blue"
         glyph={<TrophyIcon size={GLYPH_SIZE} />}
         value={count(gamesPlayed)}
@@ -90,6 +122,7 @@ export default function ProfileStatsStrip({
       <Divider />
       <Cell
         testID="profile-stat-won"
+        onPress={onPressWon}
         badge="purple"
         glyph={<MedalIcon size={GLYPH_SIZE} />}
         value={count(gamesWon)}
@@ -99,6 +132,7 @@ export default function ProfileStatsStrip({
       <Divider />
       <Cell
         testID="profile-stat-hosted"
+        onPress={onPressHosted}
         badge="amber"
         glyph={<StarIcon size={GLYPH_SIZE} />}
         value={count(gamesHosted)}
@@ -108,6 +142,7 @@ export default function ProfileStatsStrip({
       <Divider />
       <Cell
         testID="profile-stat-groups"
+        onPress={onPressGroups}
         badge="green"
         glyph={<PeopleIcon size={GLYPH_SIZE} />}
         value={count(groupsCount)}
@@ -136,6 +171,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
+  pressed: { opacity: 0.7 },
   textStack: {
     flexShrink: 1,
     minWidth: 0,

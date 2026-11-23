@@ -97,18 +97,19 @@ describe('refresh after Leave and Join', () => {
     const gets = mockGet.mock.calls.length;
 
     // The server state after the withdrawal.
-    server.event = rawEvent({ going_count: 1, user_rsvp_status: 'withdrawn' });
+    server.event = rawEvent({ going_count: 1, user_rsvp_status: 'withdrawn', my_declined: true });
     server.participants = [person('user-me', 'Sam', 'withdrawn'), person('u-2', 'Bob', 'going')];
     await press(root, 'Decline');
 
-    expect(mockPost).toHaveBeenCalledWith('/events/evt-1/rsvp', { action: 'withdrawn' }, expect.anything());
+    // priority1-nov23 P1-04: the joined player's Decline is the decline route; the button then reads Accept.
+    expect(mockPost).toHaveBeenCalledWith('/events/evt-1/decline', {}, expect.anything());
     expect(mockGet.mock.calls.length).toBeGreaterThan(gets);
     expect(mockGet.mock.calls.slice(gets).map(c => c[0])).toEqual(
       expect.arrayContaining(['/events/evt-1', '/events/evt-1/participants']),
     );
     expect(avatars(root)).toHaveLength(1);
     expect(texts(root)).toContain('1 of 12 joined');
-    expect(pressableLabelled(root, 'Register')).toBeDefined();
+    expect(pressableLabelled(root, 'Accept')).toBeDefined();
     expect(root.findAll(n => n.props.accessibilityLabel === 'Leave')).toHaveLength(0);
   });
 

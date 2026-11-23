@@ -84,6 +84,9 @@ const BARE_TEXT_INPUT_FILES = [
   'src/screens/EditProfileScreen.tsx',
   'src/screens/EventDetailScreen.tsx',
   'src/screens/TransferGroupOwnershipScreen.tsx',
+  // priority1-nov23 P1-03: one search box at the top of a list (header of the FlatList); the keyboard never covers it.
+  'src/screens/GroupsScreen.tsx',
+  'src/screens/StatGamesScreen.tsx',
 ];
 
 const files = sourceFiles('src');

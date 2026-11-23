@@ -1,6 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- priority1-nov23 P1-06: Android 11+ package visibility, so react-native-share can see WhatsApp (and WhatsApp
+         Business) and hand the status screenshot straight to it. Without it the app falls back to the system share sheet. -->
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>
     <!-- Required for src/notifications/fcm.ts requestPermission() on API 33+
          (DES-MEETUP-MOBILE.md §3.6, R-072). Without this declaration the
          runtime permission request is a silent no-op. -->

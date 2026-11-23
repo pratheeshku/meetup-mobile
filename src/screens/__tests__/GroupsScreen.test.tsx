@@ -223,3 +223,33 @@ describe('GroupsScreen enhanced landing page and filtering', () => {
   });
 });
 
+
+describe('GroupsScreen order and search (priority1-nov23 P1-03)', () => {
+  const group = (id: string, name: string, role: 'owner' | 'member') => ({
+    id, name, description: '', owner_id: role === 'owner' ? 'u-1' : 'other', created_at: '2026-01-01T00:00:00Z',
+    current_user_role: role, member_count: 3,
+  });
+  const LIST = {
+    items: [group('m1', 'Morning Tennis', 'member'), group('o1', 'Owned Pickleball', 'owner'), group('m2', 'Night Badminton', 'member'), group('o2', 'Owned Badminton', 'owner')],
+    total: 4, page: 1, page_size: 4,
+  };
+  const order = (root: ReturnType<typeof render>): string[] =>
+    texts(root).filter(text => ['Morning Tennis', 'Owned Pickleball', 'Night Badminton', 'Owned Badminton'].includes(text));
+
+  it('lists the groups you own above the groups you joined, keeping the server order inside each part', async () => {
+    mockGetGroups.mockResolvedValue(LIST);
+    const root = await renderAsync(element());
+    expect(order(root)).toEqual(['Owned Pickleball', 'Owned Badminton', 'Morning Tennis', 'Night Badminton']);
+  });
+
+  it('filters by name as you type (case-insensitive) and says when nothing matches', async () => {
+    mockGetGroups.mockResolvedValue(LIST);
+    const root = await renderAsync(element());
+    const search = root.find(node => node.props.testID === 'groups-search' && typeof node.props.onChangeText === 'function');
+    act(() => search.props.onChangeText('badminton'));
+    expect(order(root)).toEqual(['Owned Badminton', 'Night Badminton']);
+    act(() => search.props.onChangeText('squash'));
+    expect(order(root)).toEqual([]);
+    expect(texts(root)).toContain('No groups match "squash"');
+  });
+});
