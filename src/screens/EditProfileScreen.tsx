@@ -34,6 +34,7 @@ import {
   uploadCover,
 } from '../api/profile';
 import { getSports } from '../api/sports';
+import { useAuth } from '../auth/AuthContext';
 import { classifyMobileNumberError, updateMobileNumber } from '../api/mobileNumber';
 import MobileNumberInput from '../components/MobileNumberInput';
 import type { MobileNumberChange } from '../components/MobileNumberInput';
@@ -116,6 +117,9 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Home reads the cached auth user, so a rename is merged into it after a successful save.
+  const { updateUser } = useAuth();
 
   // Form states
   const [displayName, setDisplayName] = useState('');
@@ -278,6 +282,7 @@ export default function EditProfileScreen({ navigation }: Props): React.JSX.Elem
       // 1. Display name
       if (displayName.trim() && displayName.trim() !== profile.display_name) {
         await updateProfile({ display_name: displayName.trim() });
+        updateUser({ display_name: displayName.trim() });
       }
 
       // 2. Cover image

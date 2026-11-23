@@ -14,6 +14,8 @@ jest.mock('../../navigation/showCompletion', () => ({ showCompletion: (...args: 
 jest.mock('@react-navigation/native', () => ({ ...jest.requireActual('@react-navigation/native'), useFocusEffect: jest.fn() }));
 jest.mock('react-native-image-crop-picker', () => ({ openPicker: jest.fn(), openCamera: jest.fn() }));
 jest.mock('../../api/sports', () => ({ getSports: jest.fn().mockResolvedValue([]) }));
+// The screen merges a saved display name into the auth user; render it outside an AuthProvider.
+jest.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ updateUser: jest.fn() }) }));
 jest.mock('../../api/profile', () => ({
   getProfile: jest.fn(),
   getSkillLevels: jest.fn(),
