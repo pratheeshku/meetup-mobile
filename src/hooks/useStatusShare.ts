@@ -1,8 +1,9 @@
 /**
  * Share the game or tournament status as a screenshot (DES-MEETUP-ADDENDUM-priority1-nov23 P1-06).
  *
- * Captures the whole scrollable detail page (react-native-view-shot, `snapshotContentContainer`), so the picture
- * holds what this viewer sees: the Accepted, Declined and Pending lists the server sent them. Then:
+ * Captures the detail page (react-native-view-shot). When the target is a ScrollView, pass `{ scrollView: true }`
+ * so the whole scrolled length is captured (`snapshotContentContainer`); a plain View target is captured as laid
+ * out (iOS fails a full-scroll capture on a non-ScrollView). The picture holds what this viewer sees: the Accepted, Declined and Pending lists the server sent them. Then:
  * - Android: straight to WhatsApp (or WhatsApp Business) when installed, else the system share sheet;
  * - iOS: the system share sheet, where WhatsApp is one of the targets.
  * A person who closes the sheet is not an error. The temporary file is left to the OS cache cleanup.
@@ -48,7 +49,17 @@ async function installedWhatsApp(): Promise<string | null> {
   return null;
 }
 
-export function useStatusShare(target: RefObject<unknown>, title: string): StatusShare {
+export interface StatusShareOptions {
+  /** True only when `target` is a ScrollView: capture its full content, not just the visible part. */
+  scrollView?: boolean;
+}
+
+export function useStatusShare(
+  target: RefObject<unknown>,
+  title: string,
+  options: StatusShareOptions = {},
+): StatusShare {
+  const scrollView = options.scrollView === true;
   const t = useT();
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +71,7 @@ export function useStatusShare(target: RefObject<unknown>, title: string): Statu
       const uri = await captureRef(target as Capturable, {
         format: 'png',
         result: 'tmpfile',
-        snapshotContentContainer: true,
+        ...(scrollView ? { snapshotContentContainer: true } : {}),
       });
       const url = uri.startsWith('file://') ? uri : `file://${uri}`;
       const message = t('mob.share_status.message', { title });
@@ -78,7 +89,7 @@ export function useStatusShare(target: RefObject<unknown>, title: string): Statu
     } finally {
       setSharing(false);
     }
-  }, [target, title, t]);
+  }, [target, title, t, scrollView]);
 
   return { sharing, error, share };
 }

@@ -1077,7 +1077,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   // priority1-nov23 P1-06: screenshot of the whole page (what this viewer sees) shared to WhatsApp.
   const detailScrollRef = useRef<ScrollView>(null);
-  const statusShare = useStatusShare(detailScrollRef, event?.title ?? '');
+  const statusShare = useStatusShare(detailScrollRef, event?.title ?? '', { scrollView: true });
   // priority1-nov23 P1-07: the calendar app's own add screen, filled with this game.
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const handleAddToCalendar = useCallback(async () => {

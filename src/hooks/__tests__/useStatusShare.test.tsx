@@ -10,11 +10,13 @@ const share = (jest.requireMock('react-native-share') as {
   default: { open: jest.Mock; shareSingle: jest.Mock; isPackageInstalled: jest.Mock };
 }).default;
 
-function mountHook(): () => StatusShare {
+const viewShot = jest.requireMock('react-native-view-shot') as { captureRef: jest.Mock };
+
+function mountHook(options?: { scrollView?: boolean }): () => StatusShare {
   let latest: StatusShare | undefined;
   const ref = { current: {} };
   function Probe(): null {
-    latest = useStatusShare(ref, 'Friday doubles');
+    latest = useStatusShare(ref, 'Friday doubles', options);
     return null;
   }
   act(() => {
@@ -65,4 +67,19 @@ it('Android without WhatsApp: falls back to the system share sheet', async () =>
   expect(share.shareSingle).not.toHaveBeenCalled();
   expect(share.open).toHaveBeenCalledWith(expect.objectContaining({ url: 'file:///tmp/status.png', type: 'image/png' }));
   expect(hook().error).toBeNull();
+});
+
+it('a plain View target (tournament page) is captured without the full-scroll option; a ScrollView target asks for it', async () => {
+  setOS('ios');
+  viewShot.captureRef.mockClear();
+  const plain = mountHook();
+  await act(async () => {
+    await plain().share();
+  });
+  expect(viewShot.captureRef.mock.calls[0][1]).not.toHaveProperty('snapshotContentContainer');
+  const scroll = mountHook({ scrollView: true });
+  await act(async () => {
+    await scroll().share();
+  });
+  expect(viewShot.captureRef.mock.calls[1][1]).toEqual(expect.objectContaining({ snapshotContentContainer: true }));
 });
