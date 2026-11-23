@@ -51,6 +51,8 @@ export type HomeStackParamList = {
    */
   TournamentWizard: { templates: WizardTemplatesResponse };
   NotificationHistory: undefined;
+  /** priority1-nov23 P1-03: the games and tournaments behind a Home stats count. */
+  StatGames: { stat: 'played' | 'hosted' | 'won' };
 };
 
 /**

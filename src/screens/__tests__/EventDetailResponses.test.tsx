@@ -85,7 +85,7 @@ describe('EventDetailScreen decline and response states', () => {
     );
   });
 
-  it('shows Decline button for a joined participant (withdraw)', async () => {
+  it('shows Decline button for a joined participant (records the decline, priority1-nov23 P1-04)', async () => {
     const root = await mount({ user_rsvp_status: 'going' });
     const content = texts(root).join(' ');
 
@@ -97,8 +97,8 @@ describe('EventDetailScreen decline and response states', () => {
     });
 
     expect(mockPost).toHaveBeenCalledWith(
-      '/events/evt-1/rsvp',
-      { action: 'withdrawn' },
+      '/events/evt-1/decline',
+      {},
       expect.any(Object),
     );
   });
@@ -122,14 +122,14 @@ describe('EventDetailScreen decline and response states', () => {
     );
   });
 
-  it('shows Declined status chip and Join button when public game was declined', async () => {
+  it('shows Declined status chip and the Accept button when public game was declined (priority1-nov23 P1-04)', async () => {
     const root = await mount({ visibility: 'public', user_rsvp_status: null, my_declined: true });
     const content = texts(root).join(' ');
 
     expect(content).toContain('Declined');
-    expect(content).toContain('Register');
+    expect(content).toContain('Accept');
 
-    const joinBtn = pressableLabelled(root, 'Register');
+    const joinBtn = pressableLabelled(root, 'Accept');
     await act(async () => {
       joinBtn.props.onPress();
     });

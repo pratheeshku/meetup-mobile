@@ -363,3 +363,42 @@ export async function updateNotificationSettings(
 }
 
 
+
+/** priority1-nov23 P1-03: which profile count a list belongs to. */
+export type StatKind = 'played' | 'hosted' | 'won';
+
+export interface StatItem {
+  kind: 'game' | 'tournament';
+  id: string;
+  title: string;
+  sport: string;
+  starts_at: string;
+  venue_name?: string | null;
+}
+
+export interface StatItemsResponse {
+  stat: StatKind;
+  total: number;
+  items: StatItem[];
+}
+
+/**
+ * `GET /users/me/stats/{stat}`: the games and tournaments behind Played, Hosted or Won, newest first.
+ * `q` filters on the title on the server.
+ */
+export async function getMyStatItems(
+  stat: StatKind,
+  params: { q?: string; limit?: number; offset?: number } = {},
+  options?: RequestOptions,
+): Promise<StatItemsResponse> {
+  const query: Record<string, string | number> = { limit: params.limit ?? 50, offset: params.offset ?? 0 };
+  const q = params.q?.trim();
+  if (q) {
+    query.q = q;
+  }
+  const { data } = await apiClient.get<StatItemsResponse>(`/users/me/stats/${stat}`, {
+    params: query,
+    correlationId: options?.correlationId,
+  });
+  return data;
+}

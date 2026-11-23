@@ -129,6 +129,8 @@ import type {
 import type { Group } from '../types/group';
 import { getApiErrorMessage, isNotFoundError } from '../utils/apiError';
 import { useRefetchOnFocus } from '../hooks/useRefetchOnFocus';
+import { useStatusShare } from '../hooks/useStatusShare';
+import { addToCalendar } from '../utils/calendar';
 import { useUnavailableScreen } from '../hooks/useUnavailableScreen';
 import { useUserMenu } from '../hooks/useUserMenu';
 import type { AlreadyInPerson } from '../components/UserSearchPicker';
@@ -1073,6 +1075,30 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
     }
   };
 
+  // priority1-nov23 P1-06: screenshot of the whole page (what this viewer sees) shared to WhatsApp.
+  const detailScrollRef = useRef<ScrollView>(null);
+  const statusShare = useStatusShare(detailScrollRef, event?.title ?? '');
+  // priority1-nov23 P1-07: the calendar app's own add screen, filled with this game.
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const handleAddToCalendar = useCallback(async () => {
+    if (!event) {
+      return;
+    }
+    setCalendarError(null);
+    try {
+      await addToCalendar({
+        id: event.id,
+        title: event.title,
+        startsAt: event.starts_at,
+        endsAt: event.ends_at,
+        location: event.venue_name || event.location || null,
+        notes: event.description ?? null,
+      });
+    } catch {
+      setCalendarError(t('mob.calendar.error'));
+    }
+  }, [event, t]);
+
   if (isLoading) return <LoadingView />;
   if (loadError || !event) {
     return <ErrorView message={loadError ?? t('mob.game_detail.not_found')} onRetry={() => loadEvent(false)} />;
@@ -1572,7 +1598,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.detailScroll} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={detailScrollRef} contentContainerStyle={styles.detailScroll} keyboardShouldPersistTaps="handled">
         {/* Blue Header Banner */}
         <View style={styles.detailHeaderBanner}>
           <View style={styles.bannerTopNav}>
@@ -1774,6 +1800,34 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             </Card>
           ) : null}
 
+          {/* priority1-nov23 P1-06 / P1-07: share the status screenshot (everyone who can view) and add to calendar
+              (while the game is still ahead). */}
+          <View style={[styles.formButtonsRow, styles.statusActionsRow]}>
+            <Button
+              label={t('mob.share_status.button')}
+              accessibilityLabel={t('mob.share_status.a11y')}
+              variant="secondary"
+              onPress={statusShare.share}
+              loading={statusShare.sharing}
+              style={styles.rowButton}
+              testID="share-status-button"
+            />
+            {!isClosed && !isGameEnded ? (
+              <Button
+                label={t('mob.calendar.add')}
+                variant="secondary"
+                onPress={handleAddToCalendar}
+                style={styles.rowButton}
+                testID="add-to-calendar-button"
+              />
+            ) : null}
+          </View>
+          {statusShare.error || calendarError ? (
+            <Text style={styles.errorText} accessibilityRole="alert">
+              {statusShare.error ?? calendarError}
+            </Text>
+          ) : null}
+
           {/* Organizer: Invite card with the picker entries (GV-5) */}
           {isOrganiserActionsVisible ? (
             <InviteCard
@@ -1835,24 +1889,24 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                     testID="series-skip-button"
                   />
                 ) : (
+                // priority1-nov23 P1-04/P1-05 (decline-response DR-04): Decline on a joined game is the decline call, which
+                // withdraws AND records the decline, so the player shows under Declined and gets Accept back. The old
+                // plain withdraw left no decline record (no Declined row, Join instead of Accept).
                 <Button
                   label={t('mob.respond.decline')}
                   accessibilityLabel={t('mob.respond.decline')}
                   variant="secondary"
-                  onPress={handleWithdraw}
+                  onPress={handleDecline}
                   loading={isActionLoading}
                   testID="decline-button"
                 />
                 )
               ) : event.my_declined ? (
+                // priority1-nov23 P1-04: after a decline the button reads Accept on every game; the action is unchanged
+                // (accept the invitation on an invite-only game, otherwise join).
                 <Button
-                  label={
-                    event.visibility === 'invite_only'
-                      ? t('mob.respond.accept')
-                      : event.visibility === 'public'
-                      ? t('mob.reg.register')
-                      : t('mob.respond.join')
-                  }
+                  label={t('mob.respond.accept')}
+                  accessibilityLabel={t('mob.respond.accept')}
                   variant="cta"
                   onPress={event.visibility === 'invite_only' ? handleAcceptInvite : handleRsvp}
                   loading={isActionLoading}
@@ -2163,6 +2217,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.ownerChipText,
   },
+  statusActionsRow: { marginTop: spacing.md },
   declinedPill: {
     backgroundColor: colors.track,
     paddingHorizontal: spacing.sm,

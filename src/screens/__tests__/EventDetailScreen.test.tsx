@@ -291,9 +291,10 @@ describe('public game: Register alone (tournament-registration TR-04, AD-3)', ()
     expect(has(invite, 'Register')).toBe(false);
   });
 
-  it('a declined public game shows Register alone', async () => {
+  it('a declined public game shows Accept alone (priority1-nov23 P1-04)', async () => {
     const root = await mount(rawEvent({ organizer_id: 'someone-else', visibility: 'public', my_declined: true }));
-    expect(has(root, 'Register')).toBe(true);
+    expect(has(root, 'Accept')).toBe(true);
+    expect(has(root, 'Register')).toBe(false);
     expect(has(root, 'Join')).toBe(false);
     expect(has(root, 'Decline')).toBe(false);
   });
@@ -365,14 +366,13 @@ describe('RSVP / withdraw contract', () => {
     expect(mockPost.mock.calls[0][1]).toEqual({ action: 'going' });
   });
 
-  it('Decline sends POST /events/{id}/rsvp with { action: "withdrawn" }', async () => {
+  it('Decline on a joined game sends POST /events/{id}/decline (priority1-nov23 P1-04, decline-response DR-04)', async () => {
     const root = await mount(rawEvent({ user_rsvp_status: 'going' }));
     await act(async () => {
       pressableLabelled(root, 'Decline').props.onPress();
     });
     expect(mockPost).toHaveBeenCalledTimes(1);
-    expect(mockPost.mock.calls[0][0]).toBe('/events/evt-1/rsvp');
-    expect(mockPost.mock.calls[0][1]).toEqual({ action: 'withdrawn' });
+    expect(mockPost.mock.calls[0][0]).toBe('/events/evt-1/decline');
   });
 
   it('shows the join error when the RSVP request fails', async () => {

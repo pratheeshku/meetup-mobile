@@ -192,3 +192,39 @@ describe('Home stats strip', () => {
     expect(texts(root)).toContain('99');
   });
 });
+
+
+describe('Home stats strip taps (priority1-nov23 P1-03)', () => {
+  it('Played, Won and Hosted open their lists; Groups opens the Groups screen', async () => {
+    const navigate = jest.fn();
+    const props = {
+      navigation: { navigate, addListener: jest.fn(() => jest.fn()) },
+      route: { key: 'k', name: 'EventsList', params: undefined },
+    } as unknown as React.ComponentProps<typeof HomeScreen>;
+    const root = await renderAsync(
+      <SafeAreaProvider initialMetrics={METRICS}>
+        <HomeScreen {...props} />
+      </SafeAreaProvider>,
+    );
+    const tap = async (id: string): Promise<void> => {
+      await act(async () => {
+        root.find(n => n.props.testID === id && typeof n.props.onPress === 'function').props.onPress();
+      });
+    };
+    await tap('profile-stat-played');
+    expect(navigate).toHaveBeenLastCalledWith('StatGames', { stat: 'played' });
+    await tap('profile-stat-won');
+    expect(navigate).toHaveBeenLastCalledWith('StatGames', { stat: 'won' });
+    await tap('profile-stat-hosted');
+    expect(navigate).toHaveBeenLastCalledWith('StatGames', { stat: 'hosted' });
+    await tap('profile-stat-groups');
+    expect(navigate).toHaveBeenLastCalledWith('Groups', { screen: 'GroupsList' });
+  });
+
+  it('reads up to 100 of the user\'s groups for the random 4 (P1-02)', async () => {
+    const { getGroups } = jest.requireMock('../../api/groups') as { getGroups: jest.Mock };
+    getGroups.mockClear();
+    await mount();
+    expect(getGroups).toHaveBeenCalledWith({ mine: true, limit: 100 }, expect.anything());
+  });
+});

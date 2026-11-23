@@ -7,9 +7,10 @@
  * - Enriched group cards with owner info ("Owner: Self" / "Owner: <name>"),
  *   member count, and multi-line descriptions
  * - Contextual empty states with direct Create Group action
+ * - priority1-nov23 P1-03: groups you own are listed above groups you joined, and a search box filters by name
  */
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -49,6 +50,7 @@ function GroupsListBody({ navigation, route }: Props): React.JSX.Element {
   const { user } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
   const [activeFilter, setActiveFilter] = useState<GroupFilter>('All');
+  const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,18 +106,19 @@ function GroupsListBody({ navigation, route }: Props): React.JSX.Element {
   }, [refreshKey, loadGroups]);
 
   const filteredGroups = useMemo(() => {
+    const isOwned = (g: Group): boolean =>
+      g.current_user_role === 'owner' || (Boolean(user?.id) && Boolean(g.owner_id) && g.owner_id === user?.id);
+    const needle = query.trim().toLocaleLowerCase();
+    const matching = needle ? groups.filter(g => (g.name ?? '').toLocaleLowerCase().includes(needle)) : groups;
     if (activeFilter === 'Organised') {
-      return groups.filter(
-        g => g.current_user_role === 'owner' || (Boolean(user?.id) && Boolean(g.owner_id) && g.owner_id === user?.id),
-      );
+      return matching.filter(isOwned);
     }
     if (activeFilter === 'Member') {
-      return groups.filter(
-        g => g.current_user_role !== 'owner' && (!user?.id || g.owner_id !== user?.id),
-      );
+      return matching.filter(g => !isOwned(g));
     }
-    return groups;
-  }, [groups, activeFilter, user?.id]);
+    // All: owned first, then joined; the server order is kept inside each part.
+    return [...matching.filter(isOwned), ...matching.filter(g => !isOwned(g))];
+  }, [groups, activeFilter, user?.id, query]);
 
   if (isLoading && groups.length === 0) {
     return <LoadingView />;
@@ -164,6 +167,20 @@ function GroupsListBody({ navigation, route }: Props): React.JSX.Element {
           })}
         </View>
       ) : null}
+      {groups.length > 0 ? (
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t('mob.groups.search_placeholder')}
+          placeholderTextColor={colors.textMuted}
+          accessibilityLabel={t('mob.groups.search_a11y')}
+          autoCorrect={false}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          style={styles.search}
+          testID="groups-search"
+        />
+      ) : null}
     </View>
   );
 
@@ -173,7 +190,8 @@ function GroupsListBody({ navigation, route }: Props): React.JSX.Element {
       data={filteredGroups}
       keyExtractor={item => item.id}
       contentContainerStyle={filteredGroups.length === 0 ? styles.emptyContainer : styles.listContainer}
-      ListHeaderComponent={renderHeader}
+      ListHeaderComponent={renderHeader()}
+      keyboardShouldPersistTaps="handled"
       refreshControl={
         <RefreshControl
           refreshing={isRefreshing}
@@ -183,7 +201,9 @@ function GroupsListBody({ navigation, route }: Props): React.JSX.Element {
         />
       }
       ListEmptyComponent={
-        groups.length === 0 ? (
+        groups.length > 0 && query.trim() ? (
+          <EmptyState title={t('mob.groups.empty_search', { query: query.trim() })} />
+        ) : groups.length === 0 ? (
           <EmptyState
             title={t('mob.groups.empty_title')}
             subtitle={t('mob.groups.empty_subtitle')}
@@ -348,6 +368,17 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  search: {
+    ...typography.body,
+    height: 44,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: borderWidth.thin,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    color: colors.textPrimary,
   },
   filterPillsRow: {
     flexDirection: 'row',

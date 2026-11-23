@@ -71,6 +71,8 @@ export interface TournamentDetailV2Props {
   responses: React.ReactNode;
   /** A change was made (a player added or removed, a decision, a saved report, a setup step): the host re-reads the page. */
   onChanged: () => void;
+  /** priority1-nov23 P1-06: the whole page (header, banners, tabs, panel) for the status screenshot. */
+  captureRef?: React.Ref<View>;
 }
 
 export default function TournamentDetailV2(props: TournamentDetailV2Props): React.JSX.Element {
@@ -264,6 +266,7 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
 
   return (
     <KeyboardAwareScreen contentContainerStyle={styles.container} testID="tournament-detail-v2">
+      <View ref={props.captureRef} collapsable={false} style={styles.capture}>
       <TournamentHeader
         title={tournament.name}
         metaLine={metaLine}
@@ -283,6 +286,7 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
       <TournamentTabs entries={entries} selected={currentKey} onSelect={setSelected} />
       <View style={styles.panel} testID="tournament-tab-panel">
         {body()}
+      </View>
       </View>
       {sheet === 'organizer' && tournament.organizer ? (
         <PeopleSheet
@@ -304,6 +308,7 @@ export default function TournamentDetailV2(props: TournamentDetailV2Props): Reac
 
 const styles = StyleSheet.create({
   container: { paddingBottom: spacing.xl, backgroundColor: dash.page },
+  capture: { backgroundColor: dash.page, paddingBottom: spacing.sm },
   banners: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   panel: {
     marginHorizontal: spacing.md,
