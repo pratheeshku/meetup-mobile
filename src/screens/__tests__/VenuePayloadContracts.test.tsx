@@ -212,7 +212,7 @@ describe('Venue Catalogue Payload Contract Assertions', () => {
           description: 'Fun doubles',
           visibility: 'public',
           capacity: 8,
-          starts_at: '2026-11-20T10:00:00Z',
+          starts_at: '2099-11-20T10:00:00Z',
           ends_at: null,
           skill_level_requirement: 'intermediate',
           status: 'upcoming',

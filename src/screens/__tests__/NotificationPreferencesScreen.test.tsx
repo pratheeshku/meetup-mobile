@@ -38,7 +38,7 @@ it('shows a row for every known type, with the two participant labels', async ()
   expect(labels).toContain('Group ownership transferred');
   const switches = root.findAllByType(Switch);
   expect(switches).toHaveLength(NOTIFICATION_TYPES.length);
-  expect(NOTIFICATION_TYPES).toHaveLength(25);
+  expect(NOTIFICATION_TYPES).toHaveLength(27);
   expect(labels).toContain('Tournament dates or venue changed');
   expect(labels).toContain('Added to a tournament');
   expect(NOTIFICATION_TYPES).toEqual(

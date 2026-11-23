@@ -187,7 +187,7 @@ describe('Legacy Venue Flow Verification (Isolated Suite)', () => {
               description: 'Fun doubles',
               visibility: 'public',
               capacity: 8,
-              starts_at: '2026-11-20T10:00:00Z',
+              starts_at: '2099-11-20T10:00:00Z',
               ends_at: null,
               skill_level_requirement: 'intermediate',
               status: 'upcoming',
@@ -422,7 +422,7 @@ describe('Legacy Venue Flow Verification (Isolated Suite)', () => {
           venue_lng: 103.851,
           skill_level_requirement: 'intermediate',
           capacity: 8,
-          starts_at: '2026-11-20T10:00:00.000Z',
+          starts_at: '2099-11-20T10:00:00.000Z',
         });
 
         // Strict negative assertions: no venue_id, others, or venue_snapshot
