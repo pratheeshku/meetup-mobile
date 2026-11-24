@@ -55,6 +55,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      id-token: write # app-update-prompt 4.5: GitHub OIDC identity for POST /app/release-build
     outputs:
       version_name: ${{ steps.guard.outputs.VERSION_NAME }}
       version_code: ${{ steps.guard.outputs.VERSION_CODE }}
@@ -219,6 +220,15 @@ jobs:
           path: android/app/build/outputs/bundle/productionRelease/app-production-release.aab
           retention-days: 30
           if-no-files-found: error
+
+      # App update prompt (DES-MEETUP-ADDENDUM-app-update-prompt AD-4, 4.5): record this versionCode as the pending
+      # latest build for android in production. It takes effect after the Admin store-availability delay, because the
+      # owner uploads the AAB in the Play Console by hand (OI-7). Never fails the run; the outcome is in the summary.
+      - name: Record the latest build for the update prompt
+        continue-on-error: true
+        env:
+          VERSION_CODE: ${{ steps.guard.outputs.VERSION_CODE }}
+        run: bash scripts/report-release-build.sh android "$VERSION_CODE" https://meetupaws.duckdns.org
 
       - name: Delete decoded secret files
         if: always()
