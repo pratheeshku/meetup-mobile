@@ -438,7 +438,9 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
       return null;
     }
     if (liveUpcoming.fromUpcomingEndpoint) {
-      return liveUpcoming.items.slice(0, HOME_SECTION_ROWS);
+      // app-update-prompt §9 AD-U1: the rows are what GET /home/upcoming returns; the admin "Games shown" setting
+      // sizes the list on the server, so the app no longer cuts it.
+      return liveUpcoming.items;
     }
     return selectGames(liveUpcoming.items, 'all', {
       userId: user?.id,
@@ -599,6 +601,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
           <View style={panelStyle('upcoming')} testID="upcoming-games-tab-content">
             <SectionHeader
               title={t('mob.home.tab_upcoming')}
+              hideTitle
               onViewAll={openAllGames}
               variant="panel"
             />
@@ -641,6 +644,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
           <View style={panelStyle('groups')} testID="your-groups-tab-content">
             <SectionHeader
               title={t('mob.home.tab_groups')}
+              hideTitle
               onViewAll={openAllGroups}
               variant="panel"
             />

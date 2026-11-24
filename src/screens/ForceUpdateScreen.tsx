@@ -1,48 +1,34 @@
 /**
- * Blocking "Update required" screen (force-update gate; approved deviation).
+ * Blocking "Update required" screen (DES-MEETUP-ADDENDUM-app-update-prompt AU-02, AD-8; Android and iOS).
  *
  * Deliberately has no dismiss control and no navigation, and swallows the
  * Android hardware back button, so nothing behind it can be reached. The only
- * action is "Update", which opens the Play Store page.
+ * action is "Update", which opens the store page.
  *
  * `storeUrl` comes from the backend and is untrusted: it is opened only if it
- * passes `resolveStoreUrl` (https + host exactly play.google.com); otherwise
- * the Play page for this app is opened instead.
+ * passes the platform allow-list (`openUpdateLink`, AD-10).
  */
 import React, { useEffect } from 'react';
-import { BackHandler, Linking, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, StyleSheet, Text, View } from 'react-native';
 
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
 import { colors, spacing, typography } from '../theme/tokens';
-import { PLAY_STORE_FALLBACK_URL, resolveStoreUrl } from '../utils/playStoreUrl';
-import { describeError } from '../utils/logSafeError';
+import type { UpdatePlatform } from '../api/versionPolicy';
+import { perfLog } from '../diagnostics/perfLog';
 import { useT } from '../labels/LabelsContext';
+import { openUpdateLink } from '../utils/openUpdateLink';
 
 interface ForceUpdateScreenProps {
-  /** The backend's `store_url`, unvalidated. */
+  /** The backend's store link, unvalidated. */
   storeUrl: string | null;
+  platform?: UpdatePlatform;
 }
 
-async function openStore(storeUrl: string | null): Promise<void> {
-  const target = resolveStoreUrl(storeUrl);
-  try {
-    await Linking.openURL(target);
-    return;
-  } catch (error) {
-    console.log('[update] opening the store page failed', describeError(error));
-  }
-  if (target === PLAY_STORE_FALLBACK_URL) {
-    return;
-  }
-  try {
-    await Linking.openURL(PLAY_STORE_FALLBACK_URL);
-  } catch (error) {
-    console.log('[update] opening the fallback store page failed', describeError(error));
-  }
-}
-
-export default function ForceUpdateScreen({ storeUrl }: ForceUpdateScreenProps): React.JSX.Element {
+export default function ForceUpdateScreen({
+  storeUrl,
+  platform = 'android',
+}: ForceUpdateScreenProps): React.JSX.Element {
   const t = useT();
   useEffect(() => {
     // Returning true consumes the press: back neither navigates nor exits.
@@ -57,7 +43,10 @@ export default function ForceUpdateScreen({ storeUrl }: ForceUpdateScreenProps):
         {t('mob.force_update.title')}
       </Text>
       <Text style={styles.message}>{t('mob.force_update.message')}</Text>
-      <Button label={t('mob.force_update.action')} onPress={() => openStore(storeUrl)} style={styles.button} />
+      <Button label={t('mob.force_update.action')} onPress={() => {
+          perfLog('update_required_update_tapped');
+          return openUpdateLink(platform, storeUrl);
+        }} style={styles.button} />
     </View>
     </ScreenContainer>
   );

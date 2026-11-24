@@ -3,7 +3,8 @@
  *
  * Request: `GET {ENV.API_BASE_URL}/app/version-policy`, 5 s timeout, NO
  * `Authorization` header, NO cookies (`withCredentials: false`).
- * Response: { android: { min_version_code: int, store_url: string } }.
+ * Response: { android: { min_version_code, store_url, latest_version_code? }, ios?: { min_build, latest_build,
+ * store_url }, reminder_hours? } (app-update-prompt 4.2; the new fields are additive).
  * Fails open — every failure resolves `null` and logs only an error tag.
  */
 import { ENV } from '../../../config/env';
@@ -61,24 +62,76 @@ describe('the request', () => {
   });
 });
 
+const IOS_STORE = 'https://apps.apple.com/sg/app/gameon-sg/id123';
+const android = (min: number, latest = 0) => ({ minBuild: min, latestBuild: latest, storeUrl: STORE });
+
 describe('a well-formed policy', () => {
-  it('resolves { minVersionCode, storeUrl }', async () => {
+  it('an older server (android only): latest off, no iOS, reminder 24 hours', async () => {
     serve({ data: goodBody });
 
-    await expect(fetchVersionPolicy()).resolves.toEqual({ minVersionCode: 7, storeUrl: STORE });
+    await expect(fetchVersionPolicy()).resolves.toEqual({ android: android(7), ios: null, reminderHours: 24 });
     expect(log).not.toHaveBeenCalled();
   });
 
-  it('ignores unrelated extra fields (other platforms, future keys)', async () => {
-    serve({ data: { ...goodBody, ios: { min_version_code: 99 }, android: { ...goodBody.android, note: 'x' } } });
+  it('reads the full additive shape: latest, iOS and the reminder', async () => {
+    serve({
+      data: {
+        android: { min_version_code: 7, store_url: STORE, latest_version_code: 9 },
+        ios: { min_build: 50, latest_build: 60, store_url: IOS_STORE },
+        reminder_hours: 12,
+      },
+    });
 
-    await expect(fetchVersionPolicy()).resolves.toEqual({ minVersionCode: 7, storeUrl: STORE });
+    await expect(fetchVersionPolicy()).resolves.toEqual({
+      android: android(7, 9),
+      ios: { minBuild: 50, latestBuild: 60, storeUrl: IOS_STORE },
+      reminderHours: 12,
+    });
+  });
+
+  it('ignores unrelated extra fields (future keys)', async () => {
+    serve({ data: { ...goodBody, android: { ...goodBody.android, note: 'x' }, future: true } });
+
+    await expect(fetchVersionPolicy()).resolves.toEqual({ android: android(7), ios: null, reminderHours: 24 });
   });
 
   it('accepts a minimum of 0 (nothing is blocked)', async () => {
     serve({ data: { android: { min_version_code: 0, store_url: STORE } } });
 
-    await expect(fetchVersionPolicy()).resolves.toEqual({ minVersionCode: 0, storeUrl: STORE });
+    await expect(fetchVersionPolicy()).resolves.toEqual({ android: android(0), ios: null, reminderHours: 24 });
+  });
+
+  it('an iOS-only body is read: Android is null', async () => {
+    serve({ data: { ios: { min_build: 0, latest_build: 61, store_url: IOS_STORE } } });
+
+    await expect(fetchVersionPolicy()).resolves.toEqual({
+      android: null,
+      ios: { minBuild: 0, latestBuild: 61, storeUrl: IOS_STORE },
+      reminderHours: 24,
+    });
+  });
+
+  it('a malformed iOS object leaves a good Android policy intact', async () => {
+    serve({ data: { ...goodBody, ios: { min_build: '5' } } });
+
+    await expect(fetchVersionPolicy()).resolves.toEqual({ android: android(7), ios: null, reminderHours: 24 });
+  });
+
+  it('a malformed latest_version_code makes Android unreadable (fails open)', async () => {
+    expect(parseVersionPolicy({ android: { ...goodBody.android, latest_version_code: 'x' } })).toBeNull();
+  });
+
+  it.each([
+    ['zero', 0],
+    ['negative', -3],
+    ['fractional', 1.5],
+    ['a string', '12'],
+  ])('reminder_hours %s -> the 24 hour default', (_label, reminder) => {
+    expect(parseVersionPolicy({ ...goodBody, reminder_hours: reminder })?.reminderHours).toBe(24);
+  });
+
+  it('an empty iOS store link is read as no link', () => {
+    expect(parseVersionPolicy({ ios: { min_build: 1, latest_build: 2, store_url: '' } })?.ios?.storeUrl).toBeNull();
   });
 });
 
@@ -117,7 +170,8 @@ describe('a malformed or missing field is "no update required"', () => {
     ['null', null],
     ['a string', 'update now'],
     ['an array', [goodBody]],
-    ['android missing', { ios: { min_version_code: 5, store_url: STORE } }],
+    ['android missing and iOS malformed', { ios: { min_build: -1, store_url: STORE } }],
+    ['android missing and iOS a string', { ios: 'yes' }],
     ['android null', { android: null }],
     ['android a string', { android: 'yes' }],
     ['android an array', { android: [7, STORE] }],
