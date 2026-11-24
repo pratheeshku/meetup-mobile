@@ -91,3 +91,24 @@ export interface PostalLookupResponse {
  */
 export const VENUE_ORGANIZER_PHOTOS_ENABLED = false;
 
+/**
+ * A venue the organizer typed as Others on an earlier game, kept in their own list
+ * (DES-MEETUP-ADDENDUM-nov24-enhancements NV-01, `GET /venues/saved`). Private to its owner.
+ */
+export interface SavedVenue {
+  id: string;
+  name: string;
+  postal_code?: string | null;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  geocoding_status?: 'pending' | 'resolved' | 'failed' | null;
+  facilities?: string[] | null;
+  operating_hours?: string | Record<string, unknown> | null;
+  info_url?: string | null;
+  last_used_at?: string | null;
+}
+
+export interface SavedVenuesResponse {
+  items: SavedVenue[];
+}

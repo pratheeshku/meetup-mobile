@@ -37,6 +37,8 @@ import {
   respondToEventInvitation,
   rsvpEvent,
   updateEvent,
+  uploadEventBanner,
+  deleteEventBanner,
   withdrawEvent,
 } from '../api/events';
 import {
@@ -67,7 +69,9 @@ import ShareActionSheet from '../components/ShareActionSheet';
 import Toast from '../components/Toast';
 import { confirmSeriesCancel, SeriesAcceptNote, SeriesEditModal, SeriesInfo, SeriesLeaveButton } from '../components/series/SeriesParts';
 import { useAppShare } from '../hooks/useAppShare';
-import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
+import VenuePicker, { savedVenueSelection, type SelectedVenueState } from '../components/venue/VenuePicker';
+import GameBannerField from '../components/GameBannerField';
+import type { PickedImage } from '../utils/imagePicker';
 import VenueRow from '../components/venue/VenueRow';
 import InviteTypeRow from '../components/invite/InviteTypeRow';
 import InviteCard from '../components/invite/InviteCard';
@@ -215,6 +219,11 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
   // Edit wizard state
   const [isEditing, setIsEditing] = useState(false);
+  // NV-03: Edit game banner. `picked` replaces the banner on save; `removed` deletes the current one.
+  const [editBanner, setEditBanner] = useState<{ picked: PickedImage | null; removed: boolean }>({
+    picked: null,
+    removed: false,
+  });
   const [editStep, setEditStep] = useState(1);
   const [editTitle, setEditTitle] = useState('');
   const [editDateValue, setEditDateValue] = useState<Date>(new Date());
@@ -388,6 +397,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
   const handleStartEdit = () => {
     if (!event) return;
     setEditTitle(event.title);
+    setEditBanner({ picked: null, removed: false });
     const startDate = event.starts_at ? new Date(event.starts_at) : new Date();
     setEditDateValue(startDate);
     const venueName = event.venue_name || event.location || '';
@@ -668,10 +678,19 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         (editGroupIds.length !== currentGroups.size || editGroupIds.some(id => !currentGroups.has(id)));
       const venueFields: Pick<
         UpdateEventInput,
-        'venue_id' | 'others' | 'venue_name' | 'venue_address' | 'venue_place_id' | 'venue_lat' | 'venue_lng'
+        | 'venue_id'
+        | 'others'
+        | 'saved_venue_id'
+        | 'venue_name'
+        | 'venue_address'
+        | 'venue_place_id'
+        | 'venue_lat'
+        | 'venue_lng'
       > =
         venueCatalogueEnabled && editCatalogueVenue
-          ? editCatalogueVenue.isOthers && editCatalogueVenue.othersInput
+          ? editCatalogueVenue.savedVenueId
+            ? { saved_venue_id: editCatalogueVenue.savedVenueId }
+            : editCatalogueVenue.isOthers && editCatalogueVenue.othersInput
             ? { others: editCatalogueVenue.othersInput }
             : (editCatalogueVenue.venueId || null) !== (event.venue_id ?? null)
             ? { venue_id: editCatalogueVenue.venueId || null }
@@ -703,6 +722,21 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
 
       await withCorrelationId(async correlationId => {
         await updateEvent(eventId, payload, { correlationId });
+        // NV-03: the banner change rides the same user action. A failure keeps the saved edit; Edit game offers the
+        // banner again.
+        try {
+          if (editBanner.picked) {
+            await uploadEventBanner(
+              eventId,
+              { uri: editBanner.picked.path, name: editBanner.picked.filename, type: editBanner.picked.mime },
+              { correlationId },
+            );
+          } else if (editBanner.removed && event.banner_url) {
+            await deleteEventBanner(eventId, { correlationId });
+          }
+        } catch {
+          console.log('[edit-game] banner change failed');
+        }
       });
       // Reload so the new groups and venue show on the game without leaving the screen.
       await loadEvent(true);
@@ -1188,6 +1222,15 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                 </View>
               </View>
 
+              <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
+                <GameBannerField
+                  previewUri={editBanner.picked?.path ?? (editBanner.removed ? null : event.banner_url ?? null)}
+                  onPick={image => setEditBanner({ picked: image, removed: false })}
+                  onRemove={() => setEditBanner({ picked: null, removed: true })}
+                  disabled={isEditSubmitting}
+                />
+              </View>
+
               {event.visibility === 'group' ? (
                 <View style={[styles.cardContainer, { marginTop: spacing.lg }]}>
                   <Text style={styles.inputCardLabel}>{t('mob.create_game.share_group_section')}</Text>
@@ -1277,6 +1320,17 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                         place_id: null,
                         lat: venue.lat ?? null,
                         lng: venue.lng ?? null,
+                      });
+                    }}
+                    onSelectSavedVenue={saved => {
+                      const selection = savedVenueSelection(saved, t('venue.source.user'));
+                      setEditCatalogueVenue(selection);
+                      setEditSelectedVenue({
+                        name: selection.name,
+                        address: selection.address || '',
+                        place_id: null,
+                        lat: selection.lat ?? null,
+                        lng: selection.lng ?? null,
                       });
                     }}
                     onSaveOthersVenue={others => {
@@ -1633,6 +1687,13 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
               </View>
             ) : null}
           </View>
+
+          {/* Game banner (NV-03, AD-5): full width, 4:1, above the title block; none when the game has no banner. */}
+          {event.banner_url ? (
+            <View style={styles.gameBanner} testID="game-banner">
+              <Image source={{ uri: event.banner_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            </View>
+          ) : null}
 
           {/* Centered Sport Circle */}
           <View style={styles.sportBadgeCenter}>
@@ -2171,6 +2232,14 @@ const styles = StyleSheet.create({
   bannerActions: {
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  gameBanner: {
+    alignSelf: 'stretch',
+    marginHorizontal: -spacing.md,
+    aspectRatio: 4,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
+    backgroundColor: colors.primaryDark,
   },
   sportBadgeCenter: {
     width: 64,
