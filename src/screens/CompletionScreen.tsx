@@ -3,7 +3,7 @@
  * values are whatever the caller already has in memory. Hardware back
  * runs the primary action and does not pop back to the form.
  */
-import React, { useCallback, useContext, useEffect, useRef, useSyncExternalStore } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { BackHandler, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { NavigationContext } from '@react-navigation/native';
 
@@ -11,6 +11,7 @@ import Button from '../components/Button';
 import Card from '../components/Card';
 import { RegistryIcon } from '../components/icons/RegistryIcons';
 import ScreenContainer from '../components/ScreenContainer';
+import Toast from '../components/Toast';
 import type { ScreenEdge } from '../components/ScreenContainer';
 import { useT } from '../labels/LabelsContext';
 import type { LabelKey } from '../labels/fallbackLabels';
@@ -120,6 +121,10 @@ export default function CompletionScreen({
     snapshot.current = request;
   }
   const data = request ?? snapshot.current;
+  // The notice shows once per completion request; dismissing it clears it for that request.
+  const [dismissedNotice, setDismissedNotice] = useState<CompletionRequest | null>(null);
+  const dismissNotice = useCallback(() => setDismissedNotice(snapshot.current), []);
+  const notice = data?.notice && dismissedNotice !== data ? data.notice : null;
 
   const runPrimary = useCallback(() => {
     if (left.current) {
@@ -214,6 +219,7 @@ export default function CompletionScreen({
           ) : null}
         </View>
       </ScrollView>
+      <Toast message={notice} onDismiss={dismissNotice} duration={4000} />
     </ScreenContainer>
   );
 }

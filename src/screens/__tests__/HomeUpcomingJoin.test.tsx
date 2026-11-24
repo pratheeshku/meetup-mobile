@@ -82,19 +82,19 @@ describe('the list', () => {
     expect(params).not.toHaveProperty('mine');
   });
 
-  it('shows my games and open games together, earliest start first, two rows', async () => {
+  it('shows my games and open games together, earliest start first, up to the Games shown default of 4 rows', async () => {
     const root = await mount();
-    expect(titlesInOrder(root)).toEqual(['Open early', 'Going game']);
+    expect(titlesInOrder(root)).toEqual(['Open early', 'Going game', 'Open late', 'Hosted four']);
   });
 
-  it('still shows two rows when the earliest games are all open (client-side pick)', async () => {
+  it('picks open and joined games alike (client-side pick); fewer than 4 qualifying games shows them all', async () => {
     server = [
       makeEvent({ id: 'a', title: 'Open early', starts_at: days(1) }),
       makeEvent({ id: 'b', title: 'Open late', starts_at: days(2) }),
       makeEvent({ id: 'c', title: 'Going game', current_user_rsvp_status: 'going', starts_at: days(3) }),
     ];
     const root = await mount();
-    expect(titlesInOrder(root)).toEqual(['Open early', 'Open late']);
+    expect(titlesInOrder(root)).toEqual(['Open early', 'Open late', 'Going game']);
   });
 
   it('excludes invite-only, past and cancelled games', async () => {
@@ -104,7 +104,7 @@ describe('the list', () => {
     }
   });
 
-  it('shows the hosted game with a Hosting badge when it is among the first two', async () => {
+  it('shows the hosted game with a Hosting badge when it is among the rows shown', async () => {
     server = [makeEvent({ id: 'host', title: 'Hosted four', organiser_id: 'me', starts_at: days(1) })];
     const root = await mount();
     expect(titlesInOrder(root)).toEqual(['Hosted four']);
@@ -116,9 +116,8 @@ describe('the list', () => {
 describe('Join on cards', () => {
   it('only on games the user has not joined (rsvp none, not organiser)', async () => {
     const root = await mount();
-    // rows: Open early (unjoined) and Going game (joined)
-    expect(joinButtons(root)).toHaveLength(1);
-    expect(joinButtons(root)[0].props.accessibilityLabel).toBe('Join, Open early');
+    // rows: Open early and Open late (unjoined), Going game (joined), Hosted four (organiser)
+    expect(joinButtons(root).map(n => n.props.accessibilityLabel)).toEqual(['Join, Open early', 'Join, Open late']);
     expect(panelTexts(root)).toContain('Going');
   });
 
@@ -131,8 +130,8 @@ describe('Join on cards', () => {
     });
     expect(rsvpEvent).toHaveBeenCalledWith('open-early', expect.objectContaining({ correlationId: expect.any(String) }));
     expect((getEvents as jest.Mock).mock.calls.length).toBeGreaterThan(before);
-    expect(titlesInOrder(root)).toEqual(['Open early', 'Going game']);
-    expect(joinButtons(root)).toHaveLength(0);
+    expect(titlesInOrder(root)).toEqual(['Open early', 'Going game', 'Open late', 'Hosted four']);
+    expect(joinButtons(root).map(n => n.props.accessibilityLabel)).toEqual(['Join, Open late']);
     expect(panelTexts(root).filter(x => x === 'Going')).toHaveLength(2);
     expect(root.findAll(n => n.props.testID === 'home-join-error')).toHaveLength(0);
   });
@@ -145,7 +144,7 @@ describe('Join on cards', () => {
       joinButtons(root)[0].props.onPress();
     });
     expect(panelTexts(root)).toContain("Your skill level doesn't meet this game's requirement");
-    expect(joinButtons(root)).toHaveLength(1);
+    expect(joinButtons(root)).toHaveLength(2);
     expect((getEvents as jest.Mock).mock.calls.length).toBe(before); // no refresh on failure
   });
 
@@ -176,8 +175,8 @@ describe('Upcoming tile count', () => {
   it('still comes from the summary / is not derived from the whole feed', async () => {
     const root = await mount();
     const tile = root.find(n => n.props.testID === 'tab-tile-upcoming' && typeof n.type === 'string');
-    // The summary call fails in this test, so the count falls back to the rows shown (at most 2), never the 100-game feed.
+    // The summary call fails in this test, so the count falls back to the rows shown (at most 4), never the 100-game feed.
     const count = Number(texts(tile).find(x => /^\d+$/.test(x)));
-    expect(count).toBeLessThanOrEqual(2);
+    expect(count).toBeLessThanOrEqual(4);
   });
 });

@@ -10,6 +10,7 @@ import { Alert } from 'react-native';
 import { apiClient } from '../../api/client';
 import { deleteEventBanner, updateEvent, uploadEventBanner } from '../../api/events';
 import { getMyGroups } from '../../api/groups';
+import * as completion from '../../navigation/showCompletion';
 import { getSavedVenues, getVenues } from '../../api/venues';
 import { act, renderAsync } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
@@ -167,9 +168,10 @@ describe('banner on Edit game (NV-03)', () => {
     expect(deleteEventBanner).not.toHaveBeenCalled();
   });
 
-  it('a failed upload keeps the saved edit (no error shown for the edit)', async () => {
+  it('a failed upload keeps the saved edit and the completion carries the banner-not-saved notice', async () => {
     (uploadEventBanner as jest.Mock).mockRejectedValue({ response: { status: 413 } });
     jest.spyOn(console, 'log').mockImplementation(() => {});
+    const shown = jest.spyOn(completion, 'showCompletion');
     const root = await mount();
     await press(labelled(root, 'Edit Game'));
     await pickBanner(root);
@@ -177,6 +179,9 @@ describe('banner on Edit game (NV-03)', () => {
     expect(updateEvent).toHaveBeenCalledTimes(1);
     expect(uploadEventBanner).toHaveBeenCalledTimes(1);
     expect(labelled(root, 'Save changes')).toBeUndefined(); // the edit closed as saved
+    expect(shown).toHaveBeenCalledWith(
+      expect.objectContaining({ flow: 'game_updated', notice: 'Banner not saved, add it again from Edit game' }),
+    );
   });
 });
 

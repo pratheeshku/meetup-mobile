@@ -31,7 +31,7 @@ import {
 } from './VenueIcons';
 import OthersVenueModal from './OthersVenueModal';
 import { logMapFailureOnce } from './logMapFailure';
-import { useT } from '../../labels/LabelsContext';
+import { useT, type TranslateFn } from '../../labels/LabelsContext';
 import { colors, radius, spacing } from '../../theme/tokens';
 import type { OthersVenueInput, SavedVenue, VenueItem, VenueSnapshot } from '../../types/venue';
 
@@ -108,6 +108,7 @@ export default function VenuePicker({
 
   const prevSportRef = useRef(sportId);
   const [savedVenues, setSavedVenues] = useState<SavedVenue[]>([]);
+  const [savedRemoveError, setSavedRemoveError] = useState<string | null>(null);
   const savedEnabled = Boolean(onSelectSavedVenue);
   // Only the latest saved-venues request may apply its answer (typing fires one per change).
   const savedRequest = useRef(0);
@@ -203,9 +204,10 @@ export default function VenuePicker({
         text: t('mob.venue.saved_remove'),
         style: 'destructive',
         onPress: () => {
+          setSavedRemoveError(null);
           withCorrelationId(correlationId => deleteSavedVenue(item.id, { correlationId }))
             .then(() => setSavedVenues(prev => prev.filter(v => v.id !== item.id)))
-            .catch(() => setLoadError(t('mob.errors.server')));
+            .catch(() => setSavedRemoveError(t('mob.venue.saved_remove_failed')));
         },
       },
     ]);
@@ -452,6 +454,11 @@ export default function VenuePicker({
                       <Text style={styles.groupHeading} accessibilityRole="header">
                         {t('mob.venue.my_venues')}
                       </Text>
+                      {savedRemoveError ? (
+                        <Text style={styles.savedRemoveError} accessibilityRole="alert" testID="saved-venue-remove-error">
+                          {savedRemoveError}
+                        </Text>
+                      ) : null}
                       {savedVenues.map(item => (
                         <View key={item.id} style={styles.venueRow}>
                           <Pressable
@@ -794,6 +801,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  savedRemoveError: {
+    fontSize: 12,
+    color: colors.error,
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+  },
   savedRemove: {
     width: 44,
     height: 44,
@@ -846,14 +859,14 @@ const styles = StyleSheet.create({
  * The picker selection for a My venues pick (NV-01): shown like an Others venue (its snapshot source is `user`) and
  * sent as `saved_venue_id`. The server copies the saved entry; the client never sends its coordinates.
  */
-export function savedVenueSelection(item: SavedVenue, sourceLabel: string): SelectedVenueState {
+export function savedVenueSelection(item: SavedVenue, t: TranslateFn): SelectedVenueState {
   return {
     venueId: null,
     name: item.name,
-    address: item.address || (item.postal_code ? `Singapore ${item.postal_code}` : null),
+    address: item.address || (item.postal_code ? t('mob.venue.postal_address', { postal_code: item.postal_code }) : null),
     lat: item.lat ?? null,
     lng: item.lng ?? null,
-    source: sourceLabel,
+    source: t('venue.source.user'),
     isOthers: true,
     geocoding_status: item.geocoding_status ?? null,
     savedVenueId: item.id,

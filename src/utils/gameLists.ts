@@ -34,6 +34,12 @@ import type { TranslateFn } from '../labels/LabelsContext';
 /** Rows a Home section shows before "View all" (AD-14). */
 export const HOME_SECTION_ROWS = 2;
 
+/**
+ * Upcoming rows when GET /home/upcoming failed and Home falls back to the events list: the admin "Games shown"
+ * value is not readable by the app, so its design default applies (app-update-prompt section 9, AD-U2).
+ */
+export const HOME_UPCOMING_DEFAULT_ROWS = 4;
+
 export type GameBadge = 'Hosting' | 'Going' | 'Waitlisted' | 'Open' | 'Declined';
 export type GamesScope = 'all' | 'mine' | 'open';
 

@@ -129,7 +129,7 @@ describe('banner on Create game (NV-03)', () => {
     );
   });
 
-  it('a failed upload never undoes the creation: the completion still shows', async () => {
+  it('a failed upload never undoes the creation: the completion shows with the banner-not-saved notice', async () => {
     (uploadEventBanner as jest.Mock).mockRejectedValue({ response: { status: 422, data: { detail: { code: 'IMAGE_INVALID' } } } });
     jest.spyOn(console, 'log').mockImplementation(() => {});
     const root = await mountCreateGame();
@@ -138,7 +138,18 @@ describe('banner on Create game (NV-03)', () => {
     await pickBanner(root);
     await finish(root);
     expect(createEvent).toHaveBeenCalledTimes(1);
-    expect(showCompletion).toHaveBeenCalledWith(expect.objectContaining({ flow: 'game_created' }));
+    expect(showCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ flow: 'game_created', notice: 'Banner not saved, add it again from Edit game' }),
+    );
+  });
+
+  it('a successful upload carries no notice', async () => {
+    const root = await mountCreateGame();
+    await press(byLabel(root, 'Next'));
+    await typeTitle(root);
+    await pickBanner(root);
+    await finish(root);
+    expect((showCompletion as jest.Mock).mock.calls[0][0]).not.toHaveProperty('notice');
   });
 
   it('Remove clears the picked banner before the create', async () => {

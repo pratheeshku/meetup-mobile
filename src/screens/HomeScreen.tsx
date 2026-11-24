@@ -83,7 +83,7 @@ import { getApiErrorMessage } from '../utils/apiError';
 import {
   filteredEmptyMessage,
   getGameBadge,
-  HOME_SECTION_ROWS,
+  HOME_UPCOMING_DEFAULT_ROWS,
   isOrganiserOf,
   selectGames,
 } from '../utils/gameLists';
@@ -445,7 +445,7 @@ export default function HomeScreen({ navigation, route }: Props): React.JSX.Elem
     return selectGames(liveUpcoming.items, 'all', {
       userId: user?.id,
       sportKeys: filter.selected,
-    }).slice(0, HOME_SECTION_ROWS);
+    }).slice(0, HOME_UPCOMING_DEFAULT_ROWS);
   }, [liveUpcoming.items, liveUpcoming.fromUpcomingEndpoint, user?.id, filter.selected]);
 
   const upcomingCount = liveUpcoming.fromUpcomingEndpoint

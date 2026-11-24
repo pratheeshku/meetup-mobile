@@ -579,6 +579,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         const emailsToInvite = invitedEmails;
         const failedEmailInvites: string[] = [];
         let emailsInvited = 0;
+        let bannerFailed = false;
         const created = await withCorrelationId(async correlationId => {
           const event = await createEvent(input, { correlationId });
           // NV-03, AD-5: the banner is uploaded after the create, under the same correlation id. A failure keeps the
@@ -591,6 +592,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
                 { correlationId },
               );
             } catch {
+              bannerFailed = true;
               console.log('[create-game] banner upload failed');
             }
           }
@@ -627,6 +629,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           rows,
           primary: 'dashboard',
           secondary: { button: 'view_game', id: created.id },
+          ...(bannerFailed ? { notice: t('mob.create_game.banner_failed') } : {}),
         });
       } else {
         const input: CreateTournamentInput = {
@@ -1010,7 +1013,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
               onSelectSavedVenue={
                 mode === 'game'
                   ? saved => {
-                      const selection = savedVenueSelection(saved, t('venue.source.user'));
+                      const selection = savedVenueSelection(saved, t);
                       setCatalogueVenue(selection);
                       setSelectedVenue({
                         name: selection.name,

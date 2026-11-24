@@ -320,6 +320,19 @@ describe('list rules (AD-20)', () => {
     expect(texts(root)).toContain('6');
   });
 
+  it('fallback (GET /home/upcoming failed): the events-list rows are cut to the Games shown default of 4', async () => {
+    mockGetUpcoming.mockRejectedValue(new Error('500'));
+    mockGetEvents.mockResolvedValue(
+      eventsOf(
+        [1, 2, 3, 4, 5, 6].map(n =>
+          makeEvent({ id: `f${n}`, title: `Fallback ${n}`, current_user_rsvp_status: 'going', starts_at: hours(n) }),
+        ),
+      ),
+    );
+    const section = rowTitles(await mount(), UPCOMING_PANEL);
+    expect(section.filter(text => /^Fallback \d$/.test(text))).toEqual(['Fallback 1', 'Fallback 2', 'Fallback 3', 'Fallback 4']);
+  });
+
   it('a hosted game appears in Upcoming games when the server returns it, and the app does not cut the list', async () => {
     mockGetUpcoming.mockResolvedValue(
       upcomingOf([

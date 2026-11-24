@@ -720,6 +720,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         ...venueFields,
       };
 
+      let bannerFailed = false;
       await withCorrelationId(async correlationId => {
         await updateEvent(eventId, payload, { correlationId });
         // NV-03: the banner change rides the same user action. A failure keeps the saved edit; Edit game offers the
@@ -735,6 +736,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
             await deleteEventBanner(eventId, { correlationId });
           }
         } catch {
+          bannerFailed = true;
           console.log('[edit-game] banner change failed');
         }
       });
@@ -769,6 +771,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
         rows,
         primary: 'dashboard',
         secondary: { button: 'view_game', id: eventId },
+        ...(bannerFailed ? { notice: t('mob.create_game.banner_failed') } : {}),
       });
     } catch (e: any) {
       // 404: the game is gone or no longer visible (AC-11): close with the neutral message.
@@ -1323,7 +1326,7 @@ export default function EventDetailScreen({ navigation, route }: Props): React.J
                       });
                     }}
                     onSelectSavedVenue={saved => {
-                      const selection = savedVenueSelection(saved, t('venue.source.user'));
+                      const selection = savedVenueSelection(saved, t);
                       setEditCatalogueVenue(selection);
                       setEditSelectedVenue({
                         name: selection.name,

@@ -9,6 +9,7 @@ import { Alert, TextInput } from 'react-native';
 import VenuePicker, { savedVenueSelection } from '../VenuePicker';
 import * as venuesApi from '../../../api/venues';
 import type { SavedVenue, VenueItem } from '../../../types/venue';
+import { bundledT } from '../../../labels/LabelsContext';
 import { act, pressableLabelled, renderAsync, texts } from '../../../test-utils/render';
 
 jest.mock('../../../api/venues');
@@ -151,6 +152,28 @@ describe('My venues (NV-01, AD-2)', () => {
     expect(texts(root)).toContain('Hougang Sport Centre');
   });
 
+  it('a failed removal keeps the row and shows the remove-failed message, not the venues load error', async () => {
+    let buttons: Array<{ text?: string; onPress?: () => void }> = [];
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, given) => {
+      buttons = (given ?? []) as typeof buttons;
+    });
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    mockDeleteSaved.mockRejectedValue(new Error('500'));
+    const root = await mountPicker(jest.fn());
+    await act(async () => {
+      root.findAll(node => node.props.testID === 'saved-venue-remove-sv-1' && typeof node.props.onPress === 'function')[0].props.onPress();
+    });
+    await act(async () => {
+      buttons.find(button => button.text === 'Remove')?.onPress?.();
+    });
+    await flush();
+    const all = texts(root);
+    expect(all).toContain('Could not remove this venue. Please try again.');
+    expect(all).toContain('Condo Court');
+    expect(all).toContain('Hougang Sport Centre');
+    expect(all.some(text => /Retry/i.test(text))).toBe(false);
+  });
+
   it('without onSelectSavedVenue (tournament screens, OI-2) nothing is fetched or shown', async () => {
     const root = await mountPicker(undefined);
     expect(mockGetSaved).not.toHaveBeenCalled();
@@ -160,7 +183,7 @@ describe('My venues (NV-01, AD-2)', () => {
 
 describe('savedVenueSelection', () => {
   it('marks the pick as a saved venue, shown like Others, with its id for saved_venue_id', () => {
-    expect(savedVenueSelection(saved[0], 'Others')).toEqual({
+    expect(savedVenueSelection(saved[0], bundledT)).toEqual({
       venueId: null,
       name: 'Condo Court',
       address: '1 Condo Road',
@@ -173,7 +196,7 @@ describe('savedVenueSelection', () => {
     });
   });
 
-  it('falls back to the postal code when there is no address yet', () => {
-    expect(savedVenueSelection(saved[1], 'Others').address).toBe('Singapore 654321');
+  it('falls back to the postal code, worded by the mob.venue.postal_address label, when there is no address yet', () => {
+    expect(savedVenueSelection(saved[1], bundledT).address).toBe('Singapore 654321');
   });
 });
