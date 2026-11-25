@@ -19,7 +19,7 @@ import { deferred, installFakeBackend } from '../../test-utils/apiHarness';
 import type { FakeBackend, FakeReply } from '../../test-utils/apiHarness';
 import { act, pressables, pressableWithText, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
-import { PLAY_STORE_FALLBACK_URL } from '../../utils/playStoreUrl';
+import { APP_STORE_FALLBACK_URL, PLAY_STORE_FALLBACK_URL } from '../../utils/playStoreUrl';
 import ForceUpdateGate from '../ForceUpdateGate';
 
 const STORE = 'https://play.google.com/store/apps/details?id=org.duckdns.meetups';
@@ -674,13 +674,59 @@ describe('iOS (app-update-prompt AU-01, AU-02, 4.3)', () => {
     expect(Linking.openURL).toHaveBeenCalledWith(url);
   });
 
-  it('an iOS link off the allow-list is never opened', async () => {
+  it('an iOS link off the allow-list is never opened; production opens the built-in App Store page (AD-10)', async () => {
     backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61, url: 'https://evil.example/app' });
     const root = await mountGate();
     await act(async () => {
       await pressableWithText(root, 'Update').props.onPress();
     });
-    expect(Linking.openURL).not.toHaveBeenCalled();
+    expect(Linking.openURL).toHaveBeenCalledTimes(1);
+    expect(Linking.openURL).toHaveBeenCalledWith(APP_STORE_FALLBACK_URL);
+    expect(Linking.openURL).not.toHaveBeenCalledWith('https://evil.example/app');
     expect(isBlocked(root)).toBe(true);
+  });
+
+  it('a valid iOS link that cannot be opened falls back to the built-in App Store page (4.3)', async () => {
+    const url = 'https://apps.apple.com/sg/app/gameon-sg/id6818480691';
+    (Linking.openURL as jest.Mock).mockRejectedValueOnce(new Error('no handler'));
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61, url });
+    const root = await mountGate();
+    await act(async () => {
+      await pressableWithText(root, 'Update').props.onPress();
+    });
+    expect((Linking.openURL as jest.Mock).mock.calls.map(call => call[0])).toEqual([url, APP_STORE_FALLBACK_URL]);
+  });
+
+  describe('staging build (TestFlight, no App Store page)', () => {
+    beforeEach(() => {
+      (Config as Record<string, unknown>).APP_ENV = 'staging';
+    });
+    afterEach(() => {
+      delete (Config as Record<string, unknown>).APP_ENV;
+    });
+
+    it('an iOS link off the allow-list opens nothing', async () => {
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61, url: 'https://evil.example/app' });
+      const root = await mountGate();
+      await act(async () => {
+        await pressableWithText(root, 'Update').props.onPress();
+      });
+      expect(Linking.openURL).not.toHaveBeenCalled();
+      expect(isBlocked(root)).toBe(true);
+    });
+
+    it('a TestFlight link that cannot be opened is not retried with the production App Store page', async () => {
+      const url = 'https://testflight.apple.com/join/abc';
+      (Linking.openURL as jest.Mock).mockRejectedValueOnce(new Error('no handler'));
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61, url });
+      const root = await mountGate();
+      await act(async () => {
+        await pressableWithText(root, 'Update').props.onPress();
+      });
+      expect((Linking.openURL as jest.Mock).mock.calls.map(call => call[0])).toEqual([url]);
+    });
   });
 });

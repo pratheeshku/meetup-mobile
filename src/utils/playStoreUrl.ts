@@ -77,13 +77,29 @@ export function isAllowedIosStoreUrl(candidate: unknown): candidate is string {
   );
 }
 
+/** App Store page of the production app (Apple ID 6818480691, bundle org.duckdns.meetups; AD-10 built-in page). */
+export const APP_STORE_FALLBACK_URL = 'https://apps.apple.com/app/id6818480691';
+
 /**
- * The link the Update button opens for `platform`. Android falls back to this build's own Play page. iOS has no
- * built-in App Store page (the numeric App Store id is not in the app's config), so an invalid iOS link gives null.
+ * The built-in App Store page for this build's own app (AD-10). The staging iOS app is on TestFlight, which has no
+ * App Store page, so staging builds have none and use only the admin update link.
+ */
+export function appStoreFallbackUrl(): string | null {
+  return Config.APP_ENV === 'staging' ? null : APP_STORE_FALLBACK_URL;
+}
+
+/** The built-in store page for this build's own app id on `platform`, or null when there is none (staging iOS). */
+export function storeFallbackUrl(platform: 'android' | 'ios'): string | null {
+  return platform === 'android' ? playStoreFallbackUrl() : appStoreFallbackUrl();
+}
+
+/**
+ * The link the Update button opens for `platform`: the update link when it passes the allow-list, else this build's
+ * built-in store page (AD-10). Null only on staging iOS with no valid link.
  */
 export function resolveUpdateUrl(platform: 'android' | 'ios', candidate: unknown): string | null {
   if (platform === 'android') {
     return resolveStoreUrl(candidate);
   }
-  return isAllowedIosStoreUrl(candidate) ? candidate : null;
+  return isAllowedIosStoreUrl(candidate) ? candidate : appStoreFallbackUrl();
 }

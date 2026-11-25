@@ -9,6 +9,8 @@ import DeviceInfo from 'react-native-device-info';
 import { decideUpdate, LATER_STORAGE_KEY, loadLater, saveLater } from '../appUpdate';
 import { getInstalledBuild, getInstalledIosBuild } from '../installedVersion';
 import {
+  APP_STORE_FALLBACK_URL,
+  appStoreFallbackUrl,
   isAllowedIosStoreUrl,
   PLAY_STORE_FALLBACK_URL,
   PLAY_STORE_STAGING_FALLBACK_URL,
@@ -143,9 +145,19 @@ describe('update link allow-list (AD-10)', () => {
     ['itms-apps', 'itms-apps://apps.apple.com/app/id1'],
     ['over 500 characters', `https://apps.apple.com/${'a'.repeat(500)}`],
     ['the Play host', STORE],
-  ])('iOS refuses %s and has no built-in page (null)', (_label, url) => {
+  ])('iOS refuses %s: production falls back to the built-in App Store page, staging has none (null)', (_label, url) => {
     expect(isAllowedIosStoreUrl(url)).toBe(false);
+    expect(resolveUpdateUrl('ios', url)).toBe(APP_STORE_FALLBACK_URL);
+    (Config as Record<string, unknown>).APP_ENV = 'staging';
     expect(resolveUpdateUrl('ios', url)).toBeNull();
+  });
+
+  it('the built-in App Store page is the production app (Apple ID 6818480691); staging builds have none', () => {
+    expect(APP_STORE_FALLBACK_URL).toBe('https://apps.apple.com/app/id6818480691');
+    expect(isAllowedIosStoreUrl(APP_STORE_FALLBACK_URL)).toBe(true);
+    expect(appStoreFallbackUrl()).toBe(APP_STORE_FALLBACK_URL);
+    (Config as Record<string, unknown>).APP_ENV = 'staging';
+    expect(appStoreFallbackUrl()).toBeNull();
   });
 
   it('Android over 500 characters falls back to the built-in page', () => {
