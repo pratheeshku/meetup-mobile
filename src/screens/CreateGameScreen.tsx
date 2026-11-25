@@ -23,7 +23,9 @@ import Geolocation from '@react-native-community/geolocation';
 import appConfig from '../../config/appConfig.json';
 import { getClientConfig, getGameLimits, type GameLimits } from '../api/config';
 import { withCorrelationId } from '../api/correlationId';
-import { createEvent, inviteEmailToEvent } from '../api/events';
+import { createEvent, inviteEmailToEvent, uploadEventBanner } from '../api/events';
+import GameBannerField from '../components/GameBannerField';
+import type { PickedImage } from '../utils/imagePicker';
 import GameFeeFields, { parseGameFee, type GameFeeConfig } from '../components/GameFeeFields';
 import { getMyGroups } from '../api/groups';
 import {
@@ -35,7 +37,7 @@ import {
 import { getSports } from '../api/sports';
 import { createTournament, getWizardTemplates } from '../api/tournaments';
 import { listableTemplates } from '../utils/tournamentWizard';
-import VenuePicker, { type SelectedVenueState } from '../components/venue/VenuePicker';
+import VenuePicker, { savedVenueSelection, type SelectedVenueState } from '../components/venue/VenuePicker';
 import Button from '../components/Button';
 import { iosPickerThemeProps } from '../components/iosPickerTheme';
 import AddRemoveControl from '../components/AddRemoveControl';
@@ -186,6 +188,8 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
   const [courtDetails, setCourtDetails] = useState('Court 2');
   /** Remarks (team-screens-remarks AD-4): the game's `description`, optional, plain text, at most 5000 characters (UX limit; the server bounds it too). */
   const [remarks, setRemarks] = useState('');
+  // NV-03: the optional game banner, uploaded after the game is created (an upload failure never undoes the creation).
+  const [gameBanner, setGameBanner] = useState<PickedImage | null>(null);
 
   // Step 4: Who can play
   const [gVisibility, setGVisibility] = useState<EventVisibility>('group');
@@ -548,7 +552,11 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           starts_at: startsAtIso,
           ends_at: endsAtIso,
           ...(venueCatalogueEnabled && catalogueVenue
-            ? catalogueVenue.isOthers && catalogueVenue.othersInput
+            ? catalogueVenue.savedVenueId
+              ? {
+                  saved_venue_id: catalogueVenue.savedVenueId,
+                }
+              : catalogueVenue.isOthers && catalogueVenue.othersInput
               ? {
                   others: catalogueVenue.othersInput,
                 }
@@ -571,8 +579,23 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
         const emailsToInvite = invitedEmails;
         const failedEmailInvites: string[] = [];
         let emailsInvited = 0;
+        let bannerFailed = false;
         const created = await withCorrelationId(async correlationId => {
           const event = await createEvent(input, { correlationId });
+          // NV-03, AD-5: the banner is uploaded after the create, under the same correlation id. A failure keeps the
+          // game; it shows no banner and Edit game offers the banner again.
+          if (gameBanner) {
+            try {
+              await uploadEventBanner(
+                event.id,
+                { uri: gameBanner.path, name: gameBanner.filename, type: gameBanner.mime },
+                { correlationId },
+              );
+            } catch {
+              bannerFailed = true;
+              console.log('[create-game] banner upload failed');
+            }
+          }
           // One call per email, sequential, same correlation id. A failure never
           // rolls back or blocks the created game; it is listed on completion.
           for (const email of emailsToInvite) {
@@ -606,6 +629,7 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
           rows,
           primary: 'dashboard',
           secondary: { button: 'view_game', id: created.id },
+          ...(bannerFailed ? { notice: t('mob.create_game.banner_failed') } : {}),
         });
       } else {
         const input: CreateTournamentInput = {
@@ -756,6 +780,16 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
             placeholderTextColor={colors.textMuted}
           />
         </View>
+
+        {mode === 'game' ? (
+          <View style={styles.cardContainer}>
+            <GameBannerField
+              previewUri={gameBanner?.path ?? null}
+              onPick={setGameBanner}
+              onRemove={() => setGameBanner(null)}
+            />
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -976,6 +1010,21 @@ export default function CreateGameScreen({ navigation }: Props): React.JSX.Eleme
                   lng: venue.lng ?? null,
                 });
               }}
+              onSelectSavedVenue={
+                mode === 'game'
+                  ? saved => {
+                      const selection = savedVenueSelection(saved, t);
+                      setCatalogueVenue(selection);
+                      setSelectedVenue({
+                        name: selection.name,
+                        address: selection.address || '',
+                        place_id: null,
+                        lat: selection.lat ?? null,
+                        lng: selection.lng ?? null,
+                      });
+                    }
+                  : undefined
+              }
               onSaveOthersVenue={others => {
                 setCatalogueVenue({
                   venueId: null,

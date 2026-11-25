@@ -10,6 +10,7 @@
  * - POST /tournaments/{id}/venue-images
  * - DELETE /venue-images/{id}
  * - POST /venue-images/{id}/report
+ * - GET /venues/saved?q=, DELETE /venues/saved/{id} (nov24-enhancements NV-01)
  *
  * No runtime mock fallbacks. Failures (404, network error, 5xx) throw errors
  * so callers display proper error and retry state. Upload, delete, and report
@@ -19,6 +20,8 @@
 import { apiClient } from './client';
 import type {
   PostalLookupResponse,
+  SavedVenue,
+  SavedVenuesResponse,
   VenueDetail,
   VenueImage,
   VenuesListResponse,
@@ -173,4 +176,33 @@ export async function reportVenueImage(
     { reason: reason || 'Inappropriate content' },
     { correlationId: options?.correlationId },
   );
+}
+
+/** The longest `q` the saved-venues list accepts (nov24-enhancements data contracts). */
+export const SAVED_VENUES_QUERY_MAX = 100;
+
+/**
+ * The caller's own saved venues, last used first (nov24-enhancements NV-01, AD-2).
+ * GET /venues/saved?q=
+ */
+export async function getSavedVenues(
+  q?: string,
+  options?: RequestOptions,
+): Promise<SavedVenue[]> {
+  const query = q?.trim().slice(0, SAVED_VENUES_QUERY_MAX) || undefined;
+  const { data } = await apiClient.get<SavedVenuesResponse>('/venues/saved', {
+    params: { q: query },
+    correlationId: options?.correlationId,
+  });
+  return Array.isArray(data?.items) ? data.items : [];
+}
+
+/**
+ * Removes one of the caller's saved venues. 204 on success; 404 when it is not theirs or unknown.
+ * DELETE /venues/saved/{id}
+ */
+export async function deleteSavedVenue(id: string, options?: RequestOptions): Promise<void> {
+  await apiClient.delete(`/venues/saved/${id}`, {
+    correlationId: options?.correlationId,
+  });
 }

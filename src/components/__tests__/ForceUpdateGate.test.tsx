@@ -9,15 +9,17 @@
  * "no update required" — the gate fails open.
  */
 import React from 'react';
-import { AppState, BackHandler, Linking, Text } from 'react-native';
+import { AppState, BackHandler, Keyboard, Linking, Platform, Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Config from 'react-native-config';
+import DeviceInfo from 'react-native-device-info';
 import ReactTestRenderer from 'react-test-renderer';
 
 import { deferred, installFakeBackend } from '../../test-utils/apiHarness';
 import type { FakeBackend, FakeReply } from '../../test-utils/apiHarness';
 import { act, pressables, pressableWithText, texts } from '../../test-utils/render';
 import type { Instance } from '../../test-utils/render';
-import { PLAY_STORE_FALLBACK_URL } from '../../utils/playStoreUrl';
+import { APP_STORE_FALLBACK_URL, PLAY_STORE_FALLBACK_URL } from '../../utils/playStoreUrl';
 import ForceUpdateGate from '../ForceUpdateGate';
 
 const STORE = 'https://play.google.com/store/apps/details?id=org.duckdns.meetups';
@@ -29,6 +31,21 @@ const INSTALLED = 5;
 const policy = (min: number, storeUrl: unknown = STORE): FakeReply => ({
   data: { android: { min_version_code: min, store_url: storeUrl } },
 });
+
+/** The full additive shape (app-update-prompt 4.2). */
+const fullPolicy = (
+  android: { min: number; latest: number },
+  ios: { min: number; latest: number; url?: string } | null = null,
+  reminderHours = 24,
+): FakeReply => ({
+  data: {
+    android: { min_version_code: android.min, store_url: STORE, latest_version_code: android.latest },
+    ...(ios ? { ios: { min_build: ios.min, latest_build: ios.latest, store_url: ios.url ?? IOS_STORE } } : {}),
+    reminder_hours: reminderHours,
+  },
+});
+const IOS_STORE = 'https://apps.apple.com/sg/app/gameon-sg/id123';
+const PROMPT_TITLE = 'New version available';
 
 let backend: FakeBackend;
 let mounted: ReactTestRenderer.ReactTestRenderer | null = null;
@@ -60,8 +77,10 @@ const policyRequests = (): number => backend.callsTo('/app/version-policy').leng
 const isBlocked = (root: Instance): boolean => texts(root).includes(TITLE);
 const showsApp = (root: Instance): boolean => texts(root).includes(APP);
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
+  jest.replaceProperty(Platform, 'OS', 'android');
+  await AsyncStorage.clear();
   backend = installFakeBackend();
   backend.route = () => policy(INSTALLED); // equal by default: not blocked
   (Config as Record<string, unknown>).VERSION_CODE = INSTALLED;
@@ -464,5 +483,250 @@ describe('the Update button: URL validation', () => {
     const output = log.mock.calls.map(call => call.join(' ')).join('\n');
     expect(output).toContain('opening the store page failed');
     expect(output).not.toContain('SECRET');
+  });
+});
+
+describe('the optional prompt (app-update-prompt AU-01, AD-7, section 4.4)', () => {
+  const showsPrompt = (root: Instance): boolean => texts(root).includes(PROMPT_TITLE);
+  const pressLater = async (root: Instance): Promise<void> => {
+    await act(async () => {
+      await pressableWithText(root, 'Later').props.onPress();
+    });
+  };
+
+  it('A1: latest 0 and min 0 -> nothing shown', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: 0 });
+    const root = await mountGate();
+    expect(showsPrompt(root)).toBe(false);
+    expect(isBlocked(root)).toBe(false);
+    expect(showsApp(root)).toBe(true);
+  });
+
+  it('A2: installed below latest -> the prompt over the app, with Update and Later', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 2 });
+    const root = await mountGate();
+    expect(showsApp(root)).toBe(true);
+    expect(texts(root)).toEqual(
+      expect.arrayContaining([
+        PROMPT_TITLE,
+        'A new version of GameOn SG is available. Update now to get the latest features and fixes.',
+        'Update',
+        'Later',
+      ]),
+    );
+  });
+
+  it('A3: installed equal to latest -> nothing shown', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED });
+    expect(showsPrompt(await mountGate())).toBe(false);
+  });
+
+  it('A4: below the minimum -> the blocking screen and never the prompt (required wins)', async () => {
+    backend.route = () => fullPolicy({ min: INSTALLED + 1, latest: INSTALLED + 3 });
+    const root = await mountGate();
+    expect(isBlocked(root)).toBe(true);
+    expect(showsPrompt(root)).toBe(false);
+  });
+
+  it('A5: at or above the minimum and below latest -> the prompt', async () => {
+    backend.route = () => fullPolicy({ min: INSTALLED, latest: INSTALLED + 1 });
+    const root = await mountGate();
+    expect(isBlocked(root)).toBe(false);
+    expect(showsPrompt(root)).toBe(true);
+  });
+
+  it('Update opens the store link and leaves the prompt up', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 1 });
+    const root = await mountGate();
+    await act(async () => {
+      await pressableWithText(root, 'Update').props.onPress();
+    });
+    expect(Linking.openURL).toHaveBeenCalledWith(STORE);
+    expect(showsPrompt(root)).toBe(true);
+  });
+
+  it('Later closes the prompt and records the time and the dismissed build on the device', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 1 });
+    const root = await mountGate();
+    await pressLater(root);
+    expect(showsPrompt(root)).toBe(false);
+    expect(showsApp(root)).toBe(true);
+    const stored = JSON.parse((await AsyncStorage.getItem('app_update.later')) as string);
+    expect(stored.latestBuild).toBe(INSTALLED + 1);
+    expect(typeof stored.at).toBe('number');
+  });
+
+  it('A6: after Later, a foreground check within the reminder interval shows nothing', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 1 });
+    const root = await mountGate();
+    await pressLater(root);
+    await emitAppState('background');
+    await emitAppState('active');
+    expect(showsPrompt(root)).toBe(false);
+  });
+
+  it('after the reminder interval has passed, the prompt comes back', async () => {
+    await AsyncStorage.setItem(
+      'app_update.later',
+      JSON.stringify({ at: Date.now() - 25 * 60 * 60 * 1000, latestBuild: INSTALLED + 1 }),
+    );
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 1 }, null, 24);
+    expect(showsPrompt(await mountGate())).toBe(true);
+  });
+
+  it('the admin reminder interval is honoured (1 hour)', async () => {
+    await AsyncStorage.setItem(
+      'app_update.later',
+      JSON.stringify({ at: Date.now() - 2 * 60 * 60 * 1000, latestBuild: INSTALLED + 1 }),
+    );
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 1 }, null, 1);
+    expect(showsPrompt(await mountGate())).toBe(true);
+  });
+
+  it('A7: after Later, a new latest build brings the prompt back at once', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 1 });
+    const root = await mountGate();
+    await pressLater(root);
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 2 });
+    await emitAppState('background');
+    await emitAppState('active');
+    expect(showsPrompt(root)).toBe(true);
+  });
+
+  it('A8: the policy endpoint unreachable -> nothing shown', async () => {
+    backend.route = () => ({ network: true });
+    expect(showsPrompt(await mountGate())).toBe(false);
+  });
+
+  it('does not interrupt typing: with the keyboard open the prompt waits for the next check', async () => {
+    const isVisible = jest.spyOn(Keyboard, 'isVisible').mockReturnValue(true);
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 1 });
+    const root = await mountGate();
+    expect(showsPrompt(root)).toBe(false);
+
+    isVisible.mockReturnValue(false);
+    await emitAppState('background');
+    await emitAppState('active');
+    expect(showsPrompt(root)).toBe(true);
+  });
+
+  it('the keyboard never holds back the blocking screen', async () => {
+    jest.spyOn(Keyboard, 'isVisible').mockReturnValue(true);
+    backend.route = () => fullPolicy({ min: INSTALLED + 1, latest: 0 });
+    expect(isBlocked(await mountGate())).toBe(true);
+  });
+
+  it('Android back on the prompt acts as Later', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: INSTALLED + 1 });
+    const root = await mountGate();
+    const modal = root.findAll(node => typeof node.props.onRequestClose === 'function')[0];
+    await act(async () => {
+      modal.props.onRequestClose();
+    });
+    expect(showsPrompt(root)).toBe(false);
+    expect(await AsyncStorage.getItem('app_update.later')).not.toBeNull();
+  });
+});
+
+describe('iOS (app-update-prompt AU-01, AU-02, 4.3)', () => {
+  beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    (DeviceInfo.getBuildNumber as jest.Mock).mockReturnValue('60');
+  });
+
+  it('uses the ios object and the installed CFBundleVersion: below latest -> the prompt', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 0, latest: 61 });
+    expect(texts(await mountGate())).toContain(PROMPT_TITLE);
+  });
+
+  it('below the iOS minimum -> the blocking screen', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61 });
+    expect(isBlocked(await mountGate())).toBe(true);
+  });
+
+  it('ignores the Android values on iOS', async () => {
+    backend.route = () => fullPolicy({ min: 999, latest: 999 }, { min: 0, latest: 60 });
+    const root = await mountGate();
+    expect(isBlocked(root)).toBe(false);
+    expect(texts(root)).not.toContain(PROMPT_TITLE);
+  });
+
+  it('an older server with no ios object -> nothing shown on iOS', async () => {
+    backend.route = () => policy(999);
+    const root = await mountGate();
+    expect(isBlocked(root)).toBe(false);
+    expect(showsApp(root)).toBe(true);
+  });
+
+  it('a build number that is not a plain whole number fails open', async () => {
+    (DeviceInfo.getBuildNumber as jest.Mock).mockReturnValue('60.1');
+    backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 99, latest: 99 });
+    expect(isBlocked(await mountGate())).toBe(false);
+  });
+
+  it('Update opens an apps.apple.com or testflight.apple.com link', async () => {
+    const url = 'https://testflight.apple.com/join/abc';
+    backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61, url });
+    const root = await mountGate();
+    await act(async () => {
+      await pressableWithText(root, 'Update').props.onPress();
+    });
+    expect(Linking.openURL).toHaveBeenCalledWith(url);
+  });
+
+  it('an iOS link off the allow-list is never opened; production opens the built-in App Store page (AD-10)', async () => {
+    backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61, url: 'https://evil.example/app' });
+    const root = await mountGate();
+    await act(async () => {
+      await pressableWithText(root, 'Update').props.onPress();
+    });
+    expect(Linking.openURL).toHaveBeenCalledTimes(1);
+    expect(Linking.openURL).toHaveBeenCalledWith(APP_STORE_FALLBACK_URL);
+    expect(Linking.openURL).not.toHaveBeenCalledWith('https://evil.example/app');
+    expect(isBlocked(root)).toBe(true);
+  });
+
+  it('a valid iOS link that cannot be opened falls back to the built-in App Store page (4.3)', async () => {
+    const url = 'https://apps.apple.com/sg/app/gameon-sg/id6818480691';
+    (Linking.openURL as jest.Mock).mockRejectedValueOnce(new Error('no handler'));
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61, url });
+    const root = await mountGate();
+    await act(async () => {
+      await pressableWithText(root, 'Update').props.onPress();
+    });
+    expect((Linking.openURL as jest.Mock).mock.calls.map(call => call[0])).toEqual([url, APP_STORE_FALLBACK_URL]);
+  });
+
+  describe('staging build (TestFlight, no App Store page)', () => {
+    beforeEach(() => {
+      (Config as Record<string, unknown>).APP_ENV = 'staging';
+    });
+    afterEach(() => {
+      delete (Config as Record<string, unknown>).APP_ENV;
+    });
+
+    it('an iOS link off the allow-list opens nothing', async () => {
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61, url: 'https://evil.example/app' });
+      const root = await mountGate();
+      await act(async () => {
+        await pressableWithText(root, 'Update').props.onPress();
+      });
+      expect(Linking.openURL).not.toHaveBeenCalled();
+      expect(isBlocked(root)).toBe(true);
+    });
+
+    it('a TestFlight link that cannot be opened is not retried with the production App Store page', async () => {
+      const url = 'https://testflight.apple.com/join/abc';
+      (Linking.openURL as jest.Mock).mockRejectedValueOnce(new Error('no handler'));
+      jest.spyOn(console, 'log').mockImplementation(() => {});
+      backend.route = () => fullPolicy({ min: 0, latest: 0 }, { min: 61, latest: 61, url });
+      const root = await mountGate();
+      await act(async () => {
+        await pressableWithText(root, 'Update').props.onPress();
+      });
+      expect((Linking.openURL as jest.Mock).mock.calls.map(call => call[0])).toEqual([url]);
+    });
   });
 });

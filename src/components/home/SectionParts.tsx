@@ -17,18 +17,26 @@ export function SectionHeader({
   title,
   onViewAll,
   variant = 'default',
+  hideTitle = false,
 }: {
   title: string;
   onViewAll?: () => void;
   /** `panel`: Home folder-panel header (title 16/800, View all 13/700). */
   variant?: 'default' | 'panel';
+  /**
+   * NV-02 (nov24-enhancements AD-3): the Home panel under a tab does not repeat the tab's name. The title text is not
+   * drawn; `title` still names the section for screen readers (on the View all button) and View all stays.
+   */
+  hideTitle?: boolean;
 }): React.JSX.Element {
   const t = useT();
   return (
-    <View style={styles.header}>
-      <Text style={[styles.title, variant === 'panel' ? styles.titlePanel : null]} accessibilityRole="header">
-        {title}
-      </Text>
+    <View style={[styles.header, hideTitle ? styles.headerNoTitle : null]}>
+      {hideTitle ? null : (
+        <Text style={[styles.title, variant === 'panel' ? styles.titlePanel : null]} accessibilityRole="header">
+          {title}
+        </Text>
+      )}
       {onViewAll ? (
         <Pressable
           accessibilityRole="button"
@@ -115,6 +123,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.sm,
   },
+  headerNoTitle: { justifyContent: 'flex-end' },
   title: { ...typography.h3, color: dash.text },
   viewAll: {
     minHeight: dashSize.touchTarget,

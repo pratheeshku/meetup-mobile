@@ -1,5 +1,5 @@
 /**
- * The installed app's Android `versionCode`.
+ * The installed app's build number: Android `versionCode`, iOS `CFBundleVersion`.
  *
  * Read from `Config.VERSION_CODE` via the project's existing
  * `react-native-config` dependency (no new package): that library exposes every
@@ -13,6 +13,7 @@
  * value — arrive empty. That surfaces here as `null`.
  */
 import Config from 'react-native-config';
+import DeviceInfo from 'react-native-device-info';
 
 /** The installed `versionCode`, or `null` if it cannot be read as a positive integer. */
 export function getInstalledVersionCode(): number | null {
@@ -27,4 +28,27 @@ export function getInstalledVersionCode(): number | null {
     return null;
   }
   return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+/**
+ * The installed iOS build number (`CFBundleVersion`, app-update-prompt AD-1), read with the existing
+ * `react-native-device-info` dependency. Anything but a plain positive whole number is `null` (fails open, AD-9).
+ */
+export function getInstalledIosBuild(): number | null {
+  let raw: unknown;
+  try {
+    raw = DeviceInfo.getBuildNumber();
+  } catch {
+    return null;
+  }
+  if (typeof raw !== 'string' || !/^\d+$/.test(raw)) {
+    return null;
+  }
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+/** The installed build number for `platform` (Android `versionCode`, iOS `CFBundleVersion`), or `null`. */
+export function getInstalledBuild(platform: 'android' | 'ios'): number | null {
+  return platform === 'android' ? getInstalledVersionCode() : getInstalledIosBuild();
 }

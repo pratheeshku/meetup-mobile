@@ -54,6 +54,8 @@ export interface CompletionRequest {
   secondary?: CompletionSecondary;
   /** Overlay flows (onboarding) run this instead of navigating. */
   onPrimary?: () => void;
+  /** One toast on the completion screen, for a part of the action that did not go through (nov24 NV-03 banner). */
+  notice?: string;
 }
 
 type Action =

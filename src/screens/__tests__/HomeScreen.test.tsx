@@ -218,7 +218,9 @@ describe('layout and order (AD-1)', () => {
     expect(all).toContain('Upcoming games');
     expect(all).toContain('My groups');
     await tapTab(root, 'tab-tile-groups');
-    expect(rowTitles(root, GROUPS_PANEL)).toContain('My groups');
+    // NV-02: the panel under a tab does not repeat the tab's name; View all stays.
+    expect(rowTitles(root, GROUPS_PANEL)).not.toContain('My groups');
+    expect(rowTitles(root, GROUPS_PANEL)).toContain('View all');
     const afterSwitch = texts(root);
     for (const legacy of ['My Games & Groups', 'Recent Results', 'Your Upcoming Games', 'Recommended for You']) {
       expect(afterSwitch).not.toContain(legacy);
@@ -294,15 +296,44 @@ describe('banner (AD-12, AD-13)', () => {
 });
 
 describe('list rules (AD-20)', () => {
-  it('Upcoming games shows two rows, earliest first, with going, waitlisted and hosted games eligible', async () => {
+  it('Upcoming games shows every row the server returns, earliest first, with going, waitlisted and hosted games eligible (app-update-prompt §9 AD-U1)', async () => {
     const section = rowTitles(await mount(), UPCOMING_PANEL);
     expect(section.filter(text => /^(Going|Waitlisted|Hosted) /.test(text))).toEqual([
       'Going badminton',
       'Waitlisted tennis',
+      'Hosted football',
     ]);
   });
 
-  it('a hosted game appears in Upcoming games when the server returns it among the two earliest', async () => {
+  it('U1: Games shown = 4 and six qualifying games: the server returns 4 rows, all shown; the count shows 6', async () => {
+    mockGetUpcoming.mockResolvedValue({
+      ...upcomingOf(
+        [1, 2, 3, 4].map(n =>
+          makeEvent({ id: `u${n}`, title: `Upcoming ${n}`, current_user_rsvp_status: 'going', starts_at: hours(n) }),
+        ),
+      ),
+      total: 6,
+    });
+    const root = await mount();
+    const section = rowTitles(root, UPCOMING_PANEL);
+    expect(section.filter(text => /^Upcoming \d$/.test(text))).toEqual(['Upcoming 1', 'Upcoming 2', 'Upcoming 3', 'Upcoming 4']);
+    expect(texts(root)).toContain('6');
+  });
+
+  it('fallback (GET /home/upcoming failed): the events-list rows are cut to the Games shown default of 4', async () => {
+    mockGetUpcoming.mockRejectedValue(new Error('500'));
+    mockGetEvents.mockResolvedValue(
+      eventsOf(
+        [1, 2, 3, 4, 5, 6].map(n =>
+          makeEvent({ id: `f${n}`, title: `Fallback ${n}`, current_user_rsvp_status: 'going', starts_at: hours(n) }),
+        ),
+      ),
+    );
+    const section = rowTitles(await mount(), UPCOMING_PANEL);
+    expect(section.filter(text => /^Fallback \d$/.test(text))).toEqual(['Fallback 1', 'Fallback 2', 'Fallback 3', 'Fallback 4']);
+  });
+
+  it('a hosted game appears in Upcoming games when the server returns it, and the app does not cut the list', async () => {
     mockGetUpcoming.mockResolvedValue(
       upcomingOf([
         makeEvent({ id: 'h', title: 'Hosted early', organiser_id: ME, starts_at: hours(2) }),
@@ -313,7 +344,7 @@ describe('list rules (AD-20)', () => {
     const section = rowTitles(await mount(), UPCOMING_PANEL);
     expect(section).toContain('Hosted early');
     expect(section).toContain('Wait later');
-    expect(section).not.toContain('Going latest');
+    expect(section).toContain('Going latest');
   });
 
   it('never shows past or cancelled games anywhere', async () => {

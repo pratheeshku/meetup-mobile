@@ -6,8 +6,9 @@
  * reachable.
  */
 import React from 'react';
-import { AppState, BackHandler } from 'react-native';
+import { AppState, BackHandler, Platform } from 'react-native';
 import Config from 'react-native-config';
+import DeviceInfo from 'react-native-device-info';
 import ReactTestRenderer from 'react-test-renderer';
 
 import App from '../App';
@@ -26,10 +27,18 @@ let backend: FakeBackend;
 let renderer: ReactTestRenderer.ReactTestRenderer | null = null;
 let backHandlers: Array<() => boolean>;
 
+const IOS_STORE = 'https://apps.apple.com/app/id1';
+
+/** Android keeps today's shape; iOS reads the additive `ios` object (app-update-prompt 4.2). */
 const servePolicy = (min: number): void => {
   backend.route = config => {
     if (config.url === '/app/version-policy') {
-      return { data: { android: { min_version_code: min, store_url: STORE } } };
+      return {
+        data: {
+          android: { min_version_code: min, store_url: STORE },
+          ios: { min_build: min, latest_build: 0, store_url: IOS_STORE },
+        },
+      };
     }
     if (config.url === '/auth/refresh') {
       return { data: { access_token: null } }; // signed out: no session to restore
@@ -47,6 +56,7 @@ const mountApp = async (): Promise<ReactTestRenderer.ReactTestRendererJSON | Rea
 const root = () => (renderer as unknown as ReactTestRenderer.ReactTestRenderer).root;
 
 beforeEach(() => {
+  jest.replaceProperty(Platform, 'OS', 'android');
   backend = installFakeBackend();
   (Config as Record<string, unknown>).VERSION_CODE = INSTALLED;
   jest.spyOn(console, 'log').mockImplementation(() => {});
@@ -70,7 +80,15 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('App with the force-update gate', () => {
+describe.each(['android', 'ios'] as const)('App with the force-update gate on %s', os => {
+  beforeEach(() => {
+    jest.replaceProperty(Platform, 'OS', os);
+    (DeviceInfo.getBuildNumber as jest.Mock).mockReturnValue(String(INSTALLED));
+  });
+  afterEach(() => {
+    (DeviceInfo.getBuildNumber as jest.Mock).mockReturnValue('45');
+  });
+
   it('below the minimum: the blocking screen replaces the login screen and all navigation', async () => {
     servePolicy(INSTALLED + 1);
 

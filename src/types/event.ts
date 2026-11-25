@@ -127,6 +127,8 @@ export interface Event {
   payment_contact_number?: string | null;
   /** teams-payments AD-9: the caller's own participant row (the Payment card); null for anyone who is not going or waitlisted. */
   my_participation?: EventMyParticipation | null;
+  /** nov24-enhancements NV-03: the game's banner picture; null when it has none (no default banner for games). */
+  banner_url?: string | null;
 }
 
 /** `GET /events/{id}` `my_participation`. */
@@ -146,6 +148,8 @@ export interface UpdateEventInput {
   venue_address?: string | null;
   venue_id?: string | null;
   others?: OthersVenueInput | null;
+  /** A venue from the organizer's My venues (nov24-enhancements NV-01); never with `venue_id` or `others`. */
+  saved_venue_id?: string;
   skill_level_requirement?: EventSkillLevel | string | null;
   capacity?: number;
   starts_at?: string;
@@ -239,6 +243,8 @@ export interface CreateEventInput {
   venue_lng?: number | null;
   venue_id?: string;
   others?: OthersVenueInput;
+  /** A venue from the organizer's My venues (nov24-enhancements NV-01); never with `venue_id` or `others`. */
+  saved_venue_id?: string;
   /** Remarks (team-screens-remarks AD-4): plain text, null when blank. */
   description?: string | null;
   /**

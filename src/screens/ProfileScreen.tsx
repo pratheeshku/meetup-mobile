@@ -10,7 +10,7 @@
  * - Recent games card with sport icon, date/time, venue and "View all" link
  * - Outlined Log out button with confirmation dialog
  */
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +31,7 @@ import {
   getProfileSummary,
   type ProfileSummary,
 } from '../api/profile';
+import { getClientConfig } from '../api/config';
 import { getMyGroups } from '../api/groups';
 import type { Group } from '../types/group';
 import { getCachedBanners, type BannerFallback } from '../api/home';
@@ -48,6 +49,9 @@ import ErrorView from '../components/ErrorView';
 import KeyboardAwareScreen from '../components/KeyboardAwareScreen';
 import LoadingView from '../components/LoadingView';
 import ScreenContainer from '../components/ScreenContainer';
+import ShareActionSheet from '../components/ShareActionSheet';
+import Toast from '../components/Toast';
+import { useAppShare } from '../hooks/useAppShare';
 import { useSportDisplayName } from '../utils/labels';
 import { getDisplayName } from '../utils/displayName';
 import { useT } from '../labels/LabelsContext';
@@ -180,6 +184,21 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  // NV-04 (nov24-enhancements AD-6): Share app link shares the invite message and the store lines, no game or group
+  // link. Hidden while neither store URL is published in GET /config/client.
+  const share = useAppShare(null);
+  const [storeLinksPublished, setStoreLinksPublished] = useState(false);
+  useEffect(() => {
+    let active = true;
+    getClientConfig().then(config => {
+      if (active) {
+        setStoreLinksPublished(Boolean(config.android_store_url || config.ios_store_url));
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // ── Perf: render count and screen timing ──────────────────────────────────
   usePerfRender('ProfileScreen');
@@ -539,6 +558,18 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
           </Pressable>
         </View>
 
+        {storeLinksPublished ? (
+          <Pressable
+            style={[styles.actionButton, styles.shareAppButton]}
+            onPress={share.open}
+            accessibilityRole="button"
+            accessibilityLabel={t('mob.profile.share_app')}
+            testID="profile-share-app"
+          >
+            <Text style={styles.actionButtonText}>{t('mob.profile.share_app')}</Text>
+          </Pressable>
+        ) : null}
+
         {/* Log out button */}
         <Pressable
           style={styles.logoutButton}
@@ -558,6 +589,15 @@ export default function ProfileScreen({ navigation }: Props): React.JSX.Element 
         </Pressable>
       </View>
     </KeyboardAwareScreen>
+    <ShareActionSheet
+      visible={share.sheetVisible}
+      title={t('mob.profile.share_app')}
+      onShareGeneric={share.shareViaSystem}
+      onShareWhatsApp={share.shareViaWhatsApp}
+      onCopyLink={share.copyLink}
+      onClose={share.close}
+    />
+    <Toast message={share.toastMessage} onDismiss={share.clearToast} />
     </ScreenContainer>
   );
 }
@@ -601,6 +641,10 @@ const styles = StyleSheet.create({
     borderWidth: borderWidth.thin,
     borderColor: colors.border,
     borderRadius: radius.lg,
+  },
+  shareAppButton: {
+    flex: 0,
+    marginTop: spacing.md,
   },
   actionButtonText: {
     ...typography.button,

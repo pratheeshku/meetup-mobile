@@ -1,11 +1,17 @@
 /**
  * Venue Picker component for Create game and Edit game (DES-MEETUP-ADDENDUM-VENUE-CATALOGUE).
  * Matches visual boards: Game3When, EditGame2.
+ *
+ * My venues (DES-MEETUP-ADDENDUM-nov24-enhancements NV-01, AD-2): when the screen passes `onSelectSavedVenue`
+ * (Create game and Edit game only), the organizer's own saved venues show as a group above the catalogue rows, newest
+ * use first, filtered by the same search text. Each row has a remove action (confirm, then gone). With no saved venues
+ * the group is not shown. A failed load only hides the group.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -15,7 +21,8 @@ import {
   View,
 } from 'react-native';
 
-import { getVenues } from '../../api/venues';
+import { withCorrelationId } from '../../api/correlationId';
+import { deleteSavedVenue, getSavedVenues, getVenues } from '../../api/venues';
 import { SearchIcon, CrossIcon } from '../icons/ActionIcons';
 import {
   VenueChevronDownIcon,
@@ -24,9 +31,9 @@ import {
 } from './VenueIcons';
 import OthersVenueModal from './OthersVenueModal';
 import { logMapFailureOnce } from './logMapFailure';
-import { useT } from '../../labels/LabelsContext';
+import { useT, type TranslateFn } from '../../labels/LabelsContext';
 import { colors, radius, spacing } from '../../theme/tokens';
-import type { OthersVenueInput, VenueItem, VenueSnapshot } from '../../types/venue';
+import type { OthersVenueInput, SavedVenue, VenueItem, VenueSnapshot } from '../../types/venue';
 
 export interface SelectedVenueState {
   venueId?: string | null;
@@ -39,6 +46,8 @@ export interface SelectedVenueState {
   geocoding_status?: 'pending' | 'resolved' | 'failed' | null;
   snapshot?: VenueSnapshot | null;
   othersInput?: OthersVenueInput;
+  /** A pick from My venues (NV-01): sent as `saved_venue_id`; the server copies it into the snapshot. */
+  savedVenueId?: string | null;
 }
 
 interface VenuePickerProps {
@@ -64,6 +73,8 @@ interface VenuePickerProps {
    * wizard turns it off: it moves focus to the first field of the step itself (te-a4, AD-T13).
    */
   autoFocusSearch?: boolean;
+  /** NV-01: shows the My venues group and reports a pick from it. Absent (tournament screens) = no group. */
+  onSelectSavedVenue?: (venue: SavedVenue) => void;
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -80,6 +91,7 @@ export default function VenuePicker({
   variant = 'standard',
   helperText,
   autoFocusSearch = true,
+  onSelectSavedVenue,
 }: VenuePickerProps): React.JSX.Element {
   const t = useT();
   const [isOpen, setIsOpen] = useState(!selectedVenue || !selectedVenue.name);
@@ -95,6 +107,11 @@ export default function VenuePicker({
   const [failedMapUri, setFailedMapUri] = useState<string | null>(null);
 
   const prevSportRef = useRef(sportId);
+  const [savedVenues, setSavedVenues] = useState<SavedVenue[]>([]);
+  const [savedRemoveError, setSavedRemoveError] = useState<string | null>(null);
+  const savedEnabled = Boolean(onSelectSavedVenue);
+  // Only the latest saved-venues request may apply its answer (typing fires one per change).
+  const savedRequest = useRef(0);
 
   // When sport changes after catalogue venue was selected, clear venue (Others survives)
   useEffect(() => {
@@ -153,6 +170,48 @@ export default function VenuePicker({
       fetchVenues(query);
     }
   }, [isOpen, sportId, query, fetchVenues]);
+
+  useEffect(() => {
+    if (!isOpen || !savedEnabled) {
+      return;
+    }
+    savedRequest.current += 1;
+    const thisRequest = savedRequest.current;
+    Promise.resolve()
+      .then(() => getSavedVenues(query))
+      .then(items => {
+        if (thisRequest === savedRequest.current) {
+          setSavedVenues(Array.isArray(items) ? items : []);
+        }
+      })
+      .catch(() => {
+        if (thisRequest === savedRequest.current) {
+          setSavedVenues([]);
+        }
+      });
+  }, [isOpen, savedEnabled, query]);
+
+  const handleSelectSaved = (item: SavedVenue) => {
+    setSportChangeNotice(null);
+    onSelectSavedVenue?.(item);
+    setIsOpen(false);
+  };
+
+  const handleRemoveSaved = (item: SavedVenue) => {
+    Alert.alert(t('mob.venue.saved_remove_confirm'), undefined, [
+      { text: t('mob.common.cancel'), style: 'cancel' },
+      {
+        text: t('mob.venue.saved_remove'),
+        style: 'destructive',
+        onPress: () => {
+          setSavedRemoveError(null);
+          withCorrelationId(correlationId => deleteSavedVenue(item.id, { correlationId }))
+            .then(() => setSavedVenues(prev => prev.filter(v => v.id !== item.id)))
+            .catch(() => setSavedRemoveError(t('mob.venue.saved_remove_failed')));
+        },
+      },
+    ]);
+  };
 
   const handleSelect = (item: VenueItem) => {
     setSportChangeNotice(null);
@@ -355,7 +414,7 @@ export default function VenuePicker({
               <FlatList
                 data={venues}
                 keyExtractor={item => item.id}
-                scrollEnabled={venues.length > 4}
+                scrollEnabled={venues.length + savedVenues.length > 4}
                 style={styles.flatList}
                 renderItem={({ item }) => {
                   const address = [item.block, item.street]
@@ -389,6 +448,55 @@ export default function VenuePicker({
                     </Pressable>
                   );
                 }}
+                ListHeaderComponent={
+                  savedEnabled && savedVenues.length > 0 ? (
+                    <View testID="venue-my-venues">
+                      <Text style={styles.groupHeading} accessibilityRole="header">
+                        {t('mob.venue.my_venues')}
+                      </Text>
+                      {savedRemoveError ? (
+                        <Text style={styles.savedRemoveError} accessibilityRole="alert" testID="saved-venue-remove-error">
+                          {savedRemoveError}
+                        </Text>
+                      ) : null}
+                      {savedVenues.map(item => (
+                        <View key={item.id} style={styles.venueRow}>
+                          <Pressable
+                            style={styles.savedPick}
+                            onPress={() => handleSelectSaved(item)}
+                            accessibilityRole="button"
+                            accessibilityLabel={item.name}
+                            testID={`saved-venue-${item.id}`}
+                          >
+                            <View style={styles.pinBadge}>
+                              <VenuePinBadgeIcon size={18} color={colors.venuePinIcon} />
+                            </View>
+                            <View style={styles.venueRowContent}>
+                              <Text style={styles.venueRowName} numberOfLines={1}>
+                                {item.name}
+                              </Text>
+                              {item.address || item.postal_code ? (
+                                <Text style={styles.venueRowAddress} numberOfLines={1}>
+                                  {item.address || item.postal_code}
+                                </Text>
+                              ) : null}
+                            </View>
+                          </Pressable>
+                          <Pressable
+                            style={styles.savedRemove}
+                            onPress={() => handleRemoveSaved(item)}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('mob.venue.saved_remove')}
+                            hitSlop={spacing.xs}
+                            testID={`saved-venue-remove-${item.id}`}
+                          >
+                            <CrossIcon size={16} color={colors.textMuted} />
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null
+                }
                 onEndReached={handleLoadMore}
                 onEndReachedThreshold={0.5}
                 ListFooterComponent={
@@ -678,6 +786,34 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
+  groupHeading: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  savedPick: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  savedRemoveError: {
+    fontSize: 12,
+    color: colors.error,
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+  },
+  savedRemove: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   othersRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -718,3 +854,21 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+/**
+ * The picker selection for a My venues pick (NV-01): shown like an Others venue (its snapshot source is `user`) and
+ * sent as `saved_venue_id`. The server copies the saved entry; the client never sends its coordinates.
+ */
+export function savedVenueSelection(item: SavedVenue, t: TranslateFn): SelectedVenueState {
+  return {
+    venueId: null,
+    name: item.name,
+    address: item.address || (item.postal_code ? t('mob.venue.postal_address', { postal_code: item.postal_code }) : null),
+    lat: item.lat ?? null,
+    lng: item.lng ?? null,
+    source: t('venue.source.user'),
+    isOthers: true,
+    geocoding_status: item.geocoding_status ?? null,
+    savedVenueId: item.id,
+  };
+}

@@ -48,6 +48,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write # app-update-prompt 4.5: GitHub OIDC identity for POST /app/release-build
     env:
       ANDROID_UPLOAD: ${{ inputs.android_upload }}
       STAGING_PACKAGE: org.duckdns.meetups.staging
@@ -213,6 +216,14 @@ jobs:
           PY
           "$RUNNER_TEMP/play-venv/bin/python" scripts/play-upload-staging.py "$AAB_PATH" "$PLAY_CREDENTIALS_PATH"
 
+      # App update prompt (DES-MEETUP-ADDENDUM-app-update-prompt AD-4, 4.5): record this build as the pending latest
+      # build for android in staging. Only when the build went to the internal track (a build-only run is never
+      # offered to testers). Never fails the run; the outcome is written to the run summary.
+      - name: Record the latest build for the update prompt
+        if: ${{ inputs.android_upload }}
+        continue-on-error: true
+        run: bash scripts/report-release-build.sh android "$BUILD_NUMBER" https://meetupstg.duckdns.org
+
       - name: Delete decoded secret files
         if: always()
         run: |
@@ -241,6 +252,9 @@ jobs:
     runs-on: xcode-27
     environment: staging
     timeout-minutes: 90
+    permissions:
+      contents: read
+      id-token: write # app-update-prompt 4.5: GitHub OIDC identity for POST /app/release-build
     env:
       BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
       MIN_XCODE_MAJOR: '27' # Apple's upload requirement from April 2027, see ios-testflight.yml
@@ -500,6 +514,12 @@ jobs:
               exit "$status"
             }
           echo "Upload to App Store Connect finished; the build appears in TestFlight after processing."
+
+      # App update prompt (DES-MEETUP-ADDENDUM-app-update-prompt AD-4, 4.5): record this build as the pending latest
+      # build for ios in staging. Never fails the run; the outcome is written to the run summary.
+      - name: Record the latest build for the update prompt
+        continue-on-error: true
+        run: bash scripts/report-release-build.sh ios "$BUILD_NUMBER" https://meetupstg.duckdns.org
 
       - name: Delete decoded secret files
         if: always()

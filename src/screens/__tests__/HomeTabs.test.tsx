@@ -77,23 +77,24 @@ beforeEach(() => {
 });
 
 describe('folder tabs', () => {
-  it('defaults to Upcoming games: games list and panel heading, groups list hidden', async () => {
+  it('defaults to Upcoming games: games list and View all, groups list hidden, no repeated heading (NV-02)', async () => {
     const root = await mount();
     expect(tab(root, 'tab-tile-upcoming').props.accessibilityState.selected).toBe(true);
     expect(tab(root, 'tab-tile-groups').props.accessibilityState.selected).toBe(false);
     const all = texts(panel(root));
-    expect(all).toContain('Upcoming games'); // panel heading
+    expect(all).not.toContain('Upcoming games'); // NV-02: the panel no longer repeats the tab name
     expect(all).toContain('View all');
     expect(all.some(x => x.includes('Sunday Doubles'))).toBe(true);
     expect(all).not.toContain('Sunday Footballers');
   });
 
-  it('pressing the groups tab shows the groups list, hides the games list, and the heading becomes "My groups"', async () => {
+  it('pressing the groups tab shows the groups list and View all, hides the games list, no repeated heading (NV-02)', async () => {
     const root = await mount();
     await press(tab(root, 'tab-tile-groups'));
     expect(tab(root, 'tab-tile-groups').props.accessibilityState.selected).toBe(true);
     const all = texts(panel(root));
-    expect(all).toContain('My groups');
+    expect(all).not.toContain('My groups');
+    expect(all).toContain('View all');
     expect(all).not.toContain('Upcoming games');
     expect(all.some(x => x.includes('Sunday Footballers'))).toBe(true);
     expect(all.some(x => x.includes('Sunday Doubles'))).toBe(false);
@@ -111,7 +112,20 @@ describe('folder tabs', () => {
     expect(navigate).not.toHaveBeenCalled();
     expect((getEvents as jest.Mock).mock.calls.length).toBe(eventCalls);
     expect((getGroups as jest.Mock).mock.calls.length).toBe(groupCalls);
-    expect(texts(panel(root))).toContain('Upcoming games');
+    expect(texts(panel(root)).some(x => x.includes('Sunday Doubles'))).toBe(true);
+  });
+
+  it('the View all button still names its section for screen readers (NV-02, AD-3)', async () => {
+    const root = await mount();
+    const labels = panel(root)
+      .findAll(node => typeof node.props.accessibilityLabel === 'string')
+      .map(node => node.props.accessibilityLabel as string);
+    expect(labels.some(label => label.includes('Upcoming games'))).toBe(true);
+    await press(tab(root, 'tab-tile-groups'));
+    const groupLabels = panel(root)
+      .findAll(node => typeof node.props.accessibilityLabel === 'string')
+      .map(node => node.props.accessibilityLabel as string);
+    expect(groupLabels.some(label => label.includes('My groups'))).toBe(true);
   });
 
   it('keeps each tab\'s title, count and subtitle', async () => {

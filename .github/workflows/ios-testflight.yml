@@ -49,6 +49,8 @@ jobs:
     runs-on: xcode-27
     environment: testflight
     timeout-minutes: 90
+    outputs:
+      build_number: ${{ steps.uploaded.outputs.BUILD_NUMBER }}
     env:
       BUNDLE_GEMFILE: ${{ github.workspace }}/Gemfile
       USE_FRAMEWORKS_INPUT: ${{ inputs.use_frameworks || 'none' }}
@@ -292,9 +294,39 @@ jobs:
             }
           echo "Upload to App Store Connect finished; the build appears in TestFlight after processing."
 
+      - name: Hand the uploaded build number to the latest-build job
+        id: uploaded
+        run: echo "BUILD_NUMBER=$APP_BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
       - name: Clean up secrets from the runner
         if: always()
         run: |
           set -euo pipefail
           rm -f "$ASC_KEY_PATH" "$EXPORT_OPTIONS_PATH" "$XCODEBUILD_LOG"
           if [ -n "${IOS_PLIST_PATH:-}" ]; then rm -f "$IOS_PLIST_PATH"; fi
+
+  # App update prompt (DES-MEETUP-ADDENDUM-app-update-prompt AD-4, 4.5): record the uploaded build as the pending
+  # latest build for ios in production. The backend accepts only the GitHub Environment "production" on main, so this
+  # small job runs in that Environment (its reviewer approves it like the Android production build). It never fails
+  # the release: the outcome is written to the run summary.
+  latest-build:
+    name: Record the latest build for the update prompt
+    needs: testflight
+    if: ${{ github.ref == 'refs/heads/main' && needs.testflight.outputs.build_number != '' }}
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # GitHub OIDC identity for POST /app/release-build
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Record the latest build
+        continue-on-error: true
+        env:
+          BUILD_NUMBER: ${{ needs.testflight.outputs.build_number }}
+        run: bash scripts/report-release-build.sh ios "$BUILD_NUMBER" https://meetupaws.duckdns.org

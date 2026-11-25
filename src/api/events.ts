@@ -86,6 +86,8 @@ interface RequestOptions {
  */
 export interface EventApiItem {
   id: string;
+  /** Game banner (nov24-enhancements NV-03, AD-5): null or absent when the game has none. */
+  banner_url?: string | null;
   organizer_id: string;
   sport: string;
   title: string;
@@ -256,6 +258,7 @@ export function mapEventApiItem(raw: EventApiItem): Event {
       typeof raw.registration_fee_currency === 'string' && raw.registration_fee_currency ? raw.registration_fee_currency : null,
     payment_contact_number: raw.payment_contact_number?.trim() ? raw.payment_contact_number.trim() : null,
     my_participation: normaliseMyParticipation(raw.my_participation),
+    banner_url: typeof raw.banner_url === 'string' && raw.banner_url ? raw.banner_url : null,
   };
 }
 
@@ -351,7 +354,7 @@ export async function cancelEvent(
  * Partial update for an owned event: calls `PATCH /events/{id}` (§5.9 Event Edit Lifecycle).
  * Organiser-only action. Only fields present in `input` are sent.
  * Accepts: title, description, venue_name, venue_address, venue_place_id, venue_lat, venue_lng,
- * venue_id, others, group_ids, skill_level_requirement, capacity, starts_at, ends_at, visibility,
+ * venue_id, others, saved_venue_id, group_ids, skill_level_requirement, capacity, starts_at, ends_at, visibility,
  * sport, allow_waitlist, estimated_cost_cents, estimated_cost_currency, registration_fee_cents,
  * payment_contact_number.
  */
@@ -370,6 +373,7 @@ export async function updateEvent(
   if (input.venue_lng !== undefined) payload.venue_lng = input.venue_lng;
   if (input.venue_id !== undefined) payload.venue_id = input.venue_id;
   if (input.others !== undefined) payload.others = input.others;
+  if (input.saved_venue_id !== undefined) payload.saved_venue_id = input.saved_venue_id;
   // Groups replace: the full new list (EventUpdate.group_ids, NE-03). Sent only when given.
   if (input.group_ids !== undefined) payload.group_ids = input.group_ids;
   if (input.skill_level_requirement !== undefined) {
@@ -662,4 +666,32 @@ export async function updateEventSeries(
 /** `POST /events/{id}/series/cancel` (AD-8): cancels this and the following games; the rule goes inactive. Same `{ reason }` body as the game cancel. */
 export async function cancelEventSeries(id: string, reason: string, options?: RequestOptions): Promise<void> {
   await apiClient.post(`/events/${id}/series/cancel`, { reason }, { correlationId: options?.correlationId });
+}
+
+/**
+ * Game banner (DES-MEETUP-ADDENDUM-nov24-enhancements NV-03, AD-5). `PUT /events/{id}/banner` takes one multipart
+ * field named `file` (JPEG or PNG; the server checks the content, strips EXIF and crops to 4:1). Organizer only, game
+ * not ended, cancelled or closed. Answers `{banner_url}`. Coded errors reuse the tournament ones: `IMAGE_INVALID`
+ * (422) and 413 over the size cap.
+ */
+export async function uploadEventBanner(
+  id: string,
+  file: { uri: string; name: string; type: string },
+  options?: RequestOptions,
+): Promise<{ banner_url: string | null }> {
+  const formData = new FormData();
+  formData.append('file', file as unknown as Blob);
+  const { data } = await apiClient.put<{ banner_url: string | null }>(`/events/${id}/banner`, formData, {
+    correlationId: options?.correlationId,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
+/** `DELETE /events/{id}/banner`: removes the game's banner. Answers `{banner_url: null}`. */
+export async function deleteEventBanner(id: string, options?: RequestOptions): Promise<{ banner_url: null }> {
+  const { data } = await apiClient.delete<{ banner_url: null }>(`/events/${id}/banner`, {
+    correlationId: options?.correlationId,
+  });
+  return data;
 }
