@@ -412,13 +412,19 @@ describe('CreateGameScreen — Tournament form contract', () => {
     expect(texts(root).some(t => /venue address/i.test(t))).toBe(false);
   });
 
-  // Case (c): DES §4.3 says "no Skill Level in Tournament mode"; step 5 shows the skill picker in both modes.
-  // Left failing on purpose.
-  it('has no Skill level control (DES §4.3)', async () => {
+  // As built (six-step wizard board, design-ref-p23 Game5Players): step 5 shows the skill picker in both modes, but
+  // the v1 TournamentCreate payload carries no skill field. Supersedes the older DES §4.3 field list.
+  it('shows the shared Skill level picker on step 5 but never sends a skill field for a tournament', async () => {
+    mockCreateTournament.mockResolvedValueOnce({ id: 't-1' } as never);
     const root = await toTournament();
     await advance(root, 4);
     expect(on(root, H.step5)).toBe(true);
-    expect(texts(root).some(t => /skill level/i.test(t))).toBe(false);
+    expect(texts(root)).toContain('Skill level');
+    await advance(root, 1);
+    await submit(root);
+    const [payload] = mockCreateTournament.mock.calls[0];
+    expect(payload).not.toHaveProperty('skill_level_requirement');
+    expect(payload).not.toHaveProperty('skill_level');
   });
 
   it('shares with a single group only (one group per tournament)', async () => {
@@ -434,28 +440,33 @@ describe('CreateGameScreen — Tournament form contract', () => {
     expect(byLabel(root, 'Sunday Footballers').props.accessibilityState.checked).toBe(false);
   });
 
-  // Case (c): DES-MEETUP-MOBILE.md §4.3 Create Flow Amendment says Tournament Capacity* is "min 2, default 8";
-  // the wizard starts every mode at 4. Left failing on purpose (product decision needed).
-  it('pre-fills capacity=8 (DES §4.3)', async () => {
+  // As built: the wizard starts every mode at the same capacity (4); the organizer changes it on step 5.
+  it('pre-fills the same capacity (4) in tournament mode as in game mode', async () => {
     const root = await toTournament();
     await advance(root, 4);
     expect(on(root, H.step5)).toBe(true);
-    expect(capacityInput(root).props.value).toBe('8');
+    expect(capacityInput(root).props.value).toBe('4');
   });
 
-  // Case (c): DES §4.3 requires Participation Mode* (individual/team) and a Format control (Knockout / Round Robin,
-  // no Group Stage); the wizard has neither control (fixed individual + knockout). Left failing on purpose.
-  it('offers Participation and Format controls with Knockout selected and no Group stage (DES §4.3)', async () => {
+  // As built: the v1 fallback wizard has no Participation or Format control; it always creates an individual knockout
+  // (team mode and other formats live in the v2 TournamentWizard, lifecycle AD-20).
+  it('shows no Participation, Format or Group stage control and sends individual knockout', async () => {
+    mockCreateTournament.mockResolvedValueOnce({ id: 't-1' } as never);
     const root = await toTournament();
     const seen: string[] = [];
     for (let i = 0; i < 4; i += 1) {
       await next(root);
       seen.push(...texts(root));
     }
-    expect(seen.some(t => /participation/i.test(t))).toBe(true);
-    expect(seen.some(t => /format/i.test(t))).toBe(true);
-    expect(isSelected(byLabel(root, 'Knockout'))).toBe(true);
+    expect(seen.some(t => /participation/i.test(t))).toBe(false);
+    expect(() => byLabel(root, 'Knockout')).toThrow();
     expect(() => byLabel(root, 'Group stage')).toThrow();
+    await advance(root, 1);
+    await submit(root);
+    expect(mockCreateTournament).toHaveBeenCalledWith(
+      expect.objectContaining({ participation_mode: 'individual', format: 'knockout' }),
+      { correlationId: expect.any(String) },
+    );
   });
 });
 
@@ -488,13 +499,16 @@ describe('CreateGameScreen — Tournament submit', () => {
     expect(mockCreateTournament).not.toHaveBeenCalled();
   });
 
-  // Case (c): DES §4.3 makes Participation Mode* required with a validation message; no control exists to leave unset.
-  it('no participation mode is rejected (DES §4.3)', async () => {
+  // As built: participation is fixed to individual, so there is nothing to leave unset and no validation message.
+  it('always submits a participation mode (individual) without a participation validation message', async () => {
     mockCreateTournament.mockResolvedValue({ id: 't-1' } as never);
     const root = await toTournamentReview();
     await submit(root);
-    expect(texts(root)).toContain('Choose individual or team participation.');
-    expect(mockCreateTournament).not.toHaveBeenCalled();
+    expect(texts(root)).not.toContain('Choose individual or team participation.');
+    expect(mockCreateTournament).toHaveBeenCalledWith(
+      expect.objectContaining({ participation_mode: 'individual' }),
+      { correlationId: expect.any(String) },
+    );
   });
 
   it('sends the TournamentCreate payload with the default audience and no group_stage option', async () => {
@@ -537,17 +551,14 @@ describe('CreateGameScreen — Tournament submit', () => {
     );
   });
 
-  // Case (c): DES §4.3 lists an optional tournament Description (team-screens-remarks AD-4 relabels it Remarks);
-  // the wizard shows Remarks for games only. Left failing on purpose.
-  it('includes the description (Remarks) in the tournament payload (DES §4.3, TS-10)', async () => {
+  // As built: Remarks (team-screens-remarks AD-4) is a game-only field; the v1 tournament form has no description path.
+  it('shows no Remarks field in tournament mode and sends no description', async () => {
     mockCreateTournament.mockResolvedValueOnce({ id: 't-1' } as never);
     const root = await toTournamentReview();
-    type(input(root, 'Anything else players should know'), 'Bring your own ball');
+    expect(() => input(root, 'Anything else players should know')).toThrow();
     await submit(root);
-    expect(mockCreateTournament).toHaveBeenCalledWith(
-      expect.objectContaining({ description: 'Bring your own ball' }),
-      { correlationId: expect.any(String) },
-    );
+    const [payload] = mockCreateTournament.mock.calls[0];
+    expect(payload).not.toHaveProperty('description');
   });
 
   it('on success, shows the tournament completion screen with a View tournament action', async () => {
@@ -659,97 +670,66 @@ describe('CreateGameScreen — keyboard avoidance and date/time picker integrati
     );
   });
 
-  // Case (c): DES §4.3 lists an optional tournament "Registration Closes At"; the wizard's tournament path has no such
-  // picker (only the v2 TournamentWizard does). Left failing on purpose.
-  it('Tournament: picking start date and optional registration close sends exact ISO timestamps (DES §4.3)', async () => {
+  // As built: the v1 fallback has no Registration closes picker (only the v2 TournamentWizard does, lifecycle AD-20);
+  // the picked start date is sent as the date part of its ISO timestamp.
+  it('Tournament: picking a start date sends its date and no registration close', async () => {
     mockCreateTournament.mockResolvedValueOnce({ id: 't-1' } as never);
     const root = await mount();
     await chooseTournament(root);
     await next(root);
     type(titleInput(root), 'Winter Open');
     await next(root);
-    pickDateTime(root, new Date(2030, 11, 1, 9, 0));
-    // Registration close: 2030-11-28 20:00
-    pick(root, 'Registration closes', new Date(2030, 10, 28, 20, 0));
+    const start = new Date(2030, 11, 1, 9, 0);
+    pickDateTime(root, start);
+    expect(() => byText(root, 'Registration closes')).toThrow();
     await advance(root, 3);
     await submit(root);
 
     expect(mockCreateTournament).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: 'Winter Open',
-        registration_closes_at: new Date(2030, 10, 28, 20, 0).toISOString(),
-      }),
+      expect.objectContaining({ title: 'Winter Open', starts_at: start.toISOString().slice(0, 10) }),
       { correlationId: expect.any(String) },
     );
+    const [payload] = mockCreateTournament.mock.calls[0];
+    expect(payload).not.toHaveProperty('registration_closes_at');
   });
 });
 
-// Restored from origin/main and re-driven through the six-step wizard. Each test below FAILS on purpose: it asserts
-// DES-MEETUP-MOBILE §4.3 (approved 2026-09-22), which no approved design removes or amends (the cost tests cover
-// EventCreate.estimated_cost_*, which §4.3's field list does not name and no design removes). Reported as case (c),
-// pending the owner's ruling. CreateGameScreen is not changed to suit them.
-describe('CreateGameScreen — DES §4.3 behaviour pending owner ruling (case c)', () => {
-  it('fills the date portion of Start Date & Time from the quick-select chips, keeping any selected time (DES §4.3)', async () => {
+// Older DES-MEETUP-MOBILE §4.3 controls that the six-step wizard board (design-ref-p23 Game1Type..Game6Invite) does not
+// draw. These assert the wizard as built: no quick-select date chips, the first sport pre-selected in both modes, and no
+// estimated cost/currency fields (the game fee, behind game_fee_enabled, is the only price on the form).
+describe('CreateGameScreen — wizard as built versus the older DES §4.3 field list', () => {
+  it('step 3 offers Date and Start time pickers and no quick-select date chips', async () => {
     const root = await mount();
     await advance(root, 2);
-    pick(root, 'Start time', new Date(2000, 0, 1, 20, 15));
-    await press(byText(root, 'Today'));
-    const text = texts(root).join(' ');
-    expect(text).toMatch(/\d{4}-\d{2}-\d{2}/);
-    expect(text).toContain('20:15');
+    expect(on(root, H.step3)).toBe(true);
+    expect(byText(root, 'Date')).toBeDefined();
+    expect(byText(root, 'Start time')).toBeDefined();
+    expect(() => byText(root, 'Today')).toThrow();
+    expect(() => byText(root, 'Tomorrow')).toThrow();
   });
 
-  it('tournament: no sport chosen is rejected with "Choose a sport." (DES §4.3)', async () => {
+  it('tournament: the first sport is pre-selected, so the payload always carries a sport', async () => {
     mockCreateTournament.mockResolvedValue({ id: 't-1' } as never);
     const root = await mount();
     await chooseTournament(root);
     await fillGameToReview(root, 8);
     await submit(root);
-    expect(texts(root)).toContain('Choose a sport.');
-    expect(mockCreateTournament).not.toHaveBeenCalled();
+    expect(texts(root)).not.toContain('Choose a sport.');
+    expect(mockCreateTournament).toHaveBeenCalledWith(
+      expect.objectContaining({ sport: 'badminton' }),
+      { correlationId: expect.any(String) },
+    );
   });
 
-  describe('estimated cost and currency (EventCreate.estimated_cost_cents / estimated_cost_currency; not listed in DES §4.3, no design removes it)', () => {
-    it('omits cost/currency from the payload when left blank', async () => {
-      mockCreateEvent.mockResolvedValueOnce({} as never);
-      const root = await mount();
-      await fillGameToReview(root);
-      input(root, 'e.g. 15.00'); // the cost field must exist on the form
-      await submit(root);
-      const [payload] = mockCreateEvent.mock.calls[0];
-      expect(payload).not.toHaveProperty('estimated_cost_cents');
-      expect(payload).not.toHaveProperty('estimated_cost_currency');
-    });
-
-    it('converts a typed cost to integer cents and uppercases the currency code', async () => {
-      mockCreateEvent.mockResolvedValueOnce({} as never);
-      const root = await mount();
-      await fillGameToReview(root);
-      type(input(root, 'e.g. 15.00'), '12.5');
-      type(input(root, 'USD'), 'sgd');
-      await submit(root);
-      expect(mockCreateEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ estimated_cost_cents: 1250, estimated_cost_currency: 'SGD' }),
-        { correlationId: expect.any(String) },
-      );
-    });
-
-    it('rejects a negative or non-numeric cost', async () => {
-      const root = await mount();
-      await fillGameToReview(root);
-      type(input(root, 'e.g. 15.00'), '-5');
-      await submit(root);
-      expect(texts(root)).toContain('Estimated cost must be a non-negative number.');
-      expect(mockCreateEvent).not.toHaveBeenCalled();
-    });
-
-    it('rejects a currency code that is not exactly 3 letters', async () => {
-      const root = await mount();
-      await fillGameToReview(root);
-      type(input(root, 'USD'), 'US');
-      await submit(root);
-      expect(texts(root)).toContain('Currency code must be 3 letters (e.g. USD, SGD).');
-      expect(mockCreateEvent).not.toHaveBeenCalled();
-    });
+  it('has no estimated cost or currency field and never sends estimated_cost_*', async () => {
+    mockCreateEvent.mockResolvedValueOnce({} as never);
+    const root = await mount();
+    await fillGameToReview(root);
+    expect(() => input(root, 'e.g. 15.00')).toThrow();
+    expect(() => input(root, 'USD')).toThrow();
+    await submit(root);
+    const [payload] = mockCreateEvent.mock.calls[0];
+    expect(payload).not.toHaveProperty('estimated_cost_cents');
+    expect(payload).not.toHaveProperty('estimated_cost_currency');
   });
 });
